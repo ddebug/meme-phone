@@ -1,0 +1,12 @@
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器 / 工具
+.vscode/
+.idea/
+*.log
+
+# 预览打包的中间产物
+scripts/__pycache__/

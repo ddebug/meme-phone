@@ -1,0 +1,72 @@
+@import url("meme/meme.css");
+
+/* meme-phone · 宿主侧（酒馆扩展设置面板）样式
+   界面本身在 meme/meme.css 里，这里只管设置面板这一小块。 */
+
+#meme-phone-settings {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--SmartThemeBorderColor, #65758b);
+  border-radius: 10px;
+}
+
+#meme-phone-settings > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+#meme-phone-settings .meme-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 10px 0;
+}
+
+#meme-phone-settings .meme-note {
+  font-size: .85em;
+  line-height: 1.6;
+  opacity: .86;
+  margin: 6px 0;
+  white-space: pre-wrap;
+}
+
+#meme-phone-settings [data-role="status"][data-error="true"] {
+  color: #ff9189;
+  opacity: 1;
+}
+
+#meme-phone-settings button {
+  padding: 6px 12px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+#meme-phone-settings button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+#meme-phone-settings input[type="file"] {
+  max-width: 100%;
+}
+
+#meme-phone-settings.meme-floating {
+  position: fixed;
+  z-index: 99999;
+  right: 12px;
+  bottom: 12px;
+  max-width: min(420px, calc(100vw - 24px));
+  background: #243044;
+  color: #fff;
+  box-shadow: 0 4px 18px #0006;
+}
+
+/* 界面加载期间先不闪：overlay 自己带入场动画 */
+#meme-phone {
+  position: relative;
+  z-index: 100000;
+}

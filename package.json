@@ -1,0 +1,12 @@
+{
+  "name": "meme-phone",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "桌面 + App 图标形态的酒馆小手机前端（meme-phone）",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "check": "node scripts/check.mjs"
+  }
+}

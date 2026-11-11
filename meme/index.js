@@ -16,6 +16,7 @@ import { apiListApp, apiPresetApp } from './apps/api.js';
 import { userListApp, userEditApp } from './apps/user.js';
 import { charactersApp, characterApp } from './apps/characters.js';
 import { charPhoneApp, charPhoneThreadApp, ensureLookup } from './apps/charphone.js';
+import { bookApp } from './apps/book.js';
 import {
   extrasApp, extraDetailApp, walletApp, favoritesApp, emojiApp,
   membershipApp, plansApp, dressApp, helpApp,
@@ -44,6 +45,7 @@ const APPS = {
   'character-card': characterApp,
   'p-charphone': charPhoneApp,
   'p-chatphone': charPhoneThreadApp,
+  'app-book': bookApp,
   thread: threadApp,
   contact: contactApp,
   'extra-detail': extraDetailApp,
@@ -58,6 +60,8 @@ const DESKTOP_APPS = [
   { id: 'plans', name: '计划', icon: 'plan' },
   { id: 'dress', name: '装扮', icon: 'brush' },
   { id: 'api', name: '接口', icon: 'code' },
+  { id: 'book', name: '柏宝书', icon: 'book' },
+  { id: 'characters', name: '查角色', icon: 'contacts' },
 ];
 
 const DOCK_APPS = [
@@ -414,6 +418,7 @@ export function goView(view, params = {}) {
     if (first) payload = { contactId: first.id };
   }
   if (view === 'p-charphone' && params.tab) ctx.shell.cpTab = params.tab;
+  if (view === 'app-book' && params.tab) ctx.shell.bookTab = params.tab;
   if (view === 'p-chatphone' && (!payload.contactId || !payload.peer)) {
     const first = Object.values(ctx.state.contacts || {}).find(item => item.kind !== 'group');
     const lookup = first ? ensureLookup(ctx.state, first) : null;

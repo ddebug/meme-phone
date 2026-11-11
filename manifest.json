@@ -5,6 +5,7 @@
   "optional": [],
   "js": "index.js",
   "css": "style.css",
+  "generate_interceptor": "bbs_generateInterceptor",
   "author": "yona",
   "version": "0.1.0",
   "homePage": "",

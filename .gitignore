@@ -10,3 +10,9 @@ desktop.ini
 
 # 预览打包的中间产物
 scripts/__pycache__/
+
+# 只用来看/对照的克隆仓库（真正的代码已拷进 baibai-book/）
+ref/
+
+# 依赖目录
+node_modules/

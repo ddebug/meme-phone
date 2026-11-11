@@ -37,6 +37,7 @@ const P = {
   pin: '<path d="M12 4.8a4.8 4.8 0 0 1 4.8 4.8c0 3.4-4.8 9.6-4.8 9.6S7.2 13 7.2 9.6A4.8 4.8 0 0 1 12 4.8z"/><circle cx="12" cy="9.4" r="1.6"/>',
   bell: '<path d="M8 10a4 4 0 0 1 8 0c0 3 .8 4.4 1.6 5.2H6.4c.8-.8 1.6-2.2 1.6-5.2z"/><path d="M10.2 18a2 2 0 0 0 3.6 0"/>',
   code: '<path d="M9 6.6 4.4 12 9 17.4M15 6.6l4.6 5.4-4.6 5.4"/>',
+  book: '<path d="M4.6 5.8c2.6-.9 5.2-.9 7.4.7 2.2-1.6 4.8-1.6 7.4-.7v12.3c-2.6-.9-5.2-.9-7.4.7-2.2-1.6-4.8-1.6-7.4-.7z"/><path d="M12 6.5v12.3"/>',
 };
 
 export function icon(name, className = '') {
@@ -65,6 +66,7 @@ export const TINT = {
   plans: ['#bfe9d6', '#7fd2bc'],
   image: ['#c9e2f5', '#93c6ec'],
   code: ['#d3cdf0', '#aea3e6'],
+  book: ['#d9cdf2', '#a992e8'],
   draw: ['#c9e2f5', '#93c6ec'],
   api: ['#d3cdf0', '#aea3e6'],
   dress: ['#c3d6f2', '#8fb3e8'],

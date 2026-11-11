@@ -1351,7 +1351,7 @@
   box-sizing: border-box;
 }
 
-/* ---- 收尾：快捷动作 / 引用行 / 钱包卡 ---- */
+/* ---- 收尾：快捷动作 / 引用行 ---- */
 
 /* 桌面图标与 Dock 之间的快捷动作，填掉中间的空档 */
 .mp-quick {
@@ -1416,19 +1416,6 @@
 }
 .mp-extra-source .mp-i { flex: none; width: 13px; height: 13px; margin-top: 3px; opacity: .55; }
 .mp-extra-source span { min-width: 0; }
-
-/* 钱包余额卡：整套配色里唯一一块深一点的主色 */
-.mp-wallet-card {
-  padding: 18px 16px 16px;
-  border-radius: var(--r-l);
-  background: linear-gradient(150deg, #9a8bf4 0%, #8874ec 46%, #6f5cd8 100%);
-  color: #fff;
-  box-shadow: 0 18px 34px rgba(110, 90, 200, .26), inset 0 0 0 1px rgba(255, 255, 255, .28);
-}
-
-.mp-wallet-label { font-size: 11px; letter-spacing: .04em; opacity: .8; }
-.mp-wallet-amount { font-size: 34px; font-weight: 600; letter-spacing: -.04em; margin: 4px 0 2px; }
-.mp-wallet-foot { font-size: 11px; opacity: .78; }
 
 /* 修正二：时间分割线居中 / 桌面图标略放大 / 日记卡三行 */
 .mp-time {

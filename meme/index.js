@@ -20,7 +20,7 @@ import { charPhoneApp, charPhoneThreadApp, ensureLookup } from './apps/charphone
 import { bookApp, bookSettingsApp } from './apps/book.js';
 import { musicApp, musicPlaylistApp, stopMusic } from './apps/music.js';
 import {
-  extrasApp, extraDetailApp, walletApp, emojiApp,
+  extrasApp, extraDetailApp, emojiApp,
   plansApp, dressApp, helpApp,
 } from './apps/more.js';
 
@@ -32,7 +32,6 @@ const APPS = {
   'app-settings': settingsApp,
   'app-appearance': appearanceApp,
   'app-extras': extrasApp,
-  'app-wallet': walletApp,
   'app-emoji': emojiApp,
   'app-plans': plansApp,
   'app-dress': dressApp,
@@ -59,7 +58,6 @@ const APPS = {
 const DESKTOP_APPS = [
   { id: 'extras', name: '小剧场', icon: 'theater' },
   { id: 'music', name: '音乐', icon: 'music' },
-  { id: 'wallet', name: '钱包', icon: 'wallet' },
   { id: 'draw', name: '绘图', icon: 'image' },
   { id: 'plans', name: '计划', icon: 'plan' },
   { id: 'dress', name: '装扮', icon: 'brush' },

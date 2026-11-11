@@ -1,6 +1,6 @@
 /**
  * meme-phone · 其余 App
- * 小剧场 / 钱包 / 表情 / 计划 / 装扮 / 帮助
+ * 小剧场 / 表情 / 计划 / 装扮 / 帮助
  */
 
 import { icon } from '../icons.js';
@@ -91,75 +91,6 @@ export const extraDetailApp = {
         ${(item.lines || []).map(line => `
           <div style="font-family:var(--font-serif);font-size:14px;line-height:1.9;color:var(--text);margin-bottom:10px">${esc(line)}</div>`).join('')}
       </div>`;
-  },
-};
-
-/* ------------------------------------------------------------ 钱包 */
-
-export const walletApp = {
-  id: 'wallet', name: '钱包', icon: 'wallet',
-
-  render(ctx) {
-    const wallet = ctx.state.wallet;
-    const ledger = wallet.ledger || [];
-    return `
-      <div class="mp-page-body">
-        ${head('钱包', '记着花在谁身上的钱')}
-        <div class="mp-wallet-card">
-          <div class="mp-wallet-label">余额</div>
-          <div class="mp-wallet-amount">¥ ${wallet.balance.toFixed(0)}</div>
-          <div class="mp-wallet-foot">最近一笔 ${ledger[0] ? esc(ledger[0].title) : '还没有'}</div>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:14px">
-          <button class="mp-btn accent" data-act="wallet-add" type="button" style="flex:1">${icon('plus')}记一笔</button>
-          <button class="mp-btn" data-act="wallet-topup" type="button" style="flex:1">${icon('wallet')}充值</button>
-        </div>
-        <div class="mp-group-label">流水</div>
-        ${ledger.map(item => `
-          <div class="mp-row" style="cursor:default">
-            <div class="mp-row-main">
-              <div class="mp-row-name">${esc(item.title)}</div>
-              <div class="mp-row-sub">${esc(item.date || '')}</div>
-            </div>
-            <div class="mp-row-side"><span style="font-size:13px;color:${item.amount > 0 ? 'var(--ok)' : 'var(--text)'}">${item.amount > 0 ? '+' : ''}${item.amount}</span></div>
-          </div>`).join('') || '<div class="mp-empty">还没有流水。</div>'}
-      </div>`;
-  },
-
-  handle(ctx, act) {
-    if (act === 'wallet-add') {
-      ctx.openSheet({
-        kind: 'text', title: '记一笔：标题 金额', value: '', placeholder: '夜宵 -32', confirm: '记下',
-        onText: (text) => {
-          const raw = String(text || '').trim();
-          if (!raw) return;
-          const match = raw.match(/^(.*?)(-?\d+(?:\.\d+)?)$/);
-          const title = match ? match[1].trim() : raw;
-          const amount = match ? Number(match[2]) : 0;
-          ctx.state.wallet.ledger.unshift({ id: 'l' + Date.now().toString(36), title, amount, date: new Date().toISOString().slice(0, 10) });
-          ctx.state.wallet.balance += amount;
-          ctx.save();
-          ctx.rerender();
-          ctx.toast('记好了');
-        },
-      });
-      return true;
-    }
-    if (act === 'wallet-topup') {
-      ctx.openSheet({
-        title: '充值多少',
-        items: [100, 500, 1000].map(value => ({ label: `¥ ${value}`, value: String(value) })),
-        onPick: (value) => {
-          ctx.state.wallet.balance += Number(value);
-          ctx.state.wallet.ledger.unshift({ id: 'l' + Date.now().toString(36), title: '充值', amount: Number(value), date: new Date().toISOString().slice(0, 10) });
-          ctx.save();
-          ctx.rerender();
-          ctx.toast(`充了 ¥${value}`);
-        },
-      });
-      return true;
-    }
-    return false;
   },
 };
 
@@ -277,7 +208,7 @@ export const dressApp = {
         </div>
         <div class="mp-group-label" style="margin-top:16px">图标</div>
         <div class="mp-card" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;justify-items:center">
-          ${['chat', 'contacts', 'diary', 'settings', 'theater', 'wallet', 'bookmark', 'smile'].map(key => `
+          ${['chat', 'contacts', 'diary', 'settings', 'theater', 'music', 'smile', 'plan'].map(key => `
             <span class="mp-glass-ico" style="width:46px;height:46px;border-radius:14px">${icon(key)}</span>`).join('')}
         </div>
       </div>`;

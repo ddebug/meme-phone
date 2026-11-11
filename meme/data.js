@@ -55,7 +55,6 @@ export function emptyState() {
     chats: {},
     diary: { entries: {}, contacts: {}, prompt: DEFAULT_DIARY_PROMPT, lastGenerated: '' },
     emoji: DEFAULT_EMOJI.map((item, index) => ({ id: `e${index + 1}`, ...item })),
-    wallet: { balance: 4520, ledger: [] },
     plans: [],
     music: {
       playlists: [],
@@ -448,15 +447,6 @@ export function demoState() {
     { id: 'x3', title: '车里那首歌', date: '2026-11-02', lines: ['副歌进来的时候他跟着哼了一句。'] },
   ];
 
-  state.wallet = {
-    balance: 4520,
-    ledger: [
-      { id: 'l1', title: '夜宵 · 便利店', amount: -32, date: '2026-11-10' },
-      { id: 'l2', title: '生日礼物 · 沈砚', amount: -260, date: '2026-11-03' },
-      { id: 'l3', title: '零花钱到账', amount: 3000, date: '2026-11-01' },
-    ],
-  };
-
   state.plans = [
     { id: 'p1', title: '把周三晚上空出来', detail: '晚上九点以后不排任何事，等他下班。', done: false, date: '2026-11-12' },
     { id: 'p2', title: '读完那本书的第三部分', detail: '地铁上读，不要刷手机。', done: true, date: '2026-11-09' },
@@ -482,7 +472,6 @@ export function normalize(raw) {
     ...raw,
     settings: { ...base.settings, ...(raw.settings || {}) },
     diary: { ...base.diary, ...(raw.diary || {}), entries: { ...(raw.diary?.entries || {}) }, contacts: {} },
-    wallet: { ...base.wallet, ...(raw.wallet || {}) },
     dress: { ...base.dress, ...(raw.dress || {}) },
     draw: {
       ...base.draw,
@@ -494,6 +483,7 @@ export function normalize(raw) {
   };
   delete merged.membership;
   delete merged.favorites;
+  delete merged.wallet;
   for (const [contactId, entries] of Object.entries(raw.diary?.contacts || {})) {
     if (!contactId || !entries || typeof entries !== 'object' || Array.isArray(entries)) continue;
     merged.diary.contacts[contactId] = {};

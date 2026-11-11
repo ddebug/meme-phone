@@ -80,6 +80,15 @@ python scripts/build_preview.py
 - 没填地址和 Key 时不出网，只落一条演示记录并提示去哪填；填了之后走 `POST {地址}/ai/generate-image`，请求体是 NovelAI v4 格式（`n_samples:1`、`qualityToggle:true`、`v4_prompt.caption.base_caption`）。
 - 已知限制：NovelAI 官方端点回的是 zip，当前只解 JSON / 直出图片的返回，zip 需要额外的解压库。
 
+## 用户
+
+设置 → 账号 → **用户**。
+
+- 「同步」把酒馆的用户名单整份拉进来：名字和设定读的是酒馆设置里的 `power_user.personas` / `persona_descriptions`，头像直接借酒馆那张。
+- 点进某一位可以改名字和设定，改完点「写回酒馆」——只改内存里的 `power_user` 再让酒馆自己 `saveSettingsDebounced()`，不走私有接口。
+- 「小手机用谁」两选一：**跟随酒馆切换**（酒馆换 persona，手机 4 秒内跟着换）或**固定一位**（酒馆换人也不动）。
+- 没接酒馆时名单是演示数据，改了只会留在本地，写回会提示「没接上酒馆」。
+
 ## 召唤
 
 - 扩展菜单里点 `meme-phone` 打开。

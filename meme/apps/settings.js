@@ -36,7 +36,7 @@ export const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">账号</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'contacts', title: '个人资料', sub: state.settings.user.name + ' · 收发消息都用这个名字', act: 'set-profile' })}
+            ${row(ctx, { iconName: 'contacts', title: '用户', sub: `${state.settings.userMode === 'pin' ? '固定' : '跟随酒馆'} · ${state.settings.user.name}`, act: 'set-open', app: 'user' })}
             ${row(ctx, { iconName: 'brush', title: '外观与主题', sub: `${state.settings.wallpaper === 'none' ? '背景透明' : state.settings.wallpaper === 'day' ? '晨光粉彩' : '夜色'} · ${state.settings.theme === 'night' ? '夜间' : '日间'}`, act: 'set-open-appearance' })}
           </div>
         </div>
@@ -99,19 +99,6 @@ export const settingsApp = {
 
     if (act === 'set-open') {
       if (data?.app) ctx.go(`app-${data.app}`);
-      return true;
-    }
-
-    if (act === 'set-profile') {
-      ctx.openSheet({
-        kind: 'text', title: '你叫什么', value: state.settings.user.name, confirm: '改好',
-        onText: (text) => {
-          state.settings.user.name = String(text || '').trim() || '我';
-          ctx.save();
-          ctx.toast('改好了');
-          ctx.shell.rerender();
-        },
-      });
       return true;
     }
 

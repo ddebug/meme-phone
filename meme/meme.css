@@ -1949,3 +1949,169 @@
     inset 0 0 0 1px rgba(255, 255, 255, .14);
   color: #f1ecff;
 }
+
+/* ===================== 用户管理（本段） ===================== */
+.mp-user-list {
+  padding: 4px 12px;
+}
+
+.mp-user-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 2px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mp-user-row + .mp-user-row {
+  border-top: 1px solid var(--line-soft);
+}
+
+.mp-user-row:active { opacity: .7; }
+
+.mp-user-row .mp-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.mp-user-main {
+  flex: 1;
+  min-width: 0;
+  display: block;
+}
+
+.mp-user-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.mp-user-tag {
+  padding: 1px 6px;
+  border-radius: 7px;
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--accent-deep);
+  background: rgba(142, 123, 242, .12);
+}
+
+.mp-user-tag.is-dirty {
+  color: #a8712a;
+  background: rgba(233, 177, 92, .18);
+}
+
+.mp-user-desc {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-4);
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+.mp-user-row > .mp-i {
+  width: 15px;
+  height: 15px;
+  color: var(--text-4);
+  flex: none;
+}
+
+.mp-user-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 0 14px;
+}
+
+.mp-user-hero-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  font-size: 22px;
+}
+
+.mp-user-hero-name {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -.02em;
+}
+
+.mp-user-hero-sub {
+  font-size: 11px;
+  color: var(--text-4);
+}
+
+.mp-roles-radio {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px rgba(142, 123, 242, .3);
+}
+
+.mp-roles-radio.is-on {
+  box-shadow: inset 0 0 0 5px var(--accent-deep);
+}
+
+.mp-set-row.is-static {
+  cursor: default;
+}
+
+.mp-set-row.is-on {
+  background: rgba(142, 123, 242, .05);
+}
+
+.mp-user-actions {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+
+.mp-user-actions .mp-btn {
+  flex: 1;
+  justify-content: center;
+}
+
+.mp-foot-note {
+  margin: 10px 4px 0;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--text-4);
+}
+
+.mp-root[data-mp-theme="night"] .mp-user-tag {
+  color: #cbbffb;
+  background: rgba(150, 132, 235, .22);
+}
+
+.mp-root[data-mp-theme="night"] .mp-user-tag.is-dirty {
+  color: #f0c284;
+  background: rgba(233, 177, 92, .2);
+}
+
+.mp-root[data-mp-theme="night"] .mp-set-row.is-on {
+  background: rgba(150, 132, 235, .10);
+}
+
+.mp-root[data-mp-theme="night"] .mp-roles-radio {
+  box-shadow: inset 0 0 0 1.5px rgba(190, 176, 250, .35);
+}
+
+.mp-root[data-mp-theme="night"] .mp-roles-radio.is-on {
+  box-shadow: inset 0 0 0 5px #a897f2;
+}

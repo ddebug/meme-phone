@@ -6,13 +6,14 @@
 import { createStore } from './store.js';
 import { normalize, emptyState, demoState, syncTavernContacts, chatFor } from './data.js';
 import { createShell } from './shell.js';
-import { readTavernCharacters, readUserAvatar, generate, probeHost } from './host.js';
+import { readTavernCharacters, readUserAvatar, readTavernPersonas, writeTavernPersona, generate, probeHost } from './host.js';
 import { chatApp, threadApp } from './apps/chat.js';
 import { diaryApp } from './apps/diary.js';
 import { contactsApp, contactApp } from './apps/contacts.js';
 import { settingsApp, appearanceApp } from './apps/settings.js';
 import { drawApp } from './apps/draw.js';
 import { apiListApp, apiPresetApp } from './apps/api.js';
+import { userListApp, userEditApp } from './apps/user.js';
 import {
   extrasApp, extraDetailApp, walletApp, favoritesApp, emojiApp,
   membershipApp, plansApp, dressApp, helpApp,
@@ -35,6 +36,8 @@ const APPS = {
   'app-draw': drawApp,
   'app-api': apiListApp,
   'api-item': apiPresetApp,
+  'app-user': userListApp,
+  'user-item': userEditApp,
   thread: threadApp,
   contact: contactApp,
   'extra-detail': extraDetailApp,
@@ -63,6 +66,7 @@ let shellApi = null;
 let ctx = null;
 let rootEl = null;
 let initPromise = null;
+let followTimer = 0;
 
 /* ------------------------------------------------------------ 模型调用 */
 
@@ -171,11 +175,50 @@ export async function openMemePhone(options = {}) {
   if (isOpen()) return rootEl;
 
   const state = store.get();
+
+  /** 把酒馆用户拉进小手机；带 dirty 的本地改动不被覆盖。 */
+  const syncUsers = async () => {
+    const result = await readTavernPersonas();
+    if (!result.available) {
+      state.usersFromTavern = false;
+      return result;
+    }
+    const previous = new Map((state.users || []).map(user => [user.key, user]));
+    state.users = result.list.map(item => {
+      const local = previous.get(item.key);
+      return local?.dirty
+        ? { ...item, name: local.name, description: local.description, dirty: true }
+        : item;
+    });
+    state.usersFromTavern = true;
+
+    const useUser = (user) => {
+      if (!user) return;
+      state.settings.user.name = user.name || '我';
+      state.settings.user.key = user.key || '';
+      if (user.avatarUrl) state.settings.user.avatar = user.avatarUrl;
+    };
+
+    if (state.settings.userMode === 'pin') {
+      const pinned = state.users.find(user => user.key === state.settings.pinnedUser);
+      if (pinned) useUser(pinned);
+      else if (state.users[0]) {
+        state.settings.pinnedUser = state.users[0].key;
+        useUser(state.users[0]);
+      }
+    } else {
+      useUser(state.users.find(user => user.key === result.current) || null);
+    }
+    return result;
+  };
+
   const ai = makeAi(state);
   const host = {
     probe: probeHost,
     readCharacters: readTavernCharacters,
     readUserAvatar,
+    syncUsers,
+    writeUser: writeTavernPersona,
   };
 
   rootEl = document.createElement('div');
@@ -223,6 +266,34 @@ export async function openMemePhone(options = {}) {
   /* 宿主能力探针，设置页会读 */
   shellApi.shell.hostInfo = await probeHost().catch(() => ({}));
 
+  /* 酒馆用户名单：跟随就取当前那位，固定就取钉住的那位 */
+  try {
+    const personas = await syncUsers();
+    if (personas.available) {
+      store.touch();
+      shellApi.render();
+    }
+  } catch { /* 拉不到名单就保持原样 */ }
+
+  /* 跟随模式：酒馆那边换用户，这边跟着换 */
+  clearInterval(followTimer);
+  followTimer = setInterval(async () => {
+    if (!rootEl || state.settings.userMode === 'pin') return;
+    try {
+      const result = await readTavernPersonas();
+      if (!result.available) return;
+      const current = result.list.find(user => user.key === result.current);
+      if (!current || current.key === state.settings.user.key) return;
+      state.users = result.list;
+      state.usersFromTavern = true;
+      state.settings.user.name = current.name || '我';
+      state.settings.user.key = current.key;
+      if (current.avatarUrl) state.settings.user.avatar = current.avatarUrl;
+      store.touch();
+      shellApi?.render();
+    } catch { /* 换不过来就算了，等下次打开 */ }
+  }, 4000);
+
   /* 点空白关闭 */
   rootEl.addEventListener('click', event => {
     if (event.target.classList.contains('mp-overlay') || event.target.classList.contains('mp-scrim')) {
@@ -235,6 +306,8 @@ export async function openMemePhone(options = {}) {
 
 export function closeMemePhone() {
   if (!rootEl) return;
+  clearInterval(followTimer);
+  followTimer = 0;
   shellApi?.destroy();
   rootEl.remove();
   rootEl = null;
@@ -265,6 +338,10 @@ export function goView(view, params = {}) {
   if (view === 'app-extras' && !params.contactId) {
     const withExtras = Object.keys(ctx.state.extras).find(key => (ctx.state.extras[key] || []).length);
     if (withExtras) payload = { contactId: withExtras };
+  }
+  if (view === 'user-item' && !params.key) {
+    const first = (ctx.state.users || [])[0];
+    if (first?.key) payload = { key: first.key };
   }
   ctx.go(view, payload);
 }

@@ -14,7 +14,9 @@ export function emptyState() {
     settings: {
       theme: 'day',              // day | night
       wallpaper: 'none',         // none | day | night
-      user: { name: '我', avatar: '' },
+      user: { name: '我', avatar: '', key: '' },
+      userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
+      pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
       chat: { showTime: true, enterToSend: false, remind: true, wake: true },
       api: {
@@ -35,6 +37,8 @@ export function emptyState() {
       history: [],
     },
     contacts: {},
+    users: [],
+    usersFromTavern: false,
     chats: {},
     diary: { entries: {}, prompt: DEFAULT_DIARY_PROMPT, lastGenerated: '' },
     favorites: [],
@@ -244,8 +248,13 @@ export function syncTavernContacts(state, tavernCharacters = []) {
 /** 预览环境用的虚构数据，未引用任何真实聊天内容。 */
 export function demoState() {
   const state = emptyState();
-  state.settings.user = { name: '颜', avatar: '' };
+  state.settings.user = { name: '颜', avatar: '', key: 'persona_yan.png' };
   state.settings.user.name = '颜';
+  state.users = [
+    { key: 'persona_yan.png', name: '颜', description: '在便利店上夜班，说话很短，习惯先把事做完再说。', avatarUrl: '' },
+    { key: 'persona_lan.png', name: '阿蓝', description: '自由插画师，回消息慢，句子里爱用破折号。', avatarUrl: '' },
+    { key: 'persona_gu.png', name: '顾青', description: '白天在书店，晚上写东西，不太主动开口。', avatarUrl: '' },
+  ];
   state.settings.api.activeChat = 'api_default';
   state.settings.api.activeImage = 'api_default';
   state.settings.api.presets = [
@@ -376,6 +385,10 @@ export function normalize(raw) {
     },
   };
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
+  merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
+  merged.settings.userMode = raw.settings?.userMode === 'pin' ? 'pin' : 'follow';
+  merged.users = Array.isArray(raw.users) ? raw.users.filter(item => item && (item.key || item.name)) : [];
+  merged.usersFromTavern = Boolean(raw.usersFromTavern);
   merged.settings.api.presets = Array.isArray(merged.settings.api.presets) && merged.settings.api.presets.length
     ? merged.settings.api.presets
     : base.settings.api.presets;

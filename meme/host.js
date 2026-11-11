@@ -137,6 +137,70 @@ export async function novelaiImage({
   throw new Error('NovelAI 返回了 zip，当前只支持直出图片的兼容接口');
 }
 
+/**
+ * 酒馆的用户（persona）名单。
+ * 名字与设定都住在酒馆设置里：power_user.personas 存「头像文件名 → 显示名」，
+ * power_user.persona_descriptions 存每个头像对应的设定文本。读不到就返回 available:false。
+ */
+export async function readTavernPersonas() {
+  const script = await loadHostScript();
+  if (!script) return { available: false, list: [], current: '' };
+  try {
+    const ctx = script.getContext?.() || {};
+    const pu = script.power_user || ctx.powerUser || globalThis.power_user || {};
+    const names = pu.personas && typeof pu.personas === 'object' ? pu.personas : null;
+    if (!names) return { available: false, list: [], current: '' };
+    const descs = pu.persona_descriptions && typeof pu.persona_descriptions === 'object' ? pu.persona_descriptions : {};
+    const thumb = script.getThumbnailUrl;
+    const list = Object.entries(names)
+      .filter(([, name]) => Boolean(name))
+      .map(([key, name]) => ({
+        key,
+        name: String(name || '').trim(),
+        description: String(descs[key]?.description || ''),
+        avatarUrl: typeof thumb === 'function' ? thumb('persona', key) : '',
+      }));
+    const current = String(script.user_avatar || ctx.user_avatar || '');
+    return { available: true, list, current };
+  } catch {
+    return { available: false, list: [], current: '' };
+  }
+}
+
+/**
+ * 把改过的名字 / 设定写回酒馆。
+ * 只改内存里的 power_user，再让酒馆自己保存设置——不走私有接口，装进酒馆就能用。
+ */
+export async function writeTavernPersona({ key, name, description }) {
+  const script = await loadHostScript();
+  const ctx = script?.getContext?.() || {};
+  const pu = script?.power_user || ctx.powerUser || globalThis.power_user;
+  if (!pu || !pu.personas) throw new Error('没接上酒馆，改不了酒馆那一边');
+  if (!key) throw new Error('这条没有对应的酒馆用户');
+
+  const cleanName = String(name || '').trim();
+  if (cleanName) pu.personas[key] = cleanName;
+
+  if (typeof description === 'string') {
+    const descs = pu.persona_descriptions || (pu.persona_descriptions = {});
+    const prev = descs[key] || {};
+    descs[key] = { ...prev, description };
+  }
+
+  if (String(script.user_avatar || ctx.user_avatar || '') === key) {
+    if (cleanName) {
+      script.name1 = cleanName;
+      if (ctx.name1 !== undefined) ctx.name1 = cleanName;
+    }
+    const box = globalThis.document?.querySelector('#user_name');
+    if (box && cleanName) box.value = cleanName;
+  }
+
+  const save = ctx.saveSettingsDebounced || script.saveSettingsDebounced;
+  if (typeof save === 'function') await save();
+  return { ok: true };
+}
+
 /** 宿主可用性，用于设置页展示「已接入 / 未接入」。 */
 export async function probeHost() {
   const script = await loadHostScript();

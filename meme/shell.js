@@ -100,7 +100,7 @@ export function createShell(options) {
 
     const iconButtons = desktopApps.map(app => `
       <button class="mp-app" data-act="open-app" data-app="${app.id}" type="button" aria-label="${esc(app.name)}">
-        <span class="mp-tile" style="${tintStyle(app.id)}">${ico(app.icon)}</span>
+        <span class="mp-tile">${ico(app.icon)}</span>
         <span class="mp-app-label">${esc(app.name)}</span>
       </button>`).join('');
 
@@ -108,7 +108,7 @@ export function createShell(options) {
       const badge = app.id === 'chat' ? unreadTotal(state) : 0;
       return `
       <button class="mp-app" data-act="open-app" data-app="${app.id}" type="button" aria-label="${esc(app.name)}">
-        <span class="mp-tile" style="${tintStyle(app.id)}">${ico(app.icon)}${badge ? `<span class="mp-badge">${badge > 99 ? '99+' : badge}</span>` : ''}</span>
+        <span class="mp-tile">${ico(app.icon)}${badge ? `<span class="mp-badge">${badge > 99 ? '99+' : badge}</span>` : ''}</span>
         <span class="mp-app-label">${esc(app.name)}</span>
       </button>`;
     }).join('');

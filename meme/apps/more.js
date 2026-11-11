@@ -368,7 +368,7 @@ export const dressApp = {
         <div class="mp-group-label" style="margin-top:16px">图标</div>
         <div class="mp-card" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;justify-items:center">
           ${['chat', 'contacts', 'diary', 'settings', 'theater', 'wallet', 'bookmark', 'smile'].map(key => `
-            <span style="width:46px;height:46px;border-radius:14px;display:grid;place-items:center;${tintStyle(key)};box-shadow:var(--shadow-s)">${icon(key)}</span>`).join('')}
+            <span class="mp-glass-ico" style="width:46px;height:46px;border-radius:14px">${icon(key)}</span>`).join('')}
         </div>
       </div>`;
   },

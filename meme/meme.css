@@ -1848,3 +1848,104 @@
   text-overflow: ellipsis;
 }
 .mp-root .mp-api-value.is-empty { color: var(--text-3); }
+/* ===================== 图标统一：毛玻璃磁贴（本段） ===================== */
+.mp-app .mp-tile {
+  background:
+    radial-gradient(130% 115% at 16% 6%, rgba(255, 214, 234, .34), rgba(255, 255, 255, 0) 62%),
+    radial-gradient(135% 120% at 90% 98%, rgba(196, 226, 222, .30), rgba(255, 255, 255, 0) 64%),
+    linear-gradient(155deg, rgba(255, 255, 255, .58), rgba(255, 255, 255, .24) 58%);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  box-shadow:
+    0 9px 20px rgba(118, 106, 168, .16),
+    inset 0 1px 0 rgba(255, 255, 255, .95),
+    inset 0 -1px 0 rgba(150, 138, 205, .16),
+    inset 0 0 0 1px rgba(255, 255, 255, .56);
+}
+
+.mp-app .mp-tile::after {
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(158deg, rgba(255, 255, 255, .52), rgba(255, 255, 255, .05) 42%, rgba(255, 255, 255, 0) 58%);
+}
+
+.mp-app .mp-tile .mp-i {
+  color: #4f4179;
+  filter: none;
+  opacity: .92;
+}
+
+.mp-dock .mp-app .mp-tile {
+  background:
+    radial-gradient(130% 115% at 14% 4%, rgba(255, 214, 234, .30), rgba(255, 255, 255, 0) 60%),
+    radial-gradient(135% 120% at 92% 98%, rgba(196, 226, 222, .26), rgba(255, 255, 255, 0) 62%),
+    linear-gradient(155deg, rgba(255, 255, 255, .66), rgba(255, 255, 255, .34) 58%);
+  box-shadow:
+    0 7px 15px rgba(118, 106, 168, .14),
+    inset 0 1px 0 rgba(255, 255, 255, .96),
+    inset 0 -1px 0 rgba(150, 138, 205, .14),
+    inset 0 0 0 1px rgba(255, 255, 255, .6);
+}
+
+.mp-root[data-mp-theme="night"] .mp-app .mp-tile {
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, .17), rgba(255, 255, 255, .05) 56%, rgba(150, 132, 235, .18));
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  box-shadow:
+    0 9px 22px rgba(0, 0, 0, .36),
+    inset 0 1px 0 rgba(255, 255, 255, .26),
+    inset 0 -1px 0 rgba(120, 100, 200, .18),
+    inset 0 0 0 1px rgba(255, 255, 255, .14);
+}
+
+.mp-root[data-mp-theme="night"] .mp-app .mp-tile::after {
+  background:
+    linear-gradient(158deg, rgba(255, 255, 255, .20), rgba(255, 255, 255, .02) 40%, rgba(255, 255, 255, 0) 56%);
+}
+
+.mp-root[data-mp-theme="night"] .mp-app .mp-tile .mp-i {
+  color: #f1ecff;
+  opacity: .94;
+}
+
+.mp-root[data-mp-theme="night"] .mp-dock .mp-app .mp-tile {
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, .21), rgba(255, 255, 255, .07) 56%, rgba(150, 132, 235, .2));
+}
+
+/* 装扮页的图标预览：与桌面磁贴同一套毛玻璃 */
+.mp-glass-ico {
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(130% 115% at 16% 6%, rgba(255, 214, 234, .34), rgba(255, 255, 255, 0) 62%),
+    radial-gradient(135% 120% at 90% 98%, rgba(196, 226, 222, .30), rgba(255, 255, 255, 0) 64%),
+    linear-gradient(155deg, rgba(255, 255, 255, .58), rgba(255, 255, 255, .24) 58%);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  box-shadow:
+    0 6px 14px rgba(118, 106, 168, .14),
+    inset 0 1px 0 rgba(255, 255, 255, .92),
+    inset 0 0 0 1px rgba(255, 255, 255, .52);
+  color: #4f4179;
+}
+
+.mp-glass-ico .mp-i {
+  width: 20px;
+  height: 20px;
+  opacity: .92;
+}
+
+.mp-root[data-mp-theme="night"] .mp-glass-ico {
+  background:
+    radial-gradient(130% 115% at 16% 6%, rgba(255, 150, 200, .16), rgba(255, 255, 255, 0) 62%),
+    radial-gradient(135% 120% at 90% 98%, rgba(120, 200, 190, .14), rgba(255, 255, 255, 0) 64%),
+    linear-gradient(155deg, rgba(255, 255, 255, .17), rgba(255, 255, 255, .05) 58%);
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, .34),
+    inset 0 1px 0 rgba(255, 255, 255, .24),
+    inset 0 0 0 1px rgba(255, 255, 255, .14);
+  color: #f1ecff;
+}

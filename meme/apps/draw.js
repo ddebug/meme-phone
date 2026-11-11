@@ -201,7 +201,7 @@ export const drawApp = {
     if (act === 'draw-prompt') {
       ctx.openSheet({
         kind: 'text', title: '画面', placeholder: '中文描述，越具体越好',
-        value: draw.lastPrompt, onText: value => { draw.lastPrompt = value; ctx.save(); ctx.shell.rerender(); },
+        value: draw.lastPrompt, onText: value => { draw.lastPrompt = value; ctx.save(); ctx.rerender(); },
       });
       return true;
     }
@@ -216,7 +216,7 @@ export const drawApp = {
         onText: value => {
           preset[key] = value;
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -224,7 +224,7 @@ export const drawApp = {
 
     if (act === 'draw-preset') {
       draw.presetIdx = Number(data.i) || 0;
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -232,7 +232,7 @@ export const drawApp = {
       ctx.openSheet({
         kind: 'pick', title: '尺寸',
         items: SIZES.map(item => ({ value: item.key, label: item.label })),
-        onPick: value => { cfg.size = value; ctx.save(); ctx.shell.rerender(); },
+        onPick: value => { cfg.size = value; ctx.save(); ctx.rerender(); },
       });
       return true;
     }
@@ -241,7 +241,7 @@ export const drawApp = {
       ctx.openSheet({
         kind: 'pick', title: '步数',
         items: [20, 24, 28, 32, 40].map(value => ({ value: String(value), label: `${value} 步${value === 28 ? '（默认）' : ''}` })),
-        onPick: value => { cfg.steps = Number(value); ctx.save(); ctx.shell.rerender(); },
+        onPick: value => { cfg.steps = Number(value); ctx.save(); ctx.rerender(); },
       });
       return true;
     }
@@ -250,7 +250,7 @@ export const drawApp = {
       ctx.openSheet({
         kind: 'pick', title: '引导强度',
         items: [3, 4, 5, 6, 7].map(value => ({ value: String(value), label: `${value}${value === 5 ? '（默认）' : ''}` })),
-        onPick: value => { cfg.scale = Number(value); ctx.save(); ctx.shell.rerender(); },
+        onPick: value => { cfg.scale = Number(value); ctx.save(); ctx.rerender(); },
       });
       return true;
     }
@@ -259,7 +259,7 @@ export const drawApp = {
       ctx.openSheet({
         kind: 'pick', title: '采样器',
         items: SAMPLERS.map(value => ({ value, label: value })),
-        onPick: value => { cfg.sampler = value; ctx.save(); ctx.shell.rerender(); },
+        onPick: value => { cfg.sampler = value; ctx.save(); ctx.rerender(); },
       });
       return true;
     }
@@ -268,7 +268,7 @@ export const drawApp = {
       ctx.openSheet({
         kind: 'pick', title: '噪声调度',
         items: NOISES.map(value => ({ value, label: value })),
-        onPick: value => { cfg.noise = value; ctx.save(); ctx.shell.rerender(); },
+        onPick: value => { cfg.noise = value; ctx.save(); ctx.rerender(); },
       });
       return true;
     }
@@ -277,7 +277,7 @@ export const drawApp = {
       ctx.openSheet({
         kind: 'text', title: '种子', placeholder: '留空就是随机',
         value: String(cfg.seed || ''),
-        onText: value => { cfg.seed = value.replace(/[^\d]/g, ''); ctx.save(); ctx.shell.rerender(); },
+        onText: value => { cfg.seed = value.replace(/[^\d]/g, ''); ctx.save(); ctx.rerender(); },
       });
       return true;
     }
@@ -297,7 +297,7 @@ export const drawApp = {
     if (act === 'draw-del') {
       draw.history.splice(Number(data.i), 1);
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -317,7 +317,7 @@ async function run(ctx, prompt) {
   const negative = [preset.neg || DEFAULT_NEG].join(', ');
 
   draw.busy = true;
-  ctx.shell.rerender();
+  ctx.rerender();
   try {
     let entry = null;
     const ep = imageEndpoint(ctx.state);
@@ -353,6 +353,6 @@ async function run(ctx, prompt) {
   } finally {
     draw.busy = false;
     ctx.save();
-    ctx.shell.rerender();
+    ctx.rerender();
   }
 }

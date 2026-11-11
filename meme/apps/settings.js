@@ -106,21 +106,21 @@ export const settingsApp = {
     if (act === 'set-toggle-remind') {
       state.settings.chat.remind = state.settings.chat.remind === false;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
     if (act === 'set-toggle-wake') {
       state.settings.chat.wake = state.settings.chat.wake === false;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
     if (act === 'set-toggle-proactive') {
       state.settings.proactive.enabled = !state.settings.proactive.enabled;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -131,7 +131,7 @@ export const settingsApp = {
         onPick: (value) => {
           state.settings.proactive.idleMinutes = Number(value);
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -150,7 +150,7 @@ export const settingsApp = {
             state.settings.api.source = host.hasGenerate ? 'host' : 'default';
             ctx.save();
             ctx.toast(host.hasGenerate ? '用的是酒馆的模型' : '预览环境没有模型，先看界面');
-            ctx.shell.rerender();
+            ctx.rerender();
           }
           if (value === 'status') {
             const host = await ctx.host.probe();
@@ -168,7 +168,7 @@ export const settingsApp = {
           state.diary.prompt = String(text || '').trim() || state.diary.prompt;
           ctx.save();
           ctx.toast('存好了');
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -273,14 +273,14 @@ export const appearanceApp = {
     if (act === 'pick-theme') {
       ctx.state.settings.theme = data.theme;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast(data.theme === 'night' ? '夜间玻璃已打开' : '换回日间玻璃');
       return true;
     }
     if (act === 'pick-wall') {
       ctx.state.settings.wallpaper = data.wall;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast(data.wall === 'none' ? '背景已透明' : data.wall === 'day' ? '换成晨光粉彩壁纸' : '换成夜色壁纸');
       return true;
     }

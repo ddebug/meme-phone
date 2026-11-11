@@ -77,7 +77,7 @@ export function createStore(options = {}) {
     }
   }
 
-  return {
+  const api = {
     status,
 
     /** 只读一次；失败不覆盖任何已有数据。 */
@@ -106,7 +106,7 @@ export function createStore(options = {}) {
       dirty = true;
       emit();
       return new Promise((resolve, reject) => {
-        const flushNow = () => { flush().then(resolve, reject); };
+        const flushNow = () => { api.flush().then(resolve, reject); };
         clearTimeout(timer);
         timer = setTimeout(flushNow, debounceMs);
       });
@@ -138,4 +138,6 @@ export function createStore(options = {}) {
       return JSON.stringify(state, null, 2);
     },
   };
+
+  return api;
 }

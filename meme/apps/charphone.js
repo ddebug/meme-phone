@@ -206,7 +206,7 @@ export const charPhoneApp = {
 
     if (act === 'cp-tab') {
       ctx.shell.cpTab = data.tab;
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -219,7 +219,7 @@ export const charPhoneApp = {
       if (!contact) return true;
       if (typeof ctx.ai?.lookup !== 'function') { ctx.toast('这个环境生成不了'); return true; }
       ctx.shell.cpBusy = true;
-      ctx.shell.rerender();
+      ctx.rerender();
       const local = ensureLookup(ctx.state, contact);
       Promise.resolve()
         .then(() => ctx.ai.lookup(ctx, contact, local))
@@ -227,12 +227,12 @@ export const charPhoneApp = {
           if (result) ctx.state.lookups[contact.id] = { ...result, at: Date.now() };
           ctx.save();
           ctx.shell.cpBusy = false;
-          ctx.shell.rerender();
+          ctx.rerender();
           ctx.toast(result ? '这份是现编的' : '没生成出来，先看本地这份');
         })
         .catch(error => {
           ctx.shell.cpBusy = false;
-          ctx.shell.rerender();
+          ctx.rerender();
           ctx.toast(error.message || '生成失败');
         });
       return true;

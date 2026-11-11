@@ -165,14 +165,14 @@ function doSend(ctx, chatId) {
   if (ctx.shell.quote) delete ctx.shell.quote[chatId];
   ctx.shell.live = { inputValue: '', focus: true };
   ctx.save();
-  ctx.shell.rerender();
+  ctx.rerender();
   scrollToBottom(ctx);
   reply(ctx, chat, contact);
 }
 
 function reply(ctx, chat, contact) {
   chat.typing = true;
-  ctx.shell.rerender();
+  ctx.rerender();
   scrollToBottom(ctx);
 
   const delay = 900 + Math.random() * 700;
@@ -186,7 +186,7 @@ function reply(ctx, chat, contact) {
     chat.typing = false;
     if (text) pushMessage(ctx.state, chat.id, { from: 'them', text });
     ctx.save();
-    ctx.shell.rerender();
+    ctx.rerender();
     scrollToBottom(ctx);
   }, delay);
 }
@@ -194,7 +194,7 @@ function reply(ctx, chat, contact) {
 function wake(ctx, chat, contact) {
   if (chat.typing) return;
   chat.typing = true;
-  ctx.shell.rerender();
+  ctx.rerender();
   scrollToBottom(ctx);
   ctx.toast('让 TA 主动开口…');
 
@@ -213,7 +213,7 @@ function wake(ctx, chat, contact) {
       ctx.toast('模型没接通，先在设置里选一个 API');
     }
     ctx.save();
-    ctx.shell.rerender();
+    ctx.rerender();
     scrollToBottom(ctx);
   }, 1500);
 }
@@ -273,7 +273,7 @@ export const chatApp = {
             ctx.toast('会话已删除');
           }
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -297,7 +297,7 @@ export const threadApp = {
 
     if (act === 'clear-quote') {
       if (ctx.shell.quote) delete ctx.shell.quote[chatId];
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -315,11 +315,10 @@ export const threadApp = {
           if (value === 'emoji') {
             const emoji = ctx.state.emoji[Math.floor(Math.random() * ctx.state.emoji.length)];
             ctx.shell.live.inputValue = `${ctx.shell.live.inputValue || ''}${emoji.char}`;
-            ctx.shell.rerender();
+            ctx.rerender();
             setTimeout(() => {
               const input = ctx.shell.root.querySelector('.mp-compose-box input');
               input?.focus();
-              ctx.shell.improveSendState();
             }, 20);
           }
           if (value === 'quote') {
@@ -327,7 +326,7 @@ export const threadApp = {
             if (!last) { ctx.toast('还没有可引用的消息'); return; }
             ctx.shell.quote = ctx.shell.quote || {};
             ctx.shell.quote[chatId] = { text: last.text, from: last.from };
-            ctx.shell.rerender();
+            ctx.rerender();
           }
           if (value === 'extra') {
             const last = lastMessage(chat);
@@ -371,7 +370,7 @@ export const threadApp = {
             chat.unread = 0;
             ctx.save();
             ctx.toast('已清空');
-            ctx.shell.rerender();
+            ctx.rerender();
           }
         },
       });
@@ -396,7 +395,7 @@ export const threadApp = {
           if (value === 'quote') {
             ctx.shell.quote = ctx.shell.quote || {};
             ctx.shell.quote[chat.id] = { text: message.text, from: message.from };
-            ctx.shell.rerender();
+            ctx.rerender();
           }
           if (value === 'copy') {
             navigator.clipboard?.writeText(message.text).then(() => ctx.toast('已复制'), () => ctx.toast('复制失败'));
@@ -410,13 +409,13 @@ export const threadApp = {
             const index = chat.messages.indexOf(message);
             chat.messages.splice(index, 1);
             ctx.save();
-            ctx.shell.rerender();
+            ctx.rerender();
             reply(ctx, chat, contact);
           }
           if (value === 'delete') {
             chat.messages = chat.messages.filter(item => item.id !== message.id);
             ctx.save();
-            ctx.shell.rerender();
+            ctx.rerender();
             ctx.toast('已删除');
           }
         },

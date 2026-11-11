@@ -52,7 +52,7 @@ export const extrasApp = {
           if (value === 'delete') {
             ctx.state.extras[data.contact] = (ctx.state.extras[data.contact] || []).filter(entry => entry.id !== item.id);
             ctx.save();
-            ctx.shell.rerender();
+            ctx.rerender();
             ctx.toast('删掉了');
             return;
           }
@@ -129,7 +129,7 @@ export const walletApp = {
           ctx.state.wallet.ledger.unshift({ id: 'l' + Date.now().toString(36), title, amount, date: new Date().toISOString().slice(0, 10) });
           ctx.state.wallet.balance += amount;
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
           ctx.toast('记好了');
         },
       });
@@ -143,7 +143,7 @@ export const walletApp = {
           ctx.state.wallet.balance += Number(value);
           ctx.state.wallet.ledger.unshift({ id: 'l' + Date.now().toString(36), title: '充值', amount: Number(value), date: new Date().toISOString().slice(0, 10) });
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
           ctx.toast(`充了 ¥${value}`);
         },
       });
@@ -192,7 +192,7 @@ export const favoritesApp = {
     if (act === 'fav-del') {
       ctx.state.favorites = ctx.state.favorites.filter(entry => entry.id !== data.id);
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast('删掉了');
       return true;
     }
@@ -274,14 +274,14 @@ export const membershipApp = {
       until.setMonth(until.getMonth() + 1);
       ctx.state.membership = { plan: '月卡', until: until.toISOString().slice(0, 10) };
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast('月卡已开通');
       return true;
     }
     if (act === 'member-close') {
       ctx.state.membership = { plan: '', until: '' };
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast('已取消');
       return true;
     }
@@ -321,7 +321,7 @@ export const plansApp = {
       if (!plan) return true;
       plan.done = !plan.done;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
     if (act === 'plan-add') {
@@ -332,7 +332,7 @@ export const plansApp = {
           if (!title) return;
           ctx.state.plans.push({ id: 'p' + Date.now().toString(36), title, detail: '', done: false, date: new Date().toISOString().slice(0, 10) });
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
           ctx.toast('加好了');
         },
       });
@@ -378,7 +378,7 @@ export const dressApp = {
       ctx.state.settings.dress = { ...(ctx.state.settings.dress || {}), wallpaper: data.key };
       ctx.setWallpaper(data.value);
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast('换好了');
       return true;
     }

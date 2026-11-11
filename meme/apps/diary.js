@@ -118,13 +118,13 @@ export const diaryApp = {
       target.setMonth(target.getMonth() + (act === 'diary-prev' ? -1 : 1));
       ctx.shell.diaryMonth = monthKey(target);
       ctx.shell.diarySel = dayKey(target);
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
     if (act === 'diary-day') {
       ctx.shell.diarySel = data.day;
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -144,7 +144,7 @@ export const diaryApp = {
           ctx.state.diary.entries[key] = entry;
           ctx.save();
           ctx.toast(entry.text ? '写好了' : '空白的一天');
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -163,7 +163,7 @@ export const diaryApp = {
           ctx.state.diary.entries[key] = entry;
           ctx.save();
           ctx.toast('写好了');
-          ctx.shell.rerender();
+          ctx.rerender();
         })
         .catch(() => ctx.toast('写日记失败'));
       return true;

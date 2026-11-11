@@ -11,10 +11,18 @@ let hostScriptTried = false;
 export async function loadHostScript() {
   if (hostScriptTried) return hostScript;
   hostScriptTried = true;
+  /* 先拿酒馆自己的上下文（桌面版里 import('/script.js') 可能拿到 HTML 页面，
+     解析报 Unexpected token '<'）；上下文拿不到才退回 import */
   try {
-    hostScript = await import('/script.js');
-  } catch {
-    hostScript = null;
+    const ctx = globalThis.SillyTavern?.getContext?.();
+    if (ctx && typeof ctx === 'object' && Object.keys(ctx).length) hostScript = ctx;
+  } catch { hostScript = null; }
+  if (!hostScript) {
+    try {
+      hostScript = await import('/script.js');
+    } catch {
+      hostScript = null;
+    }
   }
   return hostScript;
 }
@@ -89,13 +97,18 @@ export async function readTavernContext() {
 
 export async function readUserAvatar() {
   try {
-    const personas = await import('/scripts/personas.js');
     const script = await loadHostScript();
     if (script?.user_avatar && typeof script.getThumbnailUrl === 'function') {
       return script.getThumbnailUrl('persona', script.user_avatar);
     }
-    if (personas?.user_avatar && typeof personas.getUserAvatar === 'function') {
-      return personas.getUserAvatar();
+    /* 不再 import('/scripts/personas.js')：那条路径在桌面版里会拿到 HTML，
+       解析时抛 SyntaxError，改用上下文里的真人设头像 */
+    const ctx = globalThis.SillyTavern?.getContext?.() || {};
+    const name = ctx.name1 || script?.name1 || '';
+    const avatars = ctx.power_user?.persona_avatars || {};
+    const file = avatars?.[name];
+    if (file && typeof script?.getThumbnailUrl === 'function') {
+      return script.getThumbnailUrl('persona', file);
     }
   } catch { /* 没有头像就退回首字母色块 */ }
   return '';

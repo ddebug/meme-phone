@@ -105,7 +105,7 @@ export const userListApp = {
       if (typeof sync !== 'function') { ctx.toast('拉不到名单'); return true; }
       sync().then(result => {
         ctx.save();
-        ctx.shell.rerender();
+        ctx.rerender();
         ctx.toast(result?.available ? `拉到 ${result.list.length} 位用户` : '没接上酒馆，先用演示名单看界面');
       }).catch(error => ctx.toast(error.message || '同步失败'));
       return true;
@@ -122,7 +122,7 @@ export const userListApp = {
           applyUser(state, list[0]);
           ctx.save();
           ctx.toast(`固定成 ${list[0].name}`);
-          ctx.shell.rerender();
+          ctx.rerender();
           return true;
         }
         ctx.openSheet({
@@ -135,7 +135,7 @@ export const userListApp = {
             applyUser(state, user);
             ctx.save();
             ctx.toast(`固定成 ${user?.name || '这位'}`);
-            ctx.shell.rerender();
+            ctx.rerender();
           },
         });
         return true;
@@ -144,7 +144,7 @@ export const userListApp = {
       applyUser(state, userByKey(state, state.settings.user.key));
       ctx.save();
       ctx.toast('跟着酒馆走');
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -164,7 +164,7 @@ export const userListApp = {
       applyUser(state, user);
       ctx.save();
       ctx.toast(`小手机现在用 ${user.name}`);
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -238,7 +238,7 @@ export const userEditApp = {
           if (state.settings.user.key === key) state.settings.user.name = user.name;
           ctx.save();
           ctx.toast('改好了，记得写回酒馆');
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -254,7 +254,7 @@ export const userEditApp = {
           user.dirty = true;
           ctx.save();
           ctx.toast('改好了，记得写回酒馆');
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -267,7 +267,7 @@ export const userEditApp = {
       writer({ key, name: user.name, description: user.description }).then(() => {
         user.dirty = false;
         ctx.save();
-        ctx.shell.rerender();
+        ctx.rerender();
         ctx.toast('已经写回酒馆');
       }).catch(error => ctx.toast(error.message || '写回失败'));
       return true;
@@ -280,7 +280,7 @@ export const userEditApp = {
       applyUser(state, user);
       ctx.save();
       ctx.toast(`小手机现在用 ${user.name}`);
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 

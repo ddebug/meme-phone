@@ -301,7 +301,7 @@ export async function openMemePhone(options = {}) {
       const next = emptyState();
       store.replace(next);
       ctx.state = next;
-      ctx.shell?.rerender();
+      ctx.rerender?.();
     },
     setWallpaper: (value) => {
       rootEl.style.setProperty('--wallpaper', value);

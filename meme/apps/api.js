@@ -250,7 +250,7 @@ export const apiListApp = {
             store.activeChat = target.id;
           }
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
           ctx.toast(`已切成「${target.name || '未命名'}」${asImage && target.engine === 'tavern' ? '（酒馆 API 只借聊天模型，绘图仍要选带地址那套）' : ''}`);
         },
       });
@@ -283,7 +283,7 @@ export const apiListApp = {
       store.presets.push(preset);
       editingId = preset.id;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast(`复制成「${preset.name}」`);
       return true;
     }
@@ -367,7 +367,7 @@ export const apiPresetApp = {
             preset.path = defaultPath(value);
             if (value === 'novelai' && !preset.url) preset.url = 'https://image.novelai.net';
             ctx.save();
-            ctx.shell.rerender();
+            ctx.rerender();
           },
         });
         return true;
@@ -383,7 +383,7 @@ export const apiPresetApp = {
             preset[field.key] = value.trim();
           }
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -392,7 +392,7 @@ export const apiPresetApp = {
     if (act === 'api-use-chat') {
       store.activeChat = preset.id;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast(`聊天换成「${preset.name || '未命名'}」`);
       return true;
     }
@@ -401,7 +401,7 @@ export const apiPresetApp = {
       store.activeImage = preset.id;
       applyImagePreset(ctx, preset);
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast(`绘图换成「${preset.name || '未命名'}」`);
       return true;
     }

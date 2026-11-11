@@ -88,7 +88,7 @@ export const charactersApp = {
         if (!cards.length) {
           state.charactersFromTavern = false;
           ctx.toast('没读到角色卡（预览环境下没有酒馆）');
-          ctx.shell.rerender();
+          ctx.rerender();
           return;
         }
         const previous = cardsOf(state);
@@ -98,7 +98,7 @@ export const charactersApp = {
         });
         state.charactersFromTavern = true;
         ctx.save();
-        ctx.shell.rerender();
+        ctx.rerender();
         ctx.toast(`拉到 ${cards.length} 张角色卡`);
       }).catch(error => ctx.toast(error.message || '同步失败'));
       return true;
@@ -110,7 +110,7 @@ export const charactersApp = {
         placeholder: '名字、标签、设定里的一段话都行',
         onText: (text) => {
           ctx.shell.charQuery = String(text || '').trim();
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -118,7 +118,7 @@ export const charactersApp = {
 
     if (act === 'char-clear') {
       ctx.shell.charQuery = '';
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -182,7 +182,7 @@ export const characterApp = {
       addContact(state, { name: card.name, avatar: card.avatarUrl, kind: 'char', tavernAvatar: card.avatar, signature: (card.tags || []).slice(0, 2).join(' · ') });
       ctx.save();
       ctx.toast('存进通讯录了');
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
     return false;

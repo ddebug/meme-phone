@@ -73,7 +73,7 @@ export const contactsApp = {
             const created = syncTavernContacts(ctx.state, list);
             ctx.save();
             ctx.toast(created ? `同步了 ${created} 位` : '已经是最新的');
-            ctx.shell.rerender();
+            ctx.rerender();
           }
           if (value === 'manual') {
             ctx.openSheet({
@@ -84,7 +84,7 @@ export const contactsApp = {
                 addContact(ctx.state, { name, kind: 'custom' });
                 ctx.save();
                 ctx.toast('加好了');
-                ctx.shell.rerender();
+                ctx.rerender();
               },
             });
           }
@@ -98,7 +98,7 @@ export const contactsApp = {
                 addContact(ctx.state, { name, kind: 'group', members });
                 ctx.save();
                 ctx.toast('群建好了');
-                ctx.shell.rerender();
+                ctx.rerender();
               },
             });
           }
@@ -206,7 +206,7 @@ export const contactApp = {
               onText: (text) => {
                 contact.name = String(text || '').trim() || contact.name;
                 ctx.save();
-                ctx.shell.rerender();
+                ctx.rerender();
               },
             });
           }
@@ -216,7 +216,7 @@ export const contactApp = {
               onText: (text) => {
                 contact.signature = String(text || '').trim();
                 ctx.save();
-                ctx.shell.rerender();
+                ctx.rerender();
               },
             });
           }

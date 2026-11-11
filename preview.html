@@ -3210,7 +3210,7 @@ function createStore(options = {}) {
     }
   }
 
-  return {
+  const api = {
     status,
 
     /** 只读一次；失败不覆盖任何已有数据。 */
@@ -3239,7 +3239,7 @@ function createStore(options = {}) {
       dirty = true;
       emit();
       return new Promise((resolve, reject) => {
-        const flushNow = () => { flush().then(resolve, reject); };
+        const flushNow = () => { api.flush().then(resolve, reject); };
         clearTimeout(timer);
         timer = setTimeout(flushNow, debounceMs);
       });
@@ -3271,6 +3271,8 @@ function createStore(options = {}) {
       return JSON.stringify(state, null, 2);
     },
   };
+
+  return api;
 }
 
 exports["createStore"] = createStore;
@@ -3289,10 +3291,18 @@ let hostScriptTried = false;
 async function loadHostScript() {
   if (hostScriptTried) return hostScript;
   hostScriptTried = true;
+  /* 先拿酒馆自己的上下文（桌面版里 import('/script.js') 可能拿到 HTML 页面，
+     解析报 Unexpected token '<'）；上下文拿不到才退回 import */
   try {
-    hostScript = await import('/script.js');
-  } catch {
-    hostScript = null;
+    const ctx = globalThis.SillyTavern?.getContext?.();
+    if (ctx && typeof ctx === 'object' && Object.keys(ctx).length) hostScript = ctx;
+  } catch { hostScript = null; }
+  if (!hostScript) {
+    try {
+      hostScript = await import('/script.js');
+    } catch {
+      hostScript = null;
+    }
   }
   return hostScript;
 }
@@ -3367,13 +3377,18 @@ async function readTavernContext() {
 
 async function readUserAvatar() {
   try {
-    const personas = await import('/scripts/personas.js');
     const script = await loadHostScript();
     if (script?.user_avatar && typeof script.getThumbnailUrl === 'function') {
       return script.getThumbnailUrl('persona', script.user_avatar);
     }
-    if (personas?.user_avatar && typeof personas.getUserAvatar === 'function') {
-      return personas.getUserAvatar();
+    /* 不再 import('/scripts/personas.js')：那条路径在桌面版里会拿到 HTML，
+       解析时抛 SyntaxError，改用上下文里的真人设头像 */
+    const ctx = globalThis.SillyTavern?.getContext?.() || {};
+    const name = ctx.name1 || script?.name1 || '';
+    const avatars = ctx.power_user?.persona_avatars || {};
+    const file = avatars?.[name];
+    if (file && typeof script?.getThumbnailUrl === 'function') {
+      return script.getThumbnailUrl('persona', file);
     }
   } catch { /* 没有头像就退回首字母色块 */ }
   return '';
@@ -4267,14 +4282,14 @@ function doSend(ctx, chatId) {
   if (ctx.shell.quote) delete ctx.shell.quote[chatId];
   ctx.shell.live = { inputValue: '', focus: true };
   ctx.save();
-  ctx.shell.rerender();
+  ctx.rerender();
   scrollToBottom(ctx);
   reply(ctx, chat, contact);
 }
 
 function reply(ctx, chat, contact) {
   chat.typing = true;
-  ctx.shell.rerender();
+  ctx.rerender();
   scrollToBottom(ctx);
 
   const delay = 900 + Math.random() * 700;
@@ -4288,7 +4303,7 @@ function reply(ctx, chat, contact) {
     chat.typing = false;
     if (text) pushMessage(ctx.state, chat.id, { from: 'them', text });
     ctx.save();
-    ctx.shell.rerender();
+    ctx.rerender();
     scrollToBottom(ctx);
   }, delay);
 }
@@ -4296,7 +4311,7 @@ function reply(ctx, chat, contact) {
 function wake(ctx, chat, contact) {
   if (chat.typing) return;
   chat.typing = true;
-  ctx.shell.rerender();
+  ctx.rerender();
   scrollToBottom(ctx);
   ctx.toast('让 TA 主动开口…');
 
@@ -4315,7 +4330,7 @@ function wake(ctx, chat, contact) {
       ctx.toast('模型没接通，先在设置里选一个 API');
     }
     ctx.save();
-    ctx.shell.rerender();
+    ctx.rerender();
     scrollToBottom(ctx);
   }, 1500);
 }
@@ -4375,7 +4390,7 @@ const chatApp = {
             ctx.toast('会话已删除');
           }
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -4399,7 +4414,7 @@ const threadApp = {
 
     if (act === 'clear-quote') {
       if (ctx.shell.quote) delete ctx.shell.quote[chatId];
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -4417,11 +4432,10 @@ const threadApp = {
           if (value === 'emoji') {
             const emoji = ctx.state.emoji[Math.floor(Math.random() * ctx.state.emoji.length)];
             ctx.shell.live.inputValue = `${ctx.shell.live.inputValue || ''}${emoji.char}`;
-            ctx.shell.rerender();
+            ctx.rerender();
             setTimeout(() => {
               const input = ctx.shell.root.querySelector('.mp-compose-box input');
               input?.focus();
-              ctx.shell.improveSendState();
             }, 20);
           }
           if (value === 'quote') {
@@ -4429,7 +4443,7 @@ const threadApp = {
             if (!last) { ctx.toast('还没有可引用的消息'); return; }
             ctx.shell.quote = ctx.shell.quote || {};
             ctx.shell.quote[chatId] = { text: last.text, from: last.from };
-            ctx.shell.rerender();
+            ctx.rerender();
           }
           if (value === 'extra') {
             const last = lastMessage(chat);
@@ -4473,7 +4487,7 @@ const threadApp = {
             chat.unread = 0;
             ctx.save();
             ctx.toast('已清空');
-            ctx.shell.rerender();
+            ctx.rerender();
           }
         },
       });
@@ -4498,7 +4512,7 @@ const threadApp = {
           if (value === 'quote') {
             ctx.shell.quote = ctx.shell.quote || {};
             ctx.shell.quote[chat.id] = { text: message.text, from: message.from };
-            ctx.shell.rerender();
+            ctx.rerender();
           }
           if (value === 'copy') {
             navigator.clipboard?.writeText(message.text).then(() => ctx.toast('已复制'), () => ctx.toast('复制失败'));
@@ -4512,13 +4526,13 @@ const threadApp = {
             const index = chat.messages.indexOf(message);
             chat.messages.splice(index, 1);
             ctx.save();
-            ctx.shell.rerender();
+            ctx.rerender();
             reply(ctx, chat, contact);
           }
           if (value === 'delete') {
             chat.messages = chat.messages.filter(item => item.id !== message.id);
             ctx.save();
-            ctx.shell.rerender();
+            ctx.rerender();
             ctx.toast('已删除');
           }
         },
@@ -4654,13 +4668,13 @@ const diaryApp = {
       target.setMonth(target.getMonth() + (act === 'diary-prev' ? -1 : 1));
       ctx.shell.diaryMonth = monthKey(target);
       ctx.shell.diarySel = dayKey(target);
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
     if (act === 'diary-day') {
       ctx.shell.diarySel = data.day;
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -4680,7 +4694,7 @@ const diaryApp = {
           ctx.state.diary.entries[key] = entry;
           ctx.save();
           ctx.toast(entry.text ? '写好了' : '空白的一天');
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -4699,7 +4713,7 @@ const diaryApp = {
           ctx.state.diary.entries[key] = entry;
           ctx.save();
           ctx.toast('写好了');
-          ctx.shell.rerender();
+          ctx.rerender();
         })
         .catch(() => ctx.toast('写日记失败'));
       return true;
@@ -4787,7 +4801,7 @@ const contactsApp = {
             const created = syncTavernContacts(ctx.state, list);
             ctx.save();
             ctx.toast(created ? `同步了 ${created} 位` : '已经是最新的');
-            ctx.shell.rerender();
+            ctx.rerender();
           }
           if (value === 'manual') {
             ctx.openSheet({
@@ -4798,7 +4812,7 @@ const contactsApp = {
                 addContact(ctx.state, { name, kind: 'custom' });
                 ctx.save();
                 ctx.toast('加好了');
-                ctx.shell.rerender();
+                ctx.rerender();
               },
             });
           }
@@ -4812,7 +4826,7 @@ const contactsApp = {
                 addContact(ctx.state, { name, kind: 'group', members });
                 ctx.save();
                 ctx.toast('群建好了');
-                ctx.shell.rerender();
+                ctx.rerender();
               },
             });
           }
@@ -4920,7 +4934,7 @@ const contactApp = {
               onText: (text) => {
                 contact.name = String(text || '').trim() || contact.name;
                 ctx.save();
-                ctx.shell.rerender();
+                ctx.rerender();
               },
             });
           }
@@ -4930,7 +4944,7 @@ const contactApp = {
               onText: (text) => {
                 contact.signature = String(text || '').trim();
                 ctx.save();
-                ctx.shell.rerender();
+                ctx.rerender();
               },
             });
           }
@@ -5064,21 +5078,21 @@ const settingsApp = {
     if (act === 'set-toggle-remind') {
       state.settings.chat.remind = state.settings.chat.remind === false;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
     if (act === 'set-toggle-wake') {
       state.settings.chat.wake = state.settings.chat.wake === false;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
     if (act === 'set-toggle-proactive') {
       state.settings.proactive.enabled = !state.settings.proactive.enabled;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -5089,7 +5103,7 @@ const settingsApp = {
         onPick: (value) => {
           state.settings.proactive.idleMinutes = Number(value);
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -5108,7 +5122,7 @@ const settingsApp = {
             state.settings.api.source = host.hasGenerate ? 'host' : 'default';
             ctx.save();
             ctx.toast(host.hasGenerate ? '用的是酒馆的模型' : '预览环境没有模型，先看界面');
-            ctx.shell.rerender();
+            ctx.rerender();
           }
           if (value === 'status') {
             const host = await ctx.host.probe();
@@ -5126,7 +5140,7 @@ const settingsApp = {
           state.diary.prompt = String(text || '').trim() || state.diary.prompt;
           ctx.save();
           ctx.toast('存好了');
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -5231,14 +5245,14 @@ const appearanceApp = {
     if (act === 'pick-theme') {
       ctx.state.settings.theme = data.theme;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast(data.theme === 'night' ? '夜间玻璃已打开' : '换回日间玻璃');
       return true;
     }
     if (act === 'pick-wall') {
       ctx.state.settings.wallpaper = data.wall;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast(data.wall === 'none' ? '背景已透明' : data.wall === 'day' ? '换成晨光粉彩壁纸' : '换成夜色壁纸');
       return true;
     }
@@ -5304,7 +5318,7 @@ const extrasApp = {
           if (value === 'delete') {
             ctx.state.extras[data.contact] = (ctx.state.extras[data.contact] || []).filter(entry => entry.id !== item.id);
             ctx.save();
-            ctx.shell.rerender();
+            ctx.rerender();
             ctx.toast('删掉了');
             return;
           }
@@ -5381,7 +5395,7 @@ const walletApp = {
           ctx.state.wallet.ledger.unshift({ id: 'l' + Date.now().toString(36), title, amount, date: new Date().toISOString().slice(0, 10) });
           ctx.state.wallet.balance += amount;
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
           ctx.toast('记好了');
         },
       });
@@ -5395,7 +5409,7 @@ const walletApp = {
           ctx.state.wallet.balance += Number(value);
           ctx.state.wallet.ledger.unshift({ id: 'l' + Date.now().toString(36), title: '充值', amount: Number(value), date: new Date().toISOString().slice(0, 10) });
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
           ctx.toast(`充了 ¥${value}`);
         },
       });
@@ -5444,7 +5458,7 @@ const favoritesApp = {
     if (act === 'fav-del') {
       ctx.state.favorites = ctx.state.favorites.filter(entry => entry.id !== data.id);
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast('删掉了');
       return true;
     }
@@ -5526,14 +5540,14 @@ const membershipApp = {
       until.setMonth(until.getMonth() + 1);
       ctx.state.membership = { plan: '月卡', until: until.toISOString().slice(0, 10) };
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast('月卡已开通');
       return true;
     }
     if (act === 'member-close') {
       ctx.state.membership = { plan: '', until: '' };
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast('已取消');
       return true;
     }
@@ -5573,7 +5587,7 @@ const plansApp = {
       if (!plan) return true;
       plan.done = !plan.done;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
     if (act === 'plan-add') {
@@ -5584,7 +5598,7 @@ const plansApp = {
           if (!title) return;
           ctx.state.plans.push({ id: 'p' + Date.now().toString(36), title, detail: '', done: false, date: new Date().toISOString().slice(0, 10) });
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
           ctx.toast('加好了');
         },
       });
@@ -5630,7 +5644,7 @@ const dressApp = {
       ctx.state.settings.dress = { ...(ctx.state.settings.dress || {}), wallpaper: data.key };
       ctx.setWallpaper(data.value);
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast('换好了');
       return true;
     }
@@ -5884,7 +5898,7 @@ const drawApp = {
     if (act === 'draw-prompt') {
       ctx.openSheet({
         kind: 'text', title: '画面', placeholder: '中文描述，越具体越好',
-        value: draw.lastPrompt, onText: value => { draw.lastPrompt = value; ctx.save(); ctx.shell.rerender(); },
+        value: draw.lastPrompt, onText: value => { draw.lastPrompt = value; ctx.save(); ctx.rerender(); },
       });
       return true;
     }
@@ -5899,7 +5913,7 @@ const drawApp = {
         onText: value => {
           preset[key] = value;
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -5907,7 +5921,7 @@ const drawApp = {
 
     if (act === 'draw-preset') {
       draw.presetIdx = Number(data.i) || 0;
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -5915,7 +5929,7 @@ const drawApp = {
       ctx.openSheet({
         kind: 'pick', title: '尺寸',
         items: SIZES.map(item => ({ value: item.key, label: item.label })),
-        onPick: value => { cfg.size = value; ctx.save(); ctx.shell.rerender(); },
+        onPick: value => { cfg.size = value; ctx.save(); ctx.rerender(); },
       });
       return true;
     }
@@ -5924,7 +5938,7 @@ const drawApp = {
       ctx.openSheet({
         kind: 'pick', title: '步数',
         items: [20, 24, 28, 32, 40].map(value => ({ value: String(value), label: `${value} 步${value === 28 ? '（默认）' : ''}` })),
-        onPick: value => { cfg.steps = Number(value); ctx.save(); ctx.shell.rerender(); },
+        onPick: value => { cfg.steps = Number(value); ctx.save(); ctx.rerender(); },
       });
       return true;
     }
@@ -5933,7 +5947,7 @@ const drawApp = {
       ctx.openSheet({
         kind: 'pick', title: '引导强度',
         items: [3, 4, 5, 6, 7].map(value => ({ value: String(value), label: `${value}${value === 5 ? '（默认）' : ''}` })),
-        onPick: value => { cfg.scale = Number(value); ctx.save(); ctx.shell.rerender(); },
+        onPick: value => { cfg.scale = Number(value); ctx.save(); ctx.rerender(); },
       });
       return true;
     }
@@ -5942,7 +5956,7 @@ const drawApp = {
       ctx.openSheet({
         kind: 'pick', title: '采样器',
         items: SAMPLERS.map(value => ({ value, label: value })),
-        onPick: value => { cfg.sampler = value; ctx.save(); ctx.shell.rerender(); },
+        onPick: value => { cfg.sampler = value; ctx.save(); ctx.rerender(); },
       });
       return true;
     }
@@ -5951,7 +5965,7 @@ const drawApp = {
       ctx.openSheet({
         kind: 'pick', title: '噪声调度',
         items: NOISES.map(value => ({ value, label: value })),
-        onPick: value => { cfg.noise = value; ctx.save(); ctx.shell.rerender(); },
+        onPick: value => { cfg.noise = value; ctx.save(); ctx.rerender(); },
       });
       return true;
     }
@@ -5960,7 +5974,7 @@ const drawApp = {
       ctx.openSheet({
         kind: 'text', title: '种子', placeholder: '留空就是随机',
         value: String(cfg.seed || ''),
-        onText: value => { cfg.seed = value.replace(/[^\d]/g, ''); ctx.save(); ctx.shell.rerender(); },
+        onText: value => { cfg.seed = value.replace(/[^\d]/g, ''); ctx.save(); ctx.rerender(); },
       });
       return true;
     }
@@ -5980,7 +5994,7 @@ const drawApp = {
     if (act === 'draw-del') {
       draw.history.splice(Number(data.i), 1);
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -6000,7 +6014,7 @@ async function run(ctx, prompt) {
   const negative = [preset.neg || DEFAULT_NEG].join(', ');
 
   draw.busy = true;
-  ctx.shell.rerender();
+  ctx.rerender();
   try {
     let entry = null;
     const ep = imageEndpoint(ctx.state);
@@ -6036,7 +6050,7 @@ async function run(ctx, prompt) {
   } finally {
     draw.busy = false;
     ctx.save();
-    ctx.shell.rerender();
+    ctx.rerender();
   }
 }
 
@@ -6296,7 +6310,7 @@ const apiListApp = {
             store.activeChat = target.id;
           }
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
           ctx.toast(`已切成「${target.name || '未命名'}」${asImage && target.engine === 'tavern' ? '（酒馆 API 只借聊天模型，绘图仍要选带地址那套）' : ''}`);
         },
       });
@@ -6329,7 +6343,7 @@ const apiListApp = {
       store.presets.push(preset);
       editingId = preset.id;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast(`复制成「${preset.name}」`);
       return true;
     }
@@ -6413,7 +6427,7 @@ const apiPresetApp = {
             preset.path = defaultPath(value);
             if (value === 'novelai' && !preset.url) preset.url = 'https://image.novelai.net';
             ctx.save();
-            ctx.shell.rerender();
+            ctx.rerender();
           },
         });
         return true;
@@ -6429,7 +6443,7 @@ const apiPresetApp = {
             preset[field.key] = value.trim();
           }
           ctx.save();
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -6438,7 +6452,7 @@ const apiPresetApp = {
     if (act === 'api-use-chat') {
       store.activeChat = preset.id;
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast(`聊天换成「${preset.name || '未命名'}」`);
       return true;
     }
@@ -6447,7 +6461,7 @@ const apiPresetApp = {
       store.activeImage = preset.id;
       applyImagePreset(ctx, preset);
       ctx.save();
-      ctx.shell.rerender();
+      ctx.rerender();
       ctx.toast(`绘图换成「${preset.name || '未命名'}」`);
       return true;
     }
@@ -6586,7 +6600,7 @@ const userListApp = {
       if (typeof sync !== 'function') { ctx.toast('拉不到名单'); return true; }
       sync().then(result => {
         ctx.save();
-        ctx.shell.rerender();
+        ctx.rerender();
         ctx.toast(result?.available ? `拉到 ${result.list.length} 位用户` : '没接上酒馆，先用演示名单看界面');
       }).catch(error => ctx.toast(error.message || '同步失败'));
       return true;
@@ -6603,7 +6617,7 @@ const userListApp = {
           applyUser(state, list[0]);
           ctx.save();
           ctx.toast(`固定成 ${list[0].name}`);
-          ctx.shell.rerender();
+          ctx.rerender();
           return true;
         }
         ctx.openSheet({
@@ -6616,7 +6630,7 @@ const userListApp = {
             applyUser(state, user);
             ctx.save();
             ctx.toast(`固定成 ${user?.name || '这位'}`);
-            ctx.shell.rerender();
+            ctx.rerender();
           },
         });
         return true;
@@ -6625,7 +6639,7 @@ const userListApp = {
       applyUser(state, userByKey(state, state.settings.user.key));
       ctx.save();
       ctx.toast('跟着酒馆走');
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -6645,7 +6659,7 @@ const userListApp = {
       applyUser(state, user);
       ctx.save();
       ctx.toast(`小手机现在用 ${user.name}`);
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -6719,7 +6733,7 @@ const userEditApp = {
           if (state.settings.user.key === key) state.settings.user.name = user.name;
           ctx.save();
           ctx.toast('改好了，记得写回酒馆');
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -6735,7 +6749,7 @@ const userEditApp = {
           user.dirty = true;
           ctx.save();
           ctx.toast('改好了，记得写回酒馆');
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -6748,7 +6762,7 @@ const userEditApp = {
       writer({ key, name: user.name, description: user.description }).then(() => {
         user.dirty = false;
         ctx.save();
-        ctx.shell.rerender();
+        ctx.rerender();
         ctx.toast('已经写回酒馆');
       }).catch(error => ctx.toast(error.message || '写回失败'));
       return true;
@@ -6761,7 +6775,7 @@ const userEditApp = {
       applyUser(state, user);
       ctx.save();
       ctx.toast(`小手机现在用 ${user.name}`);
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -6863,7 +6877,7 @@ const charactersApp = {
         if (!cards.length) {
           state.charactersFromTavern = false;
           ctx.toast('没读到角色卡（预览环境下没有酒馆）');
-          ctx.shell.rerender();
+          ctx.rerender();
           return;
         }
         const previous = cardsOf(state);
@@ -6873,7 +6887,7 @@ const charactersApp = {
         });
         state.charactersFromTavern = true;
         ctx.save();
-        ctx.shell.rerender();
+        ctx.rerender();
         ctx.toast(`拉到 ${cards.length} 张角色卡`);
       }).catch(error => ctx.toast(error.message || '同步失败'));
       return true;
@@ -6885,7 +6899,7 @@ const charactersApp = {
         placeholder: '名字、标签、设定里的一段话都行',
         onText: (text) => {
           ctx.shell.charQuery = String(text || '').trim();
-          ctx.shell.rerender();
+          ctx.rerender();
         },
       });
       return true;
@@ -6893,7 +6907,7 @@ const charactersApp = {
 
     if (act === 'char-clear') {
       ctx.shell.charQuery = '';
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -6957,7 +6971,7 @@ const characterApp = {
       addContact(state, { name: card.name, avatar: card.avatarUrl, kind: 'char', tavernAvatar: card.avatar, signature: (card.tags || []).slice(0, 2).join(' · ') });
       ctx.save();
       ctx.toast('存进通讯录了');
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
     return false;
@@ -7176,7 +7190,7 @@ const charPhoneApp = {
 
     if (act === 'cp-tab') {
       ctx.shell.cpTab = data.tab;
-      ctx.shell.rerender();
+      ctx.rerender();
       return true;
     }
 
@@ -7189,7 +7203,7 @@ const charPhoneApp = {
       if (!contact) return true;
       if (typeof ctx.ai?.lookup !== 'function') { ctx.toast('这个环境生成不了'); return true; }
       ctx.shell.cpBusy = true;
-      ctx.shell.rerender();
+      ctx.rerender();
       const local = ensureLookup(ctx.state, contact);
       Promise.resolve()
         .then(() => ctx.ai.lookup(ctx, contact, local))
@@ -7197,12 +7211,12 @@ const charPhoneApp = {
           if (result) ctx.state.lookups[contact.id] = { ...result, at: Date.now() };
           ctx.save();
           ctx.shell.cpBusy = false;
-          ctx.shell.rerender();
+          ctx.rerender();
           ctx.toast(result ? '这份是现编的' : '没生成出来，先看本地这份');
         })
         .catch(error => {
           ctx.shell.cpBusy = false;
-          ctx.shell.rerender();
+          ctx.rerender();
           ctx.toast(error.message || '生成失败');
         });
       return true;
@@ -7553,7 +7567,7 @@ async function openMemePhone(options = {}) {
       const next = emptyState();
       store.replace(next);
       ctx.state = next;
-      ctx.shell?.rerender();
+      ctx.rerender?.();
     },
     setWallpaper: (value) => {
       rootEl.style.setProperty('--wallpaper', value);

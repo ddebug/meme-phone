@@ -8,7 +8,7 @@
 
 import { icon } from '../icons.js';
 import { esc } from '../shell.js';
-import { bookApi, readSummaries } from '../book.js';
+import { bookApi, readSummaries, summaryApiPresets, applySummaryApi, clearSummaryApi } from '../book.js';
 
 const TABS = [
   ['overview', '概览'],
@@ -381,12 +381,14 @@ export const bookApp = {
 
 /* ------------------------------------------------------ 酒馆总结 · 设置 */
 
-function setRow({ iconName, title, sub, act, toggle }) {
+function setRow({ iconName, title, sub, act, toggle, value, dataId }) {
   return `
-    <button class="mp-set-row" data-act="${act}" type="button">
+    <button class="mp-set-row" data-act="${act}"${dataId ? ` data-id="${esc(dataId)}"` : ''} type="button">
       <span class="mp-set-ico">${icon(iconName)}</span>
       <span class="mp-set-name">${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
-      <span class="mp-switch${toggle ? ' on' : ''}"></span>
+      ${toggle !== undefined
+        ? `<span class="mp-switch${toggle ? ' on' : ''}"></span>`
+        : value ? `<span class="mp-set-value">${esc(value)}</span>` : `<span style="color:var(--text-4)">${icon('chevron')}</span>`}
     </button>`;
 }
 
@@ -396,6 +398,17 @@ export const bookSettingsApp = {
   render(ctx) {
     const summary = ctx.state.settings.summary || {};
     const skip = Boolean(summary.skipFirstFloor);
+    const presets = summaryApiPresets(ctx.state);
+    const activeId = summary.apiId || '';
+
+    const apiRows = presets.map(preset => setRow({
+      iconName: 'code',
+      title: preset.name || '未命名接口',
+      sub: [preset.model, preset.url].filter(Boolean).join(' · ').slice(0, 48),
+      act: 'bks-api',
+      value: activeId === preset.id ? '使用中' : '',
+      dataId: preset.id,
+    })).join('');
 
     return `
       <div class="mp-page-body mp-bk">
@@ -415,17 +428,58 @@ export const bookSettingsApp = {
           </div>
         </div>
 
-        <div class="mp-bk-note">开着的时候：聊天与摘要只吃其余总结，首楼单独用原文；关着的时候：首楼和其它楼一样走总结。</div>
+        <div class="mp-group" style="margin-top:14px">
+          <div class="mp-group-label">总结接口</div>
+          <div class="mp-group-box">
+            ${setRow({
+              iconName: 'book',
+              title: '跟随酒馆总结自带设置',
+              sub: '用酒馆总结自己配的副 API',
+              act: 'bks-api-auto',
+              value: activeId ? '' : '使用中',
+            })}
+            ${apiRows || ''}
+          </div>
+          ${presets.length ? '' : '<div class="mp-empty" style="padding:18px 4px 0">还没存接口。先去「接口」里加一套地址 + 模型，再回来选。</div>'}
+        </div>
+
+        <div class="mp-bk-note">选了手机接口后，酒馆总结的摘要与总结两个任务都会走这条渠道；以后在「接口」里改了同一套预设，再点一次它就同步过去。</div>
       </div>`;
   },
 
-  handle(ctx, act) {
+  handle(ctx, act, data) {
     if (act === 'bks-first') {
       const summary = ctx.state.settings.summary || (ctx.state.settings.summary = {});
       summary.skipFirstFloor = !summary.skipFirstFloor;
       ctx.save();
       ctx.rerender();
       ctx.toast(summary.skipFirstFloor ? '首楼改为显示原文' : '首楼恢复总结');
+      return true;
+    }
+
+    if (act === 'bks-api') {
+      const preset = summaryApiPresets(ctx.state).find(item => item.id === data.id);
+      if (!preset) return true;
+      const summary = ctx.state.settings.summary || (ctx.state.settings.summary = {});
+      const ok = applySummaryApi(preset);
+      if (!ok) {
+        ctx.toast('酒馆总结还没加载，装好并刷新酒馆后再选');
+        return true;
+      }
+      summary.apiId = preset.id;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`总结接口已切到「${preset.name || '手机接口'}」`);
+      return true;
+    }
+
+    if (act === 'bks-api-auto') {
+      const summary = ctx.state.settings.summary || (ctx.state.settings.summary = {});
+      clearSummaryApi();
+      summary.apiId = '';
+      ctx.save();
+      ctx.rerender();
+      ctx.toast('已跟随酒馆总结自带设置');
       return true;
     }
 

@@ -19,6 +19,45 @@ export function bookApi() {
   }
 }
 
+/** 手机「接口」里能拿来当总结接口的预设（酒馆 API 那条没有地址，跳过）。 */
+export function summaryApiPresets(state) {
+  const list = state?.settings?.api?.presets || [];
+  return list.filter(preset => preset && preset.url && preset.engine !== 'tavern');
+}
+
+/**
+ * 把手机的一套预设交给酒馆总结当副 API。
+ * 桥由 baibai-book/dist 暴露；没装/没加载时返回 false，调用方提示即可。
+ */
+export function applySummaryApi(preset) {
+  if (!preset) return false;
+  try {
+    const bridge = globalThis.__STBaiBaiBookPhoneApi;
+    if (!bridge || typeof bridge.useChannel !== 'function') return false;
+    return Boolean(bridge.useChannel({
+      id: preset.id,
+      name: preset.name || '手机接口',
+      url: preset.url,
+      key: preset.key || '',
+      model: preset.model || '',
+      temperature: typeof preset.temp === 'number' ? preset.temp : 0.8,
+    }));
+  } catch (error) {
+    return false;
+  }
+}
+
+export function clearSummaryApi() {
+  try {
+    const bridge = globalThis.__STBaiBaiBookPhoneApi;
+    if (bridge && typeof bridge.reset === 'function') {
+      bridge.reset();
+      return true;
+    }
+  } catch (error) { /* 没桥就当已经跟随自带 */ }
+  return false;
+}
+
 function isFirstFloor(node) {
   return node && node.floorStart === 0 && (node.floorEnd == null || node.floorEnd === 0);
 }

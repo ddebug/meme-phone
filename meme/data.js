@@ -20,7 +20,7 @@ export function emptyState() {
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
       chat: { showTime: true, enterToSend: false, remind: true, wake: true },
       /* 酒馆总结（柏宝书）：首楼默认是要总结的，关掉后那一楼直接显示原文 */
-      summary: { skipFirstFloor: false },
+      summary: { skipFirstFloor: false, apiId: '' },
       api: {
         activeChat: '', activeImage: '', presets: [
           { id: 'api_default', name: '酒馆 API', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },

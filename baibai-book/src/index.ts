@@ -1,4 +1,4 @@
-import { hydrateSettings } from '@/api/settings';
+import { hydrateSettings, resetPhoneApiChannel, usePhoneApiChannel } from '@/api/settings';
 import { bindEngine, handleGenerationIntercept } from '@/memory/engine';
 import { runVectorRecall, shouldRecallForType } from '@/memory/vector/recall';
 import { refreshInjection } from '@/memory/inject';
@@ -22,6 +22,17 @@ import '@/styles/theme.css';
 import { createApp } from 'vue';
 
 const HOST_ID = 'bbs-app-host';
+
+/**
+ * 手机端桥:让 meme-phone 的「总结设置」能选一套手机接口预设来接管副 API。
+ * 传入的 {id,name,url,key,model,temperature} 会变成一条 mp_<id> 渠道并指派给
+ * summary / resummary;reset 则回到本插件自己配的渠道。
+ */
+(globalThis as Record<string, unknown>).__STBaiBaiBookPhoneApi = {
+  useChannel: (input: { id: string; name: string; url: string; key?: string; model: string; temperature?: number }) =>
+    usePhoneApiChannel(input),
+  reset: () => resetPhoneApiChannel(),
+};
 
 /**
  * 生成拦截器:ST 在每次生成前会 await 调用 manifest.generate_interceptor 指名的全局函数,

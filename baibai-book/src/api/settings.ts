@@ -982,6 +982,50 @@ export function getChannelForTask(task: TaskType): ApiChannel | null {
   return apiSettings.channels.find(c => c.id === id) ?? null;
 }
 
+/* ============ 手机端桥:把 meme-phone 的接口预设灌进副 API ============ */
+
+export interface PhoneChannelInput {
+  /** 手机里那套预设的 id,用来生成稳定的渠道 id,重复选择是覆盖而不是加一条 */
+  id: string;
+  name: string;
+  url: string;
+  key?: string;
+  model: string;
+  temperature?: number;
+}
+
+/**
+ * 用手机「接口」里的某套预设同时接管 summary / resummary 两个任务。
+ * 渠道 id 固定为 mp_<预设id>,以后同一条预设再选一次就是更新地址/Key/模型。
+ */
+export function usePhoneApiChannel(input: PhoneChannelInput): boolean {
+  if (!input || !input.url || !input.model) return false;
+  const suffix = String(input.id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'default';
+  const id = `mp_${suffix}`;
+  const channel = normalizeChannel({
+    id,
+    name: input.name || '手机接口',
+    url: input.url,
+    key: input.key || '',
+    model: input.model,
+    temperature: typeof input.temperature === 'number' ? input.temperature : 0.8,
+  });
+  const index = apiSettings.channels.findIndex(c => c.id === id);
+  if (index >= 0) apiSettings.channels.splice(index, 1, channel);
+  else apiSettings.channels.push(channel);
+  apiSettings.assignments.summary = id;
+  apiSettings.assignments.resummary = id;
+  persist();
+  return true;
+}
+
+/** 回到「酒馆总结自己配置的那套渠道」:只清任务指派,不动渠道列表。 */
+export function resetPhoneApiChannel(): void {
+  apiSettings.assignments.summary = '';
+  apiSettings.assignments.resummary = '';
+  persist();
+}
+
 /**
  * 解析某个向量角色实际使用的端点(url/key/model)。
  * 三个角色的**模型各自独立**(embedding/rerank/query 模型本就不同),从不复用;

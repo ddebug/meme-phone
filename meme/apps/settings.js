@@ -41,7 +41,7 @@ export const settingsApp = {
           <div class="mp-group-label">账号</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'contacts', title: '用户', sub: `${state.settings.userMode === 'pin' ? '固定' : '跟随酒馆'} · ${state.settings.user.name}`, act: 'set-open', app: 'user' })}
-            ${row(ctx, { iconName: 'brush', title: '外观与主题', sub: `${state.settings.wallpaper === 'none' ? '背景透明' : state.settings.wallpaper === 'day' ? '晨光粉彩' : '夜色'} · ${state.settings.theme === 'night' ? '夜间' : '日间'}`, act: 'set-open-appearance' })}
+            ${row(ctx, { iconName: 'brush', title: '外观与主题', sub: `${state.settings.wallpaper === 'none' ? '素色底' : state.settings.wallpaper === 'day' ? '晨光粉彩' : '夜色'} · ${state.settings.theme === 'night' ? '夜间' : '日间'}`, act: 'set-open-appearance' })}
           </div>
         </div>
 
@@ -230,7 +230,7 @@ export const appearanceApp = {
     ];
 
     const walls = [
-      { key: 'none', title: '透明', sub: '不铺底色，直接透出酒馆自己的背景', swatch: 'repeating-conic-gradient(rgba(160,150,200,.18) 0% 25%, rgba(255,255,255,0) 0% 50%) 50% / 16px 16px' },
+      { key: 'none', title: '素色', sub: '不铺图片，屏幕里用干净的浅色纸（壳外仍透出酒馆）', swatch: 'repeating-conic-gradient(rgba(160,150,200,.18) 0% 25%, rgba(255,255,255,0) 0% 50%) 50% / 16px 16px' },
       { key: 'day', title: '晨光粉彩', sub: '樱粉与薄荷的柔光壁纸', swatch: 'linear-gradient(150deg,#ffe3ef,#e4f7f0 55%,#efe6ff)' },
       { key: 'night', title: '夜色', sub: '深墨蓝到紫罗兰的流体光带', swatch: 'linear-gradient(150deg,#1a1f2b,#2b2350 60%,#0a0c11)' },
     ];
@@ -286,7 +286,7 @@ export const appearanceApp = {
       ctx.state.settings.wallpaper = data.wall;
       ctx.save();
       ctx.rerender();
-      ctx.toast(data.wall === 'none' ? '背景已透明' : data.wall === 'day' ? '换成晨光粉彩壁纸' : '换成夜色壁纸');
+      ctx.toast(data.wall === 'none' ? '屏幕内换成素色底' : data.wall === 'day' ? '换成晨光粉彩壁纸' : '换成夜色壁纸');
       return true;
     }
     return false;

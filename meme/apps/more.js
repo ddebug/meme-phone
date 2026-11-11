@@ -70,14 +70,24 @@ export const extraDetailApp = {
   id: 'extra-detail', name: '片段', icon: 'theater',
 
   render(ctx, params) {
-    const contact = contactById(ctx.state, params.contactId);
-    const item = (ctx.state.extras[params.contactId] || []).find(entry => entry.id === params.extraId);
+    let ownerId = params.contactId;
+    let item = (ctx.state.extras[ownerId] || []).find(entry => entry.id === params.extraId);
+    if (!item && params.extraId) {
+      for (const [contactId, list] of Object.entries(ctx.state.extras)) {
+        const hit = (list || []).find(entry => entry.id === params.extraId);
+        if (hit) { item = hit; ownerId = contactId; break; }
+      }
+    }
+    const contact = contactById(ctx.state, ownerId);
     if (!item) return `<div class="mp-page-body"><div class="mp-empty">这一段不在了。</div></div>`;
+    const sourceChat = item.chatId ? ctx.state.chats[item.chatId] : null;
+    const source = sourceChat?.messages?.find(message => message.id === item.messageId);
     return `
       <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button><span style="flex:1"></span></div>
       <div class="mp-page-body">
         <div class="mp-subtitle" style="margin-bottom:6px">${esc(contact?.name || '')} · ${esc(item.date || '')}</div>
         <div class="mp-title" style="font-size:24px;margin-bottom:14px">${esc(item.title)}</div>
+        ${source ? `<div class="mp-extra-source">${icon('reply')}<span>${esc(source.text)}</span></div>` : ''}
         ${(item.lines || []).map(line => `
           <div style="font-family:var(--font-serif);font-size:14px;line-height:1.9;color:var(--text);margin-bottom:10px">${esc(line)}</div>`).join('')}
       </div>`;

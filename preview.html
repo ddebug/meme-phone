@@ -740,6 +740,20 @@ body {
 .mp-msg.me { align-self: flex-end; flex-direction: row-reverse; }
 .mp-msg .mp-avatar { width: 28px; height: 28px; border-radius: 9px; font-size: 11px; margin-top: 2px; }
 
+.mp-avatar-btn {
+  flex: none;
+  margin: -4px;
+  padding: 4px;
+  border: 0;
+  border-radius: 13px;
+  background: none;
+  line-height: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mp-avatar-btn .mp-avatar { margin-top: 0; }
+.mp-avatar-btn:active .mp-avatar { transform: scale(.94); }
+
 .mp-msg-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .mp-msg.me .mp-msg-body { align-items: flex-end; }
 
@@ -1293,6 +1307,7 @@ body {
 .mp-root[data-mp-theme="night"] .mp-diary-card { background: rgba(255, 255, 255, .055); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06); }
 .mp-root[data-mp-theme="night"] .mp-bubble { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .08); color: var(--text); }
 .mp-root[data-mp-theme="night"] .mp-msg.me .mp-bubble { background: linear-gradient(150deg, #6f5fd0, #8f68c8); }
+.mp-root[data-mp-theme="night"] .mp-extra-source { background: rgba(255, 255, 255, .07); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); }
 .mp-root[data-mp-theme="night"] .mp-compose-box { background: rgba(255, 255, 255, .07); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); }
 .mp-root[data-mp-theme="night"] .mp-send { background: rgba(255, 255, 255, .08); }
 .mp-root[data-mp-theme="night"] .mp-icon-btn { background: rgba(255, 255, 255, .07); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); }
@@ -1400,6 +1415,22 @@ body {
 
 .mp-quote-line .mp-i { width: 11px; height: 11px; margin-top: 2px; opacity: .7; }
 .mp-quote-line span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.mp-extra-source {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 11px 13px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .56);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-2);
+}
+.mp-extra-source .mp-i { flex: none; width: 13px; height: 13px; margin-top: 3px; opacity: .55; }
+.mp-extra-source span { min-width: 0; }
 
 /* 钱包余额卡：整套配色里唯一一块深一点的主色 */
 .mp-wallet-card {
@@ -3345,11 +3376,12 @@ function contactById(state, id) {
 
 function addChat(state, contactId, options = {}) {
   const id = options.id || newId('ch');
+  const messages = (options.messages || []).map((message, index) => ({ id: `${id}_m${index}`, ...message }));
   state.chats[id] = {
     id,
     contactId,
     kind: options.kind || (state.contacts[contactId]?.kind === 'group' ? 'group' : 'single'),
-    messages: options.messages || [],
+    messages,
     unread: 0,
     draft: '',
     pinned: false,
@@ -3650,7 +3682,7 @@ function demoState() {
   addFavorite(state, { text: '就你上次在车上放的那首。', chatId: chatJiang.id, contactId: jiang.id, from: 'them' });
 
   state.extras[shen.id] = [
-    { id: 'x1', title: '楼下的便利店', date: '2026-11-10', lines: ['他把外套领子立起来，靠在电动车上抬头看我的窗户。', '灯管太白，照得人有点狼狈。'] },
+    { id: 'x1', title: '楼下的便利店', date: '2026-11-10', messageId: 'ch_demo_shen_m0', chatId: 'ch_demo_shen', lines: ['他把外套领子立起来，靠在电动车上抬头看我的窗户。', '灯管太白，照得人有点狼狈。'] },
     { id: 'x2', title: '第 41 分钟', date: '2026-11-06', lines: ['他说等 41 分钟就走。', '结果等到第 58 分钟。'] },
   ];
   state.extras[jiang.id] = [
@@ -3752,8 +3784,10 @@ function normalize(raw) {
   merged.plans = Array.isArray(merged.plans) ? merged.plans : [];
   merged.extras = merged.extras || {};
   merged.emoji = Array.isArray(merged.emoji) && merged.emoji.length ? merged.emoji : base.emoji;
-  for (const chat of Object.values(merged.chats)) {
-    chat.messages = Array.isArray(chat.messages) ? chat.messages : [];
+  for (const [chatId, chat] of Object.entries(merged.chats)) {
+    chat.messages = Array.isArray(chat.messages)
+      ? chat.messages.map((message, index) => ({ id: message.id || `${chatId}_m${index}`, ...message }))
+      : [];
     chat.unread = chat.unread || 0;
   }
   return merged;
@@ -5173,6 +5207,53 @@ function chatSetRow(chatId, { iconName, title, sub, act, toggle, value, danger }
     </button>`;
 }
 
+function saveMessageExtra(ctx, chat, contact, message) {
+  const list = (ctx.state.extras[chat.contactId] = ctx.state.extras[chat.contactId] || []);
+  const item = {
+    id: 'x' + Date.now().toString(36),
+    title: (message.text || '这一条').slice(0, 12),
+    date: new Date(message.at || Date.now()).toLocaleDateString('sv-SE'),
+    lines: [message.text || ''],
+    messageId: message.id,
+    chatId: chat.id,
+  };
+  list.unshift(item);
+  ctx.save();
+  return item;
+}
+
+function openMessageExtra(ctx, chat, contact, message) {
+  const extras = (ctx.state.extras[chat.contactId] || [])
+    .filter(item => item.messageId === message.id);
+  if (extras.length === 1) {
+    ctx.go('extra-detail', { contactId: chat.contactId, extraId: extras[0].id });
+    return;
+  }
+  if (extras.length > 1) {
+    ctx.openSheet({
+      title: '这条消息的小剧场',
+      items: extras.map(item => ({ label: item.title, value: item.id, icon: 'theater' })),
+      onPick: (value) => ctx.go('extra-detail', { contactId: chat.contactId, extraId: value }),
+    });
+    return;
+  }
+  ctx.openSheet({
+    title: '这条消息还没有小剧场',
+    items: [
+      { label: '把这条存成小剧场', value: 'save', icon: 'theater' },
+      { label: '看 TA 的全部小剧场', value: 'all', icon: 'book' },
+    ],
+    onPick: (value) => {
+      if (value === 'save') {
+        const item = saveMessageExtra(ctx, chat, contact, message);
+        ctx.toast('已存进小剧场');
+        ctx.go('extra-detail', { contactId: chat.contactId, extraId: item.id });
+      }
+      if (value === 'all') ctx.go('app-extras', { contactId: chat.contactId });
+    },
+  });
+}
+
 function generateDiary(ctx, chat, contact) {
   ctx.toast('正在写日记…');
   Promise.resolve(ctx.ai.diary(ctx, { chat, contact })).then(text => {
@@ -5307,7 +5388,9 @@ function threadBody(ctx, chatId) {
     const speaker = message.speaker ? contactById(state, message.speaker) : null;
     blocks.push(`
       <div class="mp-msg${me ? ' me' : ''}" data-hold="message-menu" data-chat="${chat.id}" data-msg="${message.id}">
-        ${avatarHtml(me ? state.settings.user.name : (speaker?.name || contact?.name), me ? state.settings.user.avatar : (speaker?.avatar || contact?.avatar))}
+        ${me
+          ? avatarHtml(state.settings.user.name, state.settings.user.avatar)
+          : `<button class="mp-avatar-btn" data-act="avatar-extra" data-chat="${chat.id}" data-msg="${message.id}" type="button" aria-label="看 TA 的小剧场">${avatarHtml(speaker?.name || contact?.name, speaker?.avatar || contact?.avatar)}</button>`}
         <div class="mp-msg-body">
           ${message.quote ? `<div class="mp-quote-line">${icon('reply')}<span>${esc(message.quote.text)}</span></div>` : ''}
           <div class="mp-bubble">${esc(message.text)}</div>
@@ -5649,13 +5732,20 @@ const threadApp = {
             const last = lastMessage(chat);
             const contact = contactById(ctx.state, chat.contactId);
             if (!last || !contact) { ctx.toast('还没有内容'); return; }
-            const list = (ctx.state.extras[contact.id] = ctx.state.extras[contact.id] || []);
-            list.unshift({ id: 'x' + Date.now().toString(36), title: last.text.slice(0, 12), date: new Date().toISOString().slice(0, 10), lines: [last.text] });
-            ctx.save();
+            saveMessageExtra(ctx, chat, contact, last);
             ctx.toast('已存进小剧场');
           }
         },
       });
+      return true;
+    }
+
+    if (act === 'avatar-extra') {
+      const chat = chatById(ctx.state, chatId);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (!chat || !message) return true;
+      const contact = contactById(ctx.state, chat.contactId);
+      openMessageExtra(ctx, chat, contact, message);
       return true;
     }
 
@@ -5696,6 +5786,7 @@ const threadApp = {
           { label: '引用这条回复', value: 'quote', icon: 'reply' },
           { label: '复制文字', value: 'copy', icon: 'copy' },
           { label: '收藏', value: 'fav', icon: 'bookmark' },
+          { label: '存成小剧场', value: 'extra', icon: 'theater' },
           { label: '让 TA 重新说一次', value: 'regen', icon: 'refresh' },
           { label: '删除这条', value: 'delete', icon: 'trash', danger: true },
         ],
@@ -5712,6 +5803,10 @@ const threadApp = {
             ctx.state.favorites.unshift({ id: 'f' + Date.now().toString(36), chatId: chat.id, contactId: chat.contactId, text: message.text, from: message.from, at: Date.now() });
             ctx.save();
             ctx.toast('已收藏');
+          }
+          if (value === 'extra') {
+            saveMessageExtra(ctx, chat, contact, message);
+            ctx.toast('已存进小剧场');
           }
           if (value === 'regen') {
             const index = chat.messages.indexOf(message);
@@ -6538,14 +6633,24 @@ const extraDetailApp = {
   id: 'extra-detail', name: '片段', icon: 'theater',
 
   render(ctx, params) {
-    const contact = contactById(ctx.state, params.contactId);
-    const item = (ctx.state.extras[params.contactId] || []).find(entry => entry.id === params.extraId);
+    let ownerId = params.contactId;
+    let item = (ctx.state.extras[ownerId] || []).find(entry => entry.id === params.extraId);
+    if (!item && params.extraId) {
+      for (const [contactId, list] of Object.entries(ctx.state.extras)) {
+        const hit = (list || []).find(entry => entry.id === params.extraId);
+        if (hit) { item = hit; ownerId = contactId; break; }
+      }
+    }
+    const contact = contactById(ctx.state, ownerId);
     if (!item) return `<div class="mp-page-body"><div class="mp-empty">这一段不在了。</div></div>`;
+    const sourceChat = item.chatId ? ctx.state.chats[item.chatId] : null;
+    const source = sourceChat?.messages?.find(message => message.id === item.messageId);
     return `
       <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button><span style="flex:1"></span></div>
       <div class="mp-page-body">
         <div class="mp-subtitle" style="margin-bottom:6px">${esc(contact?.name || '')} · ${esc(item.date || '')}</div>
         <div class="mp-title" style="font-size:24px;margin-bottom:14px">${esc(item.title)}</div>
+        ${source ? `<div class="mp-extra-source">${icon('reply')}<span>${esc(source.text)}</span></div>` : ''}
         ${(item.lines || []).map(line => `
           <div style="font-family:var(--font-serif);font-size:14px;line-height:1.9;color:var(--text);margin-bottom:10px">${esc(line)}</div>`).join('')}
       </div>`;

@@ -111,11 +111,12 @@ export function contactById(state, id) {
 
 export function addChat(state, contactId, options = {}) {
   const id = options.id || newId('ch');
+  const messages = (options.messages || []).map((message, index) => ({ id: `${id}_m${index}`, ...message }));
   state.chats[id] = {
     id,
     contactId,
     kind: options.kind || (state.contacts[contactId]?.kind === 'group' ? 'group' : 'single'),
-    messages: options.messages || [],
+    messages,
     unread: 0,
     draft: '',
     pinned: false,
@@ -416,7 +417,7 @@ export function demoState() {
   addFavorite(state, { text: '就你上次在车上放的那首。', chatId: chatJiang.id, contactId: jiang.id, from: 'them' });
 
   state.extras[shen.id] = [
-    { id: 'x1', title: '楼下的便利店', date: '2026-11-10', lines: ['他把外套领子立起来，靠在电动车上抬头看我的窗户。', '灯管太白，照得人有点狼狈。'] },
+    { id: 'x1', title: '楼下的便利店', date: '2026-11-10', messageId: 'ch_demo_shen_m0', chatId: 'ch_demo_shen', lines: ['他把外套领子立起来，靠在电动车上抬头看我的窗户。', '灯管太白，照得人有点狼狈。'] },
     { id: 'x2', title: '第 41 分钟', date: '2026-11-06', lines: ['他说等 41 分钟就走。', '结果等到第 58 分钟。'] },
   ];
   state.extras[jiang.id] = [
@@ -518,8 +519,10 @@ export function normalize(raw) {
   merged.plans = Array.isArray(merged.plans) ? merged.plans : [];
   merged.extras = merged.extras || {};
   merged.emoji = Array.isArray(merged.emoji) && merged.emoji.length ? merged.emoji : base.emoji;
-  for (const chat of Object.values(merged.chats)) {
-    chat.messages = Array.isArray(chat.messages) ? chat.messages : [];
+  for (const [chatId, chat] of Object.entries(merged.chats)) {
+    chat.messages = Array.isArray(chat.messages)
+      ? chat.messages.map((message, index) => ({ id: message.id || `${chatId}_m${index}`, ...message }))
+      : [];
     chat.unread = chat.unread || 0;
   }
   return merged;

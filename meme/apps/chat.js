@@ -35,6 +35,53 @@ function chatSetRow(chatId, { iconName, title, sub, act, toggle, value, danger }
     </button>`;
 }
 
+function saveMessageExtra(ctx, chat, contact, message) {
+  const list = (ctx.state.extras[chat.contactId] = ctx.state.extras[chat.contactId] || []);
+  const item = {
+    id: 'x' + Date.now().toString(36),
+    title: (message.text || '这一条').slice(0, 12),
+    date: new Date(message.at || Date.now()).toLocaleDateString('sv-SE'),
+    lines: [message.text || ''],
+    messageId: message.id,
+    chatId: chat.id,
+  };
+  list.unshift(item);
+  ctx.save();
+  return item;
+}
+
+function openMessageExtra(ctx, chat, contact, message) {
+  const extras = (ctx.state.extras[chat.contactId] || [])
+    .filter(item => item.messageId === message.id);
+  if (extras.length === 1) {
+    ctx.go('extra-detail', { contactId: chat.contactId, extraId: extras[0].id });
+    return;
+  }
+  if (extras.length > 1) {
+    ctx.openSheet({
+      title: '这条消息的小剧场',
+      items: extras.map(item => ({ label: item.title, value: item.id, icon: 'theater' })),
+      onPick: (value) => ctx.go('extra-detail', { contactId: chat.contactId, extraId: value }),
+    });
+    return;
+  }
+  ctx.openSheet({
+    title: '这条消息还没有小剧场',
+    items: [
+      { label: '把这条存成小剧场', value: 'save', icon: 'theater' },
+      { label: '看 TA 的全部小剧场', value: 'all', icon: 'book' },
+    ],
+    onPick: (value) => {
+      if (value === 'save') {
+        const item = saveMessageExtra(ctx, chat, contact, message);
+        ctx.toast('已存进小剧场');
+        ctx.go('extra-detail', { contactId: chat.contactId, extraId: item.id });
+      }
+      if (value === 'all') ctx.go('app-extras', { contactId: chat.contactId });
+    },
+  });
+}
+
 function generateDiary(ctx, chat, contact) {
   ctx.toast('正在写日记…');
   Promise.resolve(ctx.ai.diary(ctx, { chat, contact })).then(text => {
@@ -169,7 +216,9 @@ function threadBody(ctx, chatId) {
     const speaker = message.speaker ? contactById(state, message.speaker) : null;
     blocks.push(`
       <div class="mp-msg${me ? ' me' : ''}" data-hold="message-menu" data-chat="${chat.id}" data-msg="${message.id}">
-        ${avatarHtml(me ? state.settings.user.name : (speaker?.name || contact?.name), me ? state.settings.user.avatar : (speaker?.avatar || contact?.avatar))}
+        ${me
+          ? avatarHtml(state.settings.user.name, state.settings.user.avatar)
+          : `<button class="mp-avatar-btn" data-act="avatar-extra" data-chat="${chat.id}" data-msg="${message.id}" type="button" aria-label="看 TA 的小剧场">${avatarHtml(speaker?.name || contact?.name, speaker?.avatar || contact?.avatar)}</button>`}
         <div class="mp-msg-body">
           ${message.quote ? `<div class="mp-quote-line">${icon('reply')}<span>${esc(message.quote.text)}</span></div>` : ''}
           <div class="mp-bubble">${esc(message.text)}</div>
@@ -511,13 +560,20 @@ export const threadApp = {
             const last = lastMessage(chat);
             const contact = contactById(ctx.state, chat.contactId);
             if (!last || !contact) { ctx.toast('还没有内容'); return; }
-            const list = (ctx.state.extras[contact.id] = ctx.state.extras[contact.id] || []);
-            list.unshift({ id: 'x' + Date.now().toString(36), title: last.text.slice(0, 12), date: new Date().toISOString().slice(0, 10), lines: [last.text] });
-            ctx.save();
+            saveMessageExtra(ctx, chat, contact, last);
             ctx.toast('已存进小剧场');
           }
         },
       });
+      return true;
+    }
+
+    if (act === 'avatar-extra') {
+      const chat = chatById(ctx.state, chatId);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (!chat || !message) return true;
+      const contact = contactById(ctx.state, chat.contactId);
+      openMessageExtra(ctx, chat, contact, message);
       return true;
     }
 
@@ -558,6 +614,7 @@ export const threadApp = {
           { label: '引用这条回复', value: 'quote', icon: 'reply' },
           { label: '复制文字', value: 'copy', icon: 'copy' },
           { label: '收藏', value: 'fav', icon: 'bookmark' },
+          { label: '存成小剧场', value: 'extra', icon: 'theater' },
           { label: '让 TA 重新说一次', value: 'regen', icon: 'refresh' },
           { label: '删除这条', value: 'delete', icon: 'trash', danger: true },
         ],
@@ -574,6 +631,10 @@ export const threadApp = {
             ctx.state.favorites.unshift({ id: 'f' + Date.now().toString(36), chatId: chat.id, contactId: chat.contactId, text: message.text, from: message.from, at: Date.now() });
             ctx.save();
             ctx.toast('已收藏');
+          }
+          if (value === 'extra') {
+            saveMessageExtra(ctx, chat, contact, message);
+            ctx.toast('已存进小剧场');
           }
           if (value === 'regen') {
             const index = chat.messages.indexOf(message);

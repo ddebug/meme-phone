@@ -76,6 +76,89 @@ export async function readTavernCards() {
   }
 }
 
+/**
+ * 读一个角色关联的所有世界书（主书 + 附加书），把条目摊平成纯数据。
+ * 角色书不是导出时那张卡里的副本，而是酒馆世界书里正在生效的那本。
+ */
+export async function readCharacterBooks(name) {
+  const script = await loadHostScript();
+  if (!script) return { available: false, books: [], reason: '没接上酒馆' };
+  try {
+    const ctx = globalThis.SillyTavern?.getContext?.() || script.getContext?.() || {};
+    const characters = Array.isArray(ctx.characters) ? ctx.characters : (script.characters || []);
+    const character = characters.find(item => item?.name === String(name || '')) || null;
+    if (!character) return { available: true, books: [], reason: '没找到这个角色' };
+
+    const settings = ctx.getWorldInfoSettings?.() || script.getWorldInfoSettings?.() || {};
+    let worldInfo = settings.world_info || script.world_info || {};
+    /* 上下文没暴露 getWorldInfoSettings 时，charLore 只存在酒馆设置里 */
+    if (!Array.isArray(worldInfo.charLore) && typeof fetch === 'function') {
+      try {
+        const headers = ctx.getRequestHeaders?.() || {};
+        const response = await fetch('/api/settings/get', { method: 'POST', headers, body: '{}' });
+        if (response.ok) {
+          const saved = await response.json();
+          worldInfo = saved.world_info_settings?.world_info || saved.world_info || worldInfo;
+        }
+      } catch { /* 读不到附加书就只读主书 */ }
+    }
+    const file = String(character.avatar || '').replace(/\.[^/.]+$/, '');
+    const primary = String(character.data?.extensions?.world || '').trim();
+    const extra = (worldInfo.charLore || []).find(item => item?.name === file)?.extraBooks || [];
+
+    const names = [...new Set([primary, ...extra.map(String)].filter(Boolean))];
+    const load = ctx.loadWorldInfo || script.loadWorldInfo;
+    if (typeof load !== 'function') return { available: true, books: [], reason: '酒馆没开放世界书读取' };
+
+    const books = [];
+    for (const bookName of names) {
+      try {
+        const data = await load(bookName);
+        if (!data) { books.push({ name: bookName, entries: [], error: '这本没读到' }); continue; }
+        const entries = Object.entries(data.entries || {}).map(([uid, entry]) => ({
+          uid: String(entry?.uid ?? uid),
+          title: String(entry?.comment || (Array.isArray(entry?.key) ? entry.key[0] : entry?.key) || `条目 ${uid}`),
+          keys: Array.isArray(entry?.key) ? entry.key.map(String) : (entry?.key ? [String(entry.key)] : []),
+          content: String(entry?.content || ''),
+          disabled: Boolean(entry?.disable),
+          constant: Boolean(entry?.constant),
+          order: Number(entry?.order ?? 0),
+        }));
+        entries.sort((a, b) => a.order - b.order);
+        books.push({ name: bookName, entries, error: '' });
+      } catch (error) {
+        books.push({ name: bookName, entries: [], error: error.message || '这本没读到' });
+      }
+    }
+    return { available: true, books, reason: '' };
+  } catch (error) {
+    return { available: true, books: [], reason: error.message || String(error) };
+  }
+}
+
+/** 开 / 关一条世界书条目，直接写回酒馆世界书。 */
+export async function setWorldEntryEnabled(bookName, uid, disabled) {
+  const script = await loadHostScript();
+  if (!script) return { ok: false, reason: '没接上酒馆' };
+  try {
+    const ctx = globalThis.SillyTavern?.getContext?.() || script.getContext?.() || {};
+    const load = ctx.loadWorldInfo || script.loadWorldInfo;
+    const save = ctx.saveWorldInfo || script.saveWorldInfo;
+    if (typeof load !== 'function' || typeof save !== 'function') {
+      return { ok: false, reason: '酒馆没开放世界书写入' };
+    }
+    const data = await load(bookName);
+    if (!data?.entries) return { ok: false, reason: '这本世界书没读到' };
+    const key = Object.keys(data.entries).find(item => String(data.entries[item]?.uid ?? item) === String(uid));
+    if (!key) return { ok: false, reason: '这条目已经不在了' };
+    data.entries[key].disable = Boolean(disabled);
+    await save(bookName, data, true);
+    return { ok: true, disabled: Boolean(disabled) };
+  } catch (error) {
+    return { ok: false, reason: error.message || String(error) };
+  }
+}
+
 /** 当前打开的酒馆聊天，用来给日记、主动消息提供素材。 */
 export async function readTavernContext() {
   const script = await loadHostScript();

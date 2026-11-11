@@ -318,6 +318,23 @@ export function demoState() {
       scenario: '夜里十点，他靠在便利店门口的电动车上，等你下班。',
       firstMes: '到楼下了，今天风有点大。',
       creator: 'meme-phone', version: '1.0',
+      demoBooks: [
+        {
+          name: '沈砚的世界',
+          entries: [
+            { uid: '0', title: '工地', keys: ['工地', '项目'], content: '城西的旧改项目，沈砚盯了三年的地方。塔吊下面总有一家凌晨还开着的面馆。', disabled: false, constant: false, order: 1 },
+            { uid: '1', title: '便利店', keys: ['便利店', '夜班'], content: '你上夜班的那家便利店，冰柜第二层永远放着两瓶温过的牛奶。', disabled: false, constant: false, order: 2 },
+            { uid: '2', title: '旧电动车', keys: ['电动车', '后座'], content: '沈砚那辆骑了五年的电动车，后座绑着一块洗得发白的垫子。', disabled: true, constant: false, order: 3 },
+          ],
+        },
+        {
+          name: '夜班人物',
+          entries: [
+            { uid: '0', title: '老赵', keys: ['老赵', '店长'], content: '便利店店长，五十多岁，总把「早点回去」挂在嘴边，但从不真的赶人。', disabled: false, constant: true, order: 1 },
+            { uid: '1', title: '小满的早饭', keys: ['小满', '早饭'], content: '林小满每天早上会多带一份早饭，放在你桌角，不问你要不要。', disabled: false, constant: false, order: 2 },
+          ],
+        },
+      ],
     },
     {
       name: '江迟', avatar: 'jiang.png', avatarUrl: '', tags: ['音乐', '夜里', '旧歌'],

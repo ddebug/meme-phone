@@ -2280,6 +2280,134 @@ body {
   word-break: break-word;
 }
 
+/* 角色关联的世界书：按书分组，每条一个开关 */
+.mp-wi-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 2px 8px;
+}
+
+.mp-wi-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.mp-wi-scan,
+.mp-wi-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 10.5px;
+  color: var(--accent-deep);
+  background: rgba(142, 123, 242, .1);
+  cursor: pointer;
+}
+
+.mp-wi-scan .mp-i { width: 13px; height: 13px; }
+
+.mp-wi-books { display: flex; flex-direction: column; gap: 10px; }
+
+.mp-wi-book-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 4px 5px;
+}
+
+.mp-wi-book-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-wi-book-count {
+  flex: none;
+  font-size: 10px;
+  color: var(--text-4);
+}
+
+.mp-wi-list { padding: 2px 12px; }
+
+.mp-wi-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: opacity .15s ease;
+}
+
+.mp-wi-row + .mp-wi-row { border-top: 1px solid var(--line-soft); }
+.mp-wi-row.is-off { opacity: .5; }
+.mp-wi-row:active { opacity: .7; }
+
+.mp-wi-main { flex: 1; min-width: 0; }
+
+.mp-wi-name {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-wi-sub {
+  display: -webkit-box;
+  margin-top: 3px;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--text-4);
+  white-space: normal;
+  word-break: break-word;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mp-wi-note {
+  padding: 10px 14px;
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--text-3);
+}
+
+.mp-wi-note .mp-wi-retry { margin-left: 8px; vertical-align: 1px; }
+
+.mp-wi-total {
+  margin: 8px 4px 0;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--text-4);
+}
+
+.mp-root[data-mp-theme="night"] .mp-wi-scan,
+.mp-root[data-mp-theme="night"] .mp-wi-retry {
+  color: #cbbffb;
+  background: rgba(150, 132, 235, .2);
+}
+
 .mp-root[data-mp-theme="night"] .mp-char-query {
   color: #cbbffb;
   background: rgba(150, 132, 235, .2);
@@ -3372,6 +3500,23 @@ function demoState() {
       scenario: '夜里十点，他靠在便利店门口的电动车上，等你下班。',
       firstMes: '到楼下了，今天风有点大。',
       creator: 'meme-phone', version: '1.0',
+      demoBooks: [
+        {
+          name: '沈砚的世界',
+          entries: [
+            { uid: '0', title: '工地', keys: ['工地', '项目'], content: '城西的旧改项目，沈砚盯了三年的地方。塔吊下面总有一家凌晨还开着的面馆。', disabled: false, constant: false, order: 1 },
+            { uid: '1', title: '便利店', keys: ['便利店', '夜班'], content: '你上夜班的那家便利店，冰柜第二层永远放着两瓶温过的牛奶。', disabled: false, constant: false, order: 2 },
+            { uid: '2', title: '旧电动车', keys: ['电动车', '后座'], content: '沈砚那辆骑了五年的电动车，后座绑着一块洗得发白的垫子。', disabled: true, constant: false, order: 3 },
+          ],
+        },
+        {
+          name: '夜班人物',
+          entries: [
+            { uid: '0', title: '老赵', keys: ['老赵', '店长'], content: '便利店店长，五十多岁，总把「早点回去」挂在嘴边，但从不真的赶人。', disabled: false, constant: true, order: 1 },
+            { uid: '1', title: '小满的早饭', keys: ['小满', '早饭'], content: '林小满每天早上会多带一份早饭，放在你桌角，不问你要不要。', disabled: false, constant: false, order: 2 },
+          ],
+        },
+      ],
     },
     {
       name: '江迟', avatar: 'jiang.png', avatarUrl: '', tags: ['音乐', '夜里', '旧歌'],
@@ -3811,6 +3956,89 @@ async function readTavernCards() {
   }
 }
 
+/**
+ * 读一个角色关联的所有世界书（主书 + 附加书），把条目摊平成纯数据。
+ * 角色书不是导出时那张卡里的副本，而是酒馆世界书里正在生效的那本。
+ */
+async function readCharacterBooks(name) {
+  const script = await loadHostScript();
+  if (!script) return { available: false, books: [], reason: '没接上酒馆' };
+  try {
+    const ctx = globalThis.SillyTavern?.getContext?.() || script.getContext?.() || {};
+    const characters = Array.isArray(ctx.characters) ? ctx.characters : (script.characters || []);
+    const character = characters.find(item => item?.name === String(name || '')) || null;
+    if (!character) return { available: true, books: [], reason: '没找到这个角色' };
+
+    const settings = ctx.getWorldInfoSettings?.() || script.getWorldInfoSettings?.() || {};
+    let worldInfo = settings.world_info || script.world_info || {};
+    /* 上下文没暴露 getWorldInfoSettings 时，charLore 只存在酒馆设置里 */
+    if (!Array.isArray(worldInfo.charLore) && typeof fetch === 'function') {
+      try {
+        const headers = ctx.getRequestHeaders?.() || {};
+        const response = await fetch('/api/settings/get', { method: 'POST', headers, body: '{}' });
+        if (response.ok) {
+          const saved = await response.json();
+          worldInfo = saved.world_info_settings?.world_info || saved.world_info || worldInfo;
+        }
+      } catch { /* 读不到附加书就只读主书 */ }
+    }
+    const file = String(character.avatar || '').replace(/\.[^/.]+$/, '');
+    const primary = String(character.data?.extensions?.world || '').trim();
+    const extra = (worldInfo.charLore || []).find(item => item?.name === file)?.extraBooks || [];
+
+    const names = [...new Set([primary, ...extra.map(String)].filter(Boolean))];
+    const load = ctx.loadWorldInfo || script.loadWorldInfo;
+    if (typeof load !== 'function') return { available: true, books: [], reason: '酒馆没开放世界书读取' };
+
+    const books = [];
+    for (const bookName of names) {
+      try {
+        const data = await load(bookName);
+        if (!data) { books.push({ name: bookName, entries: [], error: '这本没读到' }); continue; }
+        const entries = Object.entries(data.entries || {}).map(([uid, entry]) => ({
+          uid: String(entry?.uid ?? uid),
+          title: String(entry?.comment || (Array.isArray(entry?.key) ? entry.key[0] : entry?.key) || `条目 ${uid}`),
+          keys: Array.isArray(entry?.key) ? entry.key.map(String) : (entry?.key ? [String(entry.key)] : []),
+          content: String(entry?.content || ''),
+          disabled: Boolean(entry?.disable),
+          constant: Boolean(entry?.constant),
+          order: Number(entry?.order ?? 0),
+        }));
+        entries.sort((a, b) => a.order - b.order);
+        books.push({ name: bookName, entries, error: '' });
+      } catch (error) {
+        books.push({ name: bookName, entries: [], error: error.message || '这本没读到' });
+      }
+    }
+    return { available: true, books, reason: '' };
+  } catch (error) {
+    return { available: true, books: [], reason: error.message || String(error) };
+  }
+}
+
+/** 开 / 关一条世界书条目，直接写回酒馆世界书。 */
+async function setWorldEntryEnabled(bookName, uid, disabled) {
+  const script = await loadHostScript();
+  if (!script) return { ok: false, reason: '没接上酒馆' };
+  try {
+    const ctx = globalThis.SillyTavern?.getContext?.() || script.getContext?.() || {};
+    const load = ctx.loadWorldInfo || script.loadWorldInfo;
+    const save = ctx.saveWorldInfo || script.saveWorldInfo;
+    if (typeof load !== 'function' || typeof save !== 'function') {
+      return { ok: false, reason: '酒馆没开放世界书写入' };
+    }
+    const data = await load(bookName);
+    if (!data?.entries) return { ok: false, reason: '这本世界书没读到' };
+    const key = Object.keys(data.entries).find(item => String(data.entries[item]?.uid ?? item) === String(uid));
+    if (!key) return { ok: false, reason: '这条目已经不在了' };
+    data.entries[key].disable = Boolean(disabled);
+    await save(bookName, data, true);
+    return { ok: true, disabled: Boolean(disabled) };
+  } catch (error) {
+    return { ok: false, reason: error.message || String(error) };
+  }
+}
+
 /** 当前打开的酒馆聊天，用来给日记、主动消息提供素材。 */
 async function readTavernContext() {
   const script = await loadHostScript();
@@ -4178,6 +4406,8 @@ exports["loadHostScript"] = loadHostScript;
 exports["isStandalone"] = isStandalone;
 exports["readTavernCharacters"] = readTavernCharacters;
 exports["readTavernCards"] = readTavernCards;
+exports["readCharacterBooks"] = readCharacterBooks;
+exports["setWorldEntryEnabled"] = setWorldEntryEnabled;
 exports["readTavernContext"] = readTavernContext;
 exports["readUserAvatar"] = readUserAvatar;
 exports["generate"] = generate;
@@ -8153,6 +8383,8 @@ const SECTIONS = [
   ['作者备注', 'creatorNotes'],
 ];
 
+let activeCardName = '';
+
 function cardsOf(state) {
   return Array.isArray(state.characters) ? state.characters : [];
 }
@@ -8160,6 +8392,99 @@ function cardsOf(state) {
 function findCard(state, name) {
   return cardsOf(state).find(card => card.name === name) || null;
 }
+
+/* 世界书扫描结果只放当前会话，不写进小手机的存档，避免酒馆那边改了还拿旧数据 */
+function bookCache(ctx, card) {
+  if (!ctx.shell.charBooks) ctx.shell.charBooks = {};
+  return ctx.shell.charBooks[card.name] || null;
+}
+
+async function scanBooks(ctx, card, force = false) {
+  const cached = bookCache(ctx, card);
+  if (cached && !force && !cached.error) return cached;
+  const reader = ctx.host?.readBooks;
+  if (typeof reader !== 'function') {
+    const demo = Array.isArray(card.demoBooks) ? card.demoBooks : [];
+    ctx.shell.charBooks[card.name] = { books: demo, available: false, reason: '预览环境读不到酒馆世界书', loading: false };
+    ctx.rerender();
+    return ctx.shell.charBooks[card.name];
+  }
+  ctx.shell.charBooks[card.name] = { books: [], loading: true, error: '' };
+  ctx.rerender();
+  try {
+    const result = await reader(card.name);
+    const offline = !result?.available;
+    const demo = offline && Array.isArray(card.demoBooks) ? card.demoBooks : [];
+    ctx.shell.charBooks[card.name] = {
+      books: result?.available && Array.isArray(result.books) ? result.books : demo,
+      available: Boolean(result?.available),
+      reason: demo.length ? '' : (offline ? '预览环境没有这个角色的演示世界书' : (result?.reason || '')),
+      error: result?.available || demo.length || offline ? '' : (result?.reason || '读不到酒馆'),
+      loading: false,
+    };
+  } catch (error) {
+    ctx.shell.charBooks[card.name] = { books: [], error: error.message || '扫描失败', loading: false };
+  }
+  ctx.rerender();
+  return ctx.shell.charBooks[card.name];
+}
+
+function ensureBooks(ctx, card) {
+  const cache = bookCache(ctx, card);
+  if (cache) return cache;
+  ctx.shell.charBooks[card.name] = { books: [], loading: true };
+  setTimeout(() => scanBooks(ctx, card, true), 0);
+  return ctx.shell.charBooks[card.name];
+}
+
+function bookEntryRow(book, entry) {
+  const keys = entry.keys?.length ? entry.keys.join('、') : '没有关键词';
+  const preview = String(entry.content || '').replace(/\s+/g, ' ').slice(0, 72);
+  const sub = [keys, entry.constant ? '常驻' : '', preview].filter(Boolean).join(' · ');
+  return `
+    <button class="mp-wi-row${entry.disabled ? ' is-off' : ''}" data-act="char-wi-toggle"
+      data-book="${esc(book.name)}" data-uid="${esc(entry.uid)}" type="button" role="switch" aria-checked="${entry.disabled ? 'false' : 'true'}">
+      <span class="mp-wi-main">
+        <span class="mp-wi-name">${esc(entry.title)}</span>
+        <span class="mp-wi-sub">${esc(sub)}</span>
+      </span>
+      <span class="mp-switch${entry.disabled ? '' : ' on'}"></span>
+    </button>`;
+}
+
+function booksHtml(cache, cardName) {
+  if (!cache || cache.loading) {
+    return `<div class="mp-wi-note">正在扫描这个角色关联的世界书…</div>`;
+  }
+  if (cache.error) {
+    return `<div class="mp-wi-note">${esc(cache.error)}<button class="mp-wi-retry" data-act="char-wi-scan" data-name="${esc(cardName)}" type="button">重试</button></div>`;
+  }
+  if (!cache.books.length) {
+    return `<div class="mp-wi-note">${esc(cache.reason || '这个角色没有关联世界书。')}<button class="mp-wi-retry" data-act="char-wi-scan" data-name="${esc(cardName)}" type="button">重新扫描</button></div>`;
+  }
+  const total = cache.books.reduce((sum, book) => sum + book.entries.length, 0);
+  const on = cache.books.reduce((sum, book) => sum + book.entries.filter(entry => !entry.disabled).length, 0);
+  return `
+    <div class="mp-wi-books">
+      ${cache.available === false ? '<div class="mp-wi-note">预览里的演示世界书，真机上会读酒馆。</div>' : ''}
+      ${cache.books.map(book => {
+        const open = book.entries.filter(entry => !entry.disabled).length;
+        return `
+          <div class="mp-wi-book">
+            <div class="mp-wi-book-head">
+              <span class="mp-wi-book-name">${esc(book.name)}</span>
+              <span class="mp-wi-book-count">${open}/${book.entries.length} 条开着</span>
+            </div>
+            ${book.error ? `<div class="mp-wi-note">${esc(book.error)}</div>` : ''}
+            <div class="mp-card mp-wi-list">
+              ${book.entries.length ? book.entries.map(entry => bookEntryRow(book, entry)).join('') : '<div class="mp-empty">这本世界书里没有条目。</div>'}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>
+    <div class="mp-wi-total">${cache.books.length} 本 · 共 ${total} 条，${on} 条开着。开关会直接写回酒馆世界书。</div>`;
+}
+
 
 function match(card, query) {
   if (!query) return true;
@@ -8259,7 +8584,54 @@ const charactersApp = {
 
     if (act === 'char-open') {
       const name = String(data?.name || '');
-      if (name) ctx.go('character-card', { name });
+      if (name) {
+        const card = findCard(state, name);
+        ctx.go('character-card', { name });
+        if (card) scanBooks(ctx, card);
+      }
+      return true;
+    }
+
+    if (act === 'char-wi-scan') {
+      const card = findCard(state, String(data?.name || activeCardName || ''));
+      if (card) scanBooks(ctx, card, true);
+      else ctx.toast('这张卡不在了');
+      return true;
+    }
+
+    if (act === 'char-wi-toggle') {
+      const card = findCard(state, activeCardName);
+      const cache = card ? bookCache(ctx, card) : null;
+      const book = cache?.books?.find(item => item.name === String(data?.book || ''));
+      const entry = book?.entries?.find(item => String(item.uid) === String(data?.uid || ''));
+      if (!card || !book || !entry) { ctx.toast('这条目已经不在了，重新扫描一下'); return true; }
+      if (entry.busy) return true;
+      const next = !entry.disabled;
+      const toggler = ctx.host?.toggleBookEntry;
+      if (typeof toggler !== 'function') {
+        entry.disabled = next;
+        ctx.rerender();
+        ctx.toast(`演示环境：已${next ? '关闭' : '开启'}「${entry.title}」`);
+        return true;
+      }
+      entry.busy = true;
+      entry.disabled = next;
+      ctx.rerender();
+      toggler(book.name, entry.uid, next).then(result => {
+        entry.busy = false;
+        if (!result?.ok) {
+          entry.disabled = !next;
+          ctx.toast(result?.reason || '没写进酒馆世界书');
+        } else {
+          ctx.toast(`已${next ? '关闭' : '开启'}「${entry.title}」`);
+        }
+        ctx.rerender();
+      }).catch(error => {
+        entry.busy = false;
+        entry.disabled = !next;
+        ctx.toast(error.message || '写入失败');
+        ctx.rerender();
+      });
       return true;
     }
 
@@ -8274,6 +8646,7 @@ const characterApp = {
     const state = ctx.state;
     const card = findCard(state, params?.name || '');
     if (!card) return '<div class="mp-page-body"><div class="mp-empty">这张卡不在了。</div></div>';
+    activeCardName = card.name;
 
     const inContacts = contactsOf(state).some(contact => contact.name === card.name);
 
@@ -8286,6 +8659,7 @@ const characterApp = {
         </div>`).join('');
 
     const tags = (card.tags || []).map(tag => `<span class="mp-char-tag">${esc(tag)}</span>`).join('');
+    const bookState = ensureBooks(ctx, card);
 
     return `
       <div class="mp-page-body">
@@ -8297,6 +8671,12 @@ const characterApp = {
         </div>
 
         ${body || '<div class="mp-empty">这张卡只有名字。</div>'}
+
+        <div class="mp-wi-head">
+          <span class="mp-wi-title">关联世界书</span>
+          <button class="mp-wi-scan" data-act="char-wi-scan" data-name="${esc(card.name)}" type="button">${icon('refresh')}<span>重新扫描</span></button>
+        </div>
+        ${booksHtml(bookState, card.name)}
 
         <div class="mp-user-actions">
           <button class="mp-btn${inContacts ? '' : ' accent'}" data-act="char-add" data-name="${esc(card.name)}" type="button">
@@ -9154,7 +9534,7 @@ __mods["meme/index.js"] = function(module, exports, __req){
 const { createStore } = __req("meme/store.js");
 const { normalize, emptyState, demoState, syncTavernContacts, chatFor } = __req("meme/data.js");
 const { createShell } = __req("meme/shell.js");
-const { readTavernCharacters, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } = __req("meme/host.js");
+const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } = __req("meme/host.js");
 const { chatApp, threadApp } = __req("meme/apps/chat.js");
 const { summaryContext } = __req("meme/book.js");
 const { diaryApp } = __req("meme/apps/diary.js");
@@ -9442,6 +9822,8 @@ async function openMemePhone(options = {}) {
     probe: probeHost,
     readCharacters: readTavernCharacters,
     readCards: readTavernCards,
+    readBooks: readCharacterBooks,
+    toggleBookEntry: setWorldEntryEnabled,
     readUserAvatar,
     syncUsers,
     writeUser: writeTavernPersona,

@@ -18,6 +18,8 @@ const SECTIONS = [
   ['作者备注', 'creatorNotes'],
 ];
 
+let activeCardName = '';
+
 function cardsOf(state) {
   return Array.isArray(state.characters) ? state.characters : [];
 }
@@ -25,6 +27,99 @@ function cardsOf(state) {
 function findCard(state, name) {
   return cardsOf(state).find(card => card.name === name) || null;
 }
+
+/* 世界书扫描结果只放当前会话，不写进小手机的存档，避免酒馆那边改了还拿旧数据 */
+function bookCache(ctx, card) {
+  if (!ctx.shell.charBooks) ctx.shell.charBooks = {};
+  return ctx.shell.charBooks[card.name] || null;
+}
+
+async function scanBooks(ctx, card, force = false) {
+  const cached = bookCache(ctx, card);
+  if (cached && !force && !cached.error) return cached;
+  const reader = ctx.host?.readBooks;
+  if (typeof reader !== 'function') {
+    const demo = Array.isArray(card.demoBooks) ? card.demoBooks : [];
+    ctx.shell.charBooks[card.name] = { books: demo, available: false, reason: '预览环境读不到酒馆世界书', loading: false };
+    ctx.rerender();
+    return ctx.shell.charBooks[card.name];
+  }
+  ctx.shell.charBooks[card.name] = { books: [], loading: true, error: '' };
+  ctx.rerender();
+  try {
+    const result = await reader(card.name);
+    const offline = !result?.available;
+    const demo = offline && Array.isArray(card.demoBooks) ? card.demoBooks : [];
+    ctx.shell.charBooks[card.name] = {
+      books: result?.available && Array.isArray(result.books) ? result.books : demo,
+      available: Boolean(result?.available),
+      reason: demo.length ? '' : (offline ? '预览环境没有这个角色的演示世界书' : (result?.reason || '')),
+      error: result?.available || demo.length || offline ? '' : (result?.reason || '读不到酒馆'),
+      loading: false,
+    };
+  } catch (error) {
+    ctx.shell.charBooks[card.name] = { books: [], error: error.message || '扫描失败', loading: false };
+  }
+  ctx.rerender();
+  return ctx.shell.charBooks[card.name];
+}
+
+function ensureBooks(ctx, card) {
+  const cache = bookCache(ctx, card);
+  if (cache) return cache;
+  ctx.shell.charBooks[card.name] = { books: [], loading: true };
+  setTimeout(() => scanBooks(ctx, card, true), 0);
+  return ctx.shell.charBooks[card.name];
+}
+
+function bookEntryRow(book, entry) {
+  const keys = entry.keys?.length ? entry.keys.join('、') : '没有关键词';
+  const preview = String(entry.content || '').replace(/\s+/g, ' ').slice(0, 72);
+  const sub = [keys, entry.constant ? '常驻' : '', preview].filter(Boolean).join(' · ');
+  return `
+    <button class="mp-wi-row${entry.disabled ? ' is-off' : ''}" data-act="char-wi-toggle"
+      data-book="${esc(book.name)}" data-uid="${esc(entry.uid)}" type="button" role="switch" aria-checked="${entry.disabled ? 'false' : 'true'}">
+      <span class="mp-wi-main">
+        <span class="mp-wi-name">${esc(entry.title)}</span>
+        <span class="mp-wi-sub">${esc(sub)}</span>
+      </span>
+      <span class="mp-switch${entry.disabled ? '' : ' on'}"></span>
+    </button>`;
+}
+
+function booksHtml(cache, cardName) {
+  if (!cache || cache.loading) {
+    return `<div class="mp-wi-note">正在扫描这个角色关联的世界书…</div>`;
+  }
+  if (cache.error) {
+    return `<div class="mp-wi-note">${esc(cache.error)}<button class="mp-wi-retry" data-act="char-wi-scan" data-name="${esc(cardName)}" type="button">重试</button></div>`;
+  }
+  if (!cache.books.length) {
+    return `<div class="mp-wi-note">${esc(cache.reason || '这个角色没有关联世界书。')}<button class="mp-wi-retry" data-act="char-wi-scan" data-name="${esc(cardName)}" type="button">重新扫描</button></div>`;
+  }
+  const total = cache.books.reduce((sum, book) => sum + book.entries.length, 0);
+  const on = cache.books.reduce((sum, book) => sum + book.entries.filter(entry => !entry.disabled).length, 0);
+  return `
+    <div class="mp-wi-books">
+      ${cache.available === false ? '<div class="mp-wi-note">预览里的演示世界书，真机上会读酒馆。</div>' : ''}
+      ${cache.books.map(book => {
+        const open = book.entries.filter(entry => !entry.disabled).length;
+        return `
+          <div class="mp-wi-book">
+            <div class="mp-wi-book-head">
+              <span class="mp-wi-book-name">${esc(book.name)}</span>
+              <span class="mp-wi-book-count">${open}/${book.entries.length} 条开着</span>
+            </div>
+            ${book.error ? `<div class="mp-wi-note">${esc(book.error)}</div>` : ''}
+            <div class="mp-card mp-wi-list">
+              ${book.entries.length ? book.entries.map(entry => bookEntryRow(book, entry)).join('') : '<div class="mp-empty">这本世界书里没有条目。</div>'}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>
+    <div class="mp-wi-total">${cache.books.length} 本 · 共 ${total} 条，${on} 条开着。开关会直接写回酒馆世界书。</div>`;
+}
+
 
 function match(card, query) {
   if (!query) return true;
@@ -124,7 +219,54 @@ export const charactersApp = {
 
     if (act === 'char-open') {
       const name = String(data?.name || '');
-      if (name) ctx.go('character-card', { name });
+      if (name) {
+        const card = findCard(state, name);
+        ctx.go('character-card', { name });
+        if (card) scanBooks(ctx, card);
+      }
+      return true;
+    }
+
+    if (act === 'char-wi-scan') {
+      const card = findCard(state, String(data?.name || activeCardName || ''));
+      if (card) scanBooks(ctx, card, true);
+      else ctx.toast('这张卡不在了');
+      return true;
+    }
+
+    if (act === 'char-wi-toggle') {
+      const card = findCard(state, activeCardName);
+      const cache = card ? bookCache(ctx, card) : null;
+      const book = cache?.books?.find(item => item.name === String(data?.book || ''));
+      const entry = book?.entries?.find(item => String(item.uid) === String(data?.uid || ''));
+      if (!card || !book || !entry) { ctx.toast('这条目已经不在了，重新扫描一下'); return true; }
+      if (entry.busy) return true;
+      const next = !entry.disabled;
+      const toggler = ctx.host?.toggleBookEntry;
+      if (typeof toggler !== 'function') {
+        entry.disabled = next;
+        ctx.rerender();
+        ctx.toast(`演示环境：已${next ? '关闭' : '开启'}「${entry.title}」`);
+        return true;
+      }
+      entry.busy = true;
+      entry.disabled = next;
+      ctx.rerender();
+      toggler(book.name, entry.uid, next).then(result => {
+        entry.busy = false;
+        if (!result?.ok) {
+          entry.disabled = !next;
+          ctx.toast(result?.reason || '没写进酒馆世界书');
+        } else {
+          ctx.toast(`已${next ? '关闭' : '开启'}「${entry.title}」`);
+        }
+        ctx.rerender();
+      }).catch(error => {
+        entry.busy = false;
+        entry.disabled = !next;
+        ctx.toast(error.message || '写入失败');
+        ctx.rerender();
+      });
       return true;
     }
 
@@ -139,6 +281,7 @@ export const characterApp = {
     const state = ctx.state;
     const card = findCard(state, params?.name || '');
     if (!card) return '<div class="mp-page-body"><div class="mp-empty">这张卡不在了。</div></div>';
+    activeCardName = card.name;
 
     const inContacts = contactsOf(state).some(contact => contact.name === card.name);
 
@@ -151,6 +294,7 @@ export const characterApp = {
         </div>`).join('');
 
     const tags = (card.tags || []).map(tag => `<span class="mp-char-tag">${esc(tag)}</span>`).join('');
+    const bookState = ensureBooks(ctx, card);
 
     return `
       <div class="mp-page-body">
@@ -162,6 +306,12 @@ export const characterApp = {
         </div>
 
         ${body || '<div class="mp-empty">这张卡只有名字。</div>'}
+
+        <div class="mp-wi-head">
+          <span class="mp-wi-title">关联世界书</span>
+          <button class="mp-wi-scan" data-act="char-wi-scan" data-name="${esc(card.name)}" type="button">${icon('refresh')}<span>重新扫描</span></button>
+        </div>
+        ${booksHtml(bookState, card.name)}
 
         <div class="mp-user-actions">
           <button class="mp-btn${inContacts ? '' : ' accent'}" data-act="char-add" data-name="${esc(card.name)}" type="button">

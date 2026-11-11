@@ -199,10 +199,17 @@ export async function readUserAvatar() {
 
 /**
  * 生成一段文字。
+ * 传了具体接口预设时先走那套地址 / Key / 模型；没传、是酒馆 API，或那套没填地址时走宿主。
  * 真机上走宿主 generateQuietPrompt；预览环境返回演示文案并标记 demo=true。
  */
-export async function generate({ prompt, system = '', demoReply = '' }) {
+export async function generate({ prompt, system = '', demoReply = '', preset = null }) {
   const script = await loadHostScript();
+  if (script && preset && preset.engine !== 'tavern' && String(preset.url || '').trim()) {
+    try {
+      const text = await presetCompletion(preset, { prompt, system });
+      if (text) return { text, demo: false };
+    } catch { /* 这套接口没接通就退回酒馆自己的模型，别让聊天卡死 */ }
+  }
   if (script && typeof script.generateQuietPrompt === 'function') {
     const quiet = String(prompt || '');
     const text = await script.generateQuietPrompt({ quietPrompt: quiet, quietName: '' });
@@ -211,6 +218,54 @@ export async function generate({ prompt, system = '', demoReply = '' }) {
   }
   return { text: demoReply, demo: true };
 }
+
+/** 借酒馆后端请求一套自定义 OpenAI 兼容接口，避开浏览器 CORS。 */
+async function presetCompletion(preset, { prompt, system }) {
+  const script = await loadHostScript();
+  if (!script) return '';
+  const base = String(preset.url || '').trim().replace(/\/+$/, '');
+  const path = String(preset.path || '').trim() || '/v1/chat/completions';
+  const url = /^https?:/i.test(path)
+    ? path
+    : (/\/chat\/completions$/i.test(base) ? base : `${base}${path.startsWith('/') ? path : `/${path}`}`);
+  const ctx = globalThis.SillyTavern?.getContext?.() || script.getContext?.() || {};
+  const getHeaders = ctx.getRequestHeaders || script.getRequestHeaders;
+  const headers = typeof getHeaders === 'function' ? { ...getHeaders() } : {};
+  if (!headers['X-CSRF-Token']) {
+    const token = ctx.csrf_token || globalThis.csrf_token || '';
+    if (token) headers['X-CSRF-Token'] = token;
+  }
+  headers['Content-Type'] = 'application/json';
+
+  const messages = [];
+  if (system) messages.push({ role: 'system', content: String(system) });
+  messages.push({ role: 'user', content: String(prompt || '') });
+  const body = {
+    chat_completion_source: 'custom',
+    custom_url: url,
+    custom_include_headers: '',
+    reverse_proxy: base,
+    proxy_password: String(preset.key || ''),
+    model: String(preset.model || ''),
+    messages,
+    temperature: typeof preset.temp === 'number' ? preset.temp : 0.8,
+    stream: false,
+  };
+  const response = await fetch('/api/backends/chat-completions/generate', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new Error(`接口返回 ${response.status}`);
+  const data = await response.json().catch(() => null);
+  if (!data || data.error) throw new Error(data?.message || '接口没有返回内容');
+  const content = data?.choices?.[0]?.message?.content ?? data?.choices?.[0]?.text ?? data?.content ?? data?.text;
+  if (Array.isArray(content)) return content.map(part => (typeof part === 'string' ? part : part?.text || '')).join('').trim();
+  return typeof content === 'string' ? content.trim() : '';
+}
+
 
 /**
  * NovelAI 出图。

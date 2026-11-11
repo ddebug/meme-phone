@@ -124,6 +124,7 @@ export function addChat(state, contactId, options = {}) {
     draft: '',
     pinned: false,
     muted: false,
+    llmPresetId: '',
     updatedAt: Date.now(),
   };
   return state.chats[id];
@@ -141,6 +142,20 @@ export function chatsOf(state) {
 
 export function chatById(state, id) {
   return state.chats[id] || null;
+}
+
+/** 手机里保存的聊天接口预设。 */
+export function apiPresetsOf(state) {
+  const store = state?.settings?.api;
+  return Array.isArray(store?.presets) ? store.presets : [];
+}
+
+/** 这个会话实际用哪套 LLM：自己选了就用自己那套，没选就跟随手机。 */
+export function llmPresetFor(state, chat) {
+  const list = apiPresetsOf(state);
+  const own = list.find(preset => preset.id === chat?.llmPresetId);
+  if (own) return own;
+  return list.find(preset => preset.id === state?.settings?.api?.activeChat) || list[0] || null;
 }
 
 export function lastMessage(chat) {

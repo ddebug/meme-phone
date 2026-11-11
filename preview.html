@@ -3794,6 +3794,7 @@ function addChat(state, contactId, options = {}) {
     draft: '',
     pinned: false,
     muted: false,
+    llmPresetId: '',
     updatedAt: Date.now(),
   };
   return state.chats[id];
@@ -3811,6 +3812,20 @@ function chatsOf(state) {
 
 function chatById(state, id) {
   return state.chats[id] || null;
+}
+
+/** 手机里保存的聊天接口预设。 */
+function apiPresetsOf(state) {
+  const store = state?.settings?.api;
+  return Array.isArray(store?.presets) ? store.presets : [];
+}
+
+/** 这个会话实际用哪套 LLM：自己选了就用自己那套，没选就跟随手机。 */
+function llmPresetFor(state, chat) {
+  const list = apiPresetsOf(state);
+  const own = list.find(preset => preset.id === chat?.llmPresetId);
+  if (own) return own;
+  return list.find(preset => preset.id === state?.settings?.api?.activeChat) || list[0] || null;
 }
 
 function lastMessage(chat) {
@@ -4243,6 +4258,8 @@ exports["addChat"] = addChat;
 exports["chatFor"] = chatFor;
 exports["chatsOf"] = chatsOf;
 exports["chatById"] = chatById;
+exports["apiPresetsOf"] = apiPresetsOf;
+exports["llmPresetFor"] = llmPresetFor;
 exports["lastMessage"] = lastMessage;
 exports["pushMessage"] = pushMessage;
 exports["unreadTotal"] = unreadTotal;
@@ -4604,10 +4621,17 @@ async function readUserAvatar() {
 
 /**
  * 生成一段文字。
+ * 传了具体接口预设时先走那套地址 / Key / 模型；没传、是酒馆 API，或那套没填地址时走宿主。
  * 真机上走宿主 generateQuietPrompt；预览环境返回演示文案并标记 demo=true。
  */
-async function generate({ prompt, system = '', demoReply = '' }) {
+async function generate({ prompt, system = '', demoReply = '', preset = null }) {
   const script = await loadHostScript();
+  if (script && preset && preset.engine !== 'tavern' && String(preset.url || '').trim()) {
+    try {
+      const text = await presetCompletion(preset, { prompt, system });
+      if (text) return { text, demo: false };
+    } catch { /* 这套接口没接通就退回酒馆自己的模型，别让聊天卡死 */ }
+  }
   if (script && typeof script.generateQuietPrompt === 'function') {
     const quiet = String(prompt || '');
     const text = await script.generateQuietPrompt({ quietPrompt: quiet, quietName: '' });
@@ -4616,6 +4640,54 @@ async function generate({ prompt, system = '', demoReply = '' }) {
   }
   return { text: demoReply, demo: true };
 }
+
+/** 借酒馆后端请求一套自定义 OpenAI 兼容接口，避开浏览器 CORS。 */
+async function presetCompletion(preset, { prompt, system }) {
+  const script = await loadHostScript();
+  if (!script) return '';
+  const base = String(preset.url || '').trim().replace(/\/+$/, '');
+  const path = String(preset.path || '').trim() || '/v1/chat/completions';
+  const url = /^https?:/i.test(path)
+    ? path
+    : (/\/chat\/completions$/i.test(base) ? base : `${base}${path.startsWith('/') ? path : `/${path}`}`);
+  const ctx = globalThis.SillyTavern?.getContext?.() || script.getContext?.() || {};
+  const getHeaders = ctx.getRequestHeaders || script.getRequestHeaders;
+  const headers = typeof getHeaders === 'function' ? { ...getHeaders() } : {};
+  if (!headers['X-CSRF-Token']) {
+    const token = ctx.csrf_token || globalThis.csrf_token || '';
+    if (token) headers['X-CSRF-Token'] = token;
+  }
+  headers['Content-Type'] = 'application/json';
+
+  const messages = [];
+  if (system) messages.push({ role: 'system', content: String(system) });
+  messages.push({ role: 'user', content: String(prompt || '') });
+  const body = {
+    chat_completion_source: 'custom',
+    custom_url: url,
+    custom_include_headers: '',
+    reverse_proxy: base,
+    proxy_password: String(preset.key || ''),
+    model: String(preset.model || ''),
+    messages,
+    temperature: typeof preset.temp === 'number' ? preset.temp : 0.8,
+    stream: false,
+  };
+  const response = await fetch('/api/backends/chat-completions/generate', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new Error(`接口返回 ${response.status}`);
+  const data = await response.json().catch(() => null);
+  if (!data || data.error) throw new Error(data?.message || '接口没有返回内容');
+  const content = data?.choices?.[0]?.message?.content ?? data?.choices?.[0]?.text ?? data?.content ?? data?.text;
+  if (Array.isArray(content)) return content.map(part => (typeof part === 'string' ? part : part?.text || '')).join('').trim();
+  return typeof content === 'string' ? content.trim() : '';
+}
+
 
 /**
  * NovelAI 出图。
@@ -5628,6 +5700,7 @@ __mods["meme/apps/chat.js"] = function(module, exports, __req){
 const { icon } = __req("meme/icons.js");
 const {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
+  apiPresetsOf,
 } = __req("meme/data.js");
 const { avatarHtml, esc, shortText, timeText } = __req("meme/shell.js");
 
@@ -5713,6 +5786,12 @@ function settingsBody(ctx, chatId) {
   const count = chat.messages?.length || 0;
   const mode = contact?.kind === 'group' ? '群聊' : contact?.kind === 'char' ? '酒馆角色' : '单聊';
   const status = [mode, `${count} 条消息`, chat.pinned ? '置顶' : '', chat.muted ? '免打扰' : ''].filter(Boolean).join(' · ');
+  const presets = apiPresetsOf(state);
+  const ownPreset = presets.find(item => item.id === chat.llmPresetId) || null;
+  const globalPreset = presets.find(item => item.id === state.settings.api?.activeChat) || presets[0] || null;
+  const llmSub = ownPreset
+    ? `只对这个会话 · ${ownPreset.name || '未命名方案'}`
+    : `跟随手机 · ${globalPreset?.name || '酒馆 API'}`;
 
   return `
     <div class="mp-page-body">
@@ -5734,6 +5813,16 @@ function settingsBody(ctx, chatId) {
           ${chatSetRow(chat.id, { iconName: 'pin', title: '置顶聊天', sub: chat.pinned ? '已固定在会话列表最上面' : '让这个会话排在前面', act: 'ts-toggle-pin', toggle: chat.pinned })}
           ${chatSetRow(chat.id, { iconName: 'bell', title: '消息免打扰', sub: chat.muted ? '新消息不显示未读角标' : '这个会话的新消息照常计数', act: 'ts-toggle-mute', toggle: chat.muted })}
           ${chatSetRow(chat.id, { iconName: 'chat', title: '空着发送 = 让 TA 主动开口', sub: chat.wake === false ? '已经关掉，空消息不会发出去' : '不写内容也能让 TA 先开口', act: 'ts-toggle-wake', toggle: chat.wake !== false })}
+        </div>
+      </div>
+
+      <div class="mp-group">
+        <div class="mp-group-label">模型</div>
+        <div class="mp-group-box">
+          ${chatSetRow(chat.id, {
+            iconName: 'spark', title: '这个聊天的 LLM',
+            sub: llmSub, act: 'ts-llm', value: ownPreset ? '单独' : '跟随',
+          })}
         </div>
       </div>
 
@@ -6063,6 +6152,38 @@ const threadSettingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(chat.wake ? '空发送会触发主动开口' : '空发送已关掉');
+      return true;
+    }
+
+    if (act === 'ts-llm') {
+      const presets = apiPresetsOf(ctx.state);
+      const globalPreset = presets.find(item => item.id === ctx.state.settings.api?.activeChat) || presets[0] || null;
+      ctx.openSheet({
+        title: '这个聊天的 LLM',
+        items: [
+          { label: '跟随手机', value: 'follow', note: `现在用「${globalPreset?.name || '酒馆 API'}」` },
+          ...presets.map(item => ({
+            label: item.name || '未命名方案',
+            value: item.id,
+            note: [item.model, item.url].filter(Boolean).join(' · ') || '借酒馆自己的模型',
+          })),
+        ],
+        onPick: (value) => {
+          if (value === 'follow') {
+            chat.llmPresetId = '';
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('已跟随手机的 LLM 方案');
+            return;
+          }
+          const preset = presets.find(item => item.id === value);
+          if (!preset) return;
+          chat.llmPresetId = preset.id;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`这个会话改用「${preset.name || '未命名方案'}」`);
+        },
+      });
       return true;
     }
 
@@ -11036,7 +11157,7 @@ __mods["meme/index.js"] = function(module, exports, __req){
  */
 
 const { createStore } = __req("meme/store.js");
-const { normalize, emptyState, demoState, syncTavernContacts, chatFor } = __req("meme/data.js");
+const { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor } = __req("meme/data.js");
 const { createShell, applyWall } = __req("meme/shell.js");
 const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } = __req("meme/host.js");
 const { chatApp, threadApp, threadSettingsApp } = __req("meme/apps/chat.js");
@@ -11139,7 +11260,7 @@ function makeAi(state) {
         `${state.settings.user.name}：${chat.messages[chat.messages.length - 1]?.text || ''}`,
         `${contact?.name || '对方'}：`,
       ].filter(Boolean).join('\n');
-      const result = await generate({ prompt, demoReply });
+      const result = await generate({ prompt, demoReply, preset: llmPresetFor(state, chat) });
       return result.text;
     },
 
@@ -11153,7 +11274,7 @@ function makeAi(state) {
         transcript(state, chat, 6),
         `${contact?.name || '对方'}：`,
       ].filter(Boolean).join('\n');
-      const result = await generate({ prompt, demoReply });
+      const result = await generate({ prompt, demoReply, preset: llmPresetFor(state, chat) });
       return result.text;
     },
 
@@ -11170,7 +11291,7 @@ function makeAi(state) {
         '{"chats":[{"peer":"名字","tag":"家人/朋友/同事/群聊","group":false,"unread":0,"msgs":[{"me":false,"text":"一句话","at":"21:04"}]}],"contacts":[{"name":"","note":""}],"moments":[{"text":"","at":"21:04","likes":3,"comments":[{"who":"","text":""}]}],"schedule":{"week":[{"when":"11月13日 周五","time":"20:00","title":"","note":""}],"month":[{"when":"11月20日","time":"下午","title":"","note":""}],"year":[{"when":"明年春天","title":"","note":""}]}}',
         'chats 4 条（每条 4~6 句，me 表示是不是 TA 自己说的），contacts 6 条，moments 3 条，schedule 的 week/month/year 各 3 条。',
       ].filter(Boolean).join('\n');
-      const result = await generate({ prompt, demoReply: JSON.stringify(local) });
+      const result = await generate({ prompt, demoReply: JSON.stringify(local), preset: llmPresetFor(state, null) });
       const text = String(result.text || '');
       const start = text.indexOf('{');
       const end = text.lastIndexOf('}');
@@ -11248,6 +11369,7 @@ function makeAi(state) {
       const result = await generate({
         prompt,
         demoReply: '今天没什么特别的。\n只是在便利店的灯下坐了一会儿，风从门口进来，吹动了货架上的塑料帘子。\n回去的路上想起白天没回的那条消息，觉得有点迟了。',
+        preset: llmPresetFor(state, chat),
       });
       return result.text;
     },

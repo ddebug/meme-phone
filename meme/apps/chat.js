@@ -6,6 +6,7 @@
 import { icon } from '../icons.js';
 import {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
+  apiPresetsOf,
 } from '../data.js';
 import { avatarHtml, esc, shortText, timeText } from '../shell.js';
 
@@ -91,6 +92,12 @@ function settingsBody(ctx, chatId) {
   const count = chat.messages?.length || 0;
   const mode = contact?.kind === 'group' ? '群聊' : contact?.kind === 'char' ? '酒馆角色' : '单聊';
   const status = [mode, `${count} 条消息`, chat.pinned ? '置顶' : '', chat.muted ? '免打扰' : ''].filter(Boolean).join(' · ');
+  const presets = apiPresetsOf(state);
+  const ownPreset = presets.find(item => item.id === chat.llmPresetId) || null;
+  const globalPreset = presets.find(item => item.id === state.settings.api?.activeChat) || presets[0] || null;
+  const llmSub = ownPreset
+    ? `只对这个会话 · ${ownPreset.name || '未命名方案'}`
+    : `跟随手机 · ${globalPreset?.name || '酒馆 API'}`;
 
   return `
     <div class="mp-page-body">
@@ -112,6 +119,16 @@ function settingsBody(ctx, chatId) {
           ${chatSetRow(chat.id, { iconName: 'pin', title: '置顶聊天', sub: chat.pinned ? '已固定在会话列表最上面' : '让这个会话排在前面', act: 'ts-toggle-pin', toggle: chat.pinned })}
           ${chatSetRow(chat.id, { iconName: 'bell', title: '消息免打扰', sub: chat.muted ? '新消息不显示未读角标' : '这个会话的新消息照常计数', act: 'ts-toggle-mute', toggle: chat.muted })}
           ${chatSetRow(chat.id, { iconName: 'chat', title: '空着发送 = 让 TA 主动开口', sub: chat.wake === false ? '已经关掉，空消息不会发出去' : '不写内容也能让 TA 先开口', act: 'ts-toggle-wake', toggle: chat.wake !== false })}
+        </div>
+      </div>
+
+      <div class="mp-group">
+        <div class="mp-group-label">模型</div>
+        <div class="mp-group-box">
+          ${chatSetRow(chat.id, {
+            iconName: 'spark', title: '这个聊天的 LLM',
+            sub: llmSub, act: 'ts-llm', value: ownPreset ? '单独' : '跟随',
+          })}
         </div>
       </div>
 
@@ -441,6 +458,38 @@ export const threadSettingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(chat.wake ? '空发送会触发主动开口' : '空发送已关掉');
+      return true;
+    }
+
+    if (act === 'ts-llm') {
+      const presets = apiPresetsOf(ctx.state);
+      const globalPreset = presets.find(item => item.id === ctx.state.settings.api?.activeChat) || presets[0] || null;
+      ctx.openSheet({
+        title: '这个聊天的 LLM',
+        items: [
+          { label: '跟随手机', value: 'follow', note: `现在用「${globalPreset?.name || '酒馆 API'}」` },
+          ...presets.map(item => ({
+            label: item.name || '未命名方案',
+            value: item.id,
+            note: [item.model, item.url].filter(Boolean).join(' · ') || '借酒馆自己的模型',
+          })),
+        ],
+        onPick: (value) => {
+          if (value === 'follow') {
+            chat.llmPresetId = '';
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('已跟随手机的 LLM 方案');
+            return;
+          }
+          const preset = presets.find(item => item.id === value);
+          if (!preset) return;
+          chat.llmPresetId = preset.id;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`这个会话改用「${preset.name || '未命名方案'}」`);
+        },
+      });
       return true;
     }
 

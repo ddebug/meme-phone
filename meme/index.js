@@ -4,7 +4,7 @@
  */
 
 import { createStore } from './store.js';
-import { normalize, emptyState, demoState, syncTavernContacts, chatFor } from './data.js';
+import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor } from './data.js';
 import { createShell, applyWall } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
@@ -107,7 +107,7 @@ function makeAi(state) {
         `${state.settings.user.name}：${chat.messages[chat.messages.length - 1]?.text || ''}`,
         `${contact?.name || '对方'}：`,
       ].filter(Boolean).join('\n');
-      const result = await generate({ prompt, demoReply });
+      const result = await generate({ prompt, demoReply, preset: llmPresetFor(state, chat) });
       return result.text;
     },
 
@@ -121,7 +121,7 @@ function makeAi(state) {
         transcript(state, chat, 6),
         `${contact?.name || '对方'}：`,
       ].filter(Boolean).join('\n');
-      const result = await generate({ prompt, demoReply });
+      const result = await generate({ prompt, demoReply, preset: llmPresetFor(state, chat) });
       return result.text;
     },
 
@@ -138,7 +138,7 @@ function makeAi(state) {
         '{"chats":[{"peer":"名字","tag":"家人/朋友/同事/群聊","group":false,"unread":0,"msgs":[{"me":false,"text":"一句话","at":"21:04"}]}],"contacts":[{"name":"","note":""}],"moments":[{"text":"","at":"21:04","likes":3,"comments":[{"who":"","text":""}]}],"schedule":{"week":[{"when":"11月13日 周五","time":"20:00","title":"","note":""}],"month":[{"when":"11月20日","time":"下午","title":"","note":""}],"year":[{"when":"明年春天","title":"","note":""}]}}',
         'chats 4 条（每条 4~6 句，me 表示是不是 TA 自己说的），contacts 6 条，moments 3 条，schedule 的 week/month/year 各 3 条。',
       ].filter(Boolean).join('\n');
-      const result = await generate({ prompt, demoReply: JSON.stringify(local) });
+      const result = await generate({ prompt, demoReply: JSON.stringify(local), preset: llmPresetFor(state, null) });
       const text = String(result.text || '');
       const start = text.indexOf('{');
       const end = text.lastIndexOf('}');
@@ -216,6 +216,7 @@ function makeAi(state) {
       const result = await generate({
         prompt,
         demoReply: '今天没什么特别的。\n只是在便利店的灯下坐了一会儿，风从门口进来，吹动了货架上的塑料帘子。\n回去的路上想起白天没回的那条消息，觉得有点迟了。',
+        preset: llmPresetFor(state, chat),
       });
       return result.text;
     },

@@ -56,7 +56,6 @@ export function emptyState() {
     favorites: [],
     emoji: DEFAULT_EMOJI.map((item, index) => ({ id: `e${index + 1}`, ...item })),
     wallet: { balance: 4520, ledger: [] },
-    membership: { plan: '', until: '' },
     plans: [],
     extras: {},
     dress: { wallpaperDay: 'assets/wallpaper-day.jpg', wallpaperNight: 'assets/wallpaper-night.jpg', accent: '#8e7bf2' },
@@ -438,7 +437,6 @@ export function demoState() {
     { id: 'p2', title: '读完那本书的第三部分', detail: '地铁上读，不要刷手机。', done: true, date: '2026-11-09' },
   ];
 
-  state.membership = { plan: '月卡', until: '2026-12-10' };
   return state;
 }
 
@@ -460,7 +458,6 @@ export function normalize(raw) {
     settings: { ...base.settings, ...(raw.settings || {}) },
     diary: { ...base.diary, ...(raw.diary || {}), entries: { ...(raw.diary?.entries || {}) } },
     wallet: { ...base.wallet, ...(raw.wallet || {}) },
-    membership: { ...base.membership, ...(raw.membership || {}) },
     dress: { ...base.dress, ...(raw.dress || {}) },
     draw: {
       ...base.draw,
@@ -470,6 +467,7 @@ export function normalize(raw) {
       history: Array.isArray(raw.draw?.history) ? raw.draw.history : [],
     },
   };
+  delete merged.membership;
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
   merged.settings.summary = { ...base.settings.summary, ...(raw.settings?.summary || {}) };

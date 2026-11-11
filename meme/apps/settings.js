@@ -267,7 +267,7 @@ export const appearanceApp = {
         <div class="mp-group-label" style="margin-top:14px">图标</div>
         <div class="mp-group-box" style="padding:14px">
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;justify-items:center">
-            ${Object.keys(TINT).slice(0, 8).map(key => `<span style="width:44px;height:44px;border-radius:13px;display:grid;place-items:center;${tintStyle(key)};box-shadow:var(--shadow-s)">${icon(key === 'membership' ? 'crown' : key)}</span>`).join('')}
+            ${Object.keys(TINT).slice(0, 8).map(key => `<span style="width:44px;height:44px;border-radius:13px;display:grid;place-items:center;${tintStyle(key)};box-shadow:var(--shadow-s)">${icon(key)}</span>`).join('')}
           </div>
         </div>
       </div>`;

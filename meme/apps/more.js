@@ -1,6 +1,6 @@
 /**
  * meme-phone · 其余 App
- * 小剧场 / 钱包 / 收藏 / 表情 / 会员 / 计划 / 装扮 / 帮助
+ * 小剧场 / 钱包 / 收藏 / 表情 / 计划 / 装扮 / 帮助
  */
 
 import { icon, TINT } from '../icons.js';
@@ -240,59 +240,6 @@ export const emojiApp = {
     }
     if (act === 'emoji-add') {
       ctx.toast('这个先留着：表情库下一步接自定义上传');
-      return true;
-    }
-    return false;
-  },
-};
-
-/* ------------------------------------------------------------ 会员 */
-
-export const membershipApp = {
-  id: 'membership', name: '会员', icon: 'crown',
-
-  render(ctx) {
-    const membership = ctx.state.membership;
-    return `
-      <div class="mp-page-body">
-        ${head('会员', '只影响装扮与主动消息次数')}
-        <div class="mp-card" style="background:linear-gradient(150deg,#fdf3ff,#fff0f6 60%,#fff6ea);padding:18px 16px">
-          <div style="display:flex;align-items:center;gap:9px">
-            <span style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center;${tintStyle('crown')}">${icon('crown')}</span>
-            <div>
-              <div style="font-size:15px;font-weight:600">${membership.plan || '还没开通'}</div>
-              <div style="font-size:11px;color:rgba(86,66,108,.72)">${membership.until ? `有效期到 ${esc(membership.until)}` : '开通后可以多存一些片段'}</div>
-            </div>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:12px">
-          <button class="mp-btn accent" data-act="member-open" type="button" style="flex:1">开通月卡</button>
-          <button class="mp-btn" data-act="member-close" type="button" style="flex:1">取消</button>
-        </div>
-        <div class="mp-group-label" style="margin-top:16px">包含</div>
-        <div class="mp-card" style="font-size:12.5px;line-height:2;color:var(--text-2)">
-          · 小剧场不限段数<br>
-          · 每天主动消息上限翻倍<br>
-          · 装扮里的图标与壁纸全解锁
-        </div>
-      </div>`;
-  },
-
-  handle(ctx, act) {
-    if (act === 'member-open') {
-      const until = new Date();
-      until.setMonth(until.getMonth() + 1);
-      ctx.state.membership = { plan: '月卡', until: until.toISOString().slice(0, 10) };
-      ctx.save();
-      ctx.rerender();
-      ctx.toast('月卡已开通');
-      return true;
-    }
-    if (act === 'member-close') {
-      ctx.state.membership = { plan: '', until: '' };
-      ctx.save();
-      ctx.rerender();
-      ctx.toast('已取消');
       return true;
     }
     return false;

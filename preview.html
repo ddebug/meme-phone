@@ -305,16 +305,17 @@ body {
 /* ------------------------------------------------------ 桌面图标网格 */
 .mp-apps {
   flex: 1;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-auto-rows: min-content;
-  align-content: start;
-  gap: 22px 0;
-  justify-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: flex-start;
+  row-gap: 22px;
   padding: 24px 0 0;
   overflow-y: auto;
   scrollbar-width: none;
 }
+
+.mp-apps > .mp-app { flex: 0 0 25%; }
 
 .mp-apps::-webkit-scrollbar { display: none; }
 
@@ -3321,7 +3322,6 @@ function emptyState() {
     favorites: [],
     emoji: DEFAULT_EMOJI.map((item, index) => ({ id: `e${index + 1}`, ...item })),
     wallet: { balance: 4520, ledger: [] },
-    membership: { plan: '', until: '' },
     plans: [],
     extras: {},
     dress: { wallpaperDay: 'assets/wallpaper-day.jpg', wallpaperNight: 'assets/wallpaper-night.jpg', accent: '#8e7bf2' },
@@ -3703,7 +3703,6 @@ function demoState() {
     { id: 'p2', title: '读完那本书的第三部分', detail: '地铁上读，不要刷手机。', done: true, date: '2026-11-09' },
   ];
 
-  state.membership = { plan: '月卡', until: '2026-12-10' };
   return state;
 }
 
@@ -3725,7 +3724,6 @@ function normalize(raw) {
     settings: { ...base.settings, ...(raw.settings || {}) },
     diary: { ...base.diary, ...(raw.diary || {}), entries: { ...(raw.diary?.entries || {}) } },
     wallet: { ...base.wallet, ...(raw.wallet || {}) },
-    membership: { ...base.membership, ...(raw.membership || {}) },
     dress: { ...base.dress, ...(raw.dress || {}) },
     draw: {
       ...base.draw,
@@ -3735,6 +3733,7 @@ function normalize(raw) {
       history: Array.isArray(raw.draw?.history) ? raw.draw.history : [],
     },
   };
+  delete merged.membership;
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
   merged.settings.summary = { ...base.settings.summary, ...(raw.settings?.summary || {}) };
@@ -4520,7 +4519,6 @@ const P = {
   wallet: '<path d="M4 8.2A2.2 2.2 0 0 1 6.2 6h11.2a1.6 1.6 0 0 1 1.6 1.6v9.4a1.6 1.6 0 0 1-1.6 1.6H6.2A2.2 2.2 0 0 1 4 16.4z"/><path d="M15.4 11.4h3.4v3.2h-3.4a1.6 1.6 0 0 1 0-3.2z"/><path d="M6.8 6v11"/>',
   bookmark: '<path d="M7 4.6h10A1.4 1.4 0 0 1 18.4 6v13.4l-6.4-3.7-6.4 3.7V6A1.4 1.4 0 0 1 7 4.6z"/>',
   smile: '<circle cx="12" cy="12" r="7.8"/><path d="M9.2 14.6c.7.9 1.7 1.4 2.8 1.4s2.1-.5 2.8-1.4"/><circle cx="9.4" cy="10.2" r=".8"/><circle cx="14.6" cy="10.2" r=".8"/>',
-  crown: '<path d="M5 17.4h14"/><path d="M5.4 17.4 4 8.6l4.2 2.6L12 6.6l3.8 4.6L20 8.6l-1.4 8.8"/>',
   plan: '<rect x="4.4" y="4.6" width="15.2" height="15" rx="3"/><path d="M8 9.4l1.6 1.6 2.6-2.6M8 15l1.6 1.6 2.6-2.6"/><path d="M14.6 9.8h2.4M14.6 15.4h2.4"/>',
   brush: '<path d="M15.6 4.6 19.4 8.4 9.6 18.2l-3.8 1.2 1.2-3.8z"/><path d="M13.4 6.8 17.2 10.6"/>',
   help: '<circle cx="12" cy="12" r="7.8"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.6 2.3c-.7.5-1.2 1-1.2 1.9"/><circle cx="12" cy="16.4" r=".8"/>',
@@ -4563,11 +4561,9 @@ const TINT = {
   wallet: ['#fbd6ae', '#f5b877'],
   bookmark: ['#f4c8e6', '#e79fce'],
   smile: ['#fbd0c4', '#f39f92'],
-  crown: ['#fbdda6', '#f2bd5f'],
   plan: ['#bfe9d6', '#7fd2bc'],
   brush: ['#c3d6f2', '#8fb3e8'],
   help: ['#d7d2e6', '#a9a2c4'],
-  membership: ['#fbdda6', '#f0b451'],
   favorites: ['#f4c8e6', '#e79fce'],
   extras: ['#e2ccf6', '#bf9cec'],
   emoji: ['#fbd0c4', '#f39f92'],
@@ -6526,7 +6522,7 @@ const appearanceApp = {
         <div class="mp-group-label" style="margin-top:14px">图标</div>
         <div class="mp-group-box" style="padding:14px">
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;justify-items:center">
-            ${Object.keys(TINT).slice(0, 8).map(key => `<span style="width:44px;height:44px;border-radius:13px;display:grid;place-items:center;${tintStyle(key)};box-shadow:var(--shadow-s)">${icon(key === 'membership' ? 'crown' : key)}</span>`).join('')}
+            ${Object.keys(TINT).slice(0, 8).map(key => `<span style="width:44px;height:44px;border-radius:13px;display:grid;place-items:center;${tintStyle(key)};box-shadow:var(--shadow-s)">${icon(key)}</span>`).join('')}
           </div>
         </div>
       </div>`;
@@ -6563,7 +6559,7 @@ exports["appearanceApp"] = appearanceApp;
 __mods["meme/apps/more.js"] = function(module, exports, __req){
 /**
  * meme-phone · 其余 App
- * 小剧场 / 钱包 / 收藏 / 表情 / 会员 / 计划 / 装扮 / 帮助
+ * 小剧场 / 钱包 / 收藏 / 表情 / 计划 / 装扮 / 帮助
  */
 
 const { icon, TINT } = __req("meme/icons.js");
@@ -6809,59 +6805,6 @@ const emojiApp = {
   },
 };
 
-/* ------------------------------------------------------------ 会员 */
-
-const membershipApp = {
-  id: 'membership', name: '会员', icon: 'crown',
-
-  render(ctx) {
-    const membership = ctx.state.membership;
-    return `
-      <div class="mp-page-body">
-        ${head('会员', '只影响装扮与主动消息次数')}
-        <div class="mp-card" style="background:linear-gradient(150deg,#fdf3ff,#fff0f6 60%,#fff6ea);padding:18px 16px">
-          <div style="display:flex;align-items:center;gap:9px">
-            <span style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center;${tintStyle('crown')}">${icon('crown')}</span>
-            <div>
-              <div style="font-size:15px;font-weight:600">${membership.plan || '还没开通'}</div>
-              <div style="font-size:11px;color:rgba(86,66,108,.72)">${membership.until ? `有效期到 ${esc(membership.until)}` : '开通后可以多存一些片段'}</div>
-            </div>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:12px">
-          <button class="mp-btn accent" data-act="member-open" type="button" style="flex:1">开通月卡</button>
-          <button class="mp-btn" data-act="member-close" type="button" style="flex:1">取消</button>
-        </div>
-        <div class="mp-group-label" style="margin-top:16px">包含</div>
-        <div class="mp-card" style="font-size:12.5px;line-height:2;color:var(--text-2)">
-          · 小剧场不限段数<br>
-          · 每天主动消息上限翻倍<br>
-          · 装扮里的图标与壁纸全解锁
-        </div>
-      </div>`;
-  },
-
-  handle(ctx, act) {
-    if (act === 'member-open') {
-      const until = new Date();
-      until.setMonth(until.getMonth() + 1);
-      ctx.state.membership = { plan: '月卡', until: until.toISOString().slice(0, 10) };
-      ctx.save();
-      ctx.rerender();
-      ctx.toast('月卡已开通');
-      return true;
-    }
-    if (act === 'member-close') {
-      ctx.state.membership = { plan: '', until: '' };
-      ctx.save();
-      ctx.rerender();
-      ctx.toast('已取消');
-      return true;
-    }
-    return false;
-  },
-};
-
 /* ------------------------------------------------------------ 计划 */
 
 const plansApp = {
@@ -6996,7 +6939,6 @@ exports["extraDetailApp"] = extraDetailApp;
 exports["walletApp"] = walletApp;
 exports["favoritesApp"] = favoritesApp;
 exports["emojiApp"] = emojiApp;
-exports["membershipApp"] = membershipApp;
 exports["plansApp"] = plansApp;
 exports["dressApp"] = dressApp;
 exports["helpApp"] = helpApp;
@@ -9877,7 +9819,7 @@ const { charPhoneApp, charPhoneThreadApp, ensureLookup } = __req("meme/apps/char
 const { bookApp, bookSettingsApp } = __req("meme/apps/book.js");
 const {
   extrasApp, extraDetailApp, walletApp, favoritesApp, emojiApp,
-  membershipApp, plansApp, dressApp, helpApp,
+  plansApp, dressApp, helpApp,
 } = __req("meme/apps/more.js");
 
 const APPS = {
@@ -9890,7 +9832,6 @@ const APPS = {
   'app-wallet': walletApp,
   'app-favorites': favoritesApp,
   'app-emoji': emojiApp,
-  'app-membership': membershipApp,
   'app-plans': plansApp,
   'app-dress': dressApp,
   'app-help': helpApp,
@@ -9916,7 +9857,6 @@ const DESKTOP_APPS = [
   { id: 'wallet', name: '钱包', icon: 'wallet' },
   { id: 'favorites', name: '收藏', icon: 'bookmark' },
   { id: 'draw', name: '绘图', icon: 'image' },
-  { id: 'membership', name: '会员', icon: 'crown' },
   { id: 'plans', name: '计划', icon: 'plan' },
   { id: 'dress', name: '装扮', icon: 'brush' },
   { id: 'api', name: '接口', icon: 'code' },

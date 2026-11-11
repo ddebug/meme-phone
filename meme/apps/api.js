@@ -8,11 +8,24 @@ import { esc } from '../shell.js';
 import { newId } from '../data.js';
 
 const ENGINES = [
-  { value: 'tavern', label: '酒馆默认', hint: '直接借酒馆自己的模型，不用填地址' },
+  { value: 'tavern', label: '酒馆 API', hint: '直接借酒馆自己的模型，不用填地址' },
   { value: 'openai', label: 'OpenAI 兼容', hint: '/v1/chat/completions 或 /images/generations' },
   { value: 'novelai', label: 'NovelAI', hint: 'image.novelai.net，Key 以 pst- 开头' },
   { value: 'custom', label: '自定义', hint: '自己填路径' },
 ];
+
+/* 酒馆 chat_completion_source 的显示名，导入时拿来给预设起名字 */
+const SOURCE_LABELS = {
+  openai: 'OpenAI',
+  claude: 'Claude',
+  openrouter: 'OpenRouter',
+  makersuite: 'Gemini',
+  google: 'Gemini',
+  mistralai: 'Mistral',
+  cohere: 'Cohere',
+  custom: '自定义',
+  windowai: 'WindowAI',
+};
 
 const FIELDS = [
   { key: 'name', label: '名称', kind: 'text', placeholder: '比如 我的 NAI' },
@@ -153,13 +166,22 @@ export const apiListApp = {
         <div class="mp-group-label" style="margin-top:16px">全部预设</div>
         <div class="mp-group">${rows}</div>
 
+        <button class="mp-row mp-api-import" data-act="api-import-tavern" type="button">
+          ${icon('reply')}
+          <span class="mp-row-main">
+            <span class="mp-row-name">从酒馆导入当前接口</span>
+            <span class="mp-row-sub">只读一次：把酒馆正在用的地址、Key、模型抄成一套</span>
+          </span>
+          ${icon('chevron')}
+        </button>
+
         <div class="mp-api-note">
           右上角 ＋ 会拿当前聊天这套复制一份当模板；地址、Key、模型都在这一套里，不会串到别套。
         </div>
       </div>`;
   },
 
-  handle(ctx, act, data) {
+  async handle(ctx, act, data) {
     const store = api(ctx.state);
 
     if (act === 'api-open') {
@@ -194,6 +216,44 @@ export const apiListApp = {
           ctx.toast(`已切成「${target.name || '未命名'}」${asImage && target.engine === 'tavern' ? '（酒馆 API 只借聊天模型，绘图仍要选带地址那套）' : ''}`);
         },
       });
+      return true;
+    }
+
+    if (act === 'api-import-tavern') {
+      const info = typeof ctx.host?.readApi === 'function'
+        ? await ctx.host.readApi()
+        : { available: false, reason: '预览里读不到酒馆设置' };
+      if (!info?.available) {
+        ctx.toast(info?.reason || '没接上酒馆，导入不了');
+        return true;
+      }
+      if (!info.direct) {
+        ctx.toast('酒馆这套走它自己的内部转发，没有可直接请求的地址，得手填一套');
+        return true;
+      }
+      const same = store.presets.find(item => item.url === info.url && item.model === info.model);
+      if (same) {
+        editingId = same.id;
+        ctx.go('api-item');
+        ctx.toast('这套已经在了');
+        return true;
+      }
+      const label = SOURCE_LABELS[info.source] || info.source || '酒馆';
+      const preset = {
+        id: newId('api'),
+        name: `酒馆 · ${label}`,
+        engine: info.source === 'custom' ? 'custom' : 'openai',
+        url: info.url,
+        path: '/v1/chat/completions',
+        model: info.model || '',
+        key: info.key || '',
+        temp: 0.8,
+      };
+      store.presets.push(preset);
+      editingId = preset.id;
+      ctx.save();
+      ctx.go('api-item');
+      ctx.toast(`导入了「${preset.name}」`);
       return true;
     }
 

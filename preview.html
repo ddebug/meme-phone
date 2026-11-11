@@ -3478,6 +3478,54 @@ async function writeTavernPersona({ key, name, description }) {
   return { ok: true };
 }
 
+/**
+ * 酒馆当前在用的 API 配置（只读，不写）。
+ * 酒馆把连接参数放在 oai_settings：反向代理地址在 reverse_proxy，
+ * 代理密码（也就是 Key）在 proxy_password，来源与模型各有字段。
+ * 只在用户点「从酒馆导入」时调用，读不到就返回 available:false。
+ */
+async function readTavernApi() {
+  const script = await loadHostScript();
+  if (!script) return { available: false, reason: '没接上酒馆' };
+  try {
+    const ctx = script.getContext?.() || {};
+    const settings = script.oai_settings
+      || ctx.oaiSettings
+      || script.settings?.oai_settings
+      || globalThis.oai_settings
+      || null;
+    if (!settings) return { available: false, reason: '酒馆这版没暴露接口设置' };
+
+    const source = String(settings.chat_completion_source || 'openai');
+    const model = String(
+      settings.custom_model
+      || settings.openai_model
+      || settings.claude_model
+      || settings.google_model
+      || settings.openrouter_model
+      || settings.mistralai_model
+      || settings.cohere_model
+      || '',
+    );
+    const proxy = String(settings.reverse_proxy || '').trim();
+    const customUrl = String(settings.custom_url || '').trim();
+    const key = String(settings.proxy_password || '').trim();
+    const url = (proxy || customUrl).replace(/\/+$/, '');
+
+    return {
+      available: true,
+      source,
+      url,
+      key,
+      model,
+      /* 没有反代 / 自定义地址时，酒馆是走自己内部的转发，小手机直连不了 */
+      direct: Boolean(url),
+    };
+  } catch {
+    return { available: false, reason: '读酒馆设置时出错' };
+  }
+}
+
 /** 宿主可用性，用于设置页展示「已接入 / 未接入」。 */
 async function probeHost() {
   const script = await loadHostScript();
@@ -3498,6 +3546,7 @@ exports["generate"] = generate;
 exports["novelaiImage"] = novelaiImage;
 exports["readTavernPersonas"] = readTavernPersonas;
 exports["writeTavernPersona"] = writeTavernPersona;
+exports["readTavernApi"] = readTavernApi;
 exports["probeHost"] = probeHost;
 };
 __mods["meme/icons.js"] = function(module, exports, __req){
@@ -5975,11 +6024,24 @@ const { esc } = __req("meme/shell.js");
 const { newId } = __req("meme/data.js");
 
 const ENGINES = [
-  { value: 'tavern', label: '酒馆默认', hint: '直接借酒馆自己的模型，不用填地址' },
+  { value: 'tavern', label: '酒馆 API', hint: '直接借酒馆自己的模型，不用填地址' },
   { value: 'openai', label: 'OpenAI 兼容', hint: '/v1/chat/completions 或 /images/generations' },
   { value: 'novelai', label: 'NovelAI', hint: 'image.novelai.net，Key 以 pst- 开头' },
   { value: 'custom', label: '自定义', hint: '自己填路径' },
 ];
+
+/* 酒馆 chat_completion_source 的显示名，导入时拿来给预设起名字 */
+const SOURCE_LABELS = {
+  openai: 'OpenAI',
+  claude: 'Claude',
+  openrouter: 'OpenRouter',
+  makersuite: 'Gemini',
+  google: 'Gemini',
+  mistralai: 'Mistral',
+  cohere: 'Cohere',
+  custom: '自定义',
+  windowai: 'WindowAI',
+};
 
 const FIELDS = [
   { key: 'name', label: '名称', kind: 'text', placeholder: '比如 我的 NAI' },
@@ -6120,13 +6182,22 @@ const apiListApp = {
         <div class="mp-group-label" style="margin-top:16px">全部预设</div>
         <div class="mp-group">${rows}</div>
 
+        <button class="mp-row mp-api-import" data-act="api-import-tavern" type="button">
+          ${icon('reply')}
+          <span class="mp-row-main">
+            <span class="mp-row-name">从酒馆导入当前接口</span>
+            <span class="mp-row-sub">只读一次：把酒馆正在用的地址、Key、模型抄成一套</span>
+          </span>
+          ${icon('chevron')}
+        </button>
+
         <div class="mp-api-note">
           右上角 ＋ 会拿当前聊天这套复制一份当模板；地址、Key、模型都在这一套里，不会串到别套。
         </div>
       </div>`;
   },
 
-  handle(ctx, act, data) {
+  async handle(ctx, act, data) {
     const store = api(ctx.state);
 
     if (act === 'api-open') {
@@ -6161,6 +6232,44 @@ const apiListApp = {
           ctx.toast(`已切成「${target.name || '未命名'}」${asImage && target.engine === 'tavern' ? '（酒馆 API 只借聊天模型，绘图仍要选带地址那套）' : ''}`);
         },
       });
+      return true;
+    }
+
+    if (act === 'api-import-tavern') {
+      const info = typeof ctx.host?.readApi === 'function'
+        ? await ctx.host.readApi()
+        : { available: false, reason: '预览里读不到酒馆设置' };
+      if (!info?.available) {
+        ctx.toast(info?.reason || '没接上酒馆，导入不了');
+        return true;
+      }
+      if (!info.direct) {
+        ctx.toast('酒馆这套走它自己的内部转发，没有可直接请求的地址，得手填一套');
+        return true;
+      }
+      const same = store.presets.find(item => item.url === info.url && item.model === info.model);
+      if (same) {
+        editingId = same.id;
+        ctx.go('api-item');
+        ctx.toast('这套已经在了');
+        return true;
+      }
+      const label = SOURCE_LABELS[info.source] || info.source || '酒馆';
+      const preset = {
+        id: newId('api'),
+        name: `酒馆 · ${label}`,
+        engine: info.source === 'custom' ? 'custom' : 'openai',
+        url: info.url,
+        path: '/v1/chat/completions',
+        model: info.model || '',
+        key: info.key || '',
+        temp: 0.8,
+      };
+      store.presets.push(preset);
+      editingId = preset.id;
+      ctx.save();
+      ctx.go('api-item');
+      ctx.toast(`导入了「${preset.name}」`);
       return true;
     }
 
@@ -7113,7 +7222,7 @@ __mods["meme/index.js"] = function(module, exports, __req){
 const { createStore } = __req("meme/store.js");
 const { normalize, emptyState, demoState, syncTavernContacts, chatFor } = __req("meme/data.js");
 const { createShell } = __req("meme/shell.js");
-const { readTavernCharacters, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, generate, probeHost } = __req("meme/host.js");
+const { readTavernCharacters, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, generate, probeHost } = __req("meme/host.js");
 const { chatApp, threadApp } = __req("meme/apps/chat.js");
 const { diaryApp } = __req("meme/apps/diary.js");
 const { contactsApp, contactApp } = __req("meme/apps/contacts.js");
@@ -7387,6 +7496,7 @@ async function openMemePhone(options = {}) {
     readUserAvatar,
     syncUsers,
     writeUser: writeTavernPersona,
+    readApi: readTavernApi,
   };
 
   rootEl = document.createElement('div');

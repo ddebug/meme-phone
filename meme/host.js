@@ -230,6 +230,54 @@ export async function writeTavernPersona({ key, name, description }) {
   return { ok: true };
 }
 
+/**
+ * 酒馆当前在用的 API 配置（只读，不写）。
+ * 酒馆把连接参数放在 oai_settings：反向代理地址在 reverse_proxy，
+ * 代理密码（也就是 Key）在 proxy_password，来源与模型各有字段。
+ * 只在用户点「从酒馆导入」时调用，读不到就返回 available:false。
+ */
+export async function readTavernApi() {
+  const script = await loadHostScript();
+  if (!script) return { available: false, reason: '没接上酒馆' };
+  try {
+    const ctx = script.getContext?.() || {};
+    const settings = script.oai_settings
+      || ctx.oaiSettings
+      || script.settings?.oai_settings
+      || globalThis.oai_settings
+      || null;
+    if (!settings) return { available: false, reason: '酒馆这版没暴露接口设置' };
+
+    const source = String(settings.chat_completion_source || 'openai');
+    const model = String(
+      settings.custom_model
+      || settings.openai_model
+      || settings.claude_model
+      || settings.google_model
+      || settings.openrouter_model
+      || settings.mistralai_model
+      || settings.cohere_model
+      || '',
+    );
+    const proxy = String(settings.reverse_proxy || '').trim();
+    const customUrl = String(settings.custom_url || '').trim();
+    const key = String(settings.proxy_password || '').trim();
+    const url = (proxy || customUrl).replace(/\/+$/, '');
+
+    return {
+      available: true,
+      source,
+      url,
+      key,
+      model,
+      /* 没有反代 / 自定义地址时，酒馆是走自己内部的转发，小手机直连不了 */
+      direct: Boolean(url),
+    };
+  } catch {
+    return { available: false, reason: '读酒馆设置时出错' };
+  }
+}
+
 /** 宿主可用性，用于设置页展示「已接入 / 未接入」。 */
 export async function probeHost() {
   const script = await loadHostScript();

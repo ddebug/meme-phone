@@ -151,31 +151,17 @@ export function createShell(options) {
     return `${Number(month)}月${Number(day)}日`;
   }
 
-  function floatHomeHtml() {
-    return `
-      <button class="mp-float-home" data-act="home" type="button">${ico('home')}<span>桌面</span></button>`;
-  }
-
-  function actionsHtml() {
-    const depth = shell.stack.length;
-    return `
-      <div class="mp-actions">
-        <button class="mp-action-btn primary" data-act="home" type="button">${ico('home')}<span>回桌面</span></button>
-        ${depth > 1 ? `<button class="mp-action-btn" data-act="back" type="button">${ico('back')}<span>后退</span></button>` : ''}
-        <button class="mp-action-btn" data-act="phone-close" type="button">${ico('close')}<span>收起</span></button>
-        <span class="mp-actions-hint">上滑也能回桌面</span>
-      </div>`;
-  }
-
   function pageHtml() {
     const entry = shell.stack[shell.stack.length - 1];
     const app = apps[entry.view];
     if (!app) return desktopHtml();
-    const withThread = entry.view === 'thread' || entry.view === 'contact' || entry.view === 'extra-detail';
+    const body = app.render(ctx, entry.params || {});
+    // 页面自己没画返回键就补一条：所有界面都得能回去
+    const hasBack = String(body).includes('data-act="back"');
     return `
       <div class="mp-page" data-view="${esc(entry.view)}">
-        ${app.render(ctx, entry.params || {})}
-        ${withThread ? floatHomeHtml() : actionsHtml()}
+        ${hasBack ? '' : `<div class="mp-nav"><button class="mp-back" data-act="back" type="button">${ico('back')}<span>返回</span></button><span style="flex:1"></span></div>`}
+        ${body}
       </div>`;
   }
 

@@ -613,7 +613,6 @@ export const threadApp = {
         items: [
           { label: '引用这条回复', value: 'quote', icon: 'reply' },
           { label: '复制文字', value: 'copy', icon: 'copy' },
-          { label: '收藏', value: 'fav', icon: 'bookmark' },
           { label: '存成小剧场', value: 'extra', icon: 'theater' },
           { label: '让 TA 重新说一次', value: 'regen', icon: 'refresh' },
           { label: '删除这条', value: 'delete', icon: 'trash', danger: true },
@@ -626,11 +625,6 @@ export const threadApp = {
           }
           if (value === 'copy') {
             navigator.clipboard?.writeText(message.text).then(() => ctx.toast('已复制'), () => ctx.toast('复制失败'));
-          }
-          if (value === 'fav') {
-            ctx.state.favorites.unshift({ id: 'f' + Date.now().toString(36), chatId: chat.id, contactId: chat.contactId, text: message.text, from: message.from, at: Date.now() });
-            ctx.save();
-            ctx.toast('已收藏');
           }
           if (value === 'extra') {
             saveMessageExtra(ctx, chat, contact, message);

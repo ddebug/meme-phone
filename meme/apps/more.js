@@ -1,10 +1,10 @@
 /**
  * meme-phone · 其余 App
- * 小剧场 / 钱包 / 收藏 / 表情 / 计划 / 装扮 / 帮助
+ * 小剧场 / 钱包 / 表情 / 计划 / 装扮 / 帮助
  */
 
-import { icon, TINT } from '../icons.js';
-import { esc, tintStyle, shortText, avatarHtml } from '../shell.js';
+import { icon } from '../icons.js';
+import { esc, tintStyle } from '../shell.js';
 import { contactsOf, contactById, extrasOf } from '../data.js';
 
 function head(title, sub) {
@@ -163,53 +163,6 @@ export const walletApp = {
   },
 };
 
-/* ------------------------------------------------------------ 收藏 */
-
-export const favoritesApp = {
-  id: 'favorites', name: '收藏', icon: 'bookmark',
-
-  render(ctx) {
-    const list = ctx.state.favorites;
-    return `
-      <div class="mp-page-body">
-        ${head('收藏', `${list.length} 句留着的话`)}
-        ${list.map(item => {
-    const contact = contactById(ctx.state, item.contactId);
-    return `
-          <div class="mp-card">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
-              ${avatarHtml(contact?.name || '?', contact?.avatar, 'mp-avatar mp-avatar-sm')}
-              <span style="font-size:12px;color:var(--text-2);flex:1">${esc(contact?.name || '不知道是谁')}</span>
-              <span style="font-size:10.5px;color:var(--text-4)">${shortText(item.at)}</span>
-            </div>
-            <div style="font-family:var(--font-serif);font-size:13.5px;line-height:1.78;color:var(--text)">${esc(item.text)}</div>
-            <div style="display:flex;gap:7px;margin-top:9px">
-              <button class="mp-btn ghost" data-act="fav-copy" data-id="${item.id}" type="button">${icon('copy')}复制</button>
-              <button class="mp-btn ghost" data-act="fav-del" data-id="${item.id}" type="button">${icon('trash')}删掉</button>
-            </div>
-          </div>`;
-  }).join('') || '<div class="mp-empty">还没有收藏。<br>长按会话里的一句话就能收藏。</div>'}
-      </div>`;
-  },
-
-  handle(ctx, act, data) {
-    const item = ctx.state.favorites.find(entry => entry.id === data.id);
-    if (!item) return false;
-    if (act === 'fav-copy') {
-      navigator.clipboard?.writeText(item.text).then(() => ctx.toast('已复制'), () => ctx.toast('复制失败'));
-      return true;
-    }
-    if (act === 'fav-del') {
-      ctx.state.favorites = ctx.state.favorites.filter(entry => entry.id !== data.id);
-      ctx.save();
-      ctx.rerender();
-      ctx.toast('删掉了');
-      return true;
-    }
-    return false;
-  },
-};
-
 /* ------------------------------------------------------------ 表情 */
 
 export const emojiApp = {
@@ -359,7 +312,7 @@ export const helpApp = {
         </div>
         <div class="mp-card" style="font-size:12.5px;line-height:1.95;color:var(--text-2)">
           <b style="color:var(--text)">聊天</b><br>
-          长按一句话：引用、复制、收藏、让 TA 重说、删除。<br>
+          长按一句话：引用、复制、存成小剧场、让 TA 重说、删除。<br>
           输入框空着点发送，不是发空消息，是让 TA 主动开口。
         </div>
         <div class="mp-card" style="font-size:12.5px;line-height:1.95;color:var(--text-2)">

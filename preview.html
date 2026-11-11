@@ -1498,17 +1498,6 @@ body {
     inset 0 0 0 1px rgba(255, 255, 255, .08);
 }
 
-/* 收藏卡里的小头像 */
-.mp-avatar-sm {
-  width: 26px;
-  height: 26px;
-  border-radius: 9px;
-  font-size: 11px;
-  display: inline-grid;
-  place-items: center;
-  flex: 0 0 auto;
-}
-
 /* ======================================================= 透明背景 + 回桌面 */
 
 /* 背景三选一：none 透明 / day 樱粉 / night 夜色 */
@@ -3319,7 +3308,6 @@ function emptyState() {
     lookups: {},
     chats: {},
     diary: { entries: {}, prompt: DEFAULT_DIARY_PROMPT, lastGenerated: '' },
-    favorites: [],
     emoji: DEFAULT_EMOJI.map((item, index) => ({ id: `e${index + 1}`, ...item })),
     wallet: { balance: 4520, ledger: [] },
     plans: [],
@@ -3473,20 +3461,7 @@ function latestDiary(state) {
   return null;
 }
 
-/* ----------------------------------------------------- 收藏 / 小剧场等 */
-
-function addFavorite(state, payload) {
-  const item = {
-    id: newId('f'),
-    chatId: payload.chatId || '',
-    contactId: payload.contactId || '',
-    text: payload.text || '',
-    from: payload.from || 'them',
-    at: Date.now(),
-  };
-  state.favorites.unshift(item);
-  return item;
-}
+/* ---------------------------------------------------------- 小剧场等 */
 
 function extrasOf(state, contactId) {
   state.extras[contactId] = state.extras[contactId] || [];
@@ -3678,8 +3653,6 @@ function demoState() {
 
   state.diary.entries['2026-11-09'] = { key: '2026-11-09', text: '', tags: [], auto: false, createdAt: 0 };
 
-  addFavorite(state, { text: '我到了，路上小心。', chatId: chatShen.id, contactId: shen.id, from: 'them' });
-  addFavorite(state, { text: '就你上次在车上放的那首。', chatId: chatJiang.id, contactId: jiang.id, from: 'them' });
 
   state.extras[shen.id] = [
     { id: 'x1', title: '楼下的便利店', date: '2026-11-10', messageId: 'ch_demo_shen_m0', chatId: 'ch_demo_shen', lines: ['他把外套领子立起来，靠在电动车上抬头看我的窗户。', '灯管太白，照得人有点狼狈。'] },
@@ -3734,6 +3707,7 @@ function normalize(raw) {
     },
   };
   delete merged.membership;
+  delete merged.favorites;
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
   merged.settings.summary = { ...base.settings.summary, ...(raw.settings?.summary || {}) };
@@ -3779,7 +3753,6 @@ function normalize(raw) {
   merged.version = SCHEMA_VERSION;
   merged.contacts = merged.contacts || {};
   merged.chats = merged.chats || {};
-  merged.favorites = Array.isArray(merged.favorites) ? merged.favorites : [];
   merged.plans = Array.isArray(merged.plans) ? merged.plans : [];
   merged.extras = merged.extras || {};
   merged.emoji = Array.isArray(merged.emoji) && merged.emoji.length ? merged.emoji : base.emoji;
@@ -3810,7 +3783,6 @@ exports["dayKey"] = dayKey;
 exports["diaryEntry"] = diaryEntry;
 exports["writeDiary"] = writeDiary;
 exports["latestDiary"] = latestDiary;
-exports["addFavorite"] = addFavorite;
 exports["extrasOf"] = extrasOf;
 exports["syncTavernContacts"] = syncTavernContacts;
 exports["demoState"] = demoState;
@@ -4564,7 +4536,6 @@ const TINT = {
   plan: ['#bfe9d6', '#7fd2bc'],
   brush: ['#c3d6f2', '#8fb3e8'],
   help: ['#d7d2e6', '#a9a2c4'],
-  favorites: ['#f4c8e6', '#e79fce'],
   extras: ['#e2ccf6', '#bf9cec'],
   emoji: ['#fbd0c4', '#f39f92'],
   plans: ['#bfe9d6', '#7fd2bc'],
@@ -5781,7 +5752,6 @@ const threadApp = {
         items: [
           { label: '引用这条回复', value: 'quote', icon: 'reply' },
           { label: '复制文字', value: 'copy', icon: 'copy' },
-          { label: '收藏', value: 'fav', icon: 'bookmark' },
           { label: '存成小剧场', value: 'extra', icon: 'theater' },
           { label: '让 TA 重新说一次', value: 'regen', icon: 'refresh' },
           { label: '删除这条', value: 'delete', icon: 'trash', danger: true },
@@ -5794,11 +5764,6 @@ const threadApp = {
           }
           if (value === 'copy') {
             navigator.clipboard?.writeText(message.text).then(() => ctx.toast('已复制'), () => ctx.toast('复制失败'));
-          }
-          if (value === 'fav') {
-            ctx.state.favorites.unshift({ id: 'f' + Date.now().toString(36), chatId: chat.id, contactId: chat.contactId, text: message.text, from: message.from, at: Date.now() });
-            ctx.save();
-            ctx.toast('已收藏');
           }
           if (value === 'extra') {
             saveMessageExtra(ctx, chat, contact, message);
@@ -6131,7 +6096,6 @@ const contactApp = {
       return `<div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button></div><div class="mp-page-body"><div class="mp-empty">这个人不在了。</div></div>`;
     }
     const chats = Object.values(ctx.state.chats).filter(chat => chat.contactId === contact.id);
-    const favorites = ctx.state.favorites.filter(item => item.contactId === contact.id);
     const extras = ctx.state.extras[contact.id] || [];
     const last = chats[0] ? lastMessage(chats[0]) : null;
 
@@ -6166,9 +6130,6 @@ const contactApp = {
         </div>
         ${contact.kind === 'group' ? '' : `<button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button">${icon('search')}查 TA 的手机</button>`}
         ${rows}
-        <div class="mp-group-label" style="margin-top:16px">收藏了 TA 的 ${favorites.length} 句</div>
-        ${favorites.slice(0, 3).map(item => `
-          <div class="mp-card" style="font-family:var(--font-serif);font-size:13px;line-height:1.7;color:var(--text-2)">${esc(item.text)}</div>`).join('') || '<div class="mp-empty" style="padding:16px 0">还没有收藏。</div>'}
       </div>`;
   },
 
@@ -6559,11 +6520,11 @@ exports["appearanceApp"] = appearanceApp;
 __mods["meme/apps/more.js"] = function(module, exports, __req){
 /**
  * meme-phone · 其余 App
- * 小剧场 / 钱包 / 收藏 / 表情 / 计划 / 装扮 / 帮助
+ * 小剧场 / 钱包 / 表情 / 计划 / 装扮 / 帮助
  */
 
-const { icon, TINT } = __req("meme/icons.js");
-const { esc, tintStyle, shortText, avatarHtml } = __req("meme/shell.js");
+const { icon } = __req("meme/icons.js");
+const { esc, tintStyle } = __req("meme/shell.js");
 const { contactsOf, contactById, extrasOf } = __req("meme/data.js");
 
 function head(title, sub) {
@@ -6722,53 +6683,6 @@ const walletApp = {
   },
 };
 
-/* ------------------------------------------------------------ 收藏 */
-
-const favoritesApp = {
-  id: 'favorites', name: '收藏', icon: 'bookmark',
-
-  render(ctx) {
-    const list = ctx.state.favorites;
-    return `
-      <div class="mp-page-body">
-        ${head('收藏', `${list.length} 句留着的话`)}
-        ${list.map(item => {
-    const contact = contactById(ctx.state, item.contactId);
-    return `
-          <div class="mp-card">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
-              ${avatarHtml(contact?.name || '?', contact?.avatar, 'mp-avatar mp-avatar-sm')}
-              <span style="font-size:12px;color:var(--text-2);flex:1">${esc(contact?.name || '不知道是谁')}</span>
-              <span style="font-size:10.5px;color:var(--text-4)">${shortText(item.at)}</span>
-            </div>
-            <div style="font-family:var(--font-serif);font-size:13.5px;line-height:1.78;color:var(--text)">${esc(item.text)}</div>
-            <div style="display:flex;gap:7px;margin-top:9px">
-              <button class="mp-btn ghost" data-act="fav-copy" data-id="${item.id}" type="button">${icon('copy')}复制</button>
-              <button class="mp-btn ghost" data-act="fav-del" data-id="${item.id}" type="button">${icon('trash')}删掉</button>
-            </div>
-          </div>`;
-  }).join('') || '<div class="mp-empty">还没有收藏。<br>长按会话里的一句话就能收藏。</div>'}
-      </div>`;
-  },
-
-  handle(ctx, act, data) {
-    const item = ctx.state.favorites.find(entry => entry.id === data.id);
-    if (!item) return false;
-    if (act === 'fav-copy') {
-      navigator.clipboard?.writeText(item.text).then(() => ctx.toast('已复制'), () => ctx.toast('复制失败'));
-      return true;
-    }
-    if (act === 'fav-del') {
-      ctx.state.favorites = ctx.state.favorites.filter(entry => entry.id !== data.id);
-      ctx.save();
-      ctx.rerender();
-      ctx.toast('删掉了');
-      return true;
-    }
-    return false;
-  },
-};
-
 /* ------------------------------------------------------------ 表情 */
 
 const emojiApp = {
@@ -6918,7 +6832,7 @@ const helpApp = {
         </div>
         <div class="mp-card" style="font-size:12.5px;line-height:1.95;color:var(--text-2)">
           <b style="color:var(--text)">聊天</b><br>
-          长按一句话：引用、复制、收藏、让 TA 重说、删除。<br>
+          长按一句话：引用、复制、存成小剧场、让 TA 重说、删除。<br>
           输入框空着点发送，不是发空消息，是让 TA 主动开口。
         </div>
         <div class="mp-card" style="font-size:12.5px;line-height:1.95;color:var(--text-2)">
@@ -6937,7 +6851,6 @@ const helpApp = {
 exports["extrasApp"] = extrasApp;
 exports["extraDetailApp"] = extraDetailApp;
 exports["walletApp"] = walletApp;
-exports["favoritesApp"] = favoritesApp;
 exports["emojiApp"] = emojiApp;
 exports["plansApp"] = plansApp;
 exports["dressApp"] = dressApp;
@@ -9818,7 +9731,7 @@ const { charactersApp, characterApp } = __req("meme/apps/characters.js");
 const { charPhoneApp, charPhoneThreadApp, ensureLookup } = __req("meme/apps/charphone.js");
 const { bookApp, bookSettingsApp } = __req("meme/apps/book.js");
 const {
-  extrasApp, extraDetailApp, walletApp, favoritesApp, emojiApp,
+  extrasApp, extraDetailApp, walletApp, emojiApp,
   plansApp, dressApp, helpApp,
 } = __req("meme/apps/more.js");
 
@@ -9830,7 +9743,6 @@ const APPS = {
   'app-appearance': appearanceApp,
   'app-extras': extrasApp,
   'app-wallet': walletApp,
-  'app-favorites': favoritesApp,
   'app-emoji': emojiApp,
   'app-plans': plansApp,
   'app-dress': dressApp,
@@ -9855,7 +9767,6 @@ const APPS = {
 const DESKTOP_APPS = [
   { id: 'extras', name: '小剧场', icon: 'theater' },
   { id: 'wallet', name: '钱包', icon: 'wallet' },
-  { id: 'favorites', name: '收藏', icon: 'bookmark' },
   { id: 'draw', name: '绘图', icon: 'image' },
   { id: 'plans', name: '计划', icon: 'plan' },
   { id: 'dress', name: '装扮', icon: 'brush' },

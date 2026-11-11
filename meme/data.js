@@ -53,7 +53,6 @@ export function emptyState() {
     lookups: {},
     chats: {},
     diary: { entries: {}, prompt: DEFAULT_DIARY_PROMPT, lastGenerated: '' },
-    favorites: [],
     emoji: DEFAULT_EMOJI.map((item, index) => ({ id: `e${index + 1}`, ...item })),
     wallet: { balance: 4520, ledger: [] },
     plans: [],
@@ -207,20 +206,7 @@ export function latestDiary(state) {
   return null;
 }
 
-/* ----------------------------------------------------- 收藏 / 小剧场等 */
-
-export function addFavorite(state, payload) {
-  const item = {
-    id: newId('f'),
-    chatId: payload.chatId || '',
-    contactId: payload.contactId || '',
-    text: payload.text || '',
-    from: payload.from || 'them',
-    at: Date.now(),
-  };
-  state.favorites.unshift(item);
-  return item;
-}
+/* ---------------------------------------------------------- 小剧场等 */
 
 export function extrasOf(state, contactId) {
   state.extras[contactId] = state.extras[contactId] || [];
@@ -412,8 +398,6 @@ export function demoState() {
 
   state.diary.entries['2026-11-09'] = { key: '2026-11-09', text: '', tags: [], auto: false, createdAt: 0 };
 
-  addFavorite(state, { text: '我到了，路上小心。', chatId: chatShen.id, contactId: shen.id, from: 'them' });
-  addFavorite(state, { text: '就你上次在车上放的那首。', chatId: chatJiang.id, contactId: jiang.id, from: 'them' });
 
   state.extras[shen.id] = [
     { id: 'x1', title: '楼下的便利店', date: '2026-11-10', messageId: 'ch_demo_shen_m0', chatId: 'ch_demo_shen', lines: ['他把外套领子立起来，靠在电动车上抬头看我的窗户。', '灯管太白，照得人有点狼狈。'] },
@@ -468,6 +452,7 @@ export function normalize(raw) {
     },
   };
   delete merged.membership;
+  delete merged.favorites;
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
   merged.settings.summary = { ...base.settings.summary, ...(raw.settings?.summary || {}) };
@@ -513,7 +498,6 @@ export function normalize(raw) {
   merged.version = SCHEMA_VERSION;
   merged.contacts = merged.contacts || {};
   merged.chats = merged.chats || {};
-  merged.favorites = Array.isArray(merged.favorites) ? merged.favorites : [];
   merged.plans = Array.isArray(merged.plans) ? merged.plans : [];
   merged.extras = merged.extras || {};
   merged.emoji = Array.isArray(merged.emoji) && merged.emoji.length ? merged.emoji : base.emoji;

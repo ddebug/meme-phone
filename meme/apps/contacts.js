@@ -120,7 +120,6 @@ export const contactApp = {
       return `<div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button></div><div class="mp-page-body"><div class="mp-empty">这个人不在了。</div></div>`;
     }
     const chats = Object.values(ctx.state.chats).filter(chat => chat.contactId === contact.id);
-    const favorites = ctx.state.favorites.filter(item => item.contactId === contact.id);
     const extras = ctx.state.extras[contact.id] || [];
     const last = chats[0] ? lastMessage(chats[0]) : null;
 
@@ -155,9 +154,6 @@ export const contactApp = {
         </div>
         ${contact.kind === 'group' ? '' : `<button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button">${icon('search')}查 TA 的手机</button>`}
         ${rows}
-        <div class="mp-group-label" style="margin-top:16px">收藏了 TA 的 ${favorites.length} 句</div>
-        ${favorites.slice(0, 3).map(item => `
-          <div class="mp-card" style="font-family:var(--font-serif);font-size:13px;line-height:1.7;color:var(--text-2)">${esc(item.text)}</div>`).join('') || '<div class="mp-empty" style="padding:16px 0">还没有收藏。</div>'}
       </div>`;
   },
 

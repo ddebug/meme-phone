@@ -57,7 +57,6 @@ export const TINT = {
   plan: ['#bfe9d6', '#7fd2bc'],
   brush: ['#c3d6f2', '#8fb3e8'],
   help: ['#d7d2e6', '#a9a2c4'],
-  favorites: ['#f4c8e6', '#e79fce'],
   extras: ['#e2ccf6', '#bf9cec'],
   emoji: ['#fbd0c4', '#f39f92'],
   plans: ['#bfe9d6', '#7fd2bc'],

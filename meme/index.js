@@ -19,7 +19,7 @@ import { charactersApp, characterApp } from './apps/characters.js';
 import { charPhoneApp, charPhoneThreadApp, ensureLookup } from './apps/charphone.js';
 import { bookApp, bookSettingsApp } from './apps/book.js';
 import {
-  extrasApp, extraDetailApp, walletApp, favoritesApp, emojiApp,
+  extrasApp, extraDetailApp, walletApp, emojiApp,
   plansApp, dressApp, helpApp,
 } from './apps/more.js';
 
@@ -31,7 +31,6 @@ const APPS = {
   'app-appearance': appearanceApp,
   'app-extras': extrasApp,
   'app-wallet': walletApp,
-  'app-favorites': favoritesApp,
   'app-emoji': emojiApp,
   'app-plans': plansApp,
   'app-dress': dressApp,
@@ -56,7 +55,6 @@ const APPS = {
 const DESKTOP_APPS = [
   { id: 'extras', name: '小剧场', icon: 'theater' },
   { id: 'wallet', name: '钱包', icon: 'wallet' },
-  { id: 'favorites', name: '收藏', icon: 'bookmark' },
   { id: 'draw', name: '绘图', icon: 'image' },
   { id: 'plans', name: '计划', icon: 'plan' },
   { id: 'dress', name: '装扮', icon: 'brush' },

@@ -1481,17 +1481,6 @@
     inset 0 0 0 1px rgba(255, 255, 255, .08);
 }
 
-/* 收藏卡里的小头像 */
-.mp-avatar-sm {
-  width: 26px;
-  height: 26px;
-  border-radius: 9px;
-  font-size: 11px;
-  display: inline-grid;
-  place-items: center;
-  flex: 0 0 auto;
-}
-
 /* ======================================================= 透明背景 + 回桌面 */
 
 /* 背景三选一：none 透明 / day 樱粉 / night 夜色 */

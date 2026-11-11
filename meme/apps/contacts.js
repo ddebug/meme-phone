@@ -153,6 +153,7 @@ export const contactApp = {
           <button class="mp-btn accent" data-act="contact-chat" data-contact="${contact.id}" type="button" style="flex:1">${icon('chat')}发消息</button>
           <button class="mp-btn" data-act="contact-extras" data-contact="${contact.id}" type="button" style="flex:1">${icon('theater')}小剧场 ${extras.length || ''}</button>
         </div>
+        ${contact.kind === 'group' ? '' : `<button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button">${icon('search')}查 TA 的手机</button>`}
         ${rows}
         <div class="mp-group-label" style="margin-top:16px">收藏了 TA 的 ${favorites.length} 句</div>
         ${favorites.slice(0, 3).map(item => `
@@ -180,6 +181,12 @@ export const contactApp = {
 
     if (act === 'contact-extras') {
       ctx.go('app-extras', { contactId: data.contact });
+      return true;
+    }
+
+    if (act === 'contact-phone') {
+      if (!contact) return true;
+      ctx.go('p-charphone', { contactId: contact.id });
       return true;
     }
 

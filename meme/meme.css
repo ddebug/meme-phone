@@ -2246,3 +2246,294 @@
   color: var(--text-3);
   background: rgba(190, 180, 230, .12);
 }
+
+/* ===================== 查 TA 的手机（本段） ===================== */
+.mp-cp-entry {
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.mp-cp-badge {
+  padding: 3px 9px;
+  border-radius: 9px;
+  font-size: 10.5px;
+  color: var(--text-3);
+  background: rgba(120, 116, 150, .08);
+}
+
+.mp-cp-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 2px 14px;
+}
+
+.mp-cp-head .mp-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  font-size: 14px;
+}
+
+.mp-cp-head-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.mp-cp-head-name {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+
+.mp-cp-head-sub {
+  margin-top: 3px;
+  font-size: 10.5px;
+  color: var(--text-4);
+}
+
+.mp-cp-shell {
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+  overflow: hidden;
+}
+
+.mp-cp-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 6px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.mp-cp-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 0 10px;
+  border: 0;
+  border-radius: 10px 10px 0 0;
+  background: none;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--text-3);
+  cursor: pointer;
+  position: relative;
+}
+
+.mp-cp-tab .mp-i {
+  width: 14px;
+  height: 14px;
+}
+
+.mp-cp-tab.is-on {
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+
+.mp-cp-tab.is-on::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent-deep);
+  transform: translateX(-50%);
+}
+
+.mp-cp-chats,
+.mp-cp-roster {
+  padding: 2px 12px 6px;
+  box-shadow: none;
+  background: none;
+  border-radius: 0;
+}
+
+.mp-cp-chat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 2px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mp-cp-chat + .mp-cp-chat,
+.mp-cp-roster .mp-user-row + .mp-user-row {
+  border-top: 1px solid var(--line-soft);
+}
+
+.mp-cp-chat:active { opacity: .7; }
+
+.mp-user-row.is-static-row {
+  cursor: default;
+}
+
+.mp-cp-chat .mp-avatar,
+.mp-cp-roster .mp-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.mp-cp-chat .mp-user-desc,
+.mp-cp-roster .mp-user-desc {
+  -webkit-line-clamp: 1;
+}
+
+.mp-cp-count {
+  margin-left: 5px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--text-4);
+  background: rgba(120, 116, 150, .1);
+}
+
+.mp-cp-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font-size: 9.5px;
+  color: var(--text-4);
+}
+
+.mp-cp-dot {
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 15px;
+  text-align: center;
+  color: #fff;
+  background: var(--accent-deep);
+}
+
+.mp-cp-feed {
+  padding: 10px 12px 14px;
+}
+
+.mp-cp-moment {
+  padding: 12px 0 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.mp-cp-moment:last-child {
+  border-bottom: 0;
+}
+
+.mp-cp-moment-text {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-2);
+}
+
+.mp-cp-moment-meta {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--text-4);
+}
+
+.mp-cp-comment {
+  margin-top: 6px;
+  padding: 6px 9px;
+  border-radius: 9px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-3);
+  background: rgba(120, 116, 150, .06);
+}
+
+.mp-cp-comment b {
+  margin-right: 5px;
+  font-weight: 600;
+  color: var(--accent-deep);
+}
+
+.mp-cp-thread-head {
+  padding: 2px 2px 12px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.mp-cp-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+
+.mp-cp-bubble-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.mp-cp-bubble-row.is-me {
+  flex-direction: row-reverse;
+}
+
+.mp-cp-bubble-row .mp-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  font-size: 11px;
+}
+
+.mp-cp-bubble {
+  max-width: 74%;
+  padding: 8px 11px;
+  border-radius: 13px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+}
+
+.mp-cp-bubble-row.is-me .mp-cp-bubble {
+  color: #fff;
+  background: linear-gradient(150deg, #a99cf6, #8e7bf2);
+}
+
+.mp-cp-time {
+  display: block;
+  margin-top: 4px;
+  font-size: 9px;
+  color: var(--text-4);
+}
+
+.mp-cp-bubble-row.is-me .mp-cp-time {
+  color: rgba(255, 255, 255, .7);
+  text-align: right;
+}
+
+.mp-root[data-mp-theme="night"] .mp-cp-badge {
+  background: rgba(190, 180, 230, .12);
+}
+
+.mp-root[data-mp-theme="night"] .mp-cp-comment {
+  background: rgba(190, 180, 230, .08);
+}
+
+.mp-root[data-mp-theme="night"] .mp-cp-bubble {
+  background: rgba(255, 255, 255, .07);
+  color: var(--text);
+}

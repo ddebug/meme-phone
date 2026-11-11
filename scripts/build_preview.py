@@ -24,6 +24,7 @@ MODULES = [
     "meme/apps/api.js",
     "meme/apps/user.js",
   "meme/apps/characters.js",
+  "meme/apps/charphone.js",
     "meme/index.js",
 ]
 ENTRY = "meme/index.js"
@@ -133,7 +134,10 @@ def build() -> str:
     log('opened, phone=' + (document.getElementById('meme-phone') ? 'yes' : 'no'));
     const view = new URLSearchParams(location.search).get('view') || hash.split('&')[0];
     log('hash=' + hash + ' view=' + view);
-    if (view) api.goView(view);
+    const rest = new URLSearchParams(hash.split('&').slice(1).join('&') || '');
+    const params = {{}};
+    rest.forEach(function(value, key) {{ if (key !== 'debug' && key !== 'night') params[key] = value; }});
+    if (view) api.goView(view, params);
     if (hash.indexOf('night') >= 0) {{
       const node = document.getElementById('meme-phone');
       if (node) node.dataset.mpTheme = 'night';

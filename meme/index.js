@@ -15,6 +15,7 @@ import { drawApp } from './apps/draw.js';
 import { apiListApp, apiPresetApp } from './apps/api.js';
 import { userListApp, userEditApp } from './apps/user.js';
 import { charactersApp, characterApp } from './apps/characters.js';
+import { charPhoneApp, charPhoneThreadApp, ensureLookup } from './apps/charphone.js';
 import {
   extrasApp, extraDetailApp, walletApp, favoritesApp, emojiApp,
   membershipApp, plansApp, dressApp, helpApp,
@@ -41,6 +42,8 @@ const APPS = {
   'user-item': userEditApp,
   'app-characters': charactersApp,
   'character-card': characterApp,
+  'p-charphone': charPhoneApp,
+  'p-chatphone': charPhoneThreadApp,
   thread: threadApp,
   contact: contactApp,
   'extra-detail': extraDetailApp,
@@ -105,6 +108,60 @@ function makeAi(state) {
       ].join('\n');
       const result = await generate({ prompt, demoReply });
       return result.text;
+    },
+
+    /* 查 TA 的手机：让模型按人设现编一份聊天 / 通讯录 / 朋友圈 */
+    async lookup(context, contact, local) {
+      const card = (state.characters || []).find(item => item.name === contact?.name);
+      const prompt = [
+        `你在给「${contact?.name || 'TA'}」这台手机写内容。`,
+        card ? `人物设定：${(card.description || '').slice(0, 300)}` : '',
+        card?.personality ? `性格：${card.personality.slice(0, 120)}` : '',
+        card?.scenario ? `常出现的场景：${card.scenario.slice(0, 120)}` : '',
+        '写 TA 手机里的东西：和别人的聊天、通讯录、朋友圈。全部口语中文，贴合这个人，不要写成说明书。',
+        '只输出 JSON，不要解释、不要 markdown 代码块：',
+        '{"chats":[{"peer":"名字","tag":"家人/朋友/同事/群聊","group":false,"unread":0,"msgs":[{"me":false,"text":"一句话","at":"21:04"}]}],"contacts":[{"name":"","note":""}],"moments":[{"text":"","at":"21:04","likes":3,"comments":[{"who":"","text":""}]}]}',
+        'chats 4 条（每条 4~6 句，me 表示是不是 TA 自己说的），contacts 6 条，moments 3 条。',
+      ].filter(Boolean).join('\n');
+      const result = await generate({ prompt, demoReply: JSON.stringify(local) });
+      const text = String(result.text || '');
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}');
+      if (start < 0 || end <= start) return local;
+      try {
+        const parsed = JSON.parse(text.slice(start, end + 1));
+        const chats = Array.isArray(parsed.chats) ? parsed.chats.filter(item => item && item.peer && Array.isArray(item.msgs)) : [];
+        const moments = Array.isArray(parsed.moments) ? parsed.moments.filter(item => item && item.text) : [];
+        if (!chats.length) return local;
+        return {
+          at: Date.now(),
+          chats: chats.map((item, index) => ({
+            id: `g${index}`,
+            peer: String(item.peer).slice(0, 18),
+            tag: String(item.tag || '朋友').slice(0, 6),
+            group: Boolean(item.group),
+            unread: Number(item.unread) > 0 ? Number(item.unread) : 0,
+            msgs: item.msgs.slice(0, 8).map(msg => ({
+              me: Boolean(msg.me),
+              text: String(msg.text || '').slice(0, 120),
+              at: String(msg.at || '').slice(0, 8),
+            })),
+          })),
+          contacts: Array.isArray(parsed.contacts)
+            ? parsed.contacts.filter(item => item && item.name).slice(0, 10).map(item => ({ name: String(item.name).slice(0, 16), note: String(item.note || '').slice(0, 24) }))
+            : local.contacts,
+          moments: moments.length ? moments.slice(0, 4).map(item => ({
+            text: String(item.text).slice(0, 160),
+            at: String(item.at || '').slice(0, 8),
+            likes: Number(item.likes) >= 0 ? Number(item.likes) : 0,
+            comments: Array.isArray(item.comments)
+              ? item.comments.filter(c => c && c.text).slice(0, 3).map(c => ({ who: String(c.who || '').slice(0, 12), text: String(c.text).slice(0, 60) }))
+              : [],
+          })) : local.moments,
+        };
+      } catch {
+        return local;
+      }
     },
 
     async diary(context, payload) {
@@ -350,6 +407,17 @@ export function goView(view, params = {}) {
   if (view === 'character-card' && !params.name) {
     const first = (ctx.state.characters || [])[0];
     if (first?.name) payload = { name: first.name };
+  }
+  if (view === 'p-charphone' && !payload.contactId) {
+    const first = Object.values(ctx.state.contacts || {}).find(item => item.kind !== 'group');
+    if (first) payload = { contactId: first.id };
+  }
+  if (view === 'p-charphone' && params.tab) ctx.shell.cpTab = params.tab;
+  if (view === 'p-chatphone' && (!payload.contactId || !payload.peer)) {
+    const first = Object.values(ctx.state.contacts || {}).find(item => item.kind !== 'group');
+    const lookup = first ? ensureLookup(ctx.state, first) : null;
+    const peer = lookup?.chats?.[0]?.id;
+    if (first && peer) payload = { contactId: first.id, peer };
   }
   ctx.go(view, payload);
 }

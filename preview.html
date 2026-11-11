@@ -2264,6 +2264,297 @@ body {
   background: rgba(190, 180, 230, .12);
 }
 
+/* ===================== 查 TA 的手机（本段） ===================== */
+.mp-cp-entry {
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.mp-cp-badge {
+  padding: 3px 9px;
+  border-radius: 9px;
+  font-size: 10.5px;
+  color: var(--text-3);
+  background: rgba(120, 116, 150, .08);
+}
+
+.mp-cp-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 2px 14px;
+}
+
+.mp-cp-head .mp-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  font-size: 14px;
+}
+
+.mp-cp-head-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.mp-cp-head-name {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+
+.mp-cp-head-sub {
+  margin-top: 3px;
+  font-size: 10.5px;
+  color: var(--text-4);
+}
+
+.mp-cp-shell {
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+  overflow: hidden;
+}
+
+.mp-cp-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 6px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.mp-cp-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 0 10px;
+  border: 0;
+  border-radius: 10px 10px 0 0;
+  background: none;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--text-3);
+  cursor: pointer;
+  position: relative;
+}
+
+.mp-cp-tab .mp-i {
+  width: 14px;
+  height: 14px;
+}
+
+.mp-cp-tab.is-on {
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+
+.mp-cp-tab.is-on::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent-deep);
+  transform: translateX(-50%);
+}
+
+.mp-cp-chats,
+.mp-cp-roster {
+  padding: 2px 12px 6px;
+  box-shadow: none;
+  background: none;
+  border-radius: 0;
+}
+
+.mp-cp-chat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 2px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mp-cp-chat + .mp-cp-chat,
+.mp-cp-roster .mp-user-row + .mp-user-row {
+  border-top: 1px solid var(--line-soft);
+}
+
+.mp-cp-chat:active { opacity: .7; }
+
+.mp-user-row.is-static-row {
+  cursor: default;
+}
+
+.mp-cp-chat .mp-avatar,
+.mp-cp-roster .mp-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.mp-cp-chat .mp-user-desc,
+.mp-cp-roster .mp-user-desc {
+  -webkit-line-clamp: 1;
+}
+
+.mp-cp-count {
+  margin-left: 5px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--text-4);
+  background: rgba(120, 116, 150, .1);
+}
+
+.mp-cp-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font-size: 9.5px;
+  color: var(--text-4);
+}
+
+.mp-cp-dot {
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 15px;
+  text-align: center;
+  color: #fff;
+  background: var(--accent-deep);
+}
+
+.mp-cp-feed {
+  padding: 10px 12px 14px;
+}
+
+.mp-cp-moment {
+  padding: 12px 0 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.mp-cp-moment:last-child {
+  border-bottom: 0;
+}
+
+.mp-cp-moment-text {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-2);
+}
+
+.mp-cp-moment-meta {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--text-4);
+}
+
+.mp-cp-comment {
+  margin-top: 6px;
+  padding: 6px 9px;
+  border-radius: 9px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-3);
+  background: rgba(120, 116, 150, .06);
+}
+
+.mp-cp-comment b {
+  margin-right: 5px;
+  font-weight: 600;
+  color: var(--accent-deep);
+}
+
+.mp-cp-thread-head {
+  padding: 2px 2px 12px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.mp-cp-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+
+.mp-cp-bubble-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.mp-cp-bubble-row.is-me {
+  flex-direction: row-reverse;
+}
+
+.mp-cp-bubble-row .mp-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  font-size: 11px;
+}
+
+.mp-cp-bubble {
+  max-width: 74%;
+  padding: 8px 11px;
+  border-radius: 13px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+}
+
+.mp-cp-bubble-row.is-me .mp-cp-bubble {
+  color: #fff;
+  background: linear-gradient(150deg, #a99cf6, #8e7bf2);
+}
+
+.mp-cp-time {
+  display: block;
+  margin-top: 4px;
+  font-size: 9px;
+  color: var(--text-4);
+}
+
+.mp-cp-bubble-row.is-me .mp-cp-time {
+  color: rgba(255, 255, 255, .7);
+  text-align: right;
+}
+
+.mp-root[data-mp-theme="night"] .mp-cp-badge {
+  background: rgba(190, 180, 230, .12);
+}
+
+.mp-root[data-mp-theme="night"] .mp-cp-comment {
+  background: rgba(190, 180, 230, .08);
+}
+
+.mp-root[data-mp-theme="night"] .mp-cp-bubble {
+  background: rgba(255, 255, 255, .07);
+  color: var(--text);
+}
+
 </style>
 </head>
 <body>
@@ -2323,6 +2614,7 @@ function emptyState() {
     usersFromTavern: false,
     characters: [],
     charactersFromTavern: false,
+    lookups: {},
     chats: {},
     diary: { entries: {}, prompt: DEFAULT_DIARY_PROMPT, lastGenerated: '' },
     favorites: [],
@@ -2709,6 +3001,7 @@ function normalize(raw) {
   merged.users = Array.isArray(raw.users) ? raw.users.filter(item => item && (item.key || item.name)) : [];
   merged.characters = Array.isArray(raw.characters) ? raw.characters.filter(item => item && item.name) : [];
   merged.charactersFromTavern = Boolean(raw.charactersFromTavern);
+  merged.lookups = (raw.lookups && typeof raw.lookups === 'object' && !Array.isArray(raw.lookups)) ? raw.lookups : {};
   merged.usersFromTavern = Boolean(raw.usersFromTavern);
   merged.settings.api.presets = Array.isArray(merged.settings.api.presets) && merged.settings.api.presets.length
     ? merged.settings.api.presets
@@ -4439,6 +4732,7 @@ const contactApp = {
           <button class="mp-btn accent" data-act="contact-chat" data-contact="${contact.id}" type="button" style="flex:1">${icon('chat')}发消息</button>
           <button class="mp-btn" data-act="contact-extras" data-contact="${contact.id}" type="button" style="flex:1">${icon('theater')}小剧场 ${extras.length || ''}</button>
         </div>
+        ${contact.kind === 'group' ? '' : `<button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button">${icon('search')}查 TA 的手机</button>`}
         ${rows}
         <div class="mp-group-label" style="margin-top:16px">收藏了 TA 的 ${favorites.length} 句</div>
         ${favorites.slice(0, 3).map(item => `
@@ -4466,6 +4760,12 @@ const contactApp = {
 
     if (act === 'contact-extras') {
       ctx.go('app-extras', { contactId: data.contact });
+      return true;
+    }
+
+    if (act === 'contact-phone') {
+      if (!contact) return true;
+      ctx.go('p-charphone', { contactId: contact.id });
       return true;
     }
 
@@ -6347,6 +6647,288 @@ const characterApp = {
 exports["charactersApp"] = charactersApp;
 exports["characterApp"] = characterApp;
 };
+__mods["meme/apps/charphone.js"] = function(module, exports, __req){
+/**
+ * meme-phone · 查 TA 的手机
+ *
+ * 打开某个联系人自己的那台手机：聊天、通讯录、朋友圈。
+ * 默认按角色卡在本地拼一份（立刻能看）；接上酒馆模型后可以「现编」一份更像 TA 的。
+ */
+
+const { icon } = __req("meme/icons.js");
+const { esc, avatarHtml, shortText } = __req("meme/shell.js");
+const { contactById } = __req("meme/data.js");
+const ROLE_LINES = {
+  family: ['吃饭了没', '别老熬夜', '周末回不回来', '钱够不够用', '你爸又念叨你了'],
+  work: ['图纸改完了吗', '明早八点的会', '老板刚在群里点名了', '这版还得再改一次', '下班了吗'],
+  friend: ['出来喝一杯', '在老地方等你', '刚看到个特别好笑的东西', '你上次说的那家店我去了', '睡不着'],
+  group: ['今晚谁还在', '楼下集合', '我先撤了', '别@全体了', '这周六定不定'],
+};
+
+const SELF_LINES = ['好，我知道了', '等我一下', '马上', '今天有点累', '晚点说', '在忙，回头聊'];
+
+const PHOTO_LINES = ['在楼下便利店坐了一会儿，风比昨天凉。', '今天的云很低，像要压到楼顶。', '收工，路口的灯刚好亮了。'];
+const COMMENTS = [['阿泽', '这张拍得不错'], ['小满', '又在加班？'], ['妈妈', '早点睡']];
+
+function hash(text) {
+  let value = 0;
+  const source = String(text || '');
+  for (let i = 0; i < source.length; i += 1) value = (value * 31 + source.charCodeAt(i)) % 99991;
+  return value;
+}
+
+function pick(list, seed, offset = 0) {
+  return list[(seed + offset) % list.length];
+}
+
+function clockLabel(minutesAgo) {
+  const date = new Date(Date.now() - minutesAgo * 60000);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+/** 本地生成一份：够看，不联网。 */
+function buildLocal(contact, card) {
+  const seed = hash(contact.name);
+
+  const ownLine = (card?.firstMes || '').split('\n')[0].trim();
+  const place = (card?.scenario || '').split(/[。；]/)[0].trim();
+
+  const peers = [
+    { id: 'p1', name: '妈妈', tag: '家人', kind: 'family' },
+    { id: 'p2', name: contact.kind === 'group' ? '群里的老周' : '老同学 阿泽', tag: '朋友', kind: 'friend' },
+    { id: 'p3', name: contact.kind === 'group' ? '同事 小满' : '同事 小满', tag: '同事', kind: 'work' },
+    { id: 'p4', name: '三号工地群', tag: '群聊', kind: 'group', group: true },
+  ];
+
+  const chats = peers.map((peer, index) => {
+    const pool = ROLE_LINES[peer.kind] || ROLE_LINES.friend;
+    const base = index * 26;
+    const msgs = [];
+    const push = (me, text, ago) => { if (text) msgs.push({ me, text, at: clockLabel(ago) }); };
+    push(false, pick(pool, seed, index), base + 180);
+    push(true, pick(SELF_LINES, seed, index + 2), base + 150);
+    push(false, pick(pool, seed, index + 3), base + 40);
+    if (index === 2) push(false, ownLine, base + 12);
+    if (index === 1) push(false, place, base + 12);
+    push(true, pick(SELF_LINES, seed, index + 4), base + 6);
+    push(false, pick(pool, seed, index + 5), base + 2);
+    return {
+      id: peer.id,
+      peer: peer.name,
+      tag: peer.tag,
+      group: Boolean(peer.group),
+      unread: index === 3 ? 2 : 0,
+      msgs,
+    };
+  });
+
+  const roster = [
+    { name: '妈妈', note: '每周三打电话' },
+    { name: '老同学 阿泽', note: '上次见面是夏天' },
+    { name: '同事 小满', note: '同层工位' },
+    { name: '三号工地群', note: '9 人' },
+    { name: '外卖 王师傅', note: '送到就走' },
+    { name: '楼下便利店', note: '常去' },
+  ];
+
+  const moments = [
+    {
+      text: photoText(seed, 0),
+      at: clockLabel(240),
+      likes: 6 + (seed % 9),
+      comments: COMMENT_SET(seed, 0),
+    },
+    {
+      text: photoText(seed, 1),
+      at: clockLabel(1500),
+      likes: 11 + (seed % 7),
+      comments: COMMENT_SET(seed, 1),
+    },
+    {
+      text: ownLine || '今天没什么想说的。',
+      at: clockLabel(4300),
+      likes: 3 + (seed % 5),
+      comments: COMMENT_SET(seed, 2),
+    },
+  ];
+
+  return { at: Date.now(), chats, contacts: roster, moments };
+}
+
+function photoText(seed, offset) {
+  return pick(PHOTO_LINES, seed, offset);
+}
+
+function COMMENT_SET(seed, offset) {
+  return [0, 1].map(step => {
+    const [who, text] = COMMENTS[(seed + offset + step) % COMMENTS.length];
+    return { who, text };
+  });
+}
+
+function ensureLookup(state, contact) {
+  if (!state.lookups) state.lookups = {};
+  if (state.lookups[contact.id]) return state.lookups[contact.id];
+  const card = (state.characters || []).find(item => item.name === contact.name) || null;
+  state.lookups[contact.id] = buildLocal(contact, card);
+  return state.lookups[contact.id];
+}
+
+function tabsHtml(active) {
+  const tabs = [
+    ['chat', '聊天', 'chat'],
+    ['roster', '通讯录', 'contacts'],
+    ['moments', '朋友圈', 'spark'],
+  ];
+  return `<div class="mp-cp-tabs">${tabs.map(([key, label, ico]) => `
+    <button class="mp-cp-tab${active === key ? ' is-on' : ''}" data-act="cp-tab" data-tab="${key}" type="button">
+      ${icon(ico)}<span>${label}</span>
+    </button>`).join('')}</div>`;
+}
+
+const charPhoneApp = {
+  id: 'p-charphone',
+
+  render(ctx, params) {
+    const contact = contactById(ctx.state, params?.contactId);
+    if (!contact) return '<div class="mp-page-body"><div class="mp-empty">这个人不在了。</div></div>';
+
+    const data = ensureLookup(ctx.state, contact);
+    const tab = ctx.shell.cpTab || 'chat';
+    const generating = ctx.shell.cpBusy;
+
+    const head = `
+      <div class="mp-cp-head">
+        ${avatarHtml(contact.name, contact.avatar, 'mp-avatar')}
+        <div class="mp-cp-head-main">
+          <div class="mp-cp-head-name">${esc(contact.name)} 的手机</div>
+          <div class="mp-cp-head-sub">只能看，动了会被发现</div>
+        </div>
+        <button class="mp-icon-btn" data-act="cp-gen" data-contact="${contact.id}" type="button" aria-label="生成">${icon('spark')}</button>
+      </div>`;
+
+    const body = tab === 'roster'
+      ? `<div class="mp-card mp-cp-roster">${data.contacts.map(item => `
+          <div class="mp-user-row is-static-row">
+            ${avatarHtml(item.name, '', 'mp-avatar')}
+            <span class="mp-user-main">
+              <span class="mp-user-name">${esc(item.name)}</span>
+              <span class="mp-user-desc">${esc(item.note || '')}</span>
+            </span>
+          </div>`).join('')}</div>`
+      : tab === 'moments'
+        ? `<div class="mp-cp-feed">${data.moments.map(item => `
+            <div class="mp-cp-moment">
+              <div class="mp-cp-moment-text">${esc(item.text)}</div>
+              <div class="mp-cp-moment-meta">${esc(item.at)} · ${item.likes} 赞</div>
+              ${(item.comments || []).map(comment => `
+                <div class="mp-cp-comment"><b>${esc(comment.who)}</b>${esc(comment.text)}</div>`).join('')}
+            </div>`).join('')}</div>`
+        : `<div class="mp-card mp-cp-chats">${data.chats.map(chat => {
+            const last = chat.msgs[chat.msgs.length - 1];
+            return `<button class="mp-cp-chat" data-act="cp-open-chat" data-contact="${contact.id}" data-peer="${chat.id}" type="button">
+              ${avatarHtml(chat.peer, '', 'mp-avatar')}
+              <span class="mp-user-main">
+                <span class="mp-user-name">${esc(chat.peer)}${chat.group ? '<i class="mp-cp-count">群</i>' : ''}</span>
+                <span class="mp-user-desc">${esc(last?.text || '')}</span>
+              </span>
+              <span class="mp-cp-side">${esc(last?.at || '')}${chat.unread ? `<i class="mp-cp-dot">${chat.unread}</i>` : ''}</span>
+            </button>`;
+          }).join('')}</div>`;
+
+    return `
+      <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button>
+        <span style="flex:1"></span>
+        <span class="mp-cp-badge">${generating ? '正在现编…' : 'TA 的手机'}</span>
+      </div>
+      <div class="mp-page-body">
+        ${head}
+        <div class="mp-cp-shell">
+          ${tabsHtml(tab)}
+          ${body}
+        </div>
+        <div class="mp-foot-note">这些是 TA 手机里的东西，看过就往回走；点右上角可以让模型现编一份。</div>
+      </div>`;
+  },
+
+  handle(ctx, act, data) {
+    const contact = contactById(ctx.state, data?.contact);
+
+    if (act === 'cp-tab') {
+      ctx.shell.cpTab = data.tab;
+      ctx.shell.rerender();
+      return true;
+    }
+
+    if (act === 'cp-open-chat') {
+      ctx.go('p-chatphone', { contactId: data.contact, peer: data.peer });
+      return true;
+    }
+
+    if (act === 'cp-gen') {
+      if (!contact) return true;
+      if (typeof ctx.ai?.lookup !== 'function') { ctx.toast('这个环境生成不了'); return true; }
+      ctx.shell.cpBusy = true;
+      ctx.shell.rerender();
+      const local = ensureLookup(ctx.state, contact);
+      Promise.resolve()
+        .then(() => ctx.ai.lookup(ctx, contact, local))
+        .then(result => {
+          if (result) ctx.state.lookups[contact.id] = { ...result, at: Date.now() };
+          ctx.save();
+          ctx.shell.cpBusy = false;
+          ctx.shell.rerender();
+          ctx.toast(result ? '这份是现编的' : '没生成出来，先看本地这份');
+        })
+        .catch(error => {
+          ctx.shell.cpBusy = false;
+          ctx.shell.rerender();
+          ctx.toast(error.message || '生成失败');
+        });
+      return true;
+    }
+
+    return false;
+  },
+};
+
+const charPhoneThreadApp = {
+  id: 'p-chatphone',
+
+  render(ctx, params) {
+    const contact = contactById(ctx.state, params?.contactId);
+    const data = contact ? ensureLookup(ctx.state, contact) : null;
+    const chat = data?.chats.find(item => item.id === params?.peer);
+    if (!contact || !chat) return '<div class="mp-page-body"><div class="mp-empty">这段对话不在了。</div></div>';
+
+    const bubbles = chat.msgs.map(msg => `
+      <div class="mp-cp-bubble-row${msg.me ? ' is-me' : ''}">
+        ${msg.me ? '' : avatarHtml(chat.peer, '', 'mp-avatar')}
+        <div class="mp-cp-bubble">${esc(msg.text)}<span class="mp-cp-time">${esc(msg.at)}</span></div>
+      </div>`).join('');
+
+    return `
+      <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button>
+        <span style="flex:1"></span>
+        <span class="mp-cp-badge">${esc(contact.name)} 的手机 · ${esc(chat.peer)}</span>
+      </div>
+      <div class="mp-page-body">
+        <div class="mp-cp-thread-head">${esc(chat.peer)}${chat.group ? ` · ${chat.tag}` : ''}</div>
+        <div class="mp-cp-thread">${bubbles}</div>
+        <div class="mp-foot-note">只读，回不去的话往左上角点。</div>
+      </div>`;
+  },
+
+  handle() {
+    return false;
+  },
+};
+
+exports["buildLocal"] = buildLocal;
+exports["ensureLookup"] = ensureLookup;
+exports["charPhoneApp"] = charPhoneApp;
+exports["charPhoneThreadApp"] = charPhoneThreadApp;
+};
 __mods["meme/index.js"] = function(module, exports, __req){
 /**
  * meme-phone · 模块入口
@@ -6365,6 +6947,7 @@ const { drawApp } = __req("meme/apps/draw.js");
 const { apiListApp, apiPresetApp } = __req("meme/apps/api.js");
 const { userListApp, userEditApp } = __req("meme/apps/user.js");
 const { charactersApp, characterApp } = __req("meme/apps/characters.js");
+const { charPhoneApp, charPhoneThreadApp, ensureLookup } = __req("meme/apps/charphone.js");
 const {
   extrasApp, extraDetailApp, walletApp, favoritesApp, emojiApp,
   membershipApp, plansApp, dressApp, helpApp,
@@ -6391,6 +6974,8 @@ const APPS = {
   'user-item': userEditApp,
   'app-characters': charactersApp,
   'character-card': characterApp,
+  'p-charphone': charPhoneApp,
+  'p-chatphone': charPhoneThreadApp,
   thread: threadApp,
   contact: contactApp,
   'extra-detail': extraDetailApp,
@@ -6455,6 +7040,60 @@ function makeAi(state) {
       ].join('\n');
       const result = await generate({ prompt, demoReply });
       return result.text;
+    },
+
+    /* 查 TA 的手机：让模型按人设现编一份聊天 / 通讯录 / 朋友圈 */
+    async lookup(context, contact, local) {
+      const card = (state.characters || []).find(item => item.name === contact?.name);
+      const prompt = [
+        `你在给「${contact?.name || 'TA'}」这台手机写内容。`,
+        card ? `人物设定：${(card.description || '').slice(0, 300)}` : '',
+        card?.personality ? `性格：${card.personality.slice(0, 120)}` : '',
+        card?.scenario ? `常出现的场景：${card.scenario.slice(0, 120)}` : '',
+        '写 TA 手机里的东西：和别人的聊天、通讯录、朋友圈。全部口语中文，贴合这个人，不要写成说明书。',
+        '只输出 JSON，不要解释、不要 markdown 代码块：',
+        '{"chats":[{"peer":"名字","tag":"家人/朋友/同事/群聊","group":false,"unread":0,"msgs":[{"me":false,"text":"一句话","at":"21:04"}]}],"contacts":[{"name":"","note":""}],"moments":[{"text":"","at":"21:04","likes":3,"comments":[{"who":"","text":""}]}]}',
+        'chats 4 条（每条 4~6 句，me 表示是不是 TA 自己说的），contacts 6 条，moments 3 条。',
+      ].filter(Boolean).join('\n');
+      const result = await generate({ prompt, demoReply: JSON.stringify(local) });
+      const text = String(result.text || '');
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}');
+      if (start < 0 || end <= start) return local;
+      try {
+        const parsed = JSON.parse(text.slice(start, end + 1));
+        const chats = Array.isArray(parsed.chats) ? parsed.chats.filter(item => item && item.peer && Array.isArray(item.msgs)) : [];
+        const moments = Array.isArray(parsed.moments) ? parsed.moments.filter(item => item && item.text) : [];
+        if (!chats.length) return local;
+        return {
+          at: Date.now(),
+          chats: chats.map((item, index) => ({
+            id: `g${index}`,
+            peer: String(item.peer).slice(0, 18),
+            tag: String(item.tag || '朋友').slice(0, 6),
+            group: Boolean(item.group),
+            unread: Number(item.unread) > 0 ? Number(item.unread) : 0,
+            msgs: item.msgs.slice(0, 8).map(msg => ({
+              me: Boolean(msg.me),
+              text: String(msg.text || '').slice(0, 120),
+              at: String(msg.at || '').slice(0, 8),
+            })),
+          })),
+          contacts: Array.isArray(parsed.contacts)
+            ? parsed.contacts.filter(item => item && item.name).slice(0, 10).map(item => ({ name: String(item.name).slice(0, 16), note: String(item.note || '').slice(0, 24) }))
+            : local.contacts,
+          moments: moments.length ? moments.slice(0, 4).map(item => ({
+            text: String(item.text).slice(0, 160),
+            at: String(item.at || '').slice(0, 8),
+            likes: Number(item.likes) >= 0 ? Number(item.likes) : 0,
+            comments: Array.isArray(item.comments)
+              ? item.comments.filter(c => c && c.text).slice(0, 3).map(c => ({ who: String(c.who || '').slice(0, 12), text: String(c.text).slice(0, 60) }))
+              : [],
+          })) : local.moments,
+        };
+      } catch {
+        return local;
+      }
     },
 
     async diary(context, payload) {
@@ -6701,6 +7340,17 @@ function goView(view, params = {}) {
     const first = (ctx.state.characters || [])[0];
     if (first?.name) payload = { name: first.name };
   }
+  if (view === 'p-charphone' && !payload.contactId) {
+    const first = Object.values(ctx.state.contacts || {}).find(item => item.kind !== 'group');
+    if (first) payload = { contactId: first.id };
+  }
+  if (view === 'p-charphone' && params.tab) ctx.shell.cpTab = params.tab;
+  if (view === 'p-chatphone' && (!payload.contactId || !payload.peer)) {
+    const first = Object.values(ctx.state.contacts || {}).find(item => item.kind !== 'group');
+    const lookup = first ? ensureLookup(ctx.state, first) : null;
+    const peer = lookup?.chats?.[0]?.id;
+    if (first && peer) payload = { contactId: first.id, peer };
+  }
   ctx.go(view, payload);
 }
 
@@ -6745,7 +7395,10 @@ exports["importState"] = importState;
     log('opened, phone=' + (document.getElementById('meme-phone') ? 'yes' : 'no'));
     const view = new URLSearchParams(location.search).get('view') || hash.split('&')[0];
     log('hash=' + hash + ' view=' + view);
-    if (view) api.goView(view);
+    const rest = new URLSearchParams(hash.split('&').slice(1).join('&') || '');
+    const params = {};
+    rest.forEach(function(value, key) { if (key !== 'debug' && key !== 'night') params[key] = value; });
+    if (view) api.goView(view, params);
     if (hash.indexOf('night') >= 0) {
       const node = document.getElementById('meme-phone');
       if (node) node.dataset.mpTheme = 'night';

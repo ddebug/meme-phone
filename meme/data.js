@@ -41,6 +41,7 @@ export function emptyState() {
     usersFromTavern: false,
     characters: [],
     charactersFromTavern: false,
+    lookups: {},
     chats: {},
     diary: { entries: {}, prompt: DEFAULT_DIARY_PROMPT, lastGenerated: '' },
     favorites: [],
@@ -427,6 +428,7 @@ export function normalize(raw) {
   merged.users = Array.isArray(raw.users) ? raw.users.filter(item => item && (item.key || item.name)) : [];
   merged.characters = Array.isArray(raw.characters) ? raw.characters.filter(item => item && item.name) : [];
   merged.charactersFromTavern = Boolean(raw.charactersFromTavern);
+  merged.lookups = (raw.lookups && typeof raw.lookups === 'object' && !Array.isArray(raw.lookups)) ? raw.lookups : {};
   merged.usersFromTavern = Boolean(raw.usersFromTavern);
   merged.settings.api.presets = Array.isArray(merged.settings.api.presets) && merged.settings.api.presets.length
     ? merged.settings.api.presets

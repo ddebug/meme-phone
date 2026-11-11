@@ -283,9 +283,11 @@ export function createShell(options) {
     'phone-close': () => { if (typeof ctx.onClose === 'function') ctx.onClose(); },
     'toggle-theme': () => {
       const settings = ctx.state.settings;
-      settings.theme = settings.theme === 'night' ? 'day' : 'night';
-      ctx.save();
+      const next = settings.theme === 'night' ? 'day' : 'night';
+      settings.theme = next;
+      if (settings.wallpaper !== 'none') settings.wallpaper = next;
       render();
+      ctx.save();
     },
   };
 

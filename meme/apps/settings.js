@@ -275,17 +275,23 @@ export const appearanceApp = {
 
   handle(ctx, act, data) {
     if (act === 'pick-theme') {
-      ctx.state.settings.theme = data.theme;
-      ctx.save();
+      const next = data.theme === 'night' ? 'night' : 'day';
+      ctx.state.settings.theme = next;
+      /* 图片壁纸跟着明暗一起走，免得选了夜间还是一屏亮壁纸，看着像没切换 */
+      if (ctx.state.settings.wallpaper !== 'none') ctx.state.settings.wallpaper = next;
       ctx.rerender();
-      ctx.toast(data.theme === 'night' ? '夜间玻璃已打开' : '换回日间玻璃');
+      ctx.save();
+      ctx.toast(next === 'night' ? '夜间玻璃已打开' : '换回日间玻璃');
       return true;
     }
     if (act === 'pick-wall') {
-      ctx.state.settings.wallpaper = data.wall;
-      ctx.save();
+      const wall = ['none', 'day', 'night'].includes(data.wall) ? data.wall : 'none';
+      ctx.state.settings.wallpaper = wall;
+      if (wall === 'day') ctx.state.settings.theme = 'day';
+      if (wall === 'night') ctx.state.settings.theme = 'night';
       ctx.rerender();
-      ctx.toast(data.wall === 'none' ? '屏幕内换成素色底' : data.wall === 'day' ? '换成晨光粉彩壁纸' : '换成夜色壁纸');
+      ctx.save();
+      ctx.toast(wall === 'none' ? '屏幕内换成素色底' : wall === 'day' ? '换成晨光粉彩壁纸' : '换成夜色壁纸');
       return true;
     }
     return false;

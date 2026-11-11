@@ -39,6 +39,8 @@ export function emptyState() {
     contacts: {},
     users: [],
     usersFromTavern: false,
+    characters: [],
+    charactersFromTavern: false,
     chats: {},
     diary: { entries: {}, prompt: DEFAULT_DIARY_PROMPT, lastGenerated: '' },
     favorites: [],
@@ -278,6 +280,41 @@ export function demoState() {
   const gu = addContact(state, { name: '顾南风', signature: '路过书店', status: 'away' });
   const group = addContact(state, { name: '周末局', kind: 'group', members: [shen.id, jiang.id, lin.id], signature: '5 人' });
 
+  state.characters = [
+    {
+      name: '沈砚', avatar: 'shen.png', avatarUrl: '', tags: ['都市', '加班', '夜宵'],
+      description: '做工程的男人，二十八岁。白天在工地，晚上回办公室改图纸。说话短，习惯先把事情做完再解释。',
+      personality: '克制、话少、记性好。不会追问，但会记得你上次说过的事。',
+      scenario: '夜里十点，他靠在便利店门口的电动车上，等你下班。',
+      firstMes: '到楼下了，今天风有点大。',
+      creator: 'meme-phone', version: '1.0',
+    },
+    {
+      name: '江迟', avatar: 'jiang.png', avatarUrl: '', tags: ['音乐', '夜里', '旧歌'],
+      description: '在唱片店做店员，喜欢把整张专辑听完再换。手机里存着一堆演唱会现场录音。',
+      personality: '慢热，聊到喜欢的东西会突然话多。',
+      scenario: '车里，副歌刚进来的时候。',
+      firstMes: '那首歌我循环了一下午。',
+      creator: 'meme-phone', version: '1.0',
+    },
+    {
+      name: '林小满', avatar: 'lin.png', avatarUrl: '', tags: ['雨天', '同事', '碎嘴'],
+      description: '同层的同事，工位在你斜对面。每天带两份早饭，一份给自己，一份放在你桌上。',
+      personality: '话多、爱打听、其实很会看人脸色。',
+      scenario: '下班前十分钟，外面开始下雨。',
+      firstMes: '下班了吗，雨好大。',
+      creator: 'meme-phone', version: '1.0',
+    },
+    {
+      name: '顾南风', avatar: 'gu.png', avatarUrl: '', tags: ['书店', '安静', '旧友'],
+      description: '在旧书店做事，认得每本书放在哪一格。你们认识很久了，见面也不一定说话。',
+      personality: '安静，慢，记得住别人随口提过的小事。',
+      scenario: '书店快打烊，他把最后一批书搬回架子。',
+      firstMes: '你上次找的那本，到了。',
+      creator: 'meme-phone', version: '1.0',
+    },
+  ];
+
   const chatShen = addChat(state, shen.id, {
     messages: [
       { from: 'them', text: '到楼下了，今天风有点大。', at: at(21, 2) },
@@ -388,6 +425,8 @@ export function normalize(raw) {
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
   merged.settings.userMode = raw.settings?.userMode === 'pin' ? 'pin' : 'follow';
   merged.users = Array.isArray(raw.users) ? raw.users.filter(item => item && (item.key || item.name)) : [];
+  merged.characters = Array.isArray(raw.characters) ? raw.characters.filter(item => item && item.name) : [];
+  merged.charactersFromTavern = Boolean(raw.charactersFromTavern);
   merged.usersFromTavern = Boolean(raw.usersFromTavern);
   merged.settings.api.presets = Array.isArray(merged.settings.api.presets) && merged.settings.api.presets.length
     ? merged.settings.api.presets

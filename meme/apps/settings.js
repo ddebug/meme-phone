@@ -70,6 +70,7 @@ export const settingsApp = {
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'image', title: '绘图', sub: state.draw?.config?.key ? `${state.draw.config.model} · 已填 Key` : 'NovelAI · 还没填地址和 Key', act: 'set-open', app: 'draw' })}
             ${row(ctx, { iconName: 'code', title: '接口与预设', sub: '聊天和绘图各挑一套地址 / Key / 模型', act: 'set-open', app: 'api' })}
+            ${row(ctx, { iconName: 'search', title: '查角色', sub: (state.charactersFromTavern ? `酒馆里 ${state.characters.length} 张角色卡` : '看酒馆里每张角色卡的设定'), act: 'set-open', app: 'characters' })}
             ${row(ctx, { iconName: 'smile', title: '表情包', sub: '表情面板里那些贴纸', act: 'set-open', app: 'emoji' })}
             ${row(ctx, { iconName: 'help', title: '帮助', sub: '怎么用、快捷键、常见问题', act: 'set-open', app: 'help' })}
           </div>

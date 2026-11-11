@@ -38,6 +38,7 @@ export const contactsApp = {
       <div class="mp-page-body">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
           <div class="mp-title" style="flex:1">通讯录</div>
+          <button class="mp-icon-btn" data-act="contact-lookup" type="button" aria-label="查角色">${icon('search')}</button>
           <button class="mp-icon-btn" data-act="contact-add" type="button" aria-label="添加">${icon('plus')}</button>
         </div>
         <div class="mp-subtitle">${contacts.length} 位 · 只有在这里的人才会出现在聊天里</div>
@@ -46,6 +47,11 @@ export const contactsApp = {
   },
 
   handle(ctx, act, data) {
+    if (act === 'contact-lookup') {
+      ctx.go('app-characters');
+      return true;
+    }
+
     if (act === 'open-contact') {
       ctx.go('contact', { contactId: data.contact });
       return true;

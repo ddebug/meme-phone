@@ -6,7 +6,7 @@
 import { createStore } from './store.js';
 import { normalize, emptyState, demoState, syncTavernContacts, chatFor } from './data.js';
 import { createShell } from './shell.js';
-import { readTavernCharacters, readUserAvatar, readTavernPersonas, writeTavernPersona, generate, probeHost } from './host.js';
+import { readTavernCharacters, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, generate, probeHost } from './host.js';
 import { chatApp, threadApp } from './apps/chat.js';
 import { diaryApp } from './apps/diary.js';
 import { contactsApp, contactApp } from './apps/contacts.js';
@@ -14,6 +14,7 @@ import { settingsApp, appearanceApp } from './apps/settings.js';
 import { drawApp } from './apps/draw.js';
 import { apiListApp, apiPresetApp } from './apps/api.js';
 import { userListApp, userEditApp } from './apps/user.js';
+import { charactersApp, characterApp } from './apps/characters.js';
 import {
   extrasApp, extraDetailApp, walletApp, favoritesApp, emojiApp,
   membershipApp, plansApp, dressApp, helpApp,
@@ -38,6 +39,8 @@ const APPS = {
   'api-item': apiPresetApp,
   'app-user': userListApp,
   'user-item': userEditApp,
+  'app-characters': charactersApp,
+  'character-card': characterApp,
   thread: threadApp,
   contact: contactApp,
   'extra-detail': extraDetailApp,
@@ -216,6 +219,7 @@ export async function openMemePhone(options = {}) {
   const host = {
     probe: probeHost,
     readCharacters: readTavernCharacters,
+    readCards: readTavernCards,
     readUserAvatar,
     syncUsers,
     writeUser: writeTavernPersona,
@@ -342,6 +346,10 @@ export function goView(view, params = {}) {
   if (view === 'user-item' && !params.key) {
     const first = (ctx.state.users || [])[0];
     if (first?.key) payload = { key: first.key };
+  }
+  if (view === 'character-card' && !params.name) {
+    const first = (ctx.state.characters || [])[0];
+    if (first?.name) payload = { name: first.name };
   }
   ctx.go(view, payload);
 }

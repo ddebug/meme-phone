@@ -2115,3 +2115,134 @@
 .mp-root[data-mp-theme="night"] .mp-roles-radio.is-on {
   box-shadow: inset 0 0 0 5px #a897f2;
 }
+
+/* ===================== 查角色（本段） ===================== */
+.mp-char-list {
+  padding: 4px 12px;
+  margin-top: 10px;
+}
+
+.mp-char-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 2px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mp-char-row + .mp-char-row {
+  border-top: 1px solid var(--line-soft);
+}
+
+.mp-char-row:active { opacity: .7; }
+
+.mp-char-row .mp-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  font-size: 13px;
+}
+
+.mp-char-name {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.mp-char-sub {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-4);
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-char-row > .mp-i {
+  width: 15px;
+  height: 15px;
+  color: var(--text-4);
+  flex: none;
+}
+
+.mp-char-query {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--accent-deep);
+  background: rgba(142, 123, 242, .1);
+  cursor: pointer;
+}
+
+.mp-char-query span {
+  font-size: 13px;
+  line-height: 1;
+  opacity: .7;
+}
+
+.mp-char-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.mp-char-tag {
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 10.5px;
+  color: var(--text-3);
+  background: rgba(120, 116, 150, .1);
+}
+
+.mp-char-block {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+}
+
+.mp-char-block:first-of-type {
+  margin-top: 4px;
+}
+
+.mp-char-label {
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  color: var(--text-3);
+}
+
+.mp-char-text {
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--text-2);
+  white-space: normal;
+  word-break: break-word;
+}
+
+.mp-root[data-mp-theme="night"] .mp-char-query {
+  color: #cbbffb;
+  background: rgba(150, 132, 235, .2);
+}
+
+.mp-root[data-mp-theme="night"] .mp-char-tag {
+  color: var(--text-3);
+  background: rgba(190, 180, 230, .12);
+}

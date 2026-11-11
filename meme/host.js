@@ -39,6 +39,35 @@ export async function readTavernCharacters() {
     }));
 }
 
+/** 角色卡全文，供「查角色」用：描述、性格、场景、开场白都按卡片原样给。 */
+export async function readTavernCards() {
+  const script = await loadHostScript();
+  if (!Array.isArray(script?.characters)) return [];
+  const thumbnail = script.getThumbnailUrl;
+  try {
+    return script.characters
+      .filter(character => character && character.name)
+      .map(character => ({
+        name: character.name,
+        avatar: character.avatar || character.name,
+        avatarUrl: typeof thumbnail === 'function' && character.avatar
+          ? thumbnail('avatar', `characters/${character.avatar}`)
+          : '',
+        description: character.description || '',
+        personality: character.personality || '',
+        scenario: character.scenario || '',
+        firstMes: character.first_mes || '',
+        example: character.mes_example || '',
+        creatorNotes: character.creator_notes || '',
+        creator: character.creator || '',
+        version: character.character_version || '',
+        tags: Array.isArray(character.tags) ? character.tags.map(String) : [],
+      }));
+  } catch {
+    return [];
+  }
+}
+
 /** 当前打开的酒馆聊天，用来给日记、主动消息提供素材。 */
 export async function readTavernContext() {
   const script = await loadHostScript();

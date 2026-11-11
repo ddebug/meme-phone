@@ -6,6 +6,7 @@
 import { icon, TINT } from '../icons.js';
 import { esc, tintStyle } from '../shell.js';
 import { contactsOf, chatsOf, unreadTotal } from '../data.js';
+import { imageEndpoint } from './draw.js';
 
 function row(ctx, { iconName, title, sub, act, value, toggle, app }) {
   return `
@@ -27,10 +28,9 @@ export const settingsApp = {
     const host = ctx.shell.hostInfo || {};
     const apiReady = host.hasGenerate;
     const contacts = contactsOf(state).length;
-    const image = state.settings.image || {};
+    const image = imageEndpoint(state);
     const imageLabel = image.engine === 'custom' ? '自定义接口' : image.engine === 'doubao' ? '豆包 · 火山方舟' : 'NovelAI 官方';
-    const imageLink = image.engine === 'custom' ? (image.custom || {}) : image.engine === 'doubao' ? (image.doubao || {}) : (image.novelai || {});
-    const imageReady = image.engine === 'custom' ? Boolean(imageLink.url) : Boolean(imageLink.key);
+    const imageReady = image.engine === 'custom' ? Boolean(image.url) : Boolean(image.url && image.key);
 
     return `
       <div class="mp-page-body">
@@ -72,7 +72,7 @@ export const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">生成</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'image', title: '绘图', sub: imageReady ? `${imageLabel} · ${imageLink.model || '模型没填'}` : `${imageLabel} · 还没填${state.settings.image.engine === 'custom' ? '地址' : ' Key'}`, act: 'set-open', app: 'draw' })}
+            ${row(ctx, { iconName: 'image', title: '绘图', sub: imageReady ? `${imageLabel} · ${image.model || '模型没填'}` : `${imageLabel} · 还没填${image.engine === 'custom' ? '地址' : ' Key'}`, act: 'set-open', app: 'draw' })}
             ${row(ctx, { iconName: 'code', title: '聊天接口与预设', sub: '每套 = 地址 + Key + 模型，只影响聊天', act: 'set-open', app: 'api' })}
             ${row(ctx, { iconName: 'search', title: '查角色', sub: (state.charactersFromTavern ? `酒馆里 ${state.characters.length} 张角色卡` : '看酒馆里每张角色卡的设定'), act: 'set-open', app: 'characters' })}
             ${row(ctx, { iconName: 'smile', title: '表情包', sub: '表情面板里那些贴纸', act: 'set-open', app: 'emoji' })}

@@ -1583,6 +1583,37 @@
 }
 .mp-root .mp-draw-chips::-webkit-scrollbar { display: none; }
 
+.mp-root .mp-draw-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.mp-root .mp-draw-group-head .mp-group-label {
+  margin: 0;
+}
+
+.mp-root .mp-draw-mini {
+  flex: 0 0 auto;
+  border: 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(142, 123, 242, .1);
+  color: var(--accent-deep);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.mp-root .mp-draw-hint {
+  margin: 2px 2px 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+
 .mp-root .mp-draw-desc {
   width: 100%;
   display: flex;

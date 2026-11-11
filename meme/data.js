@@ -273,6 +273,10 @@ export function demoState() {
     novelai: { url: 'https://image.novelai.net', key: 'pst-demo', model: 'nai-diffusion-4-curated-preview' },
     doubao: { url: 'https://ark.cn-beijing.volces.com/api/v3/images/generations', key: '', model: 'doubao-seedream-4-5-251128' },
     custom: { url: '', key: '', model: '', path: '/v1/images/generations' },
+    presets: [
+      { id: 'image_default', name: 'NovelAI 官方', engine: 'novelai', url: 'https://image.novelai.net', path: '', key: 'pst-demo', model: 'nai-diffusion-4-curated-preview' },
+    ],
+    activeId: 'image_default',
   };
   state.settings.api.presets = [
     { id: 'api_default', name: '酒馆 API', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
@@ -285,6 +289,16 @@ export function demoState() {
     { id: 'dp_night', name: '夜街', pos: 'night street, neon reflection, wet asphalt, cinematic', neg: 'flat lighting, blurry' },
   ];
   state.draw.presetIdx = 1;
+  state.settings.image.presets.push({
+    id: 'image_local', name: '本地 SD WebUI', engine: 'custom',
+    url: 'http://127.0.0.1:7860', path: '/v1/images/generations',
+    key: '', model: 'sd_xl_base_1.0',
+  });
+  state.draw.schemes = [
+    { id: 'ds_film', name: '胶片人像 · NovelAI', apiId: 'image_default', promptId: 'dp_film' },
+    { id: 'ds_night', name: '夜街 · 本地 SD', apiId: 'image_local', promptId: 'dp_night' },
+  ];
+  state.draw.schemeId = 'ds_film';
   state.draw.history = [
     { id: 'img_demo1', prompt: '便利店台阶上的夜，侧脸，路灯', seed: 20261111, url: '', tint: 'linear-gradient(150deg,#e6dcff,#c9bcf7 60%,#b3d6f2)', at: Date.now() },
     { id: 'img_demo2', prompt: '雨夜车窗上的水痕', seed: 88421337, url: '', tint: 'linear-gradient(150deg,#ffe3ef,#f8c6dd 60%,#efe6ff)', at: Date.now() - 60000 },

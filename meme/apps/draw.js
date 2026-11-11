@@ -60,6 +60,8 @@ function ensure(state) {
     },
     presets: [{ id: 'dp_default', name: '默认', pos: '', neg: '' }],
     presetIdx: 0,
+    schemes: [],
+    schemeId: '',
     lastPrompt: '',
     history: [],
   };
@@ -67,7 +69,7 @@ function ensure(state) {
   state.draw.config = { ...base.config, ...(state.draw.config || {}) };
   if (!Array.isArray(state.draw.presets) || !state.draw.presets.length) state.draw.presets = base.presets;
   state.draw.presets = state.draw.presets.map((item, index) => ({
-    id: item.id || `dp_${index}_${newId('x')}`,
+    id: item.id || `dp_${index}`,
     name: item.name || `预设 ${index + 1}`,
     pos: item.pos || '',
     neg: item.neg || '',
@@ -82,7 +84,73 @@ function ensure(state) {
   image.novelai = { url: 'https://image.novelai.net', key: '', model: 'nai-diffusion-4-curated-preview', ...(image.novelai || {}) };
   image.doubao = { url: 'https://ark.cn-beijing.volces.com/api/v3/images/generations', key: '', model: 'doubao-seedream-4-5-251128', ...(image.doubao || {}) };
   image.custom = { url: '', key: '', model: '', path: '/v1/images/generations', ...(image.custom || {}) };
+
+  /* 把原来那套单一接口配置收成第一套「绘图接口预设」，老存档不用手动迁移 */
+  if (!Array.isArray(image.presets) || !image.presets.length) {
+    const engine = image.engine;
+    const legacy = engine === 'novelai' ? image.novelai : engine === 'doubao' ? image.doubao : image.custom;
+    image.presets = [{
+      id: 'image_default',
+      name: engine === 'novelai' ? 'NovelAI 官方' : engine === 'doubao' ? '豆包 Seedream' : '自定义接口',
+      engine,
+      url: legacy.url || '',
+      path: legacy.path || '',
+      key: legacy.key || '',
+      model: legacy.model || '',
+    }];
+  }
+  image.presets = image.presets.map((item, index) => ({
+    id: item.id || `image_${index}`,
+    name: item.name || `接口 ${index + 1}`,
+    engine: ['custom', 'doubao'].includes(item.engine) ? item.engine : 'novelai',
+    url: String(item.url || ''),
+    path: String(item.path || ''),
+    key: String(item.key || ''),
+    model: String(item.model || ''),
+  }));
+  if (!image.presets.some(item => item.id === image.activeId)) image.activeId = image.presets[0].id;
+
+  /* 整体方案 = 一套接口预设 + 一套提示词预设 */
+  if (!Array.isArray(state.draw.schemes)) state.draw.schemes = [];
+  state.draw.schemes = state.draw.schemes.map((item, index) => ({
+    id: item.id || `ds_${index}`,
+    name: item.name || `方案 ${index + 1}`,
+    apiId: item.apiId || image.activeId,
+    promptId: item.promptId || state.draw.presets[0].id,
+  }));
+  if (!state.draw.schemes.some(item => item.id === state.draw.schemeId)) {
+    state.draw.schemeId = state.draw.schemes[0]?.id || '';
+  }
+  if (!state.draw.schemes.length) {
+    const first = {
+      id: 'ds_default',
+      name: '默认方案',
+      apiId: image.activeId,
+      promptId: state.draw.presets[state.draw.presetIdx]?.id || state.draw.presets[0].id,
+    };
+    state.draw.schemes.push(first);
+    state.draw.schemeId = first.id;
+  }
   return state.draw;
+}
+
+function activeApi(state) {
+  const image = state.settings?.image || {};
+  return (image.presets || []).find(item => item.id === image.activeId) || (image.presets || [])[0] || null;
+}
+
+function activePrompt(state) {
+  const draw = state.draw || {};
+  return draw.presets?.[draw.presetIdx] || draw.presets?.[0] || { id: '', name: '默认', pos: '', neg: '' };
+}
+
+function applyScheme(state, scheme) {
+  const image = state.settings.image;
+  const draw = state.draw;
+  if (scheme.apiId && image.presets.some(item => item.id === scheme.apiId)) image.activeId = scheme.apiId;
+  const index = draw.presets.findIndex(item => item.id === scheme.promptId);
+  if (index >= 0) draw.presetIdx = index;
+  draw.schemeId = scheme.id;
 }
 
 function sizeOf(key) {
@@ -105,21 +173,31 @@ function joinUrl(base, path) {
   return `${clean}${route.startsWith('/') ? '' : '/'}${route}`;
 }
 
-/* 绘图接口只读 settings.image，跟聊天那套 API 预设没有关系 */
+/* 绘图接口只读 settings.image 里当前选中的那套接口预设，跟聊天 API 分开 */
 export function imageEndpoint(state) {
   const image = state.settings?.image || {};
-  const engine = ['custom', 'doubao'].includes(image.engine) ? image.engine : 'novelai';
-  const cfg = engine === 'novelai'
-    ? (image.novelai || {})
-    : engine === 'doubao' ? (image.doubao || {}) : (image.custom || {});
+  const preset = activeApi(state);
+  if (!preset) {
+    const legacyEngine = ['custom', 'doubao'].includes(image.engine) ? image.engine : 'novelai';
+    const cfg = legacyEngine === 'novelai' ? (image.novelai || {}) : legacyEngine === 'doubao' ? (image.doubao || {}) : (image.custom || {});
+    return {
+      engine: legacyEngine,
+      name: legacyEngine === 'novelai' ? 'NovelAI 官方' : legacyEngine === 'doubao' ? '豆包 · 火山方舟' : '自定义接口',
+      url: String(cfg.url || '').trim(),
+      path: legacyEngine === 'custom' ? String(cfg.path || '/v1/images/generations').trim() : '',
+      key: String(cfg.key || '').trim(),
+      model: String(cfg.model || '').trim(),
+    };
+  }
+  const engine = ['custom', 'doubao'].includes(preset?.engine) ? preset.engine : 'novelai';
   const drawCfg = state.draw?.config || {};
   return {
     engine,
-    name: engine === 'novelai' ? 'NovelAI 官方' : engine === 'doubao' ? '豆包 · 火山方舟' : '自定义接口',
-    url: String(cfg.url || (engine === 'novelai' ? drawCfg.url : '') || '').trim(),
-    path: engine === 'custom' ? String(cfg.path || '/v1/images/generations').trim() : '',
-    key: String(cfg.key || (engine === 'novelai' ? drawCfg.key : '') || '').trim(),
-    model: String(cfg.model || (engine === 'novelai' ? drawCfg.model : '') || '').trim(),
+    name: String(preset?.name || (engine === 'novelai' ? 'NovelAI 官方' : engine === 'doubao' ? '豆包 · 火山方舟' : '自定义接口')),
+    url: String(preset?.url || (engine === 'novelai' ? drawCfg.url : '') || '').trim(),
+    path: engine === 'custom' ? String(preset?.path || '/v1/images/generations').trim() : '',
+    key: String(preset?.key || (engine === 'novelai' ? drawCfg.key : '') || '').trim(),
+    model: String(preset?.model || (engine === 'novelai' ? drawCfg.model : '') || '').trim(),
   };
 }
 
@@ -139,10 +217,22 @@ export const drawApp = {
     const ep = imageEndpoint(ctx.state);
     const ready = endpointReady(ep);
     const busy = Boolean(draw.busy);
+    const apiPreset = activeApi(ctx.state);
+    const schemeIndex = draw.schemes.findIndex(item => item.id === draw.schemeId);
 
-    const chips = draw.presets.map((item, index) => `
+    const promptChips = draw.presets.map((item, index) => `
       <button class="mp-chip-btn${index === draw.presetIdx ? ' is-on' : ''}" data-act="draw-preset" data-i="${index}" type="button">
         <span style="font-size:12.5px">${esc(item.name || `预设 ${index + 1}`)}</span>
+      </button>`).join('');
+
+    const apiChips = (ctx.state.settings.image.presets || []).map((item, index) => `
+      <button class="mp-chip-btn${item.id === ctx.state.settings.image.activeId ? ' is-on' : ''}" data-act="draw-api" data-i="${index}" type="button">
+        <span style="font-size:12.5px">${esc(item.name || `接口 ${index + 1}`)}</span>
+      </button>`).join('');
+
+    const schemeChips = draw.schemes.map((item, index) => `
+      <button class="mp-chip-btn${item.id === draw.schemeId ? ' is-on' : ''}" data-act="draw-scheme" data-i="${index}" type="button">
+        <span style="font-size:12.5px">${esc(item.name || `方案 ${index + 1}`)}</span>
       </button>`).join('');
 
     const rows = [
@@ -173,7 +263,7 @@ export const drawApp = {
       <div class="mp-nav">
         <button class="mp-back" data-act="back" type="button">${icon('back')}</button>
         <span style="flex:1"></span>
-        <button class="mp-back" data-act="draw-preset-menu" type="button" title="提示词预设">${icon('settings')}</button>
+        <button class="mp-back" data-act="draw-scheme-menu" type="button" title="管理整体方案">${icon('settings')}</button>
       </div>
       <div class="mp-page-body">
         <div class="mp-title" style="margin-top:0">绘图</div>
@@ -184,10 +274,21 @@ export const drawApp = {
           <span>${ready
             ? `已接「${esc(ep.name)}」${ep.model ? ` · ${esc(ep.model)}` : ''}`
             : (ep.engine === 'custom' ? '还没填自定义接口地址，现在是演示出图' : `${esc(ep.name)} 的 Key 还没填，现在是演示出图`)}</span>
-          <button class="mp-draw-state-btn" data-act="draw-key" type="button">填 Key</button>
+          <button class="mp-draw-state-btn" data-act="${ep.engine === 'custom' ? 'draw-url' : 'draw-key'}" type="button">${ep.engine === 'custom' ? '改地址' : '填 Key'}</button>
         </div>
 
-        <div class="mp-group-label" style="margin-top:12px">绘图接口 · 跟聊天 API 分开</div>
+        <div class="mp-group-label" style="margin-top:12px">整体方案</div>
+        <div class="mp-draw-chips">
+          ${schemeChips || '<div class="mp-empty" style="padding:4px 2px">还没有方案，新建一套就会把当前的接口和提示词绑在一起。</div>'}
+          <button class="mp-chip-btn" data-act="draw-scheme-new" type="button"><span style="font-size:12.5px">＋ 新建</span></button>
+        </div>
+        <div class="mp-draw-hint">方案 = 一套接口预设 + 一套提示词预设，切换时两边一起换${schemeIndex >= 0 ? ` · 当前「${esc(draw.schemes[schemeIndex].name || '未命名')}」：${esc(apiPreset?.name || '接口')} / ${esc(preset.name || '提示词')}` : ''}</div>
+
+        <div class="mp-draw-group-head">
+          <span class="mp-group-label">绘图接口预设</span>
+          <button class="mp-draw-mini" data-act="draw-api-menu" type="button">管理</button>
+        </div>
+        <div class="mp-draw-chips">${apiChips}<button class="mp-chip-btn" data-act="draw-api-new" type="button"><span style="font-size:12.5px">＋ 新建</span></button></div>
         <div class="mp-group">
           <button class="mp-row" data-act="draw-engine" type="button">
             <span class="mp-row-main">
@@ -215,8 +316,11 @@ export const drawApp = {
           </button>
         </div>
 
-        <div class="mp-group-label" style="margin-top:12px">提示词预设</div>
-        <div class="mp-draw-chips">${chips}<button class="mp-chip-btn" data-act="draw-preset-new" type="button"><span style="font-size:12.5px">＋ 新建</span></button></div>
+        <div class="mp-draw-group-head">
+          <span class="mp-group-label">提示词预设</span>
+          <button class="mp-draw-mini" data-act="draw-preset-menu" type="button">管理</button>
+        </div>
+        <div class="mp-draw-chips">${promptChips}<button class="mp-chip-btn" data-act="draw-preset-new" type="button"><span style="font-size:12.5px">＋ 新建</span></button></div>
 
         <div class="mp-group-label" style="margin-top:14px">画面</div>
         <button class="mp-draw-desc" data-act="draw-prompt" type="button">
@@ -263,15 +367,142 @@ export const drawApp = {
     const draw = ensure(ctx.state);
     const cfg = draw.config;
     const image = ctx.state.settings.image;
-    const engine = image.engine;
-    const target = engine === 'novelai' ? image.novelai : engine === 'doubao' ? image.doubao : image.custom;
+    const apiPreset = activeApi(ctx.state);
+    const engine = apiPreset?.engine || 'novelai';
+    const target = apiPreset || {};
     const preset = draw.presets[draw.presetIdx] || draw.presets[0];
+    const scheme = draw.schemes.find(item => item.id === draw.schemeId);
+
+    if (act === 'draw-scheme') {
+      const picked = draw.schemes[Number(data.i)];
+      if (!picked) return true;
+      applyScheme(ctx.state, picked);
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`切到方案「${picked.name || '未命名'}」`);
+      return true;
+    }
+
+    if (act === 'draw-scheme-new') {
+      const copy = {
+        id: newId('ds'),
+        name: `${preset.name || '提示词'} · ${target.name || '接口'}`,
+        apiId: image.activeId,
+        promptId: preset.id,
+      };
+      draw.schemes.push(copy);
+      draw.schemeId = copy.id;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast('按当前接口 + 提示词新建了一套方案');
+      return true;
+    }
+
+    if (act === 'draw-scheme-menu') {
+      ctx.openSheet({
+        kind: 'pick', title: `整体方案 · ${scheme?.name || '未选'}`,
+        items: [
+          { label: '用当前接口 + 提示词新建', value: 'new', icon: 'plus' },
+          { label: '给当前方案改名', value: 'rename', icon: 'brush' },
+          { label: '删掉当前方案', value: 'del', icon: 'trash' },
+        ],
+        onPick: value => {
+          if (value === 'new') {
+            const copy = { id: newId('ds'), name: `${preset.name || '提示词'} · ${target.name || '接口'}`, apiId: image.activeId, promptId: preset.id };
+            draw.schemes.push(copy);
+            draw.schemeId = copy.id;
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('新建了一套方案');
+          }
+          if (value === 'rename') {
+            if (!scheme) { ctx.toast('先选一套方案'); return; }
+            ctx.openSheet({
+              kind: 'text', title: '方案名字', value: scheme.name || '',
+              onText: text => { scheme.name = String(text || '').trim() || scheme.name; ctx.save(); ctx.rerender(); },
+            });
+          }
+          if (value === 'del') {
+            if (!scheme) { ctx.toast('先选一套方案'); return; }
+            draw.schemes = draw.schemes.filter(item => item.id !== scheme.id);
+            draw.schemeId = draw.schemes[0]?.id || '';
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('方案删掉了');
+          }
+        },
+      });
+      return true;
+    }
+
+    if (act === 'draw-api') {
+      const picked = image.presets[Number(data.i)];
+      if (!picked) return true;
+      image.activeId = picked.id;
+      image.engine = picked.engine;
+      /* 选接口就是给当前方案换搭配 */
+      if (scheme) scheme.apiId = picked.id;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`接口换成「${picked.name || '未命名'}」`);
+      return true;
+    }
+
+    if (act === 'draw-api-new') {
+      const copy = { ...target, id: newId('image'), name: `${target.name || '接口'} 副本` };
+      image.presets.push(copy);
+      image.activeId = copy.id;
+      if (scheme) scheme.apiId = copy.id;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast('复制出一套新接口，改完就是模板');
+      return true;
+    }
+
+    if (act === 'draw-api-menu') {
+      ctx.openSheet({
+        kind: 'pick', title: `接口预设 · ${target.name || ''}`,
+        items: [
+          { label: '复制当前这套新建', value: 'new', icon: 'plus' },
+          { label: '给这套改名', value: 'rename', icon: 'brush' },
+          { label: '删掉这套', value: 'del', icon: 'trash' },
+        ],
+        onPick: value => {
+          if (value === 'new') {
+            const copy = { ...target, id: newId('image'), name: `${target.name || '接口'} 副本` };
+            image.presets.push(copy);
+            image.activeId = copy.id;
+            if (scheme) scheme.apiId = copy.id;
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('复制出一套新接口');
+          }
+          if (value === 'rename') {
+            ctx.openSheet({
+              kind: 'text', title: '接口名字', value: target.name || '',
+              onText: text => { target.name = String(text || '').trim() || target.name; ctx.save(); ctx.rerender(); },
+            });
+          }
+          if (value === 'del') {
+            if (image.presets.length <= 1) { ctx.toast('至少留一套接口'); return; }
+            image.presets = image.presets.filter(item => item.id !== target.id);
+            image.activeId = image.presets[0].id;
+            draw.schemes.forEach(item => { if (item.apiId === target.id) item.apiId = image.presets[0].id; });
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('接口删掉了');
+          }
+        },
+      });
+      return true;
+    }
 
     if (act === 'draw-engine') {
       ctx.openSheet({
         kind: 'pick', title: '绘图接口',
         items: ENGINES.map(item => ({ value: item.value, label: item.label, note: item.note })),
         onPick: value => {
+          target.engine = value;
           image.engine = value;
           ctx.save();
           ctx.rerender();
@@ -357,7 +588,10 @@ export const drawApp = {
     }
 
     if (act === 'draw-preset') {
-      draw.presetIdx = Number(data.i) || 0;
+      const pickedIndex = Number(data.i) || 0;
+      draw.presetIdx = pickedIndex;
+      if (scheme) scheme.promptId = draw.presets[pickedIndex]?.id || scheme.promptId;
+      ctx.save();
       ctx.rerender();
       return true;
     }
@@ -371,6 +605,7 @@ export const drawApp = {
       };
       draw.presets.push(copy);
       draw.presetIdx = draw.presets.length - 1;
+      if (scheme) scheme.promptId = copy.id;
       ctx.save();
       ctx.rerender();
       ctx.toast(`按「${preset.name || '预设'}」新建了一套`);
@@ -390,6 +625,7 @@ export const drawApp = {
             const copy = { id: newId('dp'), name: `${preset.name || '预设'} 副本`, pos: preset.pos || '', neg: preset.neg || '' };
             draw.presets.push(copy);
             draw.presetIdx = draw.presets.length - 1;
+            if (scheme) scheme.promptId = copy.id;
             ctx.save();
             ctx.rerender();
             ctx.toast('新建了一套，改名后就是你的模板');
@@ -406,8 +642,10 @@ export const drawApp = {
           }
           if (value === 'del') {
             if (draw.presets.length <= 1) { ctx.toast('至少留一套'); return; }
+            const removedId = preset.id;
             draw.presets.splice(draw.presetIdx, 1);
             draw.presetIdx = Math.max(0, draw.presetIdx - 1);
+            draw.schemes.forEach(item => { if (item.promptId === removedId) item.promptId = draw.presets[0].id; });
             ctx.save();
             ctx.rerender();
             ctx.toast('删掉了');

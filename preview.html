@@ -616,6 +616,58 @@ body {
   text-align: center;
 }
 
+/* 聊天设置页头：这个会话是谁，现在是什么状态 */
+.mp-chat-set-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 14px;
+  border-radius: var(--r-l);
+  background: rgba(255, 255, 255, .82);
+  box-shadow: var(--shadow-s);
+}
+
+.mp-chat-set-head .mp-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  font-size: 15px;
+}
+
+.mp-chat-set-main { flex: 1; min-width: 0; }
+
+.mp-chat-set-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-chat-set-sub {
+  margin-top: 3px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text-4);
+}
+
+.mp-set-row.is-danger .mp-set-name { color: #b75a73; }
+.mp-set-row.is-danger .mp-set-ico {
+  color: #b75a73;
+  background: rgba(216, 106, 134, .10);
+}
+
+.mp-root[data-mp-theme="night"] .mp-chat-set-head {
+  background: rgba(48, 43, 68, .72);
+}
+
+.mp-root[data-mp-theme="night"] .mp-set-row.is-danger .mp-set-name { color: #ee9bb1; }
+.mp-root[data-mp-theme="night"] .mp-set-row.is-danger .mp-set-ico {
+  color: #ee9bb1;
+  background: rgba(238, 155, 177, .12);
+}
+
 /* ------------------------------------------------------------ 会话页 */
 .mp-thread {
   position: absolute;
@@ -3351,7 +3403,7 @@ function pushMessage(state, chatId, message) {
 }
 
 function unreadTotal(state) {
-  return Object.values(state.chats).reduce((sum, chat) => sum + (chat.unread || 0), 0);
+  return Object.values(state.chats).reduce((sum, chat) => sum + (chat.muted ? 0 : (chat.unread || 0)), 0);
 }
 
 /* ----------------------------------------------------------------- 日记 */
@@ -3545,6 +3597,7 @@ function demoState() {
   ];
 
   const chatShen = addChat(state, shen.id, {
+    id: 'ch_demo_shen',
     messages: [
       { from: 'them', text: '到楼下了，今天风有点大。', at: at(21, 2) },
       { from: 'me', text: '我还在加班，别等我了。', at: at(21, 10) },
@@ -5107,6 +5160,85 @@ function poolFor(contact) {
 
 function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
 
+/* 聊天设置页：行样式沿用全局设置页，不另造一套 */
+function chatSetRow(chatId, { iconName, title, sub, act, toggle, value, danger }) {
+  return `
+    <button class="mp-set-row${danger ? ' is-danger' : ''}" data-act="${act}" data-chat="${esc(chatId)}" type="button">
+      <span class="mp-set-ico">${icon(iconName)}</span>
+      <span class="mp-set-name">${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
+      ${toggle !== undefined
+        ? `<span class="mp-switch${toggle ? ' on' : ''}"></span>`
+        : value ? `<span class="mp-set-value">${esc(value)}</span>` : ''}
+      ${toggle === undefined ? `<span style="color:var(--text-4)">${icon('chevron')}</span>` : ''}
+    </button>`;
+}
+
+function generateDiary(ctx, chat, contact) {
+  ctx.toast('正在写日记…');
+  Promise.resolve(ctx.ai.diary(ctx, { chat, contact })).then(text => {
+    if (!text) { ctx.toast('模型没接通'); return; }
+    const key = new Date().toISOString().slice(0, 10);
+    ctx.state.diary.entries[key] = { key, text, tags: [contact?.name].filter(Boolean), auto: true, createdAt: Date.now() };
+    ctx.save();
+    ctx.toast('日记写好了');
+  }).catch(() => ctx.toast('写日记失败'));
+}
+
+function settingsBody(ctx, chatId) {
+  const state = ctx.state;
+  const chat = chatById(state, chatId);
+  if (!chat) return `<div class="mp-page-body"><div class="mp-empty">这个会话已经不在了。</div></div>`;
+  const contact = contactById(state, chat.contactId);
+  const card = (state.characters || []).find(item => item.name === contact?.name);
+  const count = chat.messages?.length || 0;
+  const mode = contact?.kind === 'group' ? '群聊' : contact?.kind === 'char' ? '酒馆角色' : '单聊';
+  const status = [mode, `${count} 条消息`, chat.pinned ? '置顶' : '', chat.muted ? '免打扰' : ''].filter(Boolean).join(' · ');
+
+  return `
+    <div class="mp-page-body">
+      <div class="mp-title" style="margin-top:0">聊天设置</div>
+      <div class="mp-subtitle">只影响这个会话，不动角色卡和酒馆</div>
+
+      <div class="mp-chat-set-head">
+        ${avatarHtml(contact?.name || '?', contact?.avatar)}
+        <div class="mp-chat-set-main">
+          <div class="mp-chat-set-name">${esc(contact?.name || '这个会话')}</div>
+          <div class="mp-chat-set-sub">${esc(status)}</div>
+        </div>
+        ${chat.pinned ? `<span class="mp-pill">置顶</span>` : ''}
+      </div>
+
+      <div class="mp-group" style="margin-top:16px">
+        <div class="mp-group-label">聊天</div>
+        <div class="mp-group-box">
+          ${chatSetRow(chat.id, { iconName: 'pin', title: '置顶聊天', sub: chat.pinned ? '已固定在会话列表最上面' : '让这个会话排在前面', act: 'ts-toggle-pin', toggle: chat.pinned })}
+          ${chatSetRow(chat.id, { iconName: 'bell', title: '消息免打扰', sub: chat.muted ? '新消息不显示未读角标' : '这个会话的新消息照常计数', act: 'ts-toggle-mute', toggle: chat.muted })}
+          ${chatSetRow(chat.id, { iconName: 'chat', title: '空着发送 = 让 TA 主动开口', sub: chat.wake === false ? '已经关掉，空消息不会发出去' : '不写内容也能让 TA 先开口', act: 'ts-toggle-wake', toggle: chat.wake !== false })}
+        </div>
+      </div>
+
+      <div class="mp-group">
+        <div class="mp-group-label">这个角色</div>
+        <div class="mp-group-box">
+          ${card
+            ? chatSetRow(chat.id, { iconName: 'contacts', title: '角色设定与世界书', sub: '看这张卡，也可以开关关联世界书', act: 'ts-open-character' })
+            : chatSetRow(chat.id, { iconName: 'search', title: '去查角色', sub: '还没同步这张角色卡', act: 'ts-open-characters' })}
+          ${chatSetRow(chat.id, { iconName: 'diary', title: '生成今天的日记', sub: '用这个会话里的聊天写一篇', act: 'ts-diary' })}
+          ${chatSetRow(chat.id, { iconName: 'theater', title: '看 TA 的小剧场', sub: '这个角色存下来的片段', act: 'ts-extras' })}
+        </div>
+      </div>
+
+      <div class="mp-group">
+        <div class="mp-group-label">记录</div>
+        <div class="mp-group-box">
+          ${chatSetRow(chat.id, { iconName: 'trash', title: '清空这个会话的消息', sub: '只删聊天记录，联系人和角色卡都还在', act: 'ts-clear', danger: true })}
+          ${chatSetRow(chat.id, { iconName: 'close', title: '删除这个会话', sub: '连同会话设置一起删掉', act: 'ts-delete', danger: true })}
+        </div>
+      </div>
+    </div>`;
+}
+
+
 /* ------------------------------------------------------ 会话列表 */
 
 function listBody(ctx) {
@@ -5133,7 +5265,7 @@ function listBody(ctx) {
         </div>
         <div class="mp-row-side">
           <span>${chat.updatedAt ? shortText(chat.updatedAt) : ''}</span>
-          ${chat.unread ? `<span class="mp-badge-count">${chat.unread > 99 ? '99+' : chat.unread}</span>` : ''}
+          ${chat.unread && !chat.muted ? `<span class="mp-badge-count">${chat.unread > 99 ? '99+' : chat.unread}</span>` : ''}
         </div>
       </button>`;
   }).join('');
@@ -5201,7 +5333,7 @@ function threadBody(ctx, chatId) {
           <div class="mp-thread-name">${esc(contact?.name || '')}</div>
           <div class="mp-thread-status"><span class="mp-dot"></span>${esc(contact?.signature || '在线')}</div>
         </div>
-        <button class="mp-icon-btn" data-act="thread-more" data-chat="${chat.id}" type="button" aria-label="更多">${icon('more')}</button>
+        <button class="mp-icon-btn" data-act="thread-settings" data-chat="${chat.id}" type="button" aria-label="聊天设置">${icon('settings')}</button>
       </div>
       <div class="mp-messages" id="mpMessages">${blocks.join('')}</div>
       <div class="mp-composer">
@@ -5242,7 +5374,11 @@ function doSend(ctx, chatId) {
   if (!chat) return;
   const contact = contactById(ctx.state, chat.contactId);
 
-  if (!text) { wake(ctx, chat, contact); return; }
+  if (!text) {
+    if (chat.wake === false) { ctx.toast('这个会话的空发送已经关掉了'); return; }
+    wake(ctx, chat, contact);
+    return;
+  }
 
   pushMessage(ctx.state, chatId, { from: 'me', text, quote: ctx.shell.quote?.[chatId] || null });
   chat.draft = '';
@@ -5368,6 +5504,97 @@ const chatApp = {
   },
 };
 
+const threadSettingsApp = {
+  id: 'thread-settings', name: '聊天设置', icon: 'settings',
+
+  render(ctx, params) {
+    return settingsBody(ctx, params.chatId);
+  },
+
+  handle(ctx, act, data) {
+    const chatId = String(data?.chat || '');
+    const chat = chatById(ctx.state, chatId);
+    if (!chat) {
+      if (act.startsWith('ts-')) { ctx.toast('这个会话已经不在了'); return true; }
+      return false;
+    }
+    const contact = contactById(ctx.state, chat.contactId);
+
+    if (act === 'ts-toggle-pin') {
+      chat.pinned = !chat.pinned;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(chat.pinned ? '已置顶这个会话' : '已取消置顶');
+      return true;
+    }
+
+    if (act === 'ts-toggle-mute') {
+      chat.muted = !chat.muted;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(chat.muted ? '这个会话不再显示未读角标' : '恢复未读角标');
+      return true;
+    }
+
+    if (act === 'ts-toggle-wake') {
+      chat.wake = chat.wake === false;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(chat.wake ? '空发送会触发主动开口' : '空发送已关掉');
+      return true;
+    }
+
+    if (act === 'ts-open-character') {
+      const card = (ctx.state.characters || []).find(item => item.name === contact?.name);
+      if (card) ctx.go('character-card', { name: card.name });
+      else ctx.go('app-characters');
+      return true;
+    }
+
+    if (act === 'ts-open-characters') { ctx.go('app-characters'); return true; }
+
+    if (act === 'ts-diary') { generateDiary(ctx, chat, contact); return true; }
+
+    if (act === 'ts-extras') { ctx.go('app-extras', { contactId: chat.contactId }); return true; }
+
+    if (act === 'ts-clear') {
+      ctx.openSheet({
+        title: '清空这个会话的消息？',
+        items: [{ label: '清空聊天记录', value: 'clear', icon: 'trash', danger: true }],
+        onPick: (value) => {
+          if (value !== 'clear') return;
+          chat.messages = [];
+          chat.unread = 0;
+          chat.typing = false;
+          ctx.save();
+          ctx.toast('聊天记录已清空');
+          ctx.rerender();
+        },
+      });
+      return true;
+    }
+
+    if (act === 'ts-delete') {
+      ctx.openSheet({
+        title: '删除这个会话？',
+        items: [{ label: '连同会话设置一起删除', value: 'delete', icon: 'trash', danger: true }],
+        onPick: (value) => {
+          if (value !== 'delete') return;
+          delete ctx.state.chats[chat.id];
+          ctx.save();
+          ctx.home();
+          ctx.go('app-chat');
+          ctx.toast('会话已删除');
+        },
+      });
+      return true;
+    }
+
+    return false;
+  },
+};
+
+
 const threadApp = {
   id: 'thread', name: '会话', icon: 'chat',
 
@@ -5377,6 +5604,11 @@ const threadApp = {
 
   handle(ctx, act, data) {
     const chatId = data.chat;
+
+    if (act === 'thread-settings') {
+      if (chatById(ctx.state, chatId)) ctx.go('thread-settings', { chatId });
+      return true;
+    }
 
     if (act === 'send') { doSend(ctx, chatId); return true; }
 
@@ -5439,16 +5671,7 @@ const threadApp = {
           { label: '清空这个会话的消息', value: 'clear', icon: 'trash', danger: true },
         ],
         onPick: (value) => {
-          if (value === 'diary') {
-            ctx.toast('正在写日记…');
-            Promise.resolve(ctx.ai.diary(ctx, { chat, contact })).then(text => {
-              if (!text) { ctx.toast('模型没接通'); return; }
-              const key = new Date().toISOString().slice(0, 10);
-              ctx.state.diary.entries[key] = { key, text, tags: [contact?.name].filter(Boolean), auto: true, createdAt: Date.now() };
-              ctx.save();
-              ctx.toast('日记写好了');
-            }).catch(() => ctx.toast('写日记失败'));
-          }
+          if (value === 'diary') generateDiary(ctx, chat, contact);
           if (value === 'extras') ctx.go('app-extras', { contactId: chat.contactId });
           if (value === 'clear') {
             chat.messages = [];
@@ -5513,6 +5736,7 @@ const threadApp = {
 };
 
 exports["chatApp"] = chatApp;
+exports["threadSettingsApp"] = threadSettingsApp;
 exports["threadApp"] = threadApp;
 };
 __mods["meme/apps/diary.js"] = function(module, exports, __req){
@@ -9535,7 +9759,7 @@ const { createStore } = __req("meme/store.js");
 const { normalize, emptyState, demoState, syncTavernContacts, chatFor } = __req("meme/data.js");
 const { createShell } = __req("meme/shell.js");
 const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } = __req("meme/host.js");
-const { chatApp, threadApp } = __req("meme/apps/chat.js");
+const { chatApp, threadApp, threadSettingsApp } = __req("meme/apps/chat.js");
 const { summaryContext } = __req("meme/book.js");
 const { diaryApp } = __req("meme/apps/diary.js");
 const { contactsApp, contactApp } = __req("meme/apps/contacts.js");
@@ -9577,6 +9801,7 @@ const APPS = {
   'app-book': bookApp,
   'book-settings': bookSettingsApp,
   thread: threadApp,
+  'thread-settings': threadSettingsApp,
   contact: contactApp,
   'extra-detail': extraDetailApp,
 };

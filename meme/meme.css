@@ -599,6 +599,58 @@
   text-align: center;
 }
 
+/* 聊天设置页头：这个会话是谁，现在是什么状态 */
+.mp-chat-set-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 14px;
+  border-radius: var(--r-l);
+  background: rgba(255, 255, 255, .82);
+  box-shadow: var(--shadow-s);
+}
+
+.mp-chat-set-head .mp-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  font-size: 15px;
+}
+
+.mp-chat-set-main { flex: 1; min-width: 0; }
+
+.mp-chat-set-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-chat-set-sub {
+  margin-top: 3px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text-4);
+}
+
+.mp-set-row.is-danger .mp-set-name { color: #b75a73; }
+.mp-set-row.is-danger .mp-set-ico {
+  color: #b75a73;
+  background: rgba(216, 106, 134, .10);
+}
+
+.mp-root[data-mp-theme="night"] .mp-chat-set-head {
+  background: rgba(48, 43, 68, .72);
+}
+
+.mp-root[data-mp-theme="night"] .mp-set-row.is-danger .mp-set-name { color: #ee9bb1; }
+.mp-root[data-mp-theme="night"] .mp-set-row.is-danger .mp-set-ico {
+  color: #ee9bb1;
+  background: rgba(238, 155, 177, .12);
+}
+
 /* ------------------------------------------------------------ 会话页 */
 .mp-thread {
   position: absolute;

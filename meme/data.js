@@ -169,7 +169,7 @@ export function pushMessage(state, chatId, message) {
 }
 
 export function unreadTotal(state) {
-  return Object.values(state.chats).reduce((sum, chat) => sum + (chat.unread || 0), 0);
+  return Object.values(state.chats).reduce((sum, chat) => sum + (chat.muted ? 0 : (chat.unread || 0)), 0);
 }
 
 /* ----------------------------------------------------------------- 日记 */
@@ -363,6 +363,7 @@ export function demoState() {
   ];
 
   const chatShen = addChat(state, shen.id, {
+    id: 'ch_demo_shen',
     messages: [
       { from: 'them', text: '到楼下了，今天风有点大。', at: at(21, 2) },
       { from: 'me', text: '我还在加班，别等我了。', at: at(21, 10) },

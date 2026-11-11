@@ -2611,6 +2611,31 @@ body {
   background: rgba(255, 255, 255, .1);
 }
 
+/* ===== 本段：壁纸透进页面（不再是纯白玻璃） ===== */
+.mp-root:not([data-mp-wall="none"]) .mp-page {
+  background: linear-gradient(180deg, rgba(255, 252, 255, .52), rgba(248, 244, 254, .62));
+}
+
+.mp-root:not([data-mp-wall="none"]) .mp-thread {
+  background: linear-gradient(180deg, rgba(255, 252, 255, .56), rgba(247, 243, 253, .66));
+}
+
+.mp-root:not([data-mp-wall="none"])[data-mp-theme="night"] .mp-page,
+.mp-root:not([data-mp-wall="none"])[data-mp-theme="night"] .mp-thread {
+  background: linear-gradient(180deg, rgba(24, 20, 38, .68), rgba(16, 13, 28, .78));
+}
+
+/* 页面里的白卡也跟着薄一点，别把壁纸整块盖死 */
+.mp-root:not([data-mp-wall="none"]) .mp-row,
+.mp-root:not([data-mp-wall="none"]) .mp-widget {
+  background: rgba(255, 255, 255, .70);
+}
+
+.mp-root:not([data-mp-wall="none"])[data-mp-theme="night"] .mp-row,
+.mp-root:not([data-mp-wall="none"])[data-mp-theme="night"] .mp-widget {
+  background: rgba(38, 33, 58, .62);
+}
+
 </style>
 </head>
 <body>
@@ -2642,7 +2667,7 @@ function emptyState() {
     createdAt: Date.now(),
     settings: {
       theme: 'day',              // day | night
-      wallpaper: 'none',         // none | day | night
+      wallpaper: 'day',          // day | night | none（默认铺壁纸，不透出酒馆背景）
       user: { name: '我', avatar: '', key: '' },
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
@@ -3053,6 +3078,11 @@ function normalize(raw) {
   };
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
+  /* 旧存档默认是「透明」，一次性改回铺壁纸；之后自己选了透明不再覆盖 */
+  if (!merged.settings.wallMigrated) {
+    merged.settings.wallMigrated = true;
+    if (merged.settings.wallpaper === 'none') merged.settings.wallpaper = 'day';
+  }
   merged.settings.userMode = raw.settings?.userMode === 'pin' ? 'pin' : 'follow';
   merged.users = Array.isArray(raw.users) ? raw.users.filter(item => item && (item.key || item.name)) : [];
   merged.characters = Array.isArray(raw.characters) ? raw.characters.filter(item => item && item.name) : [];
@@ -6133,6 +6163,44 @@ function applyImagePreset(ctx, preset) {
   };
 }
 
+/* 从酒馆读一次接口设置，抄成一套预设；失败只提示，不改任何东西 */
+async function importTavernPreset(ctx, store) {
+  const info = typeof ctx.host?.readApi === 'function'
+    ? await ctx.host.readApi()
+    : { available: false, reason: '预览里读不到酒馆设置' };
+  if (!info?.available) {
+    ctx.toast(info?.reason || '没接上酒馆，导入不了');
+    return;
+  }
+  if (!info.direct) {
+    ctx.toast('酒馆这套走它自己的内部转发，没有可直接请求的地址，得手填一套');
+    return;
+  }
+  const same = store.presets.find(item => item.url === info.url && item.model === info.model);
+  if (same) {
+    editingId = same.id;
+    ctx.go('api-item');
+    ctx.toast('这套已经在了');
+    return;
+  }
+  const label = SOURCE_LABELS[info.source] || info.source || '酒馆';
+  const preset = {
+    id: newId('api'),
+    name: `酒馆 · ${label}`,
+    engine: info.source === 'custom' ? 'custom' : 'openai',
+    url: info.url,
+    path: '/v1/chat/completions',
+    model: info.model || '',
+    key: info.key || '',
+    temp: 0.8,
+  };
+  store.presets.push(preset);
+  editingId = preset.id;
+  ctx.save();
+  ctx.go('api-item');
+  ctx.toast(`导入了「${preset.name}」`);
+}
+
 const apiListApp = {
   id: 'api', name: '接口', icon: 'code',
 
@@ -6197,7 +6265,7 @@ const apiListApp = {
       </div>`;
   },
 
-  async handle(ctx, act, data) {
+  handle(ctx, act, data) {
     const store = api(ctx.state);
 
     if (act === 'api-open') {
@@ -6236,40 +6304,8 @@ const apiListApp = {
     }
 
     if (act === 'api-import-tavern') {
-      const info = typeof ctx.host?.readApi === 'function'
-        ? await ctx.host.readApi()
-        : { available: false, reason: '预览里读不到酒馆设置' };
-      if (!info?.available) {
-        ctx.toast(info?.reason || '没接上酒馆，导入不了');
-        return true;
-      }
-      if (!info.direct) {
-        ctx.toast('酒馆这套走它自己的内部转发，没有可直接请求的地址，得手填一套');
-        return true;
-      }
-      const same = store.presets.find(item => item.url === info.url && item.model === info.model);
-      if (same) {
-        editingId = same.id;
-        ctx.go('api-item');
-        ctx.toast('这套已经在了');
-        return true;
-      }
-      const label = SOURCE_LABELS[info.source] || info.source || '酒馆';
-      const preset = {
-        id: newId('api'),
-        name: `酒馆 · ${label}`,
-        engine: info.source === 'custom' ? 'custom' : 'openai',
-        url: info.url,
-        path: '/v1/chat/completions',
-        model: info.model || '',
-        key: info.key || '',
-        temp: 0.8,
-      };
-      store.presets.push(preset);
-      editingId = preset.id;
-      ctx.save();
-      ctx.go('api-item');
-      ctx.toast(`导入了「${preset.name}」`);
+      /* handle 必须保持同步返回，异步的事情交给这个函数自己跑完再刷新 */
+      importTavernPreset(ctx, store);
       return true;
     }
 

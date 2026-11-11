@@ -117,6 +117,44 @@ function applyImagePreset(ctx, preset) {
   };
 }
 
+/* 从酒馆读一次接口设置，抄成一套预设；失败只提示，不改任何东西 */
+async function importTavernPreset(ctx, store) {
+  const info = typeof ctx.host?.readApi === 'function'
+    ? await ctx.host.readApi()
+    : { available: false, reason: '预览里读不到酒馆设置' };
+  if (!info?.available) {
+    ctx.toast(info?.reason || '没接上酒馆，导入不了');
+    return;
+  }
+  if (!info.direct) {
+    ctx.toast('酒馆这套走它自己的内部转发，没有可直接请求的地址，得手填一套');
+    return;
+  }
+  const same = store.presets.find(item => item.url === info.url && item.model === info.model);
+  if (same) {
+    editingId = same.id;
+    ctx.go('api-item');
+    ctx.toast('这套已经在了');
+    return;
+  }
+  const label = SOURCE_LABELS[info.source] || info.source || '酒馆';
+  const preset = {
+    id: newId('api'),
+    name: `酒馆 · ${label}`,
+    engine: info.source === 'custom' ? 'custom' : 'openai',
+    url: info.url,
+    path: '/v1/chat/completions',
+    model: info.model || '',
+    key: info.key || '',
+    temp: 0.8,
+  };
+  store.presets.push(preset);
+  editingId = preset.id;
+  ctx.save();
+  ctx.go('api-item');
+  ctx.toast(`导入了「${preset.name}」`);
+}
+
 export const apiListApp = {
   id: 'api', name: '接口', icon: 'code',
 
@@ -181,7 +219,7 @@ export const apiListApp = {
       </div>`;
   },
 
-  async handle(ctx, act, data) {
+  handle(ctx, act, data) {
     const store = api(ctx.state);
 
     if (act === 'api-open') {
@@ -220,40 +258,8 @@ export const apiListApp = {
     }
 
     if (act === 'api-import-tavern') {
-      const info = typeof ctx.host?.readApi === 'function'
-        ? await ctx.host.readApi()
-        : { available: false, reason: '预览里读不到酒馆设置' };
-      if (!info?.available) {
-        ctx.toast(info?.reason || '没接上酒馆，导入不了');
-        return true;
-      }
-      if (!info.direct) {
-        ctx.toast('酒馆这套走它自己的内部转发，没有可直接请求的地址，得手填一套');
-        return true;
-      }
-      const same = store.presets.find(item => item.url === info.url && item.model === info.model);
-      if (same) {
-        editingId = same.id;
-        ctx.go('api-item');
-        ctx.toast('这套已经在了');
-        return true;
-      }
-      const label = SOURCE_LABELS[info.source] || info.source || '酒馆';
-      const preset = {
-        id: newId('api'),
-        name: `酒馆 · ${label}`,
-        engine: info.source === 'custom' ? 'custom' : 'openai',
-        url: info.url,
-        path: '/v1/chat/completions',
-        model: info.model || '',
-        key: info.key || '',
-        temp: 0.8,
-      };
-      store.presets.push(preset);
-      editingId = preset.id;
-      ctx.save();
-      ctx.go('api-item');
-      ctx.toast(`导入了「${preset.name}」`);
+      /* handle 必须保持同步返回，异步的事情交给这个函数自己跑完再刷新 */
+      importTavernPreset(ctx, store);
       return true;
     }
 

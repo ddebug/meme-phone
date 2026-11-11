@@ -53,7 +53,7 @@ export function emptyState() {
     charactersFromTavern: false,
     lookups: {},
     chats: {},
-    diary: { entries: {}, prompt: DEFAULT_DIARY_PROMPT, lastGenerated: '' },
+    diary: { entries: {}, contacts: {}, prompt: DEFAULT_DIARY_PROMPT, lastGenerated: '' },
     emoji: DEFAULT_EMOJI.map((item, index) => ({ id: `e${index + 1}`, ...item })),
     wallet: { balance: 4520, ledger: [] },
     plans: [],
@@ -481,7 +481,7 @@ export function normalize(raw) {
     ...base,
     ...raw,
     settings: { ...base.settings, ...(raw.settings || {}) },
-    diary: { ...base.diary, ...(raw.diary || {}), entries: { ...(raw.diary?.entries || {}) } },
+    diary: { ...base.diary, ...(raw.diary || {}), entries: { ...(raw.diary?.entries || {}) }, contacts: {} },
     wallet: { ...base.wallet, ...(raw.wallet || {}) },
     dress: { ...base.dress, ...(raw.dress || {}) },
     draw: {
@@ -494,6 +494,15 @@ export function normalize(raw) {
   };
   delete merged.membership;
   delete merged.favorites;
+  for (const [contactId, entries] of Object.entries(raw.diary?.contacts || {})) {
+    if (!contactId || !entries || typeof entries !== 'object' || Array.isArray(entries)) continue;
+    merged.diary.contacts[contactId] = {};
+    for (const [key, entry] of Object.entries(entries)) {
+      if (entry && typeof entry === 'object' && typeof entry.text === 'string') {
+        merged.diary.contacts[contactId][key] = entry;
+      }
+    }
+  }
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
   merged.settings.summary = { ...base.settings.summary, ...(raw.settings?.summary || {}) };

@@ -9,7 +9,7 @@ import { createShell, applyWall } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { summaryContext } from './book.js';
-import { diaryApp } from './apps/diary.js';
+import { diaryApp, threadDiaryApp } from './apps/diary.js';
 import { contactsApp, contactApp } from './apps/contacts.js';
 import { settingsApp, appearanceApp } from './apps/settings.js';
 import { drawApp } from './apps/draw.js';
@@ -27,6 +27,7 @@ import {
 const APPS = {
   'app-chat': chatApp,
   'app-diary': diaryApp,
+  'thread-diary': threadDiaryApp,
   'app-contacts': contactsApp,
   'app-settings': settingsApp,
   'app-appearance': appearanceApp,

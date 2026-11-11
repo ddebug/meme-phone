@@ -82,17 +82,6 @@ function openMessageExtra(ctx, chat, contact, message) {
   });
 }
 
-function generateDiary(ctx, chat, contact) {
-  ctx.toast('正在写日记…');
-  Promise.resolve(ctx.ai.diary(ctx, { chat, contact })).then(text => {
-    if (!text) { ctx.toast('模型没接通'); return; }
-    const key = new Date().toISOString().slice(0, 10);
-    ctx.state.diary.entries[key] = { key, text, tags: [contact?.name].filter(Boolean), auto: true, createdAt: Date.now() };
-    ctx.save();
-    ctx.toast('日记写好了');
-  }).catch(() => ctx.toast('写日记失败'));
-}
-
 function settingsBody(ctx, chatId) {
   const state = ctx.state;
   const chat = chatById(state, chatId);
@@ -132,7 +121,7 @@ function settingsBody(ctx, chatId) {
           ${card
             ? chatSetRow(chat.id, { iconName: 'contacts', title: '角色设定与世界书', sub: '看这张卡，也可以开关关联世界书', act: 'ts-open-character' })
             : chatSetRow(chat.id, { iconName: 'search', title: '去查角色', sub: '还没同步这张角色卡', act: 'ts-open-characters' })}
-          ${chatSetRow(chat.id, { iconName: 'diary', title: '生成今天的日记', sub: '用这个会话里的聊天写一篇', act: 'ts-diary' })}
+          ${chatSetRow(chat.id, { iconName: 'diary', title: 'TA 的日记', sub: '按天记录这个角色和你的聊天', act: 'ts-diary' })}
           ${chatSetRow(chat.id, { iconName: 'theater', title: '看 TA 的小剧场', sub: '这个角色存下来的片段', act: 'ts-extras' })}
         </div>
       </div>
@@ -464,7 +453,7 @@ export const threadSettingsApp = {
 
     if (act === 'ts-open-characters') { ctx.go('app-characters'); return true; }
 
-    if (act === 'ts-diary') { generateDiary(ctx, chat, contact); return true; }
+    if (act === 'ts-diary') { ctx.go('thread-diary', { chatId: chat.id }); return true; }
 
     if (act === 'ts-extras') { ctx.go('app-extras', { contactId: chat.contactId }); return true; }
 
@@ -584,12 +573,10 @@ export const threadApp = {
       ctx.openSheet({
         title: contact?.name || '',
         items: [
-          { label: '生成今天的日记', value: 'diary', icon: 'diary' },
           { label: '看 TA 的小剧场', value: 'extras', icon: 'theater' },
           { label: '清空这个会话的消息', value: 'clear', icon: 'trash', danger: true },
         ],
         onPick: (value) => {
-          if (value === 'diary') generateDiary(ctx, chat, contact);
           if (value === 'extras') ctx.go('app-extras', { contactId: chat.contactId });
           if (value === 'clear') {
             chat.messages = [];

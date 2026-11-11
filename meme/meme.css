@@ -44,6 +44,7 @@
 
   --wall-day: url("../assets/wallpaper-day.jpg");
   --wall-night: url("../assets/wallpaper-night.jpg");
+  --wall-custom: var(--wall-day);
   --wallpaper: var(--wall-day);
 }
 
@@ -1483,13 +1484,18 @@
 
 /* ======================================================= 透明背景 + 回桌面 */
 
-/* 背景三选一：none 透明 / day 樱粉 / night 夜色 */
+/* 背景四种：none 透明 / day 樱粉 / night 夜色 / custom 用户图片 */
 .mp-root[data-mp-wall="day"] .mp-wallpaper {
   background-image: var(--wall-day);
 }
 
 .mp-root[data-mp-wall="night"] .mp-wallpaper {
   background-image: var(--wall-night);
+}
+
+.mp-root[data-mp-wall="custom"] .mp-wallpaper {
+  background-image: var(--wall-custom);
+  background-position: center;
 }
 
 /* 素色底：手机壳外始终透明，只有屏幕里换成干净的浅色纸，绝不再透酒馆 */

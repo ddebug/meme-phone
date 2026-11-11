@@ -5,7 +5,7 @@
 
 import { createStore } from './store.js';
 import { normalize, emptyState, demoState, syncTavernContacts, chatFor } from './data.js';
-import { createShell } from './shell.js';
+import { createShell, applyWall } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { summaryContext } from './book.js';
@@ -336,6 +336,57 @@ export async function openMemePhone(options = {}) {
   /* 主题与壁纸 */
   applyTheme(state, rootEl);
 
+  /* 自定义壁纸：选图后压到 1440×1920 内再存，避免把 localStorage 撑爆 */
+  async function useCustomWall(file) {
+    const looksImage = (file?.type && file.type.startsWith('image/')) || /\.(jpg|jpeg|png|webp|gif|bmp)$/i.test(file?.name || '');
+    if (!looksImage) { ctx.toast('请选一张图片'); return; }
+    const img = await new Promise((resolve, reject) => {
+      const image = new Image();
+      const url = URL.createObjectURL(file);
+      image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+      image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读不出来')); };
+      image.src = url;
+    });
+    const maxW = 1440;
+    const maxH = 1920;
+    const scale = Math.min(1, maxW / img.width, maxH / img.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    const painter = canvas.getContext('2d');
+    if (!painter) throw new Error('画布不可用');
+    painter.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    /* 按图片明暗自动挑日间/夜间，免得深色壁纸配浅色字看不清 */
+    const probe = document.createElement('canvas');
+    probe.width = 32;
+    probe.height = 32;
+    const probeCtx = probe.getContext('2d');
+    probeCtx?.drawImage(img, 0, 0, 32, 32);
+    let luma = 0;
+    const pixels = probeCtx?.getImageData(0, 0, 32, 32).data;
+    if (pixels) {
+      for (let index = 0; index < pixels.length; index += 4) {
+        luma += 0.2126 * pixels[index] + 0.7152 * pixels[index + 1] + 0.0722 * pixels[index + 2];
+      }
+      luma = luma / (pixels.length / 4) / 255;
+      state.settings.theme = luma < 0.45 ? 'night' : 'day';
+    }
+
+    state.settings.customWall = canvas.toDataURL('image/jpeg', 0.82);
+    state.settings.wallpaper = 'custom';
+    ctx.save();
+    ctx.rerender();
+    ctx.toast('自定义壁纸已换上');
+  }
+
+  rootEl.addEventListener('change', event => {
+    if (event.target?.id !== 'mpWallFile') return;
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) useCustomWall(file).catch(error => ctx.toast(error.message || '换壁纸失败'));
+  });
+
   /* 用户头像（酒馆里有 persona 头像） */
   try {
     const avatar = await readUserAvatar();
@@ -397,9 +448,8 @@ export function applyTheme(state, root = rootEl) {
   if (!root) return;
   const theme = state.settings.theme === 'night' ? 'night' : 'day';
   root.dataset.mpTheme = theme;
-  /* 背景三选一：none 透明 / day 樱粉 / night 夜色。图片由 CSS 给，不把路径写死在 JS 里 */
-  const wall = state.settings.wallpaper || 'none';
-  root.dataset.mpWall = ['none', 'day', 'night'].includes(wall) ? wall : 'none';
+  /* 背景：none 透明 / day 晨光 / night 夜色 / custom 自定义图 */
+  applyWall(root, state.settings);
   root.dataset.mpDress = state.settings.dress?.wallpaper || 'photo';
 }
 

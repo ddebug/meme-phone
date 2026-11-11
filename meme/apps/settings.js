@@ -31,6 +31,10 @@ export const settingsApp = {
     const image = imageEndpoint(state);
     const imageLabel = image.engine === 'custom' ? '自定义接口' : image.engine === 'doubao' ? '豆包 · 火山方舟' : 'NovelAI 官方';
     const imageReady = image.engine === 'custom' ? Boolean(image.url) : Boolean(image.url && image.key);
+    const wallLabel = state.settings.wallpaper === 'none' ? '素色底'
+      : state.settings.wallpaper === 'day' ? '晨光粉彩'
+        : state.settings.wallpaper === 'night' ? '夜色'
+          : '自定义壁纸';
 
     return `
       <div class="mp-page-body">
@@ -41,7 +45,7 @@ export const settingsApp = {
           <div class="mp-group-label">账号</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'contacts', title: '用户', sub: `${state.settings.userMode === 'pin' ? '固定' : '跟随酒馆'} · ${state.settings.user.name}`, act: 'set-open', app: 'user' })}
-            ${row(ctx, { iconName: 'brush', title: '外观与主题', sub: `${state.settings.wallpaper === 'none' ? '素色底' : state.settings.wallpaper === 'day' ? '晨光粉彩' : '夜色'} · ${state.settings.theme === 'night' ? '夜间' : '日间'}`, act: 'set-open-appearance' })}
+            ${row(ctx, { iconName: 'brush', title: '外观与主题', sub: `${wallLabel} · ${state.settings.theme === 'night' ? '夜间' : '日间'}`, act: 'set-open-appearance' })}
           </div>
         </div>
 
@@ -222,6 +226,7 @@ export const appearanceApp = {
   render(ctx) {
     const theme = ctx.state.settings.theme;
     const wall = ctx.state.settings.wallpaper || 'none';
+    const customWall = ctx.state.settings.customWall || '';
 
     const themes = [
       { key: 'day', title: '日间', sub: '浅色玻璃，白天看着干净', swatch: 'linear-gradient(150deg,#ffffff,#f3edfa 60%,#eef7f3)' },
@@ -232,6 +237,7 @@ export const appearanceApp = {
       { key: 'none', title: '素色', sub: '不铺图片，屏幕里用干净的浅色纸（壳外仍透出酒馆）', swatch: 'repeating-conic-gradient(rgba(160,150,200,.18) 0% 25%, rgba(255,255,255,0) 0% 50%) 50% / 16px 16px' },
       { key: 'day', title: '晨光粉彩', sub: '樱粉与薄荷的柔光壁纸', swatch: 'linear-gradient(150deg,#ffe3ef,#e4f7f0 55%,#efe6ff)' },
       { key: 'night', title: '夜色', sub: '深墨蓝到紫罗兰的流体光带', swatch: 'linear-gradient(150deg,#1a1f2b,#2b2350 60%,#0a0c11)' },
+      { key: 'custom', title: '自定义', sub: customWall ? '用你选的那张图，只铺在手机屏幕里' : '从相册选一张图，壳外仍然透明', swatch: customWall ? `url("${customWall}") center / cover` : 'linear-gradient(150deg,#e7e1f7,#f7e8ef 55%,#e8f5f2)' },
     ];
 
     const row = (item, act, dataKey) => `
@@ -251,6 +257,14 @@ export const appearanceApp = {
 
         <div class="mp-group-label" style="margin-top:10px">背景</div>
         ${walls.map(item => row(item, 'pick-wall', 'wall')).join('')}
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="mp-btn" data-act="choose-custom-wall" type="button" style="flex:1">
+            ${icon('image')}<span style="margin-left:6px">${customWall ? '换一张图' : '从相册选一张'}</span>
+          </button>
+          ${customWall ? `<button class="mp-btn" data-act="remove-custom-wall" type="button" style="flex:0 0 auto;padding:0 16px">删除</button>` : ''}
+        </div>
+        <input id="mpWallFile" type="file" accept="image/*" style="display:none">
+        <div class="mp-subtitle" style="margin-top:6px;font-size:11.5px">图片会存进小手机存档，导出备份时一起带走；只铺在屏幕里。</div>
 
         <div class="mp-group-label" style="margin-top:14px">主题</div>
         <div style="display:flex;gap:8px">
@@ -277,21 +291,39 @@ export const appearanceApp = {
     if (act === 'pick-theme') {
       const next = data.theme === 'night' ? 'night' : 'day';
       ctx.state.settings.theme = next;
-      /* 图片壁纸跟着明暗一起走，免得选了夜间还是一屏亮壁纸，看着像没切换 */
-      if (ctx.state.settings.wallpaper !== 'none') ctx.state.settings.wallpaper = next;
+      /* 图片壁纸跟着明暗一起走，免得选了夜间还是一屏亮壁纸；自定义图不跟着换 */
+      if (!['none', 'custom'].includes(ctx.state.settings.wallpaper)) ctx.state.settings.wallpaper = next;
       ctx.rerender();
       ctx.save();
       ctx.toast(next === 'night' ? '夜间玻璃已打开' : '换回日间玻璃');
       return true;
     }
     if (act === 'pick-wall') {
-      const wall = ['none', 'day', 'night'].includes(data.wall) ? data.wall : 'none';
+      if (data.wall === 'custom' && !ctx.state.settings.customWall) {
+        document.getElementById('mpWallFile')?.click();
+        return true;
+      }
+      const wall = ['none', 'day', 'night', 'custom'].includes(data.wall) ? data.wall : 'none';
       ctx.state.settings.wallpaper = wall;
       if (wall === 'day') ctx.state.settings.theme = 'day';
       if (wall === 'night') ctx.state.settings.theme = 'night';
       ctx.rerender();
       ctx.save();
-      ctx.toast(wall === 'none' ? '屏幕内换成素色底' : wall === 'day' ? '换成晨光粉彩壁纸' : '换成夜色壁纸');
+      ctx.toast(wall === 'none' ? '屏幕内换成素色底'
+        : wall === 'day' ? '换成晨光粉彩壁纸'
+          : wall === 'night' ? '换成夜色壁纸' : '换成自定义壁纸');
+      return true;
+    }
+    if (act === 'choose-custom-wall') {
+      document.getElementById('mpWallFile')?.click();
+      return true;
+    }
+    if (act === 'remove-custom-wall') {
+      ctx.state.settings.customWall = '';
+      if (ctx.state.settings.wallpaper === 'custom') ctx.state.settings.wallpaper = 'day';
+      ctx.rerender();
+      ctx.save();
+      ctx.toast('已删掉自定义壁纸');
       return true;
     }
     return false;

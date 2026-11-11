@@ -13,7 +13,8 @@ export function emptyState() {
     createdAt: Date.now(),
     settings: {
       theme: 'day',              // day | night
-      wallpaper: 'day',          // day | night | none（默认铺壁纸，不透出酒馆背景）
+      wallpaper: 'day',          // day | night | none | custom（默认铺壁纸，不透出酒馆背景）
+      customWall: '',            // 自定义壁纸的 data URL
       user: { name: '我', avatar: '', key: '' },
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
@@ -456,6 +457,8 @@ export function normalize(raw) {
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
   merged.settings.summary = { ...base.settings.summary, ...(raw.settings?.summary || {}) };
+  merged.settings.customWall = typeof raw.settings?.customWall === 'string' ? raw.settings.customWall : '';
+  if (merged.settings.wallpaper === 'custom' && !merged.settings.customWall) merged.settings.wallpaper = 'day';
   merged.settings.image = {
     ...base.settings.image,
     ...(raw.settings?.image || {}),

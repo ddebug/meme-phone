@@ -20,6 +20,18 @@ export function clockText(date = new Date()) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+/* 壁纸：none / day / night / custom。自定义图直接作为 CSS 变量铺进壳内 */
+export function applyWall(root, settings) {
+  if (!root || !settings) return;
+  const wall = ['none', 'day', 'night', 'custom'].includes(settings.wallpaper) ? settings.wallpaper : 'none';
+  root.dataset.mpWall = wall;
+  if (wall === 'custom' && settings.customWall) {
+    root.style.setProperty('--wall-custom', `url("${settings.customWall}")`);
+  } else {
+    root.style.removeProperty('--wall-custom');
+  }
+}
+
 export function dateText(date = new Date()) {
   return `${date.getMonth() + 1}月${date.getDate()}日<br>${WEEK[date.getDay()]}`;
 }
@@ -195,7 +207,7 @@ export function createShell(options) {
     const status = state.settings.theme === 'night' ? 'night' : 'day';
     root.className = 'mp-root';
     root.dataset.mpTheme = status;
-    root.dataset.mpWall = ['none', 'day', 'night'].includes(state.settings.wallpaper) ? state.settings.wallpaper : 'none';
+    applyWall(root, state.settings);
     root.innerHTML = `
       <div class="mp-overlay">
         <div class="mp-device">
@@ -285,7 +297,7 @@ export function createShell(options) {
       const settings = ctx.state.settings;
       const next = settings.theme === 'night' ? 'day' : 'night';
       settings.theme = next;
-      if (settings.wallpaper !== 'none') settings.wallpaper = next;
+      if (!['none', 'custom'].includes(settings.wallpaper)) settings.wallpaper = next;
       render();
       ctx.save();
     },

@@ -24,6 +24,12 @@ export function emptyState() {
           { id: 'api_default', name: '酒馆 API', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
         ],
       },
+      /* 绘图接口跟聊天的 API 预设完全分开：自己一套引擎 / 地址 / Key / 模型 */
+      image: {
+        engine: 'novelai',        // novelai 官方 | custom 自定义接口
+        novelai: { url: 'https://image.novelai.net', key: '', model: 'nai-diffusion-4-curated-preview' },
+        custom: { url: '', key: '', model: '', path: '/v1/images/generations' },
+      },
     },
     draw: {
       config: {
@@ -259,17 +265,22 @@ export function demoState() {
     { key: 'persona_gu.png', name: '顾青', description: '白天在书店，晚上写东西，不太主动开口。', avatarUrl: '' },
   ];
   state.settings.api.activeChat = 'api_default';
-  state.settings.api.activeImage = 'api_nai';
+  state.settings.image = {
+    engine: 'novelai',
+    novelai: { url: 'https://image.novelai.net', key: 'pst-demo', model: 'nai-diffusion-4-curated-preview' },
+    custom: { url: '', key: '', model: '', path: '/v1/images/generations' },
+  };
   state.settings.api.presets = [
     { id: 'api_default', name: '酒馆 API', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
-    { id: 'api_nai', name: '我的 NovelAI', engine: 'novelai', url: 'https://image.novelai.net', path: '/ai/generate-image', model: 'nai-diffusion-4', key: 'pst-demo', temp: 0.8 },
     { id: 'api_local', name: '本地 OpenAI', engine: 'openai', url: 'http://127.0.0.1:8080', path: '/v1/chat/completions', model: 'gpt-4o-mini', key: 'sk-demo', temp: 0.9 },
   ];
   state.draw.lastPrompt = '沈砚坐在便利店门口的台阶上，夜里，侧脸，路灯下点了一支烟';
   state.draw.presets = [
-    { name: '默认', pos: '', neg: '' },
-    { name: '胶片人像', pos: 'film grain, kodak portra, natural light, 50mm', neg: 'oversaturated, plastic skin' },
+    { id: 'dp_default', name: '默认', pos: '', neg: '' },
+    { id: 'dp_film', name: '胶片人像', pos: 'film grain, kodak portra, natural light, 50mm', neg: 'oversaturated, plastic skin' },
+    { id: 'dp_night', name: '夜街', pos: 'night street, neon reflection, wet asphalt, cinematic', neg: 'flat lighting, blurry' },
   ];
+  state.draw.presetIdx = 1;
   state.draw.history = [
     { id: 'img_demo1', prompt: '便利店台阶上的夜，侧脸，路灯', seed: 20261111, url: '', tint: 'linear-gradient(150deg,#e6dcff,#c9bcf7 60%,#b3d6f2)', at: Date.now() },
     { id: 'img_demo2', prompt: '雨夜车窗上的水痕', seed: 88421337, url: '', tint: 'linear-gradient(150deg,#ffe3ef,#f8c6dd 60%,#efe6ff)', at: Date.now() - 60000 },
@@ -424,6 +435,30 @@ export function normalize(raw) {
   };
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
+  merged.settings.image = {
+    ...base.settings.image,
+    ...(raw.settings?.image || {}),
+    novelai: { ...base.settings.image.novelai, ...(raw.settings?.image?.novelai || {}) },
+    custom: { ...base.settings.image.custom, ...(raw.settings?.image?.custom || {}) },
+  };
+  /* 一次性迁移：以前绘图是借聊天 API 预设里那套，现在搬进独立的 settings.image */
+  if (!raw.settings?.image) {
+    const legacy = (raw.settings?.api?.presets || []);
+    const old = legacy.find(item => item.id === raw.settings?.api?.activeImage)
+      || legacy.find(item => item.engine === 'novelai');
+    if (old?.url || old?.key) {
+      merged.settings.image.novelai = {
+        url: old.url || merged.settings.image.novelai.url,
+        key: old.key || '',
+        model: old.model || merged.settings.image.novelai.model,
+      };
+    }
+    const cfg = raw.draw?.config || {};
+    if (!old && cfg.url) {
+      merged.settings.image.engine = 'custom';
+      merged.settings.image.custom = { url: cfg.url, key: cfg.key || '', model: cfg.model || '', path: '/v1/images/generations' };
+    }
+  }
   /* 旧存档默认是「透明」，一次性改回铺壁纸；之后自己选了透明不再覆盖 */
   if (!merged.settings.wallMigrated) {
     merged.settings.wallMigrated = true;

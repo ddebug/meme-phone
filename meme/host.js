@@ -135,11 +135,18 @@ export async function generate({ prompt, system = '', demoReply = '' }) {
  * 返回 { url } 时是 data URI（图小，直接塞进内存够用）；失败抛错，由界面提示。
  */
 export async function novelaiImage({
+  engine = 'novelai',
   url, key, model, width, height, steps = 28, scale = 5,
   sampler = 'k_euler_ancestral', noise = 'karras', seed, prompt = '', negative = '',
 }) {
   const base = String(url || 'https://image.novelai.net').trim().replace(/\/+$/, '');
   const token = String(key || '').trim();
+
+  if (engine === 'custom') {
+    if (!base) throw new Error('先填自定义接口的地址');
+    return customImage({ base, token, model, width, height, steps, scale, sampler, seed, prompt, negative });
+  }
+
   if (!token) throw new Error('先填 NovelAI 的 Key');
 
   const payload = {
@@ -164,19 +171,47 @@ export async function novelaiImage({
   }
   if (!res.ok) throw new Error(`NovelAI 返回 ${res.status}（Key 或额度不对）`);
 
+  return imageFromResponse(res, 'NovelAI');
+}
+
+/** 自定义接口：OpenAI 风格 images 接口；返回里可能是 b64_json，也可能是 url。 */
+async function customImage({ base, token, model, width, height, steps, scale, sampler, seed, prompt, negative }) {
+  const payload = {
+    prompt, negative_prompt: negative || '', n: 1,
+    size: `${width}x${height}`, width, height,
+    steps, scale, sampler, seed,
+    response_format: 'b64_json',
+  };
+  if (model) payload.model = model;
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let res;
+  try {
+    res = await fetch(base, { method: 'POST', headers, body: JSON.stringify(payload) });
+  } catch (error) {
+    throw new Error(`连不上 ${base}：${error.message}`);
+  }
+  if (!res.ok) throw new Error(`接口返回 ${res.status}`);
+  return imageFromResponse(res, '接口');
+}
+
+async function imageFromResponse(res, label) {
   const type = res.headers.get('content-type') || '';
   if (type.includes('application/json')) {
     const json = await res.json().catch(() => null);
-    const b64 = json?.image || json?.data?.[0]?.b64_json || '';
-    if (!b64) throw new Error('返回里没有图');
-    return { url: b64.startsWith('data:') ? b64 : `data:image/png;base64,${b64}` };
+    const b64 = json?.image || json?.data?.[0]?.b64_json || json?.data?.[0]?.image || json?.b64_json || '';
+    if (b64) return { url: b64.startsWith('data:') ? b64 : `data:image/png;base64,${b64}` };
+    const remote = json?.data?.[0]?.url || json?.url || json?.image_url || '';
+    if (remote) return { url: remote };
+    throw new Error(`${label} 返回里没有图`);
   }
   if (type.includes('image/')) {
     const blob = await res.blob();
     return { url: URL.createObjectURL(blob) };
   }
-  // NovelAI 官方端点回的是 zip，浏览器里要解压才能拿到 png。
-  throw new Error('NovelAI 返回了 zip，当前只支持直出图片的兼容接口');
+  throw new Error(`${label} 返回了压缩包，当前只支持直出图片的接口`);
 }
 
 /**

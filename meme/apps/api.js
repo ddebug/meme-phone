@@ -1,6 +1,6 @@
 /**
- * meme-phone · 接口与预设
- * 一个 preset 就是一套「地址 + Key + 模型」，聊天和绘图各挑一套用。
+ * meme-phone · 接口与预设（只给聊天用）
+ * 一个 preset 就是一套「地址 + Key + 模型」；绘图接口在绘图页里单独一套，互不相干。
  */
 
 import { icon } from '../icons.js';
@@ -9,8 +9,7 @@ import { newId } from '../data.js';
 
 const ENGINES = [
   { value: 'tavern', label: '酒馆 API', hint: '直接借酒馆自己的模型，不用填地址' },
-  { value: 'openai', label: 'OpenAI 兼容', hint: '/v1/chat/completions 或 /images/generations' },
-  { value: 'novelai', label: 'NovelAI', hint: 'image.novelai.net，Key 以 pst- 开头' },
+  { value: 'openai', label: 'OpenAI 兼容', hint: '/v1/chat/completions' },
   { value: 'custom', label: '自定义', hint: '自己填路径' },
 ];
 
@@ -28,12 +27,12 @@ const SOURCE_LABELS = {
 };
 
 const FIELDS = [
-  { key: 'name', label: '名称', kind: 'text', placeholder: '比如 我的 NAI' },
+  { key: 'name', label: '名称', kind: 'text', placeholder: '比如 我的 GPT' },
   { key: 'engine', label: '引擎', kind: 'pick' },
-  { key: 'url', label: '地址', kind: 'text', placeholder: 'https://image.novelai.net' },
-  { key: 'path', label: '路径', kind: 'text', placeholder: '/ai/generate-image' },
-  { key: 'model', label: '模型', kind: 'text', placeholder: 'nai-diffusion-4-curated-preview' },
-  { key: 'key', label: 'Key', kind: 'text', placeholder: 'pst-...' },
+  { key: 'url', label: '地址', kind: 'text', placeholder: 'https://你的接口' },
+  { key: 'path', label: '路径', kind: 'text', placeholder: '/v1/chat/completions' },
+  { key: 'model', label: '模型', kind: 'text', placeholder: 'gpt-4o-mini' },
+  { key: 'key', label: 'Key', kind: 'text', placeholder: 'sk-...' },
   { key: 'temp', label: '温度', kind: 'text', placeholder: '0.8' },
 ];
 
@@ -51,7 +50,6 @@ function mask(key) {
 }
 
 function defaultPath(engine) {
-  if (engine === 'novelai') return '/ai/generate-image';
   if (engine === 'openai') return '/v1/chat/completions';
   return '';
 }
@@ -86,7 +84,6 @@ function api(state) {
     tavern.name = '酒馆 API';
   }
   if (!store.activeChat) store.activeChat = tavern.id;
-  if (!store.activeImage) store.activeImage = tavern.id;
   return store;
 }
 
@@ -103,18 +100,6 @@ function presetNote(preset) {
 
 function findPreset(store) {
   return store.presets.find(preset => preset.id === editingId) || store.presets[0];
-}
-
-/* 绘图页不自己存地址 Key 模型；切绘图预设时把这一套同步进 cfg 兜底 */
-function applyImagePreset(ctx, preset) {
-  if (!ctx.state.draw || typeof ctx.state.draw !== 'object') ctx.state.draw = {};
-  const cfg = ctx.state.draw.config || {};
-  ctx.state.draw.config = {
-    ...cfg,
-    url: preset.url || cfg.url || '',
-    key: preset.key || cfg.key || '',
-    model: preset.model || cfg.model || '',
-  };
 }
 
 /* 从酒馆读一次接口设置，抄成一套预设；失败只提示，不改任何东西 */
@@ -162,8 +147,7 @@ export const apiListApp = {
     const store = api(ctx.state);
     const rows = store.presets.map(preset => {
       const active = preset.id === store.activeChat ? '聊天' : '';
-      const image = preset.id === store.activeImage ? '绘图' : '';
-      const use = [active, image].filter(Boolean).join(' · ');
+      const use = active;
       const sub = preset.engine === 'tavern' && !preset.model
         ? '借酒馆自己的模型，不用填地址'
         : `${engineLabel(preset.engine)}${preset.model ? ` · ${preset.model}` : ''} · Key ${mask(preset.key)}`;
@@ -185,18 +169,13 @@ export const apiListApp = {
         <button class="mp-back" data-act="api-new" type="button" title="新建预设">${icon('plus')}</button>
       </div>
       <div class="mp-page-body">
-        <div class="mp-title" style="margin-top:0">接口</div>
-        <div class="mp-subtitle">一套预设 = 地址 + Key + 模型，聊天和绘图各挑一套</div>
+        <div class="mp-title" style="margin-top:0">聊天接口</div>
+        <div class="mp-subtitle">一套预设 = 地址 + Key + 模型；绘图接口在「绘图」页里单独填</div>
 
         <div class="mp-api-cards">
           <button class="mp-api-card" data-act="api-pick-chat" type="button">
             <span class="mp-api-card-label">${icon('chat')}<span>聊天用</span></span>
             <span class="mp-api-card-value">${esc(presetName(store, store.activeChat))}</span>
-            <span class="mp-api-card-swap">${icon('refresh')}</span>
-          </button>
-          <button class="mp-api-card" data-act="api-pick-image" type="button">
-            <span class="mp-api-card-label">${icon('image')}<span>绘图用</span></span>
-            <span class="mp-api-card-value">${esc(presetName(store, store.activeImage))}</span>
             <span class="mp-api-card-swap">${icon('refresh')}</span>
           </button>
         </div>
@@ -228,30 +207,23 @@ export const apiListApp = {
       return true;
     }
 
-    if (act === 'api-pick-chat' || act === 'api-pick-image') {
-      const asImage = act === 'api-pick-image';
-      const current = asImage ? store.activeImage : store.activeChat;
+    if (act === 'api-pick-chat') {
       ctx.openSheet({
         kind: 'pick',
-        title: asImage ? '换一套绘图 API' : '换一套聊天 API',
+        title: '换一套聊天 API',
         note: '存过的都在这里，酒馆 API 一直在最上面',
         items: store.presets.map(preset => ({
           value: preset.id,
           label: preset.name || '未命名',
-          note: preset.id === current ? '正在用 · ' + presetNote(preset) : presetNote(preset),
+          note: preset.id === store.activeChat ? '正在用 · ' + presetNote(preset) : presetNote(preset),
         })),
         onPick: id => {
           const target = store.presets.find(preset => preset.id === id);
           if (!target) return;
-          if (asImage) {
-            store.activeImage = target.id;
-            applyImagePreset(ctx, target);
-          } else {
-            store.activeChat = target.id;
-          }
+          store.activeChat = target.id;
           ctx.save();
           ctx.rerender();
-          ctx.toast(`已切成「${target.name || '未命名'}」${asImage && target.engine === 'tavern' ? '（酒馆 API 只借聊天模型，绘图仍要选带地址那套）' : ''}`);
+          ctx.toast(`聊天换成「${target.name || '未命名'}」`);
         },
       });
       return true;
@@ -266,7 +238,6 @@ export const apiListApp = {
     if (act === 'api-new') {
       /* 新建 = 拿当前这套做模板复制一份，不用从空白重填 */
       const source = store.presets.find(item => item.id === store.activeChat)
-        || store.presets.find(item => item.id === store.activeImage)
         || store.presets[0];
       const preset = clonePreset(source, ' 副本');
       store.presets.push(preset);
@@ -315,7 +286,6 @@ export const apiPresetApp = {
     }).join('');
 
     const asChat = preset.id === store.activeChat;
-    const asImage = preset.id === store.activeImage;
     const sub = preset.model
       ? `${engineLabel(preset.engine)} · ${preset.model}`
       : (preset.engine === 'tavern' ? '借酒馆自己的模型，不用填地址' : `${engineLabel(preset.engine)} · 模型没填`);
@@ -336,9 +306,6 @@ export const apiPresetApp = {
         <div class="mp-api-use">
           <button class="mp-api-use-btn${asChat ? ' is-on' : ''}" data-act="api-use-chat" type="button">
             ${icon('chat')}<span>${asChat ? '聊天正在用' : '设为聊天'}</span>
-          </button>
-          <button class="mp-api-use-btn${asImage ? ' is-on' : ''}" data-act="api-use-image" type="button">
-            ${icon('image')}<span>${asImage ? '绘图正在用' : '设为绘图'}</span>
           </button>
         </div>
 
@@ -365,7 +332,6 @@ export const apiPresetApp = {
           onPick: value => {
             preset.engine = value;
             preset.path = defaultPath(value);
-            if (value === 'novelai' && !preset.url) preset.url = 'https://image.novelai.net';
             ctx.save();
             ctx.rerender();
           },
@@ -397,15 +363,6 @@ export const apiPresetApp = {
       return true;
     }
 
-    if (act === 'api-use-image') {
-      store.activeImage = preset.id;
-      applyImagePreset(ctx, preset);
-      ctx.save();
-      ctx.rerender();
-      ctx.toast(`绘图换成「${preset.name || '未命名'}」`);
-      return true;
-    }
-
     if (act === 'api-del') {
       if (preset.engine === 'tavern') {
         ctx.toast('酒馆 API 留着兜底，删不掉');
@@ -417,7 +374,6 @@ export const apiPresetApp = {
       }
       store.presets = store.presets.filter(item => item.id !== preset.id);
       if (store.activeChat === preset.id) store.activeChat = store.presets[0].id;
-      if (store.activeImage === preset.id) store.activeImage = store.presets[0].id;
       editingId = '';
       ctx.save();
       ctx.back();

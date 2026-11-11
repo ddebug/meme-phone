@@ -1,7 +1,9 @@
 /**
  * meme-phone · 绘图 App
- * NovelAI 那一套：中文描述 → danbooru tag → 尺寸/步数/引导/采样/种子 → 出图。
- * 没有 Key 的时候不出网，只留下一条演示记录，并告诉你缺什么。
+ *
+ * 接口跟聊天的 API 预设分开：这里只认「绘图接口」自己的一套引擎 / 地址 / Key / 模型。
+ * 引擎两选一：NovelAI 官方（官方端点自带 V4 参数）、自定义接口（OpenAI 风格的 images 接口）。
+ * 提示词预设单独一套：名字 + 正向 + 反向，可以新建副本、改名、删掉。
  */
 
 import { icon } from '../icons.js';
@@ -18,6 +20,18 @@ const SIZES = [
 
 const SAMPLERS = ['k_euler_ancestral', 'k_euler', 'k_dpmpp_2m', 'k_dpmpp_2s_ancestral', 'k_heun'];
 const NOISES = ['karras', 'native', 'exponential', 'polyexponential'];
+
+const NAI_MODELS = [
+  { value: 'nai-diffusion-4-curated-preview', label: 'V4 精选（默认）' },
+  { value: 'nai-diffusion-4-full', label: 'V4 完整' },
+  { value: 'nai-diffusion-3', label: 'V3 动漫' },
+  { value: 'nai-diffusion-3-furry', label: 'V3 兽人' },
+];
+
+const ENGINES = [
+  { value: 'novelai', label: 'NovelAI 官方', note: '官方端点，自带 V4 参数与采样器' },
+  { value: 'custom', label: '自定义接口', note: 'OpenAI 风格 images 接口，地址 + Key 自己填' },
+];
 
 const QUALITY = 'best quality, amazing quality, very aesthetic, absurdres';
 const DEFAULT_NEG = 'lowres, bad anatomy, bad hands, bad feet, text, watermark, signature, worst quality, jpeg artifacts';
@@ -36,7 +50,7 @@ function ensure(state) {
       size: '832x1216', steps: 28, scale: 5,
       sampler: 'k_euler_ancestral', noise: 'karras', seed: '',
     },
-    presets: [{ name: '默认', pos: '', neg: '' }],
+    presets: [{ id: 'dp_default', name: '默认', pos: '', neg: '' }],
     presetIdx: 0,
     lastPrompt: '',
     history: [],
@@ -44,8 +58,21 @@ function ensure(state) {
   if (!state.draw || typeof state.draw !== 'object') state.draw = base;
   state.draw.config = { ...base.config, ...(state.draw.config || {}) };
   if (!Array.isArray(state.draw.presets) || !state.draw.presets.length) state.draw.presets = base.presets;
-  if (typeof state.draw.presetIdx !== 'number') state.draw.presetIdx = 0;
+  state.draw.presets = state.draw.presets.map((item, index) => ({
+    id: item.id || `dp_${index}_${newId('x')}`,
+    name: item.name || `预设 ${index + 1}`,
+    pos: item.pos || '',
+    neg: item.neg || '',
+  }));
+  if (typeof state.draw.presetIdx !== 'number' || state.draw.presetIdx >= state.draw.presets.length) state.draw.presetIdx = 0;
   if (!Array.isArray(state.draw.history)) state.draw.history = [];
+
+  const img = state.settings.image;
+  if (!img || typeof img !== 'object') state.settings.image = {};
+  const image = state.settings.image;
+  image.engine = image.engine === 'custom' ? 'custom' : 'novelai';
+  image.novelai = { url: 'https://image.novelai.net', key: '', model: 'nai-diffusion-4-curated-preview', ...(image.novelai || {}) };
+  image.custom = { url: '', key: '', model: '', path: '/v1/images/generations', ...(image.custom || {}) };
   return state.draw;
 }
 
@@ -60,24 +87,34 @@ function maskKey(key) {
   return `${text.slice(0, 4)}···${text.slice(-4)}`;
 }
 
-/* 绘图不自己存一套地址 Key 模型：一律读「接口」里当前绘图那套预设 */
+function joinUrl(base, path) {
+  const clean = String(base || '').trim().replace(/\/+$/, '');
+  if (!clean) return '';
+  if (/\/v1\/|images\/generations|\/ai\/generate-image/.test(clean)) return clean;
+  const route = String(path || '').trim();
+  if (!route) return clean;
+  return `${clean}${route.startsWith('/') ? '' : '/'}${route}`;
+}
+
+/* 绘图接口只读 settings.image，跟聊天那套 API 预设没有关系 */
 export function imageEndpoint(state) {
-  const api = state.settings?.api || {};
-  const list = Array.isArray(api.presets) ? api.presets : [];
-  const preset = list.find(item => item.id === api.activeImage)
-    || list.find(item => item.engine === 'novelai')
-    || list[0] || null;
-  const cfg = state.draw?.config || {};
+  const image = state.settings?.image || {};
+  const engine = image.engine === 'custom' ? 'custom' : 'novelai';
+  const cfg = engine === 'novelai' ? (image.novelai || {}) : (image.custom || {});
+  const drawCfg = state.draw?.config || {};
   return {
-    preset,
-    id: preset?.id || '',
-    name: preset?.name || '',
-    engine: preset?.engine || '',
-    url: String((preset?.url ?? cfg.url) || '').trim(),
-    path: String(preset?.path || '/ai/generate-image').trim(),
-    key: String((preset?.key ?? cfg.key) || '').trim(),
-    model: String((preset?.model ?? cfg.model) || '').trim(),
+    engine,
+    name: engine === 'novelai' ? 'NovelAI 官方' : '自定义接口',
+    url: String(cfg.url || (engine === 'novelai' ? drawCfg.url : '') || '').trim(),
+    path: engine === 'novelai' ? '/ai/generate-image' : String(cfg.path || '/v1/images/generations').trim(),
+    key: String(cfg.key || (engine === 'novelai' ? drawCfg.key : '') || '').trim(),
+    model: String(cfg.model || (engine === 'novelai' ? drawCfg.model : '') || '').trim(),
   };
+}
+
+function endpointReady(ep) {
+  if (ep.engine === 'novelai') return Boolean(ep.url && ep.key);
+  return Boolean(ep.url);
 }
 
 export const drawApp = {
@@ -89,7 +126,7 @@ export const drawApp = {
     const preset = draw.presets[draw.presetIdx] || draw.presets[0];
     const size = sizeOf(cfg.size);
     const ep = imageEndpoint(ctx.state);
-    const ready = Boolean(ep.key && ep.url);
+    const ready = endpointReady(ep);
     const busy = Boolean(draw.busy);
 
     const chips = draw.presets.map((item, index) => `
@@ -105,14 +142,6 @@ export const drawApp = {
       { act: 'draw-noise', label: '噪声', value: cfg.noise },
       { act: 'draw-seed', label: '种子', value: cfg.seed ? cfg.seed : '随机' },
     ];
-
-    const apiRow = `
-      <button class="mp-row" data-act="open-app" data-app="api" type="button">
-        <span class="mp-row-main">
-          <span class="mp-row-name">${esc(ep.name || '还没选绘图预设')}</span>
-          <span class="mp-row-sub">${esc(ep.model || '模型没填')} · Key ${esc(maskKey(ep.key))}</span>
-        </span>${icon('chevron')}
-      </button>`;
 
     const history = draw.history.slice(0, 6).map((item, index) => `
       <div class="mp-draw-card">
@@ -133,25 +162,50 @@ export const drawApp = {
       <div class="mp-nav">
         <button class="mp-back" data-act="back" type="button">${icon('back')}</button>
         <span style="flex:1"></span>
-        <button class="mp-back" data-act="open-app" data-app="api" type="button" title="接口与预设">${icon('code')}</button>
+        <button class="mp-back" data-act="draw-preset-menu" type="button" title="提示词预设">${icon('settings')}</button>
       </div>
       <div class="mp-page-body">
         <div class="mp-title" style="margin-top:0">绘图</div>
-        <div class="mp-subtitle">NovelAI · 中文描述会先翻成 danbooru tag</div>
+        <div class="mp-subtitle">${ep.engine === 'novelai' ? 'NovelAI 官方 · 中文描述会先翻成 danbooru tag' : '自定义接口 · 中文描述会先翻成 danbooru tag'}</div>
 
         <div class="mp-draw-state${ready ? ' is-on' : ''}">
           ${icon(ready ? 'spark' : 'help')}
           <span>${ready
-            ? `已接「${esc(ep.name || '绘图预设')}」${ep.model ? ` · ${esc(ep.model)}` : ''}`
-            : '还没接上绘图预设，现在是演示出图'}</span>
-          <button class="mp-draw-state-btn" data-act="open-app" data-app="api" type="button">去设置</button>
+            ? `已接「${esc(ep.name)}」${ep.model ? ` · ${esc(ep.model)}` : ''}`
+            : (ep.engine === 'novelai' ? '还没填 NovelAI 的 Key，现在是演示出图' : '还没填自定义接口地址，现在是演示出图')}</span>
+          <button class="mp-draw-state-btn" data-act="${ep.engine === 'novelai' ? 'draw-key' : 'draw-url'}" type="button">${ep.engine === 'novelai' ? '填 Key' : '填地址'}</button>
         </div>
 
-        <div class="mp-group-label" style="margin-top:12px">接口 · 预设带模型</div>
-        <div class="mp-group">${apiRow}</div>
+        <div class="mp-group-label" style="margin-top:12px">绘图接口 · 跟聊天 API 分开</div>
+        <div class="mp-group">
+          <button class="mp-row" data-act="draw-engine" type="button">
+            <span class="mp-row-main">
+              <span class="mp-row-name">${esc(ep.name)}</span>
+              <span class="mp-row-sub">${esc(ep.engine === 'novelai' ? '官方端点，只用 Key' : '地址 + Key 自己填')}</span>
+            </span>${icon('chevron')}
+          </button>
+          <button class="mp-row" data-act="draw-url" type="button">
+            <span class="mp-row-main">
+              <span class="mp-row-name">地址</span>
+              <span class="mp-row-sub">${esc(ep.url || (ep.engine === 'novelai' ? 'https://image.novelai.net' : '没填'))}</span>
+            </span>${icon('chevron')}
+          </button>
+          <button class="mp-row" data-act="draw-key" type="button">
+            <span class="mp-row-main">
+              <span class="mp-row-name">Key</span>
+              <span class="mp-row-sub">${esc(maskKey(ep.key))}</span>
+            </span>${icon('chevron')}
+          </button>
+          <button class="mp-row" data-act="draw-model" type="button">
+            <span class="mp-row-main">
+              <span class="mp-row-name">模型</span>
+              <span class="mp-row-sub">${esc(ep.model || '没选')}</span>
+            </span>${icon('chevron')}
+          </button>
+        </div>
 
-        <div class="mp-group-label" style="margin-top:12px">画风预设</div>
-        <div class="mp-draw-chips">${chips}</div>
+        <div class="mp-group-label" style="margin-top:12px">提示词预设</div>
+        <div class="mp-draw-chips">${chips}<button class="mp-chip-btn" data-act="draw-preset-new" type="button"><span style="font-size:12.5px">＋ 新建</span></button></div>
 
         <div class="mp-group-label" style="margin-top:14px">画面</div>
         <button class="mp-draw-desc" data-act="draw-prompt" type="button">
@@ -165,7 +219,7 @@ export const drawApp = {
           ${icon('spark')}<span>${busy ? '生成中…' : '生成一张'}</span>
         </button>
 
-        <div class="mp-group-label" style="margin-top:14px">提示词</div>
+        <div class="mp-group-label" style="margin-top:14px">这套预设的提示词</div>
         <button class="mp-row" data-act="draw-pos" type="button" style="padding:12px">
           <span class="mp-row-main">
             <span class="mp-row-name">正向 · 质量词</span>
@@ -197,6 +251,70 @@ export const drawApp = {
   handle(ctx, act, data) {
     const draw = ensure(ctx.state);
     const cfg = draw.config;
+    const image = ctx.state.settings.image;
+    const engine = image.engine === 'custom' ? 'custom' : 'novelai';
+    const target = engine === 'novelai' ? image.novelai : image.custom;
+    const preset = draw.presets[draw.presetIdx] || draw.presets[0];
+
+    if (act === 'draw-engine') {
+      ctx.openSheet({
+        kind: 'pick', title: '绘图接口',
+        items: ENGINES.map(item => ({ value: item.value, label: item.label, note: item.note })),
+        onPick: value => {
+          image.engine = value === 'custom' ? 'custom' : 'novelai';
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`绘图接口换成「${image.engine === 'novelai' ? 'NovelAI 官方' : '自定义接口'}」`);
+        },
+      });
+      return true;
+    }
+
+    if (act === 'draw-url') {
+      ctx.openSheet({
+        kind: 'text', title: engine === 'novelai' ? 'NovelAI 地址' : '接口地址',
+        placeholder: engine === 'novelai' ? '默认 https://image.novelai.net' : 'https://你的接口/v1/images/generations',
+        value: String(target.url || ''),
+        onText: value => {
+          target.url = value.trim();
+          ctx.save();
+          ctx.rerender();
+        },
+      });
+      return true;
+    }
+
+    if (act === 'draw-key') {
+      ctx.openSheet({
+        kind: 'text', title: engine === 'novelai' ? 'NovelAI Key' : '接口 Key',
+        placeholder: engine === 'novelai' ? 'pst- 开头的那串' : '没验证就留空',
+        value: String(target.key || ''),
+        onText: value => {
+          target.key = value.trim();
+          ctx.save();
+          ctx.rerender();
+        },
+      });
+      return true;
+    }
+
+    if (act === 'draw-model') {
+      if (engine === 'novelai') {
+        ctx.openSheet({
+          kind: 'pick', title: '模型',
+          items: NAI_MODELS.map(item => ({ value: item.value, label: item.label })),
+          onPick: value => { target.model = value; ctx.save(); ctx.rerender(); },
+        });
+      } else {
+        ctx.openSheet({
+          kind: 'text', title: '模型',
+          placeholder: '接口要的模型名，比如 flux-dev',
+          value: String(target.model || ''),
+          onText: value => { target.model = value.trim(); ctx.save(); ctx.rerender(); },
+        });
+      }
+      return true;
+    }
 
     if (act === 'draw-prompt') {
       ctx.openSheet({
@@ -207,7 +325,6 @@ export const drawApp = {
     }
 
     if (act === 'draw-pos' || act === 'draw-neg') {
-      const preset = draw.presets[draw.presetIdx] || draw.presets[0];
       const key = act === 'draw-pos' ? 'pos' : 'neg';
       ctx.openSheet({
         kind: 'text', title: act === 'draw-pos' ? '正向提示词' : '反向提示词',
@@ -225,6 +342,61 @@ export const drawApp = {
     if (act === 'draw-preset') {
       draw.presetIdx = Number(data.i) || 0;
       ctx.rerender();
+      return true;
+    }
+
+    if (act === 'draw-preset-new') {
+      const copy = {
+        id: newId('dp'),
+        name: `${preset.name || '预设'} 副本`,
+        pos: preset.pos || '',
+        neg: preset.neg || '',
+      };
+      draw.presets.push(copy);
+      draw.presetIdx = draw.presets.length - 1;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`按「${preset.name || '预设'}」新建了一套`);
+      return true;
+    }
+
+    if (act === 'draw-preset-menu') {
+      ctx.openSheet({
+        kind: 'pick', title: `提示词预设 · ${preset.name || ''}`,
+        items: [
+          { label: '新建一套（复制当前）', value: 'new', icon: 'plus' },
+          { label: '给这套改名', value: 'rename', icon: 'brush' },
+          { label: '删掉这套', value: 'del', icon: 'trash' },
+        ],
+        onPick: value => {
+          if (value === 'new') {
+            const copy = { id: newId('dp'), name: `${preset.name || '预设'} 副本`, pos: preset.pos || '', neg: preset.neg || '' };
+            draw.presets.push(copy);
+            draw.presetIdx = draw.presets.length - 1;
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('新建了一套，改名后就是你的模板');
+          }
+          if (value === 'rename') {
+            ctx.openSheet({
+              kind: 'text', title: '预设名字', value: preset.name || '',
+              onText: text => {
+                preset.name = String(text || '').trim() || preset.name;
+                ctx.save();
+                ctx.rerender();
+              },
+            });
+          }
+          if (value === 'del') {
+            if (draw.presets.length <= 1) { ctx.toast('至少留一套'); return; }
+            draw.presets.splice(draw.presetIdx, 1);
+            draw.presetIdx = Math.max(0, draw.presetIdx - 1);
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('删掉了');
+          }
+        },
+      });
       return true;
     }
 
@@ -321,9 +493,10 @@ async function run(ctx, prompt) {
   try {
     let entry = null;
     const ep = imageEndpoint(ctx.state);
-    if (ep.key && ep.url) {
+    if (endpointReady(ep)) {
       const result = await novelaiImage({
-        url: ep.url,
+        engine: ep.engine,
+        url: joinUrl(ep.url, ep.path),
         key: ep.key,
         model: ep.model || cfg.model,
         width: size.w,
@@ -346,7 +519,9 @@ async function run(ctx, prompt) {
         width: size.w, height: size.h,
         tint: TINTS[draw.history.length % TINTS.length],
       };
-      ctx.toast('演示出图：去接口页给绘图选一套带地址和 Key 的预设才会真的画');
+      ctx.toast(ep.engine === 'novelai'
+        ? '演示出图：绘图接口填上 NovelAI 的 Key 才会真的画'
+        : '演示出图：绘图接口填上地址才会真的画');
     }
     draw.history.unshift(entry);
     draw.history = draw.history.slice(0, 18);

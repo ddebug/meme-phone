@@ -18,6 +18,7 @@ import { userListApp, userEditApp } from './apps/user.js';
 import { charactersApp, characterApp } from './apps/characters.js';
 import { charPhoneApp, charPhoneThreadApp, ensureLookup } from './apps/charphone.js';
 import { bookApp, bookSettingsApp } from './apps/book.js';
+import { musicApp, musicPlaylistApp, stopMusic } from './apps/music.js';
 import {
   extrasApp, extraDetailApp, walletApp, emojiApp,
   plansApp, dressApp, helpApp,
@@ -46,6 +47,8 @@ const APPS = {
   'p-chatphone': charPhoneThreadApp,
   'app-book': bookApp,
   'book-settings': bookSettingsApp,
+  'app-music': musicApp,
+  'music-playlist': musicPlaylistApp,
   thread: threadApp,
   'thread-settings': threadSettingsApp,
   contact: contactApp,
@@ -54,6 +57,7 @@ const APPS = {
 
 const DESKTOP_APPS = [
   { id: 'extras', name: '小剧场', icon: 'theater' },
+  { id: 'music', name: '音乐', icon: 'music' },
   { id: 'wallet', name: '钱包', icon: 'wallet' },
   { id: 'draw', name: '绘图', icon: 'image' },
   { id: 'plans', name: '计划', icon: 'plan' },
@@ -452,6 +456,7 @@ export async function openMemePhone(options = {}) {
 
 export function closeMemePhone() {
   if (!rootEl) return;
+  stopMusic();
   clearInterval(followTimer);
   followTimer = 0;
   shellApi?.destroy();

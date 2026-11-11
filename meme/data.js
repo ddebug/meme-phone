@@ -57,6 +57,11 @@ export function emptyState() {
     emoji: DEFAULT_EMOJI.map((item, index) => ({ id: `e${index + 1}`, ...item })),
     wallet: { balance: 4520, ledger: [] },
     plans: [],
+    music: {
+      playlists: [],
+      activeId: '',
+      current: null,
+    },
     extras: {},
     dress: { wallpaperDay: 'assets/wallpaper-day.jpg', wallpaperNight: 'assets/wallpaper-night.jpg', accent: '#8e7bf2' },
   };
@@ -290,6 +295,41 @@ export function demoState() {
     { id: 'img_demo1', prompt: '便利店台阶上的夜，侧脸，路灯', seed: 20261111, url: '', tint: 'linear-gradient(150deg,#e6dcff,#c9bcf7 60%,#b3d6f2)', at: Date.now() },
     { id: 'img_demo2', prompt: '雨夜车窗上的水痕', seed: 88421337, url: '', tint: 'linear-gradient(150deg,#ffe3ef,#f8c6dd 60%,#efe6ff)', at: Date.now() - 60000 },
   ];
+  state.music.playlists = [
+    {
+      id: 'pl_demo_late',
+      source: 'netease',
+      remoteId: 'demo-night',
+      name: '夜班耳机',
+      cover: '',
+      link: '',
+      importedAt: Date.now(),
+      tracks: [
+        { id: 'tr_demo_1', title: '晚风从便利店门口吹过', artist: '颜 · 私人歌单', album: '', url: 'https://music.163.com/song/media/outer/url?id=1973665667.mp3', pic: '', lrc: '', via: 'netease' },
+        { id: 'tr_demo_2', title: '凌晨两点的最后一班车', artist: '颜 · 私人歌单', album: '', url: '', pic: '', lrc: '', via: 'netease' },
+        { id: 'tr_demo_3', title: '把外套借给你', artist: '颜 · 私人歌单', album: '', url: '', pic: '', lrc: '', via: 'netease' },
+        { id: 'tr_demo_4', title: '雨停之前不回家', artist: '颜 · 私人歌单', album: '', url: '', pic: '', lrc: '', via: 'netease' },
+        { id: 'tr_demo_5', title: '明早还要上班', artist: '颜 · 私人歌单', album: '', url: '', pic: '', lrc: '', via: 'netease' },
+      ],
+    },
+    {
+      id: 'pl_demo_qishui',
+      source: 'qishui',
+      remoteId: 'demo-qishui',
+      name: '算了挺没意思喜欢的音乐',
+      cover: '',
+      link: '',
+      importedAt: Date.now() - 3600000,
+      tracks: [
+        { id: 'tr_demo_q1', title: 'APT.', artist: 'ROSÉ, Bruno Mars', album: 'APT.', url: '', pic: '', lrc: '', via: 'qishui' },
+        { id: 'tr_demo_q2', title: 'golden hour', artist: 'JVKE', album: 'golden hour', url: '', pic: '', lrc: '', via: 'qishui' },
+        { id: 'tr_demo_q3', title: 'Believer', artist: 'Imagine Dragons', album: 'Evolve', url: '', pic: '', lrc: '', via: 'qishui' },
+        { id: 'tr_demo_q4', title: 'Count on me', artist: 'Bruno Mars', album: 'Doo-Wops & Hooligans', url: '', pic: '', lrc: '', via: 'qishui' },
+      ],
+    },
+  ];
+  state.music.activeId = 'pl_demo_late';
+  state.music.current = { playlistId: 'pl_demo_late', trackId: 'tr_demo_1' };
 
   const shen = addContact(state, { name: '沈砚', signature: '加班别等我了', status: 'online' });
   const jiang = addContact(state, { name: '江迟', signature: '在听老歌', status: 'busy' });
@@ -502,6 +542,16 @@ export function normalize(raw) {
   merged.contacts = merged.contacts || {};
   merged.chats = merged.chats || {};
   merged.plans = Array.isArray(merged.plans) ? merged.plans : [];
+  merged.music = {
+    ...base.music,
+    ...(raw.music && typeof raw.music === 'object' ? raw.music : {}),
+  };
+  merged.music.playlists = Array.isArray(merged.music.playlists)
+    ? merged.music.playlists.filter(item => item && Array.isArray(item.tracks))
+    : [];
+  merged.music.current = merged.music.current && typeof merged.music.current === 'object'
+    ? merged.music.current
+    : null;
   merged.extras = merged.extras || {};
   merged.emoji = Array.isArray(merged.emoji) && merged.emoji.length ? merged.emoji : base.emoji;
   for (const [chatId, chat] of Object.entries(merged.chats)) {

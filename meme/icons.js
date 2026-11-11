@@ -37,6 +37,10 @@ const P = {
   bell: '<path d="M8 10a4 4 0 0 1 8 0c0 3 .8 4.4 1.6 5.2H6.4c.8-.8 1.6-2.2 1.6-5.2z"/><path d="M10.2 18a2 2 0 0 0 3.6 0"/>',
   code: '<path d="M9 6.6 4.4 12 9 17.4M15 6.6l4.6 5.4-4.6 5.4"/>',
   book: '<path d="M4.6 5.8c2.6-.9 5.2-.9 7.4.7 2.2-1.6 4.8-1.6 7.4-.7v12.3c-2.6-.9-5.2-.9-7.4.7-2.2-1.6-4.8-1.6-7.4-.7z"/><path d="M12 6.5v12.3"/>',
+  music: '<path d="M9.4 17.4V7.2l8-1.5v10.4"/><circle cx="6.8" cy="17.6" r="2.6"/><circle cx="14.8" cy="16.1" r="2.6"/>',
+  play: '<path d="M8.4 5.8 18 12l-9.6 6.2z"/>',
+  pause: '<path d="M9 6.4v11.2M15 6.4v11.2"/>',
+  next: '<path d="M7 5.8 15.2 12 7 18.2z"/><path d="M18 5.6v12.8"/>',
 };
 
 export function icon(name, className = '') {
@@ -66,4 +70,5 @@ export const TINT = {
   draw: ['#c9e2f5', '#93c6ec'],
   api: ['#d3cdf0', '#aea3e6'],
   dress: ['#c3d6f2', '#8fb3e8'],
+  music: ['#e4c9f4', '#bd9bea'],
 };

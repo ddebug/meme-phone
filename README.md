@@ -79,7 +79,8 @@ python scripts/build_preview.py
 - 新建不填空白表：右上角 ＋ 拿当前聊天这套整套复制一份（地址、Key、模型、路径都带过来），改个名字和模型就成了新的一套；详情页里「复制成新的一套」同理。原来的那套不动。
 - 换 API：点顶部「聊天用」那张卡，弹出的列表就是之前存过的所有聊天 API，另加一套常驻的**酒馆 API**（借酒馆自己的模型，不用填地址、删不掉），随时能切回去。
 - 从酒馆导入：接口页底部「从酒馆导入当前接口」只读一次酒馆的 `oai_settings`，把 `reverse_proxy`（地址）、`proxy_password`（Key）、当前来源的模型抄成一套新预设。没有反向代理、走酒馆内部转发的那种读不到地址，会提示改手填；重复的那套直接打开不再建。
-- **绘图接口跟聊天接口完全分开**，存在 `settings.image` 里，不进聊天预设列表：引擎二选一（NovelAI 官方 / 自定义接口），各自记一套地址、Key、模型。绘图页「绘图接口」四行就能改，改引擎不碰聊天那套。
+- **绘图接口跟聊天接口完全分开**，存在 `settings.image` 里，不进聊天预设列表：引擎三选一（NovelAI 官方 / 豆包·火山方舟 / 自定义接口），各自记一套地址、Key、模型。绘图页「绘图接口」四行就能改，改引擎不碰聊天那套。
+- 接豆包绘图：引擎选「豆包 · 火山方舟」，地址默认 `https://ark.cn-beijing.volces.com/api/v3/images/generations`，Key 填火山方舟控制台的 `ARK_API_KEY`（不是豆包 App 的账号），模型选 Seedream 4.5 / 4.0 / 3.0。请求按官方 `images/generations` 格式发：`model`、`prompt`、`size`（当前选的宽×高）、`response_format: b64_json`、`watermark: false`，4.x 额外带 `sequential_image_generation: disabled` 只要一张。
 - 绘图页：提示词预设（名字 + 正向 + 反向，独立的模板，不是接口）可以新建副本、改名、删掉；中文画面描述、尺寸 / 步数 / 引导 / 采样器 / 噪声 / 种子，出图后可以「再来一张」。
 - 没配好时不出网，只落一条演示记录并提示去哪填。NovelAI 官方走 `POST {地址}/ai/generate-image`，请求体是 v4 格式（`n_samples:1`、`qualityToggle:true`、`v4_prompt.caption.base_caption`）；自定义接口走 OpenAI 风格 images 接口，返回里读 `b64_json` 或 `url`。
 - 旧存档里曾经借聊天预设出图的那套地址 / Key 会一次性迁到 `settings.image`，不用重填。

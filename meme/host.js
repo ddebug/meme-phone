@@ -144,7 +144,13 @@ export async function novelaiImage({
 
   if (engine === 'custom') {
     if (!base) throw new Error('先填自定义接口的地址');
-    return customImage({ base, token, model, width, height, steps, scale, sampler, seed, prompt, negative });
+    return customImage({ base, token, model, width, height, seed, prompt });
+  }
+
+  if (engine === 'doubao') {
+    if (!base) throw new Error('先填火山方舟的地址');
+    if (!token) throw new Error('先填火山方舟的 ARK API Key');
+    return doubaoImage({ base, token, model, width, height, seed, prompt });
   }
 
   if (!token) throw new Error('先填 NovelAI 的 Key');
@@ -174,15 +180,47 @@ export async function novelaiImage({
   return imageFromResponse(res, 'NovelAI');
 }
 
-/** 自定义接口：OpenAI 风格 images 接口；返回里可能是 b64_json，也可能是 url。 */
-async function customImage({ base, token, model, width, height, steps, scale, sampler, seed, prompt, negative }) {
+/** 豆包 Seedream（火山方舟）：images/generations，字段比 OpenAI 多一个 watermark / 组图开关。 */
+async function doubaoImage({ base, token, model, width, height, seed, prompt }) {
   const payload = {
-    prompt, negative_prompt: negative || '', n: 1,
-    size: `${width}x${height}`, width, height,
-    steps, scale, sampler, seed,
+    model,
+    prompt,
+    size: `${width}x${height}`,
+    response_format: 'b64_json',
+    watermark: false,
+  };
+  /* 4.x 才有组图开关；3.0 不认这个字段 */
+  if (/seedream-4/.test(model || '')) payload.sequential_image_generation = 'disabled';
+  if (Number(seed) > 0) payload.seed = Number(seed);
+
+  let res;
+  try {
+    res = await fetch(base, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    throw new Error(`连不上 ${base}：${error.message}`);
+  }
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    const short = detail ? `：${detail.slice(0, 160)}` : '';
+    throw new Error(`火山方舟返回 ${res.status}${short}`);
+  }
+  return imageFromResponse(res, '豆包');
+}
+
+/** 自定义接口：OpenAI 风格 images 接口；只发最通用的字段，避免严格端点的多余参数报错。 */
+async function customImage({ base, token, model, width, height, seed, prompt }) {
+  const payload = {
+    prompt,
+    size: `${width}x${height}`,
+    n: 1,
     response_format: 'b64_json',
   };
   if (model) payload.model = model;
+  if (Number(seed) > 0) payload.seed = Number(seed);
 
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -193,7 +231,10 @@ async function customImage({ base, token, model, width, height, steps, scale, sa
   } catch (error) {
     throw new Error(`连不上 ${base}：${error.message}`);
   }
-  if (!res.ok) throw new Error(`接口返回 ${res.status}`);
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`接口返回 ${res.status}${detail ? `：${detail.slice(0, 160)}` : ''}`);
+  }
   return imageFromResponse(res, '接口');
 }
 

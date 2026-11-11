@@ -28,8 +28,16 @@ const NAI_MODELS = [
   { value: 'nai-diffusion-3-furry', label: 'V3 兽人' },
 ];
 
+const DOUBAO_MODELS = [
+  { value: 'doubao-seedream-4-5-251128', label: 'Seedream 4.5' },
+  { value: 'doubao-seedream-4-0-250828', label: 'Seedream 4.0' },
+  { value: 'doubao-seedream-3-0-t2i-250415', label: 'Seedream 3.0 文生图' },
+  { value: 'doubao-seededit-3-0-i2i-250628', label: 'SeedEdit 3.0 图生图' },
+];
+
 const ENGINES = [
-  { value: 'novelai', label: 'NovelAI 官方', note: '官方端点，自带 V4 参数与采样器' },
+  { value: 'novelai', label: 'NovelAI 官方', note: '官方端点，Key 以 pst- 开头' },
+  { value: 'doubao', label: '豆包 · 火山方舟', note: 'ark.cn-beijing.volces.com，填 ARK_API_KEY' },
   { value: 'custom', label: '自定义接口', note: 'OpenAI 风格 images 接口，地址 + Key 自己填' },
 ];
 
@@ -70,8 +78,9 @@ function ensure(state) {
   const img = state.settings.image;
   if (!img || typeof img !== 'object') state.settings.image = {};
   const image = state.settings.image;
-  image.engine = image.engine === 'custom' ? 'custom' : 'novelai';
+  image.engine = ['custom', 'doubao'].includes(image.engine) ? image.engine : 'novelai';
   image.novelai = { url: 'https://image.novelai.net', key: '', model: 'nai-diffusion-4-curated-preview', ...(image.novelai || {}) };
+  image.doubao = { url: 'https://ark.cn-beijing.volces.com/api/v3/images/generations', key: '', model: 'doubao-seedream-4-5-251128', ...(image.doubao || {}) };
   image.custom = { url: '', key: '', model: '', path: '/v1/images/generations', ...(image.custom || {}) };
   return state.draw;
 }
@@ -99,22 +108,24 @@ function joinUrl(base, path) {
 /* 绘图接口只读 settings.image，跟聊天那套 API 预设没有关系 */
 export function imageEndpoint(state) {
   const image = state.settings?.image || {};
-  const engine = image.engine === 'custom' ? 'custom' : 'novelai';
-  const cfg = engine === 'novelai' ? (image.novelai || {}) : (image.custom || {});
+  const engine = ['custom', 'doubao'].includes(image.engine) ? image.engine : 'novelai';
+  const cfg = engine === 'novelai'
+    ? (image.novelai || {})
+    : engine === 'doubao' ? (image.doubao || {}) : (image.custom || {});
   const drawCfg = state.draw?.config || {};
   return {
     engine,
-    name: engine === 'novelai' ? 'NovelAI 官方' : '自定义接口',
+    name: engine === 'novelai' ? 'NovelAI 官方' : engine === 'doubao' ? '豆包 · 火山方舟' : '自定义接口',
     url: String(cfg.url || (engine === 'novelai' ? drawCfg.url : '') || '').trim(),
-    path: engine === 'novelai' ? '/ai/generate-image' : String(cfg.path || '/v1/images/generations').trim(),
+    path: engine === 'custom' ? String(cfg.path || '/v1/images/generations').trim() : '',
     key: String(cfg.key || (engine === 'novelai' ? drawCfg.key : '') || '').trim(),
     model: String(cfg.model || (engine === 'novelai' ? drawCfg.model : '') || '').trim(),
   };
 }
 
 function endpointReady(ep) {
-  if (ep.engine === 'novelai') return Boolean(ep.url && ep.key);
-  return Boolean(ep.url);
+  if (ep.engine === 'custom') return Boolean(ep.url);
+  return Boolean(ep.url && ep.key);
 }
 
 export const drawApp = {
@@ -166,14 +177,14 @@ export const drawApp = {
       </div>
       <div class="mp-page-body">
         <div class="mp-title" style="margin-top:0">绘图</div>
-        <div class="mp-subtitle">${ep.engine === 'novelai' ? 'NovelAI 官方 · 中文描述会先翻成 danbooru tag' : '自定义接口 · 中文描述会先翻成 danbooru tag'}</div>
+        <div class="mp-subtitle">${ep.engine === 'novelai' ? 'NovelAI 官方' : ep.engine === 'doubao' ? '豆包 Seedream · 火山方舟' : '自定义接口'} · 中文描述会先翻成 danbooru tag</div>
 
         <div class="mp-draw-state${ready ? ' is-on' : ''}">
           ${icon(ready ? 'spark' : 'help')}
           <span>${ready
             ? `已接「${esc(ep.name)}」${ep.model ? ` · ${esc(ep.model)}` : ''}`
-            : (ep.engine === 'novelai' ? '还没填 NovelAI 的 Key，现在是演示出图' : '还没填自定义接口地址，现在是演示出图')}</span>
-          <button class="mp-draw-state-btn" data-act="${ep.engine === 'novelai' ? 'draw-key' : 'draw-url'}" type="button">${ep.engine === 'novelai' ? '填 Key' : '填地址'}</button>
+            : (ep.engine === 'custom' ? '还没填自定义接口地址，现在是演示出图' : `${esc(ep.name)} 的 Key 还没填，现在是演示出图`)}</span>
+          <button class="mp-draw-state-btn" data-act="draw-key" type="button">填 Key</button>
         </div>
 
         <div class="mp-group-label" style="margin-top:12px">绘图接口 · 跟聊天 API 分开</div>
@@ -181,13 +192,13 @@ export const drawApp = {
           <button class="mp-row" data-act="draw-engine" type="button">
             <span class="mp-row-main">
               <span class="mp-row-name">${esc(ep.name)}</span>
-              <span class="mp-row-sub">${esc(ep.engine === 'novelai' ? '官方端点，只用 Key' : '地址 + Key 自己填')}</span>
+              <span class="mp-row-sub">${esc(ep.engine === 'novelai' ? '官方端点，只用 Key' : ep.engine === 'doubao' ? '火山方舟 images 接口，只用 Key' : '地址 + Key 自己填')}</span>
             </span>${icon('chevron')}
           </button>
           <button class="mp-row" data-act="draw-url" type="button">
             <span class="mp-row-main">
               <span class="mp-row-name">地址</span>
-              <span class="mp-row-sub">${esc(ep.url || (ep.engine === 'novelai' ? 'https://image.novelai.net' : '没填'))}</span>
+              <span class="mp-row-sub">${esc(ep.url || '没填')}</span>
             </span>${icon('chevron')}
           </button>
           <button class="mp-row" data-act="draw-key" type="button">
@@ -252,8 +263,8 @@ export const drawApp = {
     const draw = ensure(ctx.state);
     const cfg = draw.config;
     const image = ctx.state.settings.image;
-    const engine = image.engine === 'custom' ? 'custom' : 'novelai';
-    const target = engine === 'novelai' ? image.novelai : image.custom;
+    const engine = image.engine;
+    const target = engine === 'novelai' ? image.novelai : engine === 'doubao' ? image.doubao : image.custom;
     const preset = draw.presets[draw.presetIdx] || draw.presets[0];
 
     if (act === 'draw-engine') {
@@ -261,10 +272,11 @@ export const drawApp = {
         kind: 'pick', title: '绘图接口',
         items: ENGINES.map(item => ({ value: item.value, label: item.label, note: item.note })),
         onPick: value => {
-          image.engine = value === 'custom' ? 'custom' : 'novelai';
+          image.engine = value;
           ctx.save();
           ctx.rerender();
-          ctx.toast(`绘图接口换成「${image.engine === 'novelai' ? 'NovelAI 官方' : '自定义接口'}」`);
+          const name = ENGINES.find(item => item.value === value)?.label || value;
+          ctx.toast(`绘图接口换成「${name}」`);
         },
       });
       return true;
@@ -272,8 +284,11 @@ export const drawApp = {
 
     if (act === 'draw-url') {
       ctx.openSheet({
-        kind: 'text', title: engine === 'novelai' ? 'NovelAI 地址' : '接口地址',
-        placeholder: engine === 'novelai' ? '默认 https://image.novelai.net' : 'https://你的接口/v1/images/generations',
+        kind: 'text', title: engine === 'novelai' ? 'NovelAI 地址' : engine === 'doubao' ? '火山方舟地址' : '接口地址',
+        placeholder: engine === 'novelai'
+          ? '默认 https://image.novelai.net'
+          : engine === 'doubao' ? 'https://ark.cn-beijing.volces.com/api/v3/images/generations'
+            : 'https://你的接口/v1/images/generations',
         value: String(target.url || ''),
         onText: value => {
           target.url = value.trim();
@@ -286,8 +301,9 @@ export const drawApp = {
 
     if (act === 'draw-key') {
       ctx.openSheet({
-        kind: 'text', title: engine === 'novelai' ? 'NovelAI Key' : '接口 Key',
-        placeholder: engine === 'novelai' ? 'pst- 开头的那串' : '没验证就留空',
+        kind: 'text',
+        title: engine === 'novelai' ? 'NovelAI Key' : engine === 'doubao' ? 'ARK API Key' : '接口 Key',
+        placeholder: engine === 'novelai' ? 'pst- 开头的那串' : engine === 'doubao' ? '火山方舟控制台里的 ARK_API_KEY' : '没验证就留空',
         value: String(target.key || ''),
         onText: value => {
           target.key = value.trim();
@@ -299,10 +315,11 @@ export const drawApp = {
     }
 
     if (act === 'draw-model') {
-      if (engine === 'novelai') {
+      if (engine === 'novelai' || engine === 'doubao') {
+        const list = engine === 'novelai' ? NAI_MODELS : DOUBAO_MODELS;
         ctx.openSheet({
           kind: 'pick', title: '模型',
-          items: NAI_MODELS.map(item => ({ value: item.value, label: item.label })),
+          items: list.map(item => ({ value: item.value, label: item.label })),
           onPick: value => { target.model = value; ctx.save(); ctx.rerender(); },
         });
       } else {
@@ -521,7 +538,8 @@ async function run(ctx, prompt) {
       };
       ctx.toast(ep.engine === 'novelai'
         ? '演示出图：绘图接口填上 NovelAI 的 Key 才会真的画'
-        : '演示出图：绘图接口填上地址才会真的画');
+        : ep.engine === 'doubao' ? '演示出图：填上火山方舟的 ARK API Key 才会真的画'
+          : '演示出图：绘图接口填上地址才会真的画');
     }
     draw.history.unshift(entry);
     draw.history = draw.history.slice(0, 18);

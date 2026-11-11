@@ -26,8 +26,9 @@ export function emptyState() {
       },
       /* 绘图接口跟聊天的 API 预设完全分开：自己一套引擎 / 地址 / Key / 模型 */
       image: {
-        engine: 'novelai',        // novelai 官方 | custom 自定义接口
+        engine: 'novelai',        // novelai 官方 | doubao 火山方舟 | custom 自定义接口
         novelai: { url: 'https://image.novelai.net', key: '', model: 'nai-diffusion-4-curated-preview' },
+        doubao: { url: 'https://ark.cn-beijing.volces.com/api/v3/images/generations', key: '', model: 'doubao-seedream-4-5-251128' },
         custom: { url: '', key: '', model: '', path: '/v1/images/generations' },
       },
     },
@@ -268,6 +269,7 @@ export function demoState() {
   state.settings.image = {
     engine: 'novelai',
     novelai: { url: 'https://image.novelai.net', key: 'pst-demo', model: 'nai-diffusion-4-curated-preview' },
+    doubao: { url: 'https://ark.cn-beijing.volces.com/api/v3/images/generations', key: '', model: 'doubao-seedream-4-5-251128' },
     custom: { url: '', key: '', model: '', path: '/v1/images/generations' },
   };
   state.settings.api.presets = [
@@ -439,6 +441,7 @@ export function normalize(raw) {
     ...base.settings.image,
     ...(raw.settings?.image || {}),
     novelai: { ...base.settings.image.novelai, ...(raw.settings?.image?.novelai || {}) },
+    doubao: { ...base.settings.image.doubao, ...(raw.settings?.image?.doubao || {}) },
     custom: { ...base.settings.image.custom, ...(raw.settings?.image?.custom || {}) },
   };
   /* 一次性迁移：以前绘图是借聊天 API 预设里那套，现在搬进独立的 settings.image */

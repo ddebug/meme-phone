@@ -5,7 +5,7 @@
  */
 
 import { icon } from '../icons.js';
-import { newId, memoryPresetsOf } from '../data.js';
+import { newId, memoryPresetsOf, syncActiveChatScheme } from '../data.js';
 import { esc } from '../shell.js';
 import { MEMORY_MODES, memoryModeLabel, memoryPresetSummary } from '../memory.js';
 
@@ -78,6 +78,7 @@ function openEdit(ctx, preset) {
 
       if (value === 'use') {
         store.activeId = live.id;
+        syncActiveChatScheme(ctx.state);
         ctx.save();
         ctx.rerender();
         ctx.toast(`手机默认记忆改成「${live.name}」`);
@@ -158,6 +159,7 @@ function openEdit(ctx, preset) {
             if (index < 0) return;
             store.presets.splice(index, 1);
             if (store.activeId === live.id) store.activeId = store.presets[0].id;
+            syncActiveChatScheme(ctx.state);
             ctx.save();
             ctx.rerender();
             ctx.toast('这套记忆方案删掉了');

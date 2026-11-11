@@ -5,7 +5,11 @@
 
 import { icon } from '../icons.js';
 import { esc } from '../shell.js';
-import { newId } from '../data.js';
+import {
+  newId, chatSchemesOf, activeChatScheme, applyChatScheme, syncActiveChatScheme,
+  memoryPresetsOf,
+} from '../data.js';
+import { memoryPresetSummary } from '../memory.js';
 
 const ENGINES = [
   { value: 'tavern', label: '酒馆 API', hint: '直接借酒馆自己的模型，不用填地址' },
@@ -90,6 +94,25 @@ function api(state) {
 function presetName(store, id) {
   const item = store.presets.find(preset => preset.id === id);
   return item ? item.name || '未命名' : '没选';
+}
+
+function saveCurrentScheme(ctx, text) {
+  const store = api(ctx.state);
+  const memory = memoryPresetsOf(ctx.state).find(item => item.id === ctx.state.settings.memory?.activeId)
+    || memoryPresetsOf(ctx.state)[0];
+  const name = String(text || '').trim().slice(0, 20)
+    || `${presetName(store, store.activeChat)} · ${memory?.name || '记忆'}`;
+  const scheme = {
+    id: newId('lsch'),
+    name,
+    apiId: store.activeChat,
+    memoryId: memory?.id || '',
+  };
+  store.chatSchemes = chatSchemesOf(ctx.state).concat(scheme);
+  store.chatSchemeId = scheme.id;
+  ctx.save();
+  ctx.rerender();
+  ctx.toast(`整体方案存成「${name}」`);
 }
 
 function presetNote(preset) {
@@ -263,6 +286,14 @@ export const apiListApp = {
 
   render(ctx) {
     const store = api(ctx.state);
+    const schemes = chatSchemesOf(ctx.state);
+    const scheme = activeChatScheme(ctx.state);
+    const memoryList = memoryPresetsOf(ctx.state);
+    const activeMemory = memoryList.find(item => item.id === ctx.state.settings.memory?.activeId) || memoryList[0] || null;
+    const schemeChips = schemes.map((item, index) => `
+      <button class="mp-chip-btn${item.id === scheme?.id ? ' is-on' : ''}" data-act="api-scheme" data-id="${esc(item.id)}" type="button">
+        <span style="font-size:12.5px">${esc(item.name || `方案 ${index + 1}`)}</span>
+      </button>`).join('');
     const rows = store.presets.map(preset => {
       const active = preset.id === store.activeChat ? '聊天' : '';
       const use = active;
@@ -284,21 +315,36 @@ export const apiListApp = {
       <div class="mp-nav">
         <button class="mp-back" data-act="back" type="button">${icon('back')}</button>
         <span style="flex:1"></span>
+        <button class="mp-back" data-act="api-scheme-menu" type="button" title="管理 LLM 整体方案">${icon('settings')}</button>
         <button class="mp-back" data-act="api-new" type="button" title="新建预设">${icon('plus')}</button>
       </div>
       <div class="mp-page-body">
         <div class="mp-title" style="margin-top:0">聊天接口</div>
-        <div class="mp-subtitle">一套预设 = 地址 + Key + 模型；绘图接口在「绘图」页里单独填</div>
+        <div class="mp-subtitle">一套预设 = 地址 + Key + 模型；LLM 整体方案再把 API 和酒馆记忆绑在一起</div>
+
+        <div class="mp-group-label" style="margin-top:12px">LLM 整体方案</div>
+        <div class="mp-draw-chips">
+          ${schemeChips || '<div class="mp-empty" style="padding:4px 2px">还没有整体方案。</div>'}
+          <button class="mp-chip-btn" data-act="api-scheme-new" type="button"><span style="font-size:12.5px">＋ 存一套</span></button>
+        </div>
+        <div class="mp-draw-hint">
+          一套整体方案 = 一条聊天 API + 一套酒馆记忆，切换时两边一起换${scheme ? ` · 当前「${esc(scheme.name || '未命名')}」：${esc(presetName(store, store.activeChat))} / ${esc(activeMemory?.name || '记忆')}` : ''}
+        </div>
 
         <div class="mp-api-cards">
           <button class="mp-api-card" data-act="api-pick-chat" type="button">
-            <span class="mp-api-card-label">${icon('chat')}<span>聊天用</span></span>
+            <span class="mp-api-card-label">${icon('chat')}<span>聊天 API</span></span>
             <span class="mp-api-card-value">${esc(presetName(store, store.activeChat))}</span>
+            <span class="mp-api-card-swap">${icon('refresh')}</span>
+          </button>
+          <button class="mp-api-card" data-act="api-pick-memory" type="button">
+            <span class="mp-api-card-label">${icon('book')}<span>酒馆记忆</span></span>
+            <span class="mp-api-card-value">${esc(activeMemory?.name || '没选')}</span>
             <span class="mp-api-card-swap">${icon('refresh')}</span>
           </button>
         </div>
 
-        <div class="mp-group-label" style="margin-top:16px">全部预设</div>
+        <div class="mp-group-label" style="margin-top:16px">全部 API 预设</div>
         <div class="mp-group">${rows}</div>
 
         <button class="mp-row mp-api-import" data-act="api-import-tavern" type="button">
@@ -339,9 +385,117 @@ export const apiListApp = {
           const target = store.presets.find(preset => preset.id === id);
           if (!target) return;
           store.activeChat = target.id;
+          syncActiveChatScheme(ctx.state);
           ctx.save();
           ctx.rerender();
           ctx.toast(`聊天换成「${target.name || '未命名'}」`);
+        },
+      });
+      return true;
+    }
+
+    if (act === 'api-pick-memory') {
+      const presets = memoryPresetsOf(ctx.state);
+      ctx.openSheet({
+        kind: 'pick',
+        title: '换一套酒馆记忆',
+        note: '换完会绑进当前的 LLM 整体方案',
+        items: presets.map(item => ({
+          value: item.id,
+          label: item.name || '未命名',
+          note: item.id === ctx.state.settings.memory?.activeId ? '正在用 · ' + memoryPresetSummary(item) : memoryPresetSummary(item),
+        })),
+        onPick: id => {
+          const target = presets.find(item => item.id === id);
+          if (!target) return;
+          ctx.state.settings.memory.activeId = target.id;
+          syncActiveChatScheme(ctx.state);
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`酒馆记忆换成「${target.name || '未命名'}」`);
+        },
+      });
+      return true;
+    }
+
+    if (act === 'api-scheme') {
+      const picked = chatSchemesOf(ctx.state).find(item => item.id === String(data.id || ''));
+      if (!picked) return true;
+      applyChatScheme(ctx.state, picked);
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`整体方案换成「${picked.name || '未命名'}」`);
+      return true;
+    }
+
+    if (act === 'api-scheme-new') {
+      const memory = memoryPresetsOf(ctx.state).find(item => item.id === ctx.state.settings.memory?.activeId);
+      ctx.openSheet({
+        kind: 'text', title: '存成一套整体方案',
+        value: `${presetName(store, store.activeChat)} · ${memory?.name || '记忆'}`.slice(0, 20),
+        placeholder: '比如：本地模型 · 最近原文',
+        onText: text => saveCurrentScheme(ctx, text),
+      });
+      return true;
+    }
+
+    if (act === 'api-scheme-menu') {
+      const scheme = activeChatScheme(ctx.state);
+      ctx.openSheet({
+        kind: 'pick',
+        title: `LLM 整体方案 · ${scheme?.name || '未选'}`,
+        items: [
+          { label: '把当前搭配存成新方案', value: 'new', icon: 'plus' },
+          { label: '给当前方案改名', value: 'rename', icon: 'brush' },
+          { label: '复制当前方案', value: 'copy', icon: 'copy' },
+          { label: '删除当前方案', value: 'del', icon: 'trash', danger: true },
+        ],
+        onPick: value => {
+          if (value === 'new') {
+            const memory = memoryPresetsOf(ctx.state).find(item => item.id === ctx.state.settings.memory?.activeId);
+            ctx.openSheet({
+              kind: 'text', title: '存成一套整体方案',
+              value: `${presetName(store, store.activeChat)} · ${memory?.name || '记忆'}`.slice(0, 20),
+              onText: text => saveCurrentScheme(ctx, text),
+            });
+            return;
+          }
+          if (!scheme) { ctx.toast('先选一套整体方案'); return; }
+          if (value === 'rename') {
+            ctx.openSheet({
+              kind: 'text', title: '整体方案名字', value: scheme.name || '',
+              onText: text => {
+                scheme.name = String(text || '').trim().slice(0, 20) || scheme.name;
+                ctx.save();
+                ctx.rerender();
+              },
+            });
+            return;
+          }
+          if (value === 'copy') {
+            const copy = {
+              id: newId('lsch'), name: `${scheme.name || '方案'} 副本`.slice(0, 20),
+              apiId: scheme.apiId, memoryId: scheme.memoryId,
+            };
+            store.chatSchemes = chatSchemesOf(ctx.state).concat(copy);
+            store.chatSchemeId = copy.id;
+            ctx.save();
+            ctx.rerender();
+            ctx.toast(`复制成「${copy.name}」`);
+            return;
+          }
+          if (value === 'del') {
+            if (chatSchemesOf(ctx.state).length <= 1) {
+              ctx.toast('至少留一套整体方案');
+              return;
+            }
+            store.chatSchemes = chatSchemesOf(ctx.state).filter(item => item.id !== scheme.id);
+            const next = store.chatSchemes[0];
+            if (next) applyChatScheme(ctx.state, next);
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('这套整体方案删掉了');
+          }
         },
       });
       return true;
@@ -568,6 +722,7 @@ export const apiPresetApp = {
 
     if (act === 'api-use-chat') {
       store.activeChat = preset.id;
+      syncActiveChatScheme(ctx.state);
       ctx.save();
       ctx.rerender();
       ctx.toast(`聊天换成「${preset.name || '未命名'}」`);
@@ -585,6 +740,7 @@ export const apiPresetApp = {
       }
       store.presets = store.presets.filter(item => item.id !== preset.id);
       if (store.activeChat === preset.id) store.activeChat = store.presets[0].id;
+      syncActiveChatScheme(ctx.state);
       editingId = '';
       ctx.save();
       ctx.back();

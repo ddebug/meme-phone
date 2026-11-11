@@ -60,6 +60,7 @@ const DESKTOP_APPS = [
   { id: 'draw', name: '绘图', icon: 'image' },
   { id: 'plans', name: '计划', icon: 'plan' },
   { id: 'dress', name: '装扮', icon: 'brush' },
+  { id: 'memory-presets', name: '记忆', icon: 'book' },
   { id: 'api', name: '接口', icon: 'code' },
   { id: 'characters', name: '查角色', icon: 'contacts' },
 ];

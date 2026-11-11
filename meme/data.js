@@ -33,6 +33,11 @@ export function emptyState() {
         activeChat: '', activeImage: '', presets: [
           { id: 'api_default', name: '酒馆 API', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
         ],
+        /* LLM 整体方案 = 一套聊天 API + 一套酒馆记忆 */
+        chatSchemes: [
+          { id: 'lsch_default', name: '默认', apiId: 'api_default', memoryId: 'mem_auto' },
+        ],
+        chatSchemeId: 'lsch_default',
       },
       /* 绘图接口跟聊天的 API 预设完全分开：自己一套引擎 / 地址 / Key / 模型 */
       image: {
@@ -180,6 +185,40 @@ export function memoryPresetFor(state, chat) {
   return list.find(preset => preset.id === state?.settings?.memory?.activeId) || list[0] || null;
 }
 
+/** 手机里保存的 LLM 整体方案：一套聊天 API + 一套酒馆记忆绑在一起。 */
+export function chatSchemesOf(state) {
+  const store = state?.settings?.api;
+  return Array.isArray(store?.chatSchemes) ? store.chatSchemes : [];
+}
+
+export function activeChatScheme(state) {
+  const store = state?.settings?.api;
+  const list = chatSchemesOf(state);
+  return list.find(item => item.id === store?.chatSchemeId) || list[0] || null;
+}
+
+/** 切一套整体方案：API 和记忆一起换。 */
+export function applyChatScheme(state, scheme) {
+  if (!scheme) return false;
+  const store = state.settings.api;
+  if (apiPresetsOf(state).some(item => item.id === scheme.apiId)) store.activeChat = scheme.apiId;
+  if (memoryPresetsOf(state).some(item => item.id === scheme.memoryId)) state.settings.memory.activeId = scheme.memoryId;
+  store.chatSchemeId = scheme.id;
+  return true;
+}
+
+/** 单独换了 API 或记忆后，把当前整体方案的两个绑定同步过去。 */
+export function syncActiveChatScheme(state) {
+  const scheme = activeChatScheme(state);
+  if (!scheme) return;
+  if (apiPresetsOf(state).some(item => item.id === state.settings.api.activeChat)) {
+    scheme.apiId = state.settings.api.activeChat;
+  }
+  if (memoryPresetsOf(state).some(item => item.id === state.settings.memory.activeId)) {
+    scheme.memoryId = state.settings.memory.activeId;
+  }
+}
+
 export function lastMessage(chat) {
   const list = chat?.messages || [];
   for (let index = list.length - 1; index >= 0; index -= 1) {
@@ -310,6 +349,11 @@ export function demoState() {
     { id: 'api_default', name: '酒馆 API', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
     { id: 'api_local', name: '本地 OpenAI', engine: 'openai', url: 'http://127.0.0.1:8080', path: '/v1/chat/completions', model: 'gpt-4o-mini', key: 'sk-demo', temp: 0.9 },
   ];
+  state.settings.api.chatSchemes = [
+    { id: 'lsch_auto', name: '默认 · 自动记忆', apiId: 'api_default', memoryId: 'mem_auto' },
+    { id: 'lsch_local', name: '本地 · 最近原文', apiId: 'api_local', memoryId: 'mem_recent' },
+  ];
+  state.settings.api.chatSchemeId = 'lsch_auto';
   state.draw.lastPrompt = '沈砚坐在便利店门口的台阶上，夜里，侧脸，路灯下点了一支烟';
   state.draw.presets = [
     { id: 'dp_default', name: '默认', pos: '', neg: '' },
@@ -592,6 +636,42 @@ export function normalize(raw) {
   merged.settings.api.presets = Array.isArray(merged.settings.api.presets) && merged.settings.api.presets.length
     ? merged.settings.api.presets
     : base.settings.api.presets;
+
+  /* LLM 整体方案：旧存档没有就按当前 API + 当前记忆补一套默认方案 */
+  const apiIds = new Set(merged.settings.api.presets.map(item => item.id));
+  const memoryIds = new Set(merged.settings.memory.presets.map(item => item.id));
+  const fallbackApiId = apiIds.has(merged.settings.api.activeChat)
+    ? merged.settings.api.activeChat
+    : merged.settings.api.presets[0].id;
+  const fallbackMemoryId = memoryIds.has(merged.settings.memory.activeId)
+    ? merged.settings.memory.activeId
+    : merged.settings.memory.presets[0].id;
+  const rawSchemes = Array.isArray(raw.settings?.api?.chatSchemes) ? raw.settings.api.chatSchemes : [];
+  const seenSchemeIds = new Set();
+  const chatSchemes = [];
+  rawSchemes.forEach((item, index) => {
+    if (!item || typeof item !== 'object') return;
+    let id = String(item.id || `lsch_${index + 1}`);
+    if (seenSchemeIds.has(id)) id = `lsch_${index + 1}_${seenSchemeIds.size}`;
+    seenSchemeIds.add(id);
+    chatSchemes.push({
+      id,
+      name: String(item.name || `方案 ${index + 1}`).trim().slice(0, 20) || `方案 ${index + 1}`,
+      apiId: apiIds.has(item.apiId) ? item.apiId : fallbackApiId,
+      memoryId: memoryIds.has(item.memoryId) ? item.memoryId : fallbackMemoryId,
+    });
+  });
+  if (!chatSchemes.length) {
+    chatSchemes.push({
+      id: 'lsch_default', name: '默认', apiId: fallbackApiId, memoryId: fallbackMemoryId,
+    });
+  }
+  const wantedScheme = String(merged.settings.api.chatSchemeId || '');
+  const chatScheme = chatSchemes.find(item => item.id === wantedScheme) || chatSchemes[0];
+  merged.settings.api.chatSchemes = chatSchemes;
+  merged.settings.api.chatSchemeId = chatScheme.id;
+  merged.settings.api.activeChat = chatScheme.apiId;
+  merged.settings.memory.activeId = chatScheme.memoryId;
   merged.version = SCHEMA_VERSION;
   merged.contacts = merged.contacts || {};
   merged.chats = merged.chats || {};

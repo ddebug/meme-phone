@@ -162,7 +162,7 @@ export async function setWorldEntryEnabled(bookName, uid, disabled) {
 /** 当前打开的酒馆聊天，用来给日记、主动消息提供素材。 */
 export async function readTavernContext() {
   const script = await loadHostScript();
-  if (!script) return { userName: '我', chat: [], characterName: '' };
+  if (!script) return { userName: '我', chat: [], characterName: '', characterAvatar: '', chatFile: '' };
   try {
     const userName = script.name1 || script.getContext?.()?.name1 || '我';
     const chat = Array.isArray(script.chat) ? script.chat.map(line => ({
@@ -172,15 +172,133 @@ export async function readTavernContext() {
       at: line.send_date || '',
     })) : [];
     const character = script.characters?.[script.this_chid];
-    return { userName, chat, characterName: character?.name || '' };
+    return {
+      userName,
+      chat,
+      characterName: character?.name || '',
+      characterAvatar: character?.avatar || '',
+      chatFile: character?.chat || '',
+    };
   } catch {
-    return { userName: '我', chat: [], characterName: '' };
+    return { userName: '我', chat: [], characterName: '', characterAvatar: '', chatFile: '' };
   }
+}
+
+async function hostRequestHeaders(script) {
+  const ctx = globalThis.SillyTavern?.getContext?.() || script?.getContext?.() || {};
+  const getHeaders = ctx.getRequestHeaders || script?.getRequestHeaders;
+  const headers = typeof getHeaders === 'function' ? { ...getHeaders() } : {};
+  if (!headers['X-CSRF-Token']) {
+    const token = ctx.csrf_token || globalThis.csrf_token || '';
+    if (token) headers['X-CSRF-Token'] = token;
+  }
+  headers['Content-Type'] = 'application/json';
+  return headers;
+}
+
+function latestScore(item) {
+  const raw = item?.last_mes ?? item?.lastMes ?? item?.mtime ?? item?.last_modified ?? item?.file_name ?? '';
+  if (typeof raw === 'number') return raw > 1e12 ? raw : raw * 1000;
+  const text = String(raw);
+  const time = Date.parse(text);
+  if (Number.isFinite(time)) return time;
+  const match = text.match(/(\d{4})-(\d{2})-(\d{2})[^\d](\d{2})[^\d](\d{2})(?:[^\d](\d{2}))?/);
+  if (match) {
+    return Date.UTC(
+      Number(match[1]), Number(match[2]) - 1, Number(match[3]),
+      Number(match[4]), Number(match[5]), Number(match[6] || 0),
+    );
+  }
+  return 0;
+}
+
+/**
+ * 这个角色在酒馆里关联的最新聊天。
+ * 先问酒馆的聊天文件列表，挑最近一条；列表读不到就退回角色卡上的当前聊天文件。
+ */
+export async function readLatestTavernChat({ name = '', avatar = '', floors = 10 } = {}) {
+  const script = await loadHostScript();
+  const empty = { available: false, file: '', characterName: name, lines: [], total: 0 };
+  if (!script || !Array.isArray(script.characters)) return empty;
+  const character = script.characters.find(item => item && avatar && item.avatar === avatar)
+    || script.characters.find(item => item && item.name === name);
+  if (!character) return empty;
+
+  const headers = await hostRequestHeaders(script);
+  let file = String(character.chat || '').trim();
+  let latestMeta = null;
+
+  try {
+    const response = await fetch('/api/characters/chats', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ avatar_url: character.avatar || character.name }),
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    if (response.ok) {
+      const data = await response.json().catch(() => null);
+      const list = Array.isArray(data) ? data : Object.values(data && typeof data === 'object' ? data : {});
+      const sorted = list
+        .filter(item => item && typeof item === 'object' && (item.file_name || item.fileName))
+        .map(item => ({ ...item, file_name: item.file_name || item.fileName }))
+        .sort((a, b) => latestScore(b) - latestScore(a));
+      if (sorted.length) {
+        file = sorted[0].file_name;
+        latestMeta = sorted[0];
+      }
+    }
+  } catch { /* 列表接口不可用就继续用角色卡上的 chat */ }
+
+  let raw = [];
+  if (file) {
+    try {
+      const response = await fetch('/api/chats/get', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          ch_name: character.name,
+          file_name: String(file).replace(/\.jsonl$/i, ''),
+          avatar_url: character.avatar || character.name,
+        }),
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      if (response.ok) {
+        const data = await response.json().catch(() => null);
+        raw = Array.isArray(data) ? data : (Array.isArray(data?.messages) ? data.messages : []);
+      }
+    } catch { raw = []; }
+  }
+
+  if (!raw.length && script.characters?.[script.this_chid]?.avatar === character.avatar && Array.isArray(script.chat)) {
+    raw = script.chat;
+    file = file || String(character.chat || '当前聊天');
+  }
+
+  const lines = raw
+    .filter(line => line && !line.is_system && typeof line.mes === 'string' && line.mes.trim())
+    .map(line => ({
+      isUser: Boolean(line.is_user),
+      name: line.name || (line.is_user ? (script.name1 || '你') : character.name),
+      text: line.mes.trim(),
+    }))
+    .slice(-Math.max(1, Math.min(50, Number(floors) || 10)));
+
+  return {
+    available: Boolean(lines.length),
+    file: file || '',
+    characterName: character.name,
+    lines,
+    total: raw.length,
+    meta: latestMeta,
+  };
 }
 
 export async function readUserAvatar() {
   try {
     const script = await loadHostScript();
+
     if (script?.user_avatar && typeof script.getThumbnailUrl === 'function') {
       return script.getThumbnailUrl('persona', script.user_avatar);
     }

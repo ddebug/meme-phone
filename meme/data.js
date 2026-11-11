@@ -20,8 +20,15 @@ export function emptyState() {
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
       chat: { showTime: true, enterToSend: false, remind: true, wake: true },
-      /* 酒馆总结（柏宝书）：首楼默认是要总结的，关掉后那一楼直接显示原文 */
-      summary: { skipFirstFloor: false, apiId: '' },
+      /* 酒馆记忆方案：默认有柏宝书总结就用总结，没有就取最近 10 层酒馆聊天 */
+      memory: {
+        activeId: 'mem_auto',
+        presets: [
+          { id: 'mem_auto', name: '默认', mode: 'auto', floors: 10 },
+          { id: 'mem_summary', name: '只看总结', mode: 'summary', floors: 10 },
+          { id: 'mem_recent', name: '最近原文', mode: 'recent', floors: 20 },
+        ],
+      },
       api: {
         activeChat: '', activeImage: '', presets: [
           { id: 'api_default', name: '酒馆 API', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
@@ -125,6 +132,7 @@ export function addChat(state, contactId, options = {}) {
     pinned: false,
     muted: false,
     llmPresetId: '',
+    memoryPresetId: '',
     updatedAt: Date.now(),
   };
   return state.chats[id];
@@ -156,6 +164,20 @@ export function llmPresetFor(state, chat) {
   const own = list.find(preset => preset.id === chat?.llmPresetId);
   if (own) return own;
   return list.find(preset => preset.id === state?.settings?.api?.activeChat) || list[0] || null;
+}
+
+/** 手机里保存的酒馆记忆方案。 */
+export function memoryPresetsOf(state) {
+  const store = state?.settings?.memory;
+  return Array.isArray(store?.presets) ? store.presets : [];
+}
+
+/** 这个会话实际用哪套记忆：自己选了就用自己那套，没选就跟随手机。 */
+export function memoryPresetFor(state, chat) {
+  const list = memoryPresetsOf(state);
+  const own = list.find(preset => preset.id === chat?.memoryPresetId);
+  if (own) return own;
+  return list.find(preset => preset.id === state?.settings?.memory?.activeId) || list[0] || null;
 }
 
 export function lastMessage(chat) {
@@ -510,7 +532,25 @@ export function normalize(raw) {
   }
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
-  merged.settings.summary = { ...base.settings.summary, ...(raw.settings?.summary || {}) };
+  delete merged.settings.summary;
+  const memoryRaw = raw.settings?.memory;
+  const memoryList = Array.isArray(memoryRaw?.presets) ? memoryRaw.presets : [];
+  const memoryPresets = memoryList
+    .filter(item => item && typeof item === 'object' && String(item.name || '').trim())
+    .map((item, index) => ({
+      id: String(item.id || `mem_${index + 1}`),
+      name: String(item.name).trim().slice(0, 20),
+      mode: ['auto', 'summary', 'recent'].includes(item.mode) ? item.mode : 'auto',
+      floors: Math.max(1, Math.min(50, Number(item.floors) || 10)),
+    }));
+  merged.settings.memory = {
+    ...base.settings.memory,
+    ...(memoryRaw && typeof memoryRaw === 'object' ? memoryRaw : {}),
+    presets: memoryPresets.length ? memoryPresets : base.settings.memory.presets,
+  };
+  if (!merged.settings.memory.presets.some(item => item.id === merged.settings.memory.activeId)) {
+    merged.settings.memory.activeId = merged.settings.memory.presets[0].id;
+  }
   merged.settings.customWall = typeof raw.settings?.customWall === 'string' ? raw.settings.customWall : '';
   if (merged.settings.wallpaper === 'custom' && !merged.settings.customWall) merged.settings.wallpaper = 'day';
   merged.settings.image = {

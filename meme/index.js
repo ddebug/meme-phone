@@ -8,7 +8,7 @@ import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPrese
 import { createShell, applyWall } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
-import { summaryContext } from './book.js';
+import { buildMemoryContext } from './memory.js';
 import { diaryApp, threadDiaryApp } from './apps/diary.js';
 import { contactsApp, contactApp } from './apps/contacts.js';
 import { settingsApp, appearanceApp } from './apps/settings.js';
@@ -17,8 +17,8 @@ import { apiListApp, apiPresetApp } from './apps/api.js';
 import { userListApp, userEditApp } from './apps/user.js';
 import { charactersApp, characterApp } from './apps/characters.js';
 import { charPhoneApp, charPhoneThreadApp, ensureLookup } from './apps/charphone.js';
-import { bookApp, bookSettingsApp } from './apps/book.js';
 import { musicApp, musicPlaylistApp, stopMusic } from './apps/music.js';
+import { memoryPresetsApp } from './apps/memory.js';
 import {
   extrasApp, extraDetailApp, emojiApp,
   plansApp, dressApp, helpApp,
@@ -45,8 +45,7 @@ const APPS = {
   'character-card': characterApp,
   'p-charphone': charPhoneApp,
   'p-chatphone': charPhoneThreadApp,
-  'app-book': bookApp,
-  'book-settings': bookSettingsApp,
+  'memory-presets': memoryPresetsApp,
   'app-music': musicApp,
   'music-playlist': musicPlaylistApp,
   thread: threadApp,
@@ -62,7 +61,6 @@ const DESKTOP_APPS = [
   { id: 'plans', name: '计划', icon: 'plan' },
   { id: 'dress', name: '装扮', icon: 'brush' },
   { id: 'api', name: '接口', icon: 'code' },
-  { id: 'book', name: '酒馆总结', icon: 'book' },
   { id: 'characters', name: '查角色', icon: 'contacts' },
 ];
 
@@ -91,18 +89,18 @@ function transcript(state, chat, limit = 10) {
 }
 
 function makeAi(state) {
-  /* 手机聊天 / 日记的背景只用「酒馆总结」，不再读酒馆原文 */
-  function story(limit = 1200) {
-    return summaryContext(limit, { skipFirstFloor: state.settings.summary?.skipFirstFloor });
+  /* 手机聊天 / 日记的背景走「酒馆记忆」：有柏宝书总结先用总结，没有就读最近几层酒馆聊天 */
+  function story(chat, limit = 1200) {
+    return buildMemoryContext(state, chat, limit);
   }
 
   return {
     async reply(context, chat, contact, demoReply) {
-      const storyBlock = story(1200);
+      const storyBlock = await story(chat, 1200);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`,
         '要求：口语、短、不超过 40 字，不要旁白、不要括号动作。',
-        storyBlock.text ? `【酒馆里已有的总结】\n${storyBlock.text}` : '',
+        storyBlock.text ? `【酒馆记忆】\n${storyBlock.text}` : '',
         transcript(state, chat),
         `${state.settings.user.name}：${chat.messages[chat.messages.length - 1]?.text || ''}`,
         `${contact?.name || '对方'}：`,
@@ -112,12 +110,12 @@ function makeAi(state) {
     },
 
     async proactive(context, chat, contact, demoReply) {
-      const storyBlock = story(900);
+      const storyBlock = await story(chat, 900);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。`,
         `距离上次说话已经过去 ${state.settings.proactive.idleMinutes} 分钟，你要主动发一条消息。`,
         '要求：口语、短、不超过 30 字，像是忽然想起什么，不要提问过多。',
-        storyBlock.text ? `【酒馆里已有的总结】\n${storyBlock.text}` : '',
+        storyBlock.text ? `【酒馆记忆】\n${storyBlock.text}` : '',
         transcript(state, chat, 6),
         `${contact?.name || '对方'}：`,
       ].filter(Boolean).join('\n');
@@ -204,11 +202,11 @@ function makeAi(state) {
         const chats = Object.values(state.chats);
         material = chats.map(item => transcript(state, item, 10)).join('\n');
       }
-      const storyBlock = story(900);
+      const storyBlock = await story(chat, 900);
       const prompt = [
         state.diary.prompt || '写一段当天的日记。',
         `日期：${day}`,
-        storyBlock.text ? `酒馆里的总结：\n${storyBlock.text}` : '',
+        storyBlock.text ? `酒馆记忆：\n${storyBlock.text}` : '',
         '当天的聊天：',
         material || '（这一天没有聊天记录）',
         '写成一段自然的中文日记，不要分点，不要写标题。',
@@ -502,7 +500,6 @@ export function goView(view, params = {}) {
     if (first) payload = { contactId: first.id };
   }
   if (view === 'p-charphone' && params.tab) ctx.shell.cpTab = params.tab;
-  if (view === 'app-book' && params.tab) ctx.shell.bookTab = params.tab;
   if (view === 'p-chatphone' && (!payload.contactId || !payload.peer)) {
     const first = Object.values(ctx.state.contacts || {}).find(item => item.kind !== 'group');
     const lookup = first ? ensureLookup(ctx.state, first) : null;

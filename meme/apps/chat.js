@@ -6,8 +6,9 @@
 import { icon } from '../icons.js';
 import {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
-  apiPresetsOf,
+  apiPresetsOf, memoryPresetsOf, memoryPresetFor,
 } from '../data.js';
+import { memoryPresetSummary } from '../memory.js';
 import { avatarHtml, esc, shortText, timeText } from '../shell.js';
 
 const REPLY_POOL = {
@@ -98,6 +99,12 @@ function settingsBody(ctx, chatId) {
   const llmSub = ownPreset
     ? `只对这个会话 · ${ownPreset.name || '未命名方案'}`
     : `跟随手机 · ${globalPreset?.name || '酒馆 API'}`;
+  const memoryPresets = memoryPresetsOf(state);
+  const ownMemory = memoryPresets.find(item => item.id === chat.memoryPresetId) || null;
+  const globalMemory = memoryPresetFor(state, null);
+  const memorySub = ownMemory
+    ? `只对这个会话 · ${memoryPresetSummary(ownMemory)}`
+    : `跟随手机 · ${memoryPresetSummary(globalMemory)}`;
 
   return `
     <div class="mp-page-body">
@@ -128,6 +135,16 @@ function settingsBody(ctx, chatId) {
           ${chatSetRow(chat.id, {
             iconName: 'spark', title: '这个聊天的 LLM',
             sub: llmSub, act: 'ts-llm', value: ownPreset ? '单独' : '跟随',
+          })}
+        </div>
+      </div>
+
+      <div class="mp-group">
+        <div class="mp-group-label">上下文</div>
+        <div class="mp-group-box">
+          ${chatSetRow(chat.id, {
+            iconName: 'book', title: '酒馆记忆',
+            sub: memorySub, act: 'ts-memory', value: ownMemory ? '单独' : '跟随',
           })}
         </div>
       </div>
@@ -488,6 +505,43 @@ export const threadSettingsApp = {
           ctx.save();
           ctx.rerender();
           ctx.toast(`这个会话改用「${preset.name || '未命名方案'}」`);
+        },
+      });
+      return true;
+    }
+
+    if (act === 'ts-memory') {
+      const presets = memoryPresetsOf(ctx.state);
+      const globalPreset = memoryPresetFor(ctx.state, null);
+      ctx.openSheet({
+        title: '酒馆记忆',
+        items: [
+          { label: '跟随手机', value: 'follow', note: `现在用「${globalPreset?.name || '默认'}」` },
+          ...presets.map(item => ({
+            label: item.name,
+            value: item.id,
+            note: memoryPresetSummary(item),
+          })),
+          { label: '管理记忆方案', value: 'manage', note: '新建、改名、改层数' },
+        ],
+        onPick: (value) => {
+          if (value === 'follow') {
+            chat.memoryPresetId = '';
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('已跟随手机的酒馆记忆');
+            return;
+          }
+          if (value === 'manage') {
+            ctx.go('memory-presets');
+            return;
+          }
+          const preset = presets.find(item => item.id === value);
+          if (!preset) return;
+          chat.memoryPresetId = preset.id;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`这个会话改用「${preset.name}」`);
         },
       });
       return true;

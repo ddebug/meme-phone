@@ -1,8 +1,7 @@
 /**
- * meme-phone · 酒馆总结（原柏宝书）
+ * meme-phone · 柏宝书总结读取
  *
- * 把柏宝书的只读接口收成一层：手机里的「酒馆总结」页、聊天和日记都用这里的口径。
- * 关键口径：聊天背景用「所有酒馆总结」，不读酒馆原文；首楼可以被设置成不总结、直接显示原文。
+ * 只保留读接口：聊天 / 日记的记忆注入从这里拿总结，不再有独立的「酒馆总结」页面。
  */
 
 const DEMO_FIRST = '1988 年 9 月 28 日 傍晚，雨刚停。你拖着最后一箱书上到六楼，302 室的门半开着，屋里只有一盏没罩子的灯泡。';
@@ -17,58 +16,6 @@ export function bookApi() {
   } catch (error) {
     return null;
   }
-}
-
-/** 手机「接口」里能拿来当总结接口的预设（酒馆 API 那条没有地址，跳过）。 */
-export function summaryApiPresets(state) {
-  const list = state?.settings?.api?.presets || [];
-  return list.filter(preset => preset && preset.url && preset.engine !== 'tavern');
-}
-
-/**
- * 把手机的一套预设交给酒馆总结当副 API。
- * 桥由 baibai-book/dist 暴露；没装/没加载时返回 false，调用方提示即可。
- */
-export function applySummaryApi(preset) {
-  if (!preset) return false;
-  try {
-    const bridge = globalThis.__STBaiBaiBookPhoneApi;
-    if (!bridge || typeof bridge.useChannel !== 'function') return false;
-    return Boolean(bridge.useChannel({
-      id: preset.id,
-      name: preset.name || '手机接口',
-      url: preset.url,
-      key: preset.key || '',
-      model: preset.model || '',
-      temperature: typeof preset.temp === 'number' ? preset.temp : 0.8,
-    }));
-  } catch (error) {
-    return false;
-  }
-}
-
-export function clearSummaryApi() {
-  try {
-    const bridge = globalThis.__STBaiBaiBookPhoneApi;
-    if (bridge && typeof bridge.reset === 'function') {
-      bridge.reset();
-      return true;
-    }
-  } catch (error) { /* 没桥就当已经跟随自带 */ }
-  return false;
-}
-
-/** 补摘要：补当前聊天里还没摘的 AI 楼。没桥或没待补时返回 done=0。 */
-export async function backfillSummaries() {
-  try {
-    const bridge = globalThis.__STBaiBaiBookPhoneApi;
-    if (bridge && typeof bridge.backfill === 'function') {
-      return await bridge.backfill();
-    }
-  } catch (error) {
-    return { done: 0, total: 0, cancelled: false, error: String(error?.message || error) };
-  }
-  return { done: 0, total: 0, cancelled: false };
 }
 
 function isFirstFloor(node) {
@@ -124,12 +71,4 @@ export function summaryText(options = {}) {
     parts.push(label ? `【${label}】\n${node.text}` : node.text);
   });
   return { ...data, text: parts.join('\n\n') };
-}
-
-/** 聊天 / 日记用的截断版本，别把整本总结全塞进 prompt。 */
-export function summaryContext(limit = 1800, options = {}) {
-  const data = summaryText(options);
-  let text = data.text || '';
-  if (text.length > limit) text = `${text.slice(0, limit)}\n…（后面还有 ${data.nodes.length} 条总结）`;
-  return { ...data, text };
 }

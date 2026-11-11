@@ -1131,6 +1131,20 @@ body {
   margin-bottom: 10px;
 }
 
+.mp-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.mp-card-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text-3);
+}
+
 .mp-btn {
   display: inline-flex;
   align-items: center;
@@ -2928,379 +2942,6 @@ body {
   background: rgba(38, 33, 58, .62);
 }
 
-/* ============================================================================
-   本段：酒馆总结（app-book）
-   ============================================================================ */
-
-.mp-bk .mp-bk-tabs {
-  display: flex;
-  gap: 8px;
-  margin: 12px 0 2px;
-  padding-bottom: 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.mp-bk .mp-bk-tabs::-webkit-scrollbar { display: none; }
-
-.mp-bk .mp-bk-tab {
-  flex: 0 0 auto;
-  border: 0;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: var(--card);
-  color: var(--text-2);
-  font-size: 13px;
-  font-family: var(--font-ui);
-  box-shadow: var(--shadow-s);
-  cursor: pointer;
-  transition: background .18s ease, color .18s ease, transform .18s ease;
-}
-.mp-bk .mp-bk-tab.is-on {
-  background: linear-gradient(135deg, var(--accent), #b9a9ff);
-  color: #fff;
-  box-shadow: 0 8px 18px rgba(142, 123, 242, .28);
-}
-.mp-bk .mp-bk-tab:active { transform: scale(.96); }
-
-/* 主界面常显的两条入口：总结接口 / 补摘要 */
-.mp-bk-bar {
-  display: flex;
-  gap: 8px;
-  margin: 10px 0 0;
-}
-
-.mp-bk .mp-bk-bar-btn {
-  flex: 1 1 0;
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 38px;
-  padding: 0 11px;
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, .66);
-  color: var(--text-2);
-  font-family: var(--font-ui);
-  font-size: 12.5px;
-  cursor: pointer;
-  text-align: left;
-}
-
-.mp-bk .mp-bk-bar-btn span {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mp-bk .mp-bk-bar-btn .mp-i { width: 15px; height: 15px; flex: 0 0 auto; }
-.mp-bk .mp-bk-bar-btn:active { transform: scale(.98); }
-.mp-bk .mp-bk-bar-btn.is-warn {
-  border-color: rgba(214, 158, 92, .45);
-  background: rgba(255, 247, 233, .78);
-  color: #a2743a;
-}
-
-.mp-bk-body { display: flex; flex-direction: column; gap: 14px; padding-bottom: 20px; }
-
-.mp-bk .mp-bk-hero {
-  padding: 16px 18px;
-  border-radius: var(--r-l);
-  background: var(--card);
-  box-shadow: var(--shadow-s);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.mp-bk .mp-bk-hero-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.mp-bk .mp-bk-hero-time,
-.mp-bk .mp-bk-hero-place {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-2);
-}
-.mp-bk .mp-bk-hero-time span { color: var(--text); font-weight: 600; }
-.mp-bk .mp-bk-hero-time .mp-i,
-.mp-bk .mp-bk-hero-place .mp-i { width: 15px; height: 15px; color: var(--accent); }
-.mp-bk .mp-bk-hero-focus {
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--text-2);
-  padding-top: 8px;
-  border-top: 1px dashed var(--line);
-}
-
-.mp-bk .mp-bk-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-}
-.mp-bk .mp-bk-stat {
-  padding: 12px 6px 10px;
-  border-radius: var(--r-m);
-  background: var(--card);
-  box-shadow: var(--shadow-s);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-.mp-bk .mp-bk-stat b { font-family: var(--font-serif); font-size: 20px; line-height: 1.1; color: var(--text); }
-.mp-bk .mp-bk-stat span { font-size: 11px; color: var(--text-3); }
-
-.mp-bk .mp-bk-section {
-  padding: 14px 16px 4px;
-  border-radius: var(--r-l);
-  background: var(--card);
-  box-shadow: var(--shadow-s);
-}
-.mp-bk .mp-bk-section-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: 12px;
-  letter-spacing: .08em;
-  color: var(--text-3);
-}
-.mp-bk .mp-bk-section-head span:first-child { flex: 1; }
-.mp-bk .mp-bk-count { color: var(--text-3); }
-
-.mp-bk .mp-bk-kv {
-  display: flex;
-  gap: 12px;
-  padding: 8px 0;
-  border-top: 1px solid var(--line-soft);
-  font-size: 12.5px;
-  line-height: 1.6;
-}
-.mp-bk .mp-bk-kv span { flex: 0 0 64px; color: var(--text-3); }
-.mp-bk .mp-bk-kv b { flex: 1; min-width: 0; font-weight: 500; color: var(--text); }
-
-.mp-bk .mp-bk-para {
-  margin: 0 0 10px;
-  font-size: 13px;
-  line-height: 1.75;
-  color: var(--text);
-}
-.mp-bk .mp-bk-para:last-child { margin-bottom: 8px; }
-
-.mp-bk .mp-bk-node {
-  border-top: 1px solid var(--line-soft);
-}
-.mp-bk .mp-bk-node-head {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 0;
-  border: 0;
-  background: none;
-  text-align: left;
-  font-family: var(--font-ui);
-  cursor: pointer;
-  color: var(--text);
-}
-.mp-bk .mp-bk-node-level {
-  flex: 0 0 auto;
-  min-width: 26px;
-  text-align: center;
-  padding: 2px 6px;
-  border-radius: 8px;
-  font-size: 10.5px;
-  color: var(--accent-deep);
-  background: rgba(142, 123, 242, .12);
-}
-.mp-bk .mp-bk-node-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.mp-bk .mp-bk-node-title { font-size: 13px; font-weight: 600; }
-.mp-bk .mp-bk-node-sub { font-size: 11.5px; color: var(--text-3); }
-.mp-bk .mp-bk-node-preview {
-  margin-top: 2px;
-  font-size: 11.5px;
-  line-height: 1.55;
-  color: var(--text-4);
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.mp-bk .mp-bk-node-head .mp-i { width: 16px; height: 16px; color: var(--text-4); transition: transform .2s ease; }
-.mp-bk .mp-bk-node.is-open .mp-bk-node-head .mp-i { transform: rotate(180deg); }
-.mp-bk .mp-bk-node-text {
-  padding: 0 4px 12px 36px;
-  font-size: 12.5px;
-  line-height: 1.7;
-  color: var(--text-2);
-}
-
-.mp-bk .mp-bk-card {
-  padding: 14px 16px;
-  border-radius: var(--r-l);
-  background: var(--card);
-  box-shadow: var(--shadow-s);
-}
-.mp-bk .mp-bk-card-head { display: flex; align-items: flex-start; gap: 10px; }
-.mp-bk .mp-bk-card-head > div:first-child { flex: 1; min-width: 0; }
-.mp-bk .mp-bk-name { font-size: 16px; font-weight: 700; color: var(--text); }
-.mp-bk .mp-bk-role { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
-.mp-bk .mp-bk-tags { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
-.mp-bk .mp-bk-meta { margin-top: 4px; font-size: 11.5px; color: var(--text-3); }
-.mp-bk .mp-bk-affinity {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  margin: 8px 0 4px;
-  font-size: 12px;
-  color: var(--text-2);
-}
-.mp-bk .mp-bk-life {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--line);
-  font-size: 12px;
-  color: var(--text-2);
-}
-
-.mp-bk .mp-bk-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  color: var(--text-2);
-  background: rgba(43, 41, 55, .06);
-}
-.mp-bk .mp-bk-tag.is-key { color: var(--accent-deep); background: rgba(142, 123, 242, .14); }
-.mp-bk .mp-bk-tag.is-warn { color: #b07b2e; background: rgba(233, 177, 92, .18); }
-
-.mp-bk .mp-bk-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  margin-bottom: 8px;
-  border-radius: var(--r-m);
-  background: var(--card);
-  box-shadow: var(--shadow-s);
-}
-.mp-bk .mp-bk-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.mp-bk .mp-bk-row-name { font-size: 13.5px; font-weight: 600; color: var(--text); }
-.mp-bk .mp-bk-row-sub { font-size: 11.5px; line-height: 1.55; color: var(--text-3); }
-
-.mp-bk .mp-bk-log {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 7px 0;
-  border-top: 1px solid var(--line-soft);
-  font-size: 11.5px;
-  color: var(--text-3);
-}
-.mp-bk .mp-bk-log b { color: var(--text); font-weight: 600; }
-
-.mp-bk .mp-bk-tree {
-  padding: 6px 14px 14px;
-  border-radius: var(--r-l);
-  background: var(--card);
-  box-shadow: var(--shadow-s);
-}
-.mp-bk .mp-bk-scene {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 9px 0 9px calc(var(--depth, 0) * 16px);
-  border-top: 1px solid var(--line-soft);
-}
-.mp-bk .mp-bk-scene:first-child { border-top: 0; }
-.mp-bk .mp-bk-scene-dot {
-  flex: 0 0 auto;
-  width: 7px; height: 7px;
-  margin-top: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  opacity: calc(1 - var(--depth, 0) * .18);
-}
-.mp-bk .mp-bk-scene-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.mp-bk .mp-bk-scene-name { font-size: 13px; font-weight: 600; color: var(--text); }
-.mp-bk .mp-bk-scene-sub { font-size: 11.5px; line-height: 1.55; color: var(--text-3); }
-
-.mp-bk .mp-bk-plan { padding: 10px 0; border-top: 1px solid var(--line-soft); }
-.mp-bk .mp-bk-plan:first-of-type { border-top: 0; }
-.mp-bk .mp-bk-plan-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
-.mp-bk .mp-bk-plan-time { font-size: 11px; color: var(--text-3); }
-.mp-bk .mp-bk-plan-text { font-size: 12.5px; line-height: 1.65; color: var(--text); }
-.mp-bk .mp-bk-plan.is-done .mp-bk-plan-text { color: var(--text-3); text-decoration: line-through; text-decoration-color: var(--line); }
-.mp-bk .mp-bk-plan.is-done .mp-bk-tag { opacity: .6; }
-
-.mp-bk .mp-bk-warn {
-  padding: 10px 14px;
-  border-radius: var(--r-m);
-  background: rgba(233, 177, 92, .14);
-  color: #a06f28;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.mp-bk .mp-bk-quiet { font-size: 11.5px; color: var(--text-3); line-height: 1.6; }
-
-.mp-bk .mp-bk-empty {
-  padding: 36px 24px;
-  border-radius: var(--r-l);
-  background: var(--card);
-  box-shadow: var(--shadow-s);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  text-align: center;
-}
-.mp-bk .mp-bk-empty-ic {
-  width: 46px; height: 46px;
-  display: grid; place-items: center;
-  border-radius: 16px;
-  background: rgba(142, 123, 242, .12);
-  color: var(--accent);
-}
-.mp-bk .mp-bk-empty-ic .mp-i { width: 20px; height: 20px; }
-.mp-bk .mp-bk-empty-title { font-size: 14px; font-weight: 600; color: var(--text); }
-.mp-bk .mp-bk-empty-sub { font-size: 12px; line-height: 1.6; color: var(--text-3); max-width: 260px; }
-
-.mp-root[data-mp-theme="night"] .mp-bk .mp-bk-tag { background: rgba(255, 255, 255, .08); }
-.mp-root[data-mp-theme="night"] .mp-bk .mp-bk-hero-focus { border-top-color: rgba(255, 255, 255, .1); }
-
-/* 首楼关掉总结后，直接铺原文；样式跟摘要卡区分开 */
-.mp-bk .mp-bk-first {
-  padding: 12px 13px;
-  border-radius: 14px;
-  border: 1px solid rgba(142, 123, 242, .22);
-  background: linear-gradient(180deg, rgba(255, 255, 255, .62), rgba(255, 255, 255, .34));
-  font-size: 13px;
-  line-height: 1.75;
-  color: var(--text-2);
-  white-space: pre-wrap;
-}
-.mp-bk .mp-bk-first + * { margin-top: 10px; }
-.mp-root[data-mp-theme="night"] .mp-bk .mp-bk-first {
-  background: linear-gradient(180deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .04));
-  border-color: rgba(255, 255, 255, .14);
-  color: var(--text-2);
-}
-.mp-bk .mp-bk-note {
-  margin-top: 14px;
-  padding: 0 4px;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--text-3);
-}
-
-
 /* ============================ 音乐 ============================ */
 .mp-music {
   display: flex;
@@ -3690,8 +3331,15 @@ function emptyState() {
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
       chat: { showTime: true, enterToSend: false, remind: true, wake: true },
-      /* 酒馆总结（柏宝书）：首楼默认是要总结的，关掉后那一楼直接显示原文 */
-      summary: { skipFirstFloor: false, apiId: '' },
+      /* 酒馆记忆方案：默认有柏宝书总结就用总结，没有就取最近 10 层酒馆聊天 */
+      memory: {
+        activeId: 'mem_auto',
+        presets: [
+          { id: 'mem_auto', name: '默认', mode: 'auto', floors: 10 },
+          { id: 'mem_summary', name: '只看总结', mode: 'summary', floors: 10 },
+          { id: 'mem_recent', name: '最近原文', mode: 'recent', floors: 20 },
+        ],
+      },
       api: {
         activeChat: '', activeImage: '', presets: [
           { id: 'api_default', name: '酒馆 API', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
@@ -3795,6 +3443,7 @@ function addChat(state, contactId, options = {}) {
     pinned: false,
     muted: false,
     llmPresetId: '',
+    memoryPresetId: '',
     updatedAt: Date.now(),
   };
   return state.chats[id];
@@ -3826,6 +3475,20 @@ function llmPresetFor(state, chat) {
   const own = list.find(preset => preset.id === chat?.llmPresetId);
   if (own) return own;
   return list.find(preset => preset.id === state?.settings?.api?.activeChat) || list[0] || null;
+}
+
+/** 手机里保存的酒馆记忆方案。 */
+function memoryPresetsOf(state) {
+  const store = state?.settings?.memory;
+  return Array.isArray(store?.presets) ? store.presets : [];
+}
+
+/** 这个会话实际用哪套记忆：自己选了就用自己那套，没选就跟随手机。 */
+function memoryPresetFor(state, chat) {
+  const list = memoryPresetsOf(state);
+  const own = list.find(preset => preset.id === chat?.memoryPresetId);
+  if (own) return own;
+  return list.find(preset => preset.id === state?.settings?.memory?.activeId) || list[0] || null;
 }
 
 function lastMessage(chat) {
@@ -4180,7 +3843,25 @@ function normalize(raw) {
   }
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
-  merged.settings.summary = { ...base.settings.summary, ...(raw.settings?.summary || {}) };
+  delete merged.settings.summary;
+  const memoryRaw = raw.settings?.memory;
+  const memoryList = Array.isArray(memoryRaw?.presets) ? memoryRaw.presets : [];
+  const memoryPresets = memoryList
+    .filter(item => item && typeof item === 'object' && String(item.name || '').trim())
+    .map((item, index) => ({
+      id: String(item.id || `mem_${index + 1}`),
+      name: String(item.name).trim().slice(0, 20),
+      mode: ['auto', 'summary', 'recent'].includes(item.mode) ? item.mode : 'auto',
+      floors: Math.max(1, Math.min(50, Number(item.floors) || 10)),
+    }));
+  merged.settings.memory = {
+    ...base.settings.memory,
+    ...(memoryRaw && typeof memoryRaw === 'object' ? memoryRaw : {}),
+    presets: memoryPresets.length ? memoryPresets : base.settings.memory.presets,
+  };
+  if (!merged.settings.memory.presets.some(item => item.id === merged.settings.memory.activeId)) {
+    merged.settings.memory.activeId = merged.settings.memory.presets[0].id;
+  }
   merged.settings.customWall = typeof raw.settings?.customWall === 'string' ? raw.settings.customWall : '';
   if (merged.settings.wallpaper === 'custom' && !merged.settings.customWall) merged.settings.wallpaper = 'day';
   merged.settings.image = {
@@ -4260,6 +3941,8 @@ exports["chatsOf"] = chatsOf;
 exports["chatById"] = chatById;
 exports["apiPresetsOf"] = apiPresetsOf;
 exports["llmPresetFor"] = llmPresetFor;
+exports["memoryPresetsOf"] = memoryPresetsOf;
+exports["memoryPresetFor"] = memoryPresetFor;
 exports["lastMessage"] = lastMessage;
 exports["pushMessage"] = pushMessage;
 exports["unreadTotal"] = unreadTotal;
@@ -4584,7 +4267,7 @@ async function setWorldEntryEnabled(bookName, uid, disabled) {
 /** 当前打开的酒馆聊天，用来给日记、主动消息提供素材。 */
 async function readTavernContext() {
   const script = await loadHostScript();
-  if (!script) return { userName: '我', chat: [], characterName: '' };
+  if (!script) return { userName: '我', chat: [], characterName: '', characterAvatar: '', chatFile: '' };
   try {
     const userName = script.name1 || script.getContext?.()?.name1 || '我';
     const chat = Array.isArray(script.chat) ? script.chat.map(line => ({
@@ -4594,15 +4277,133 @@ async function readTavernContext() {
       at: line.send_date || '',
     })) : [];
     const character = script.characters?.[script.this_chid];
-    return { userName, chat, characterName: character?.name || '' };
+    return {
+      userName,
+      chat,
+      characterName: character?.name || '',
+      characterAvatar: character?.avatar || '',
+      chatFile: character?.chat || '',
+    };
   } catch {
-    return { userName: '我', chat: [], characterName: '' };
+    return { userName: '我', chat: [], characterName: '', characterAvatar: '', chatFile: '' };
   }
+}
+
+async function hostRequestHeaders(script) {
+  const ctx = globalThis.SillyTavern?.getContext?.() || script?.getContext?.() || {};
+  const getHeaders = ctx.getRequestHeaders || script?.getRequestHeaders;
+  const headers = typeof getHeaders === 'function' ? { ...getHeaders() } : {};
+  if (!headers['X-CSRF-Token']) {
+    const token = ctx.csrf_token || globalThis.csrf_token || '';
+    if (token) headers['X-CSRF-Token'] = token;
+  }
+  headers['Content-Type'] = 'application/json';
+  return headers;
+}
+
+function latestScore(item) {
+  const raw = item?.last_mes ?? item?.lastMes ?? item?.mtime ?? item?.last_modified ?? item?.file_name ?? '';
+  if (typeof raw === 'number') return raw > 1e12 ? raw : raw * 1000;
+  const text = String(raw);
+  const time = Date.parse(text);
+  if (Number.isFinite(time)) return time;
+  const match = text.match(/(\d{4})-(\d{2})-(\d{2})[^\d](\d{2})[^\d](\d{2})(?:[^\d](\d{2}))?/);
+  if (match) {
+    return Date.UTC(
+      Number(match[1]), Number(match[2]) - 1, Number(match[3]),
+      Number(match[4]), Number(match[5]), Number(match[6] || 0),
+    );
+  }
+  return 0;
+}
+
+/**
+ * 这个角色在酒馆里关联的最新聊天。
+ * 先问酒馆的聊天文件列表，挑最近一条；列表读不到就退回角色卡上的当前聊天文件。
+ */
+async function readLatestTavernChat({ name = '', avatar = '', floors = 10 } = {}) {
+  const script = await loadHostScript();
+  const empty = { available: false, file: '', characterName: name, lines: [], total: 0 };
+  if (!script || !Array.isArray(script.characters)) return empty;
+  const character = script.characters.find(item => item && avatar && item.avatar === avatar)
+    || script.characters.find(item => item && item.name === name);
+  if (!character) return empty;
+
+  const headers = await hostRequestHeaders(script);
+  let file = String(character.chat || '').trim();
+  let latestMeta = null;
+
+  try {
+    const response = await fetch('/api/characters/chats', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ avatar_url: character.avatar || character.name }),
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    if (response.ok) {
+      const data = await response.json().catch(() => null);
+      const list = Array.isArray(data) ? data : Object.values(data && typeof data === 'object' ? data : {});
+      const sorted = list
+        .filter(item => item && typeof item === 'object' && (item.file_name || item.fileName))
+        .map(item => ({ ...item, file_name: item.file_name || item.fileName }))
+        .sort((a, b) => latestScore(b) - latestScore(a));
+      if (sorted.length) {
+        file = sorted[0].file_name;
+        latestMeta = sorted[0];
+      }
+    }
+  } catch { /* 列表接口不可用就继续用角色卡上的 chat */ }
+
+  let raw = [];
+  if (file) {
+    try {
+      const response = await fetch('/api/chats/get', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          ch_name: character.name,
+          file_name: String(file).replace(/\.jsonl$/i, ''),
+          avatar_url: character.avatar || character.name,
+        }),
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      if (response.ok) {
+        const data = await response.json().catch(() => null);
+        raw = Array.isArray(data) ? data : (Array.isArray(data?.messages) ? data.messages : []);
+      }
+    } catch { raw = []; }
+  }
+
+  if (!raw.length && script.characters?.[script.this_chid]?.avatar === character.avatar && Array.isArray(script.chat)) {
+    raw = script.chat;
+    file = file || String(character.chat || '当前聊天');
+  }
+
+  const lines = raw
+    .filter(line => line && !line.is_system && typeof line.mes === 'string' && line.mes.trim())
+    .map(line => ({
+      isUser: Boolean(line.is_user),
+      name: line.name || (line.is_user ? (script.name1 || '你') : character.name),
+      text: line.mes.trim(),
+    }))
+    .slice(-Math.max(1, Math.min(50, Number(floors) || 10)));
+
+  return {
+    available: Boolean(lines.length),
+    file: file || '',
+    characterName: character.name,
+    lines,
+    total: raw.length,
+    meta: latestMeta,
+  };
 }
 
 async function readUserAvatar() {
   try {
     const script = await loadHostScript();
+
     if (script?.user_avatar && typeof script.getThumbnailUrl === 'function') {
       return script.getThumbnailUrl('persona', script.user_avatar);
     }
@@ -5006,6 +4807,7 @@ exports["readTavernCards"] = readTavernCards;
 exports["readCharacterBooks"] = readCharacterBooks;
 exports["setWorldEntryEnabled"] = setWorldEntryEnabled;
 exports["readTavernContext"] = readTavernContext;
+exports["readLatestTavernChat"] = readLatestTavernChat;
 exports["readUserAvatar"] = readUserAvatar;
 exports["generate"] = generate;
 exports["novelaiImage"] = novelaiImage;
@@ -5547,10 +5349,9 @@ exports["chatAvatarHtml"] = chatAvatarHtml;
 };
 __mods["meme/book.js"] = function(module, exports, __req){
 /**
- * meme-phone · 酒馆总结（原柏宝书）
+ * meme-phone · 柏宝书总结读取
  *
- * 把柏宝书的只读接口收成一层：手机里的「酒馆总结」页、聊天和日记都用这里的口径。
- * 关键口径：聊天背景用「所有酒馆总结」，不读酒馆原文；首楼可以被设置成不总结、直接显示原文。
+ * 只保留读接口：聊天 / 日记的记忆注入从这里拿总结，不再有独立的「酒馆总结」页面。
  */
 
 const DEMO_FIRST = '1988 年 9 月 28 日 傍晚，雨刚停。你拖着最后一箱书上到六楼，302 室的门半开着，屋里只有一盏没罩子的灯泡。';
@@ -5565,58 +5366,6 @@ function bookApi() {
   } catch (error) {
     return null;
   }
-}
-
-/** 手机「接口」里能拿来当总结接口的预设（酒馆 API 那条没有地址，跳过）。 */
-function summaryApiPresets(state) {
-  const list = state?.settings?.api?.presets || [];
-  return list.filter(preset => preset && preset.url && preset.engine !== 'tavern');
-}
-
-/**
- * 把手机的一套预设交给酒馆总结当副 API。
- * 桥由 baibai-book/dist 暴露；没装/没加载时返回 false，调用方提示即可。
- */
-function applySummaryApi(preset) {
-  if (!preset) return false;
-  try {
-    const bridge = globalThis.__STBaiBaiBookPhoneApi;
-    if (!bridge || typeof bridge.useChannel !== 'function') return false;
-    return Boolean(bridge.useChannel({
-      id: preset.id,
-      name: preset.name || '手机接口',
-      url: preset.url,
-      key: preset.key || '',
-      model: preset.model || '',
-      temperature: typeof preset.temp === 'number' ? preset.temp : 0.8,
-    }));
-  } catch (error) {
-    return false;
-  }
-}
-
-function clearSummaryApi() {
-  try {
-    const bridge = globalThis.__STBaiBaiBookPhoneApi;
-    if (bridge && typeof bridge.reset === 'function') {
-      bridge.reset();
-      return true;
-    }
-  } catch (error) { /* 没桥就当已经跟随自带 */ }
-  return false;
-}
-
-/** 补摘要：补当前聊天里还没摘的 AI 楼。没桥或没待补时返回 done=0。 */
-async function backfillSummaries() {
-  try {
-    const bridge = globalThis.__STBaiBaiBookPhoneApi;
-    if (bridge && typeof bridge.backfill === 'function') {
-      return await bridge.backfill();
-    }
-  } catch (error) {
-    return { done: 0, total: 0, cancelled: false, error: String(error?.message || error) };
-  }
-  return { done: 0, total: 0, cancelled: false };
 }
 
 function isFirstFloor(node) {
@@ -5674,22 +5423,177 @@ function summaryText(options = {}) {
   return { ...data, text: parts.join('\n\n') };
 }
 
-/** 聊天 / 日记用的截断版本，别把整本总结全塞进 prompt。 */
-function summaryContext(limit = 1800, options = {}) {
-  const data = summaryText(options);
-  let text = data.text || '';
-  if (text.length > limit) text = `${text.slice(0, limit)}\n…（后面还有 ${data.nodes.length} 条总结）`;
-  return { ...data, text };
-}
-
 exports["bookApi"] = bookApi;
-exports["summaryApiPresets"] = summaryApiPresets;
-exports["applySummaryApi"] = applySummaryApi;
-exports["clearSummaryApi"] = clearSummaryApi;
-exports["backfillSummaries"] = backfillSummaries;
 exports["readSummaries"] = readSummaries;
 exports["summaryText"] = summaryText;
-exports["summaryContext"] = summaryContext;
+};
+__mods["meme/memory.js"] = function(module, exports, __req){
+/**
+ * meme-phone · 酒馆记忆
+ *
+ * 聊天 / 日记的上下文来源收成一套「记忆方案」：
+ * - auto：这个角色当前酒馆聊天有柏宝书总结，就注入总结；没有就取最近几层酒馆原文。
+ * - summary：只用柏宝书总结。
+ * - recent：只取最近几层酒馆原文。
+ * 手机默认一套方案，某个会话可以单独换一套。
+ */
+
+const { contactById, memoryPresetFor } = __req("meme/data.js");
+const { summaryText } = __req("meme/book.js");
+const { readLatestTavernChat, readTavernContext } = __req("meme/host.js");
+
+const MEMORY_MODES = [
+  { value: 'auto', label: '自动', hint: '有总结先用总结，没有就取最近几层原文' },
+  { value: 'summary', label: '只用总结', hint: '只注入柏宝书总结' },
+  { value: 'recent', label: '只看原文', hint: '只注入最近几层酒馆聊天' },
+];
+
+function memoryModeLabel(mode) {
+  return MEMORY_MODES.find(item => item.value === mode)?.label || '自动';
+}
+
+/** 一行说明，给聊天设置和预设页共用。 */
+function memoryPresetSummary(preset) {
+  if (!preset) return '还没设记忆方案';
+  const floors = Math.max(1, Math.min(50, Number(preset.floors) || 10));
+  if (preset.mode === 'summary') return `${memoryModeLabel(preset.mode)} · 只读总结`;
+  if (preset.mode === 'recent') return `${memoryModeLabel(preset.mode)} · 最近 ${floors} 层`;
+  return `${memoryModeLabel(preset.mode)} · 有总结先用，否则 ${floors} 层`;
+}
+
+function activeMemoryPreset(state, chat) {
+  return memoryPresetFor(state, chat);
+}
+
+function clip(text, limit) {
+  const value = String(text || '').trim();
+  if (!value) return '';
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit)}\n…（后面还有 ${value.length - limit} 字）`;
+}
+
+function joinLines(lines) {
+  return lines.map(line => `${line.isUser ? '你' : (line.name || 'TA')}：${line.text}`).join('\n');
+}
+
+/** 把最近几层裁到预算内：保留最新的部分，别把开头截掉。 */
+function fitRecent(lines, limit) {
+  let text = joinLines(lines);
+  if (text.length <= limit) return text;
+  const picked = [];
+  let used = 0;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    const piece = `${line.isUser ? '你' : (line.name || 'TA')}：${line.text}`;
+    if (used + piece.length > limit && picked.length) break;
+    picked.unshift(line);
+    used += piece.length + 1;
+  }
+  text = joinLines(picked);
+  if (picked.length < lines.length) text = `…（前面还有 ${lines.length - picked.length} 层）\n${text}`;
+  return text;
+}
+
+function chatKey(file) {
+  return String(file || '').replace(/\.jsonl$/i, '').trim();
+}
+
+/**
+ * 读这个会话的酒馆记忆。
+ * limit 是总字数预算，层数是方案里的 floors。
+ */
+async function buildMemoryContext(state, chat, limit = 1200) {
+  const preset = activeMemoryPreset(state, chat);
+  const contact = contactById(state, chat?.contactId);
+  const mode = preset?.mode || 'auto';
+  const floors = Math.max(1, Math.min(50, Number(preset?.floors) || 10));
+  const summaryLimit = Math.max(300, Math.floor(limit * 0.75));
+
+  /* 先确认这个角色最新的酒馆聊天是哪一份；总结只读当前打开的那份，
+     如果最新聊天不是当前这份，就不能把当前总结当成最新聊天的记忆。 */
+  const latest = contact?.name && mode !== 'summary'
+    ? await readLatestTavernChat({
+      name: contact.name,
+      avatar: contact.tavernAvatar || '',
+      floors,
+    })
+    : null;
+
+  let summary = null;
+  if (mode !== 'recent') {
+    const data = summaryText({ skipFirstFloor: false });
+    const current = await readTavernContext();
+    const currentNode = String(current?.characterName || '').trim();
+    const sameCharacter = !contact?.name || !currentNode || currentNode === contact.name;
+    const currentFile = chatKey(current?.chatFile);
+    const latestFile = chatKey(latest?.file);
+    const sameChat = !currentFile || !latestFile || currentFile === latestFile;
+    if (data.nodes.length && sameCharacter && sameChat) {
+      const text = clip(data.text, summaryLimit);
+      if (text) summary = { text, count: data.nodes.length, demo: data.demo };
+    }
+  }
+
+  if (summary && mode !== 'recent') {
+    return {
+      text: `【柏宝书总结】\n${summary.text}`,
+      source: 'summary',
+      preset,
+      floors,
+      summaryCount: summary.count,
+      demo: summary.demo,
+    };
+  }
+
+  if (mode === 'summary') {
+    return {
+      text: '',
+      source: 'empty',
+      preset,
+      floors,
+      summaryCount: 0,
+      demo: false,
+    };
+  }
+
+  if (!contact?.name) {
+    return { text: '', source: 'empty', preset, floors, summaryCount: 0, demo: false };
+  }
+
+  const taverner = latest || await readLatestTavernChat({
+    name: contact.name,
+    avatar: contact.tavernAvatar || '',
+    floors,
+  });
+  if (!taverner?.lines?.length) {
+    return {
+      text: summary ? `【柏宝书总结】\n${summary.text}` : '',
+      source: summary ? 'summary' : 'empty',
+      preset,
+      floors,
+      summaryCount: summary?.count || 0,
+      demo: Boolean(summary?.demo),
+    };
+  }
+
+  const text = fitRecent(taverner.lines, limit);
+  const head = `【酒馆聊天 · 最近 ${taverner.lines.length} 层${taverner.file ? ` · ${taverner.file.replace(/\.jsonl$/i, '')}` : ''}】`;
+  return {
+    text: `${head}\n${text}`,
+    source: 'recent',
+    preset,
+    floors,
+    file: taverner.file,
+    summaryCount: 0,
+    demo: false,
+  };
+}
+
+exports["MEMORY_MODES"] = MEMORY_MODES;
+exports["memoryModeLabel"] = memoryModeLabel;
+exports["memoryPresetSummary"] = memoryPresetSummary;
+exports["activeMemoryPreset"] = activeMemoryPreset;
+exports["buildMemoryContext"] = buildMemoryContext;
 };
 __mods["meme/apps/chat.js"] = function(module, exports, __req){
 /**
@@ -5700,8 +5604,9 @@ __mods["meme/apps/chat.js"] = function(module, exports, __req){
 const { icon } = __req("meme/icons.js");
 const {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
-  apiPresetsOf,
+  apiPresetsOf, memoryPresetsOf, memoryPresetFor,
 } = __req("meme/data.js");
+const { memoryPresetSummary } = __req("meme/memory.js");
 const { avatarHtml, esc, shortText, timeText } = __req("meme/shell.js");
 
 const REPLY_POOL = {
@@ -5792,6 +5697,12 @@ function settingsBody(ctx, chatId) {
   const llmSub = ownPreset
     ? `只对这个会话 · ${ownPreset.name || '未命名方案'}`
     : `跟随手机 · ${globalPreset?.name || '酒馆 API'}`;
+  const memoryPresets = memoryPresetsOf(state);
+  const ownMemory = memoryPresets.find(item => item.id === chat.memoryPresetId) || null;
+  const globalMemory = memoryPresetFor(state, null);
+  const memorySub = ownMemory
+    ? `只对这个会话 · ${memoryPresetSummary(ownMemory)}`
+    : `跟随手机 · ${memoryPresetSummary(globalMemory)}`;
 
   return `
     <div class="mp-page-body">
@@ -5822,6 +5733,16 @@ function settingsBody(ctx, chatId) {
           ${chatSetRow(chat.id, {
             iconName: 'spark', title: '这个聊天的 LLM',
             sub: llmSub, act: 'ts-llm', value: ownPreset ? '单独' : '跟随',
+          })}
+        </div>
+      </div>
+
+      <div class="mp-group">
+        <div class="mp-group-label">上下文</div>
+        <div class="mp-group-box">
+          ${chatSetRow(chat.id, {
+            iconName: 'book', title: '酒馆记忆',
+            sub: memorySub, act: 'ts-memory', value: ownMemory ? '单独' : '跟随',
           })}
         </div>
       </div>
@@ -6182,6 +6103,43 @@ const threadSettingsApp = {
           ctx.save();
           ctx.rerender();
           ctx.toast(`这个会话改用「${preset.name || '未命名方案'}」`);
+        },
+      });
+      return true;
+    }
+
+    if (act === 'ts-memory') {
+      const presets = memoryPresetsOf(ctx.state);
+      const globalPreset = memoryPresetFor(ctx.state, null);
+      ctx.openSheet({
+        title: '酒馆记忆',
+        items: [
+          { label: '跟随手机', value: 'follow', note: `现在用「${globalPreset?.name || '默认'}」` },
+          ...presets.map(item => ({
+            label: item.name,
+            value: item.id,
+            note: memoryPresetSummary(item),
+          })),
+          { label: '管理记忆方案', value: 'manage', note: '新建、改名、改层数' },
+        ],
+        onPick: (value) => {
+          if (value === 'follow') {
+            chat.memoryPresetId = '';
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('已跟随手机的酒馆记忆');
+            return;
+          }
+          if (value === 'manage') {
+            ctx.go('memory-presets');
+            return;
+          }
+          const preset = presets.find(item => item.id === value);
+          if (!preset) return;
+          chat.memoryPresetId = preset.id;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`这个会话改用「${preset.name}」`);
         },
       });
       return true;
@@ -9903,542 +9861,6 @@ exports["ensureLookup"] = ensureLookup;
 exports["charPhoneApp"] = charPhoneApp;
 exports["charPhoneThreadApp"] = charPhoneThreadApp;
 };
-__mods["meme/apps/book.js"] = function(module, exports, __req){
-/**
- * meme-phone · 酒馆总结（原柏宝书）
- *
- * 柏宝书（ST-BaiBai-Book）是酒馆里的长期记忆引擎：自动摘要、总结、时间线、
- * 人物 / 物品 / 场景 / 悬念台账、向量召回。它的完整代码在仓库 baibai-book/ 里，
- * 这里通过它公开的只读接口 STBaiBaiBook 把记忆摊到手机上。
- */
-
-const { icon } = __req("meme/icons.js");
-const { esc } = __req("meme/shell.js");
-const { bookApi, readSummaries, summaryApiPresets, applySummaryApi, clearSummaryApi, backfillSummaries } = __req("meme/book.js");
-
-const TABS = [
-  ['overview', '概览'],
-  ['summary', '摘要'],
-  ['npcs', '人物'],
-  ['items', '物品'],
-  ['scenes', '场景'],
-  ['plans', '悬念'],
-];
-
-const AFFINITY_INNER = { '-2': '强烈反感', '-1': '不喜欢', 0: '无明显好恶', 1: '有好感', 2: '感情深厚' };
-const AFFINITY_OUTER = { '-2': '明显敌对', '-1': '冷淡疏远', 0: '不明显', 1: '友善亲近', 2: '明显亲近' };
-
-function api() {
-  return bookApi();
-}
-
-function call(name, fallback, ...args) {
-  const book = api();
-  if (!book || typeof book[name] !== 'function') return fallback;
-  try {
-    return book[name](...args) ?? fallback;
-  } catch (error) {
-    return fallback;
-  }
-}
-
-/* 预览环境没有柏宝书，用一份演示数据把版面撑起来 */
-function demoSnapshot() {
-  return {
-    chat: { characterName: '沈砚', length: 86 },
-    coverage: { complete: true, missingAiFloors: [] },
-    state: {
-      time: '1988 年 9 月 29 日 傍晚',
-      location: '杭州市滨江区某老小区-302室屋内',
-      locationPath: ['杭州市', '滨江区某老小区', '302室屋内'],
-      sceneFocus: { situation: '两个人在收拾刚搬进来的行李，雨还没停。' },
-    },
-    protagonist: {
-      gender: '女',
-      age: '24',
-      identity: '旧书店店员',
-      appearance: '齐肩黑发，右手虎口有一道浅疤。',
-      outfit: '米色针织衫 + 深色长裤',
-      condition: '有点感冒，嗓子发哑',
-    },
-    npcs: [{
-      id: 'npc_1', name: '沈砚', gender: '男', age: '27',
-      title: '旧书店老板', relation: '房东, 旧识',
-      desc: '清瘦，常穿深色衬衫，左手戴一块停了的手表。',
-      personality: '话少，但会记住别人随口提过的事。',
-      outfit: '深灰衬衫，袖口卷到小臂',
-      condition: '右手擦伤，贴了创可贴',
-      important: true, follow: false, location: '302室屋内',
-      affinityInner: 1, affinityOuter: 1,
-      affinityNote: '主动留了伞，但嘴上说是顺手。',
-    }],
-    items: [
-      { id: 'i1', name: '黄铜钥匙', desc: '302 室的备用钥匙，齿口有点磨损。', qty: 1, carried: true },
-      { id: 'i2', name: '旧雨伞', desc: '沈砚借的，伞骨有一根歪了。', qty: 1, carried: true },
-      { id: 'i3', name: '纸箱', desc: '装书的箱子，放在客厅角落。', qty: 3, carried: false, location: '302室屋内' },
-    ],
-    itemLog: [
-      { name: '旧雨伞', kind: 'add', to: 1, time: '1988 年 9 月 29 日 傍晚' },
-    ],
-    scenes: [
-      { id: 's1', name: '杭州市', path: ['杭州市'], parentId: '', desc: '' },
-      { id: 's2', name: '滨江区某老小区', path: ['杭州市', '滨江区某老小区'], parentId: 's1', desc: '六层老楼，楼道灯是声控的。' },
-      { id: 's3', name: '302室屋内', path: ['杭州市', '滨江区某老小区', '302室屋内'], parentId: 's2', desc: '两室一厅，朝北的窗关不严。' },
-    ],
-    plans: [
-      { id: 'p1', kind: 'plan', status: 'open', content: '周末去旧货市场找一只同款表带。', createdTime: '1988/9/29' },
-      { id: 'p2', kind: 'suspense', status: 'open', content: '沈砚的手表为什么停在三点十七分，他一直没说。', createdTime: '1988/9/29' },
-      { id: 'p3', kind: 'plan', status: 'resolved', content: '把最后一箱书搬上楼。', createdTime: '1988/9/28', outcome: 'done' },
-    ],
-    lifeDetails: [
-      { subject: 'user', text: '喝咖啡必须加两块糖。', topics: ['饮食'], tier: 'active' },
-      { subject: '沈砚', text: '不吃香菜，会默默挑出来。', topics: ['饮食'], tier: 'active' },
-    ],
-  };
-}
-
-function snapshotOf() {
-  return call('getSnapshot', null) || (api() ? null : demoSnapshot());
-}
-
-/* ------------------------------------------------------------ 小组件 */
-
-function statCard(value, label) {
-  return `<div class="mp-bk-stat"><b>${esc(value)}</b><span>${esc(label)}</span></div>`;
-}
-
-function kv(label, value) {
-  if (!value) return '';
-  return `<div class="mp-bk-kv"><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
-}
-
-function tag(text, tone = '') {
-  return `<span class="mp-bk-tag${tone ? ` is-${tone}` : ''}">${esc(text)}</span>`;
-}
-
-function section(title, body, extra = '') {
-  if (!body) return '';
-  return `<div class="mp-bk-section">
-    <div class="mp-bk-section-head"><span>${esc(title)}</span>${extra}</div>
-    ${body}
-  </div>`;
-}
-
-/* ------------------------------------------------------------ 各分页 */
-
-function overviewPage(snap) {
-  if (!snap) return emptyPage('还没接到酒馆总结', '在酒馆里装上酒馆总结后，这里会自动出现它的记忆。');
-  const state = snap.state || {};
-  const hero = snap.protagonist || {};
-  const coverage = snap.coverage || {};
-  const place = (state.locationPath && state.locationPath.length ? state.locationPath.join(' / ') : state.location) || '地点未记录';
-
-  return `
-    <div class="mp-bk-hero">
-      <div class="mp-bk-hero-row">
-        <div class="mp-bk-hero-time">${icon('clock')}<span>${esc(state.time || '故事时间未记录')}</span></div>
-        ${coverage.complete === false ? tag('有缺楼', 'warn') : ''}
-      </div>
-      <div class="mp-bk-hero-place">${icon('pin')}<span>${esc(place)}</span></div>
-      ${state.sceneFocus?.situation ? `<div class="mp-bk-hero-focus">${esc(state.sceneFocus.situation)}</div>` : ''}
-    </div>
-
-    <div class="mp-bk-stats">
-      ${statCard((snap.npcs || []).length, '人物')}
-      ${statCard((snap.items || []).length, '物品')}
-      ${statCard((snap.scenes || []).length, '地点')}
-      ${statCard((snap.plans || []).filter(plan => plan.status === 'open').length, '未了')}
-    </div>
-
-    ${section('主角', [
-      kv('身份', hero.identity),
-      kv('性别', [hero.gender, hero.age ? `${hero.age} 岁` : ''].filter(Boolean).join(' · ')),
-      kv('外貌', hero.appearance),
-      kv('着装', hero.outfit),
-      kv('状态', hero.condition),
-    ].join('') || '<div class="mp-empty">还没记到主角的档案。</div>')}
-
-    ${section('聊到哪了', `<div class="mp-bk-quiet">第 ${esc(snap.chat?.length ?? 0)} 楼 · ${esc(snap.chat?.characterName || '未打开聊天')}</div>`)}
-  `;
-}
-
-function summaryPage(ctx) {
-  const skipFirst = Boolean(ctx.state.settings.summary?.skipFirstFloor);
-  const data = readSummaries({ skipFirstFloor: skipFirst });
-  const nodes = data.nodes || [];
-  const expanded = ctx.shell.bookNode || '';
-  const rows = nodes.slice().reverse().map(node => {
-    const open = expanded === node.id;
-    const floorLabel = node.floorStart != null
-      ? `第 ${node.floorStart}${node.floorEnd != null && node.floorEnd !== node.floorStart ? `–${node.floorEnd}` : ''} 楼`
-      : '';
-    const sub = [node.kind === 'comp' ? '合并总结' : '单楼摘要', floorLabel].filter(Boolean).join(' · ');
-    const preview = !open && node.text ? node.text.replace(/\s+/g, ' ').slice(0, 72) : '';
-    return `<div class="mp-bk-node${open ? ' is-open' : ''}">
-      <button class="mp-bk-node-head" data-act="bk-node" data-id="${esc(node.id)}" type="button">
-        <span class="mp-bk-node-level">L${esc(node.level)}</span>
-        <span class="mp-bk-node-main">
-          <span class="mp-bk-node-title">${esc(node.timeLabel || '未标时间')}</span>
-          <span class="mp-bk-node-sub">${esc(sub)}</span>
-          ${preview ? `<span class="mp-bk-node-preview">${esc(preview)}${node.text.length > 72 ? '…' : ''}</span>` : ''}
-        </span>
-        ${icon('chevron')}
-      </button>
-      ${open ? `<div class="mp-bk-node-text">${esc(node.text)}</div>` : ''}
-    </div>`;
-  }).join('');
-
-  const coverage = data.coverage || {};
-  const first = data.firstText
-    ? section('首楼原文（已关掉首楼总结）', `<div class="mp-bk-first">${esc(data.firstText)}</div>`)
-    : '';
-
-  return `
-    ${coverage.complete === false
-      ? `<div class="mp-bk-warn">第 ${esc((coverage.missingAiFloors || []).join('、') || '?')} 楼还没有摘要，点上方「补摘要」补齐。</div>` : ''}
-    ${first}
-    ${section('所有总结', rows || `<div class="mp-empty">${skipFirst ? '除了首楼还没有别的总结。' : '还没有总结，酒馆里聊起来之后会自动生成。'}</div>`, `<span class="mp-bk-count">${nodes.length} 条</span>`)}
-  `;
-}
-
-function npcsPage(snap) {
-  const list = snap?.npcs || [];
-  if (!list.length) return emptyPage('还没有登场人物', '剧情里出现过的角色会被自动记进名册。');
-  const lives = snap.lifeDetails || [];
-  const cards = list.map(npc => {
-    const inner = npc.affinityInner == null ? '未知' : AFFINITY_INNER[npc.affinityInner] || '未知';
-    const outer = npc.affinityOuter == null ? '未知' : AFFINITY_OUTER[npc.affinityOuter] || '未知';
-    const notes = lives.filter(item => (item.subject || 'user') === npc.name);
-    return `<div class="mp-bk-card">
-      <div class="mp-bk-card-head">
-        <div>
-          <div class="mp-bk-name">${esc(npc.name)}</div>
-          <div class="mp-bk-role">${esc([npc.title, npc.relation].filter(Boolean).join(' · ') || '身份未记录')}</div>
-        </div>
-        <div class="mp-bk-tags">
-          ${npc.important ? tag('主要', 'key') : ''}
-          ${npc.follow ? tag('随行') : (npc.location ? tag(npc.location) : '')}
-        </div>
-      </div>
-      <div class="mp-bk-meta">${[npc.gender, npc.age ? `${npc.age} 岁` : ''].filter(Boolean).map(esc).join(' · ')}</div>
-      ${kv('外貌', npc.desc)}
-      ${kv('性格', npc.personality)}
-      ${kv('此刻', [npc.outfit, npc.condition].filter(Boolean).join(' / '))}
-      <div class="mp-bk-affinity">
-        <span>内心好感 · ${esc(inner)}</span>
-        <span>外在态度 · ${esc(outer)}</span>
-      </div>
-      ${npc.affinityNote ? `<div class="mp-bk-quiet">${esc(npc.affinityNote)}</div>` : ''}
-      ${notes.length ? `<div class="mp-bk-life">${notes.map(item => `<span>· ${esc(item.text)}</span>`).join('')}</div>` : ''}
-    </div>`;
-  }).join('');
-  return cards;
-}
-
-function itemsPage(snap) {
-  const items = snap?.items || [];
-  const logs = snap?.itemLog || [];
-  if (!items.length) return emptyPage('还没有物品', '获得、消耗、放在哪，都会记进这本台账。');
-  const rows = items.map(item => `
-    <div class="mp-bk-row">
-      <div class="mp-bk-row-main">
-        <span class="mp-bk-row-name">${esc(item.name)}${item.qty != null ? ` × ${esc(item.qty)}` : ''}</span>
-        <span class="mp-bk-row-sub">${esc(item.desc || (item.carried === false ? `存放在 ${item.location || '某处'}` : '随身带着'))}</span>
-      </div>
-      ${item.carried === false ? tag('存放') : tag('随身')}
-    </div>`).join('');
-  const logRows = logs.slice(-6).reverse().map(log => `
-    <div class="mp-bk-log">
-      <span>${esc(log.time || '时间未记')}</span>
-      <b>${esc(log.name)}</b>
-      <span>${log.kind === 'add' ? '获得' : log.kind === 'remove' ? '失去' : '变动'}${log.to != null ? ` → ${log.to}` : ''}</span>
-    </div>`).join('');
-  return `${rows}${section('变动日志', logRows || '<div class="mp-empty">还没有变动。</div>')}`;
-}
-
-function scenesPage(snap) {
-  const scenes = snap?.scenes || [];
-  if (!scenes.length) return emptyPage('还没有地点', '去过的地方会按由大到小排成一棵地图树。');
-  const rows = scenes.map(scene => {
-    const depth = Math.max(0, (scene.path || []).length - 1);
-    return `<div class="mp-bk-scene" style="--depth:${Math.min(depth, 3)}">
-      <span class="mp-bk-scene-dot"></span>
-      <div class="mp-bk-scene-main">
-        <span class="mp-bk-scene-name">${esc(scene.name)}</span>
-        <span class="mp-bk-scene-sub">${esc((scene.path || []).join(' / '))}${scene.desc ? ` · ${esc(scene.desc)}` : ''}</span>
-      </div>
-    </div>`;
-  }).join('');
-  return `<div class="mp-bk-tree">${rows}</div>`;
-}
-
-function plansPage(snap) {
-  const plans = snap?.plans || [];
-  if (!plans.length) return emptyPage('还没有计划与悬念', '约定、伏笔、没解开的谜题，都会被记在这里。');
-  const groups = [
-    ['open', '还没了结'],
-    ['resolved', '已了结'],
-  ];
-  return groups.map(([status, label]) => {
-    const list = plans.filter(plan => plan.status === status);
-    if (!list.length) return '';
-    return section(label, list.map(plan => `
-      <div class="mp-bk-plan${status === 'resolved' ? ' is-done' : ''}">
-        <div class="mp-bk-plan-head">
-          ${tag(plan.kind === 'suspense' ? '悬念' : '计划', plan.kind === 'suspense' ? 'warn' : '')}
-          <span class="mp-bk-plan-time">${esc(plan.createdTime || '')}${plan.targetTime ? ` → ${esc(plan.targetTime)}` : ''}</span>
-        </div>
-        <div class="mp-bk-plan-text">${esc(plan.content)}</div>
-        ${plan.resolvedReason ? `<div class="mp-bk-quiet">${esc(plan.resolvedReason)}</div>` : ''}
-      </div>`).join(''), `<span class="mp-bk-count">${list.length}</span>`);
-  }).join('');
-}
-
-function emptyPage(title, sub) {
-  return `<div class="mp-bk-empty">
-    <div class="mp-bk-empty-ic">${icon('bookmark')}</div>
-    <div class="mp-bk-empty-title">${esc(title)}</div>
-    <div class="mp-bk-empty-sub">${esc(sub)}</div>
-  </div>`;
-}
-
-/* ------------------------------------------------------------ App */
-
-let subscribed = false;
-
-function watchChanges(ctx) {
-  if (subscribed) return;
-  const book = api();
-  if (!book || typeof book.subscribe !== 'function') return;
-  try {
-    subscribed = true;
-    book.subscribe(() => {
-      const entry = ctx.shell?.stack?.[ctx.shell.stack.length - 1];
-      if (entry && entry.view === 'app-book') ctx.rerender();
-    });
-  } catch (error) {
-    subscribed = false;
-  }
-}
-
-const bookApp = {
-  id: 'app-book',
-
-  render(ctx) {
-    watchChanges(ctx);
-    const tab = ctx.shell.bookTab || 'overview';
-    const snap = snapshotOf();
-    const connected = Boolean(api());
-    const summary = ctx.state.settings.summary || {};
-    const presets = summaryApiPresets(ctx.state);
-    const activePreset = presets.find(item => item.id === summary.apiId);
-    const apiLabel = activePreset ? (activePreset.name || '手机接口') : '跟随自带';
-    const missing = (snap?.coverage?.missingAiFloors || []).length;
-    const busy = Boolean(ctx.shell.bookBusy);
-
-    const body = tab === 'summary'
-      ? summaryPage(ctx)
-      : tab === 'npcs' ? npcsPage(snap)
-        : tab === 'items' ? itemsPage(snap)
-          : tab === 'scenes' ? scenesPage(snap)
-            : tab === 'plans' ? plansPage(snap)
-              : overviewPage(snap);
-
-    const tabs = TABS.map(([value, label]) => `
-      <button class="mp-bk-tab${tab === value ? ' is-on' : ''}" data-act="bk-tab" data-tab="${value}" type="button">${esc(label)}</button>`).join('');
-
-    return `
-      <div class="mp-page-body mp-bk">
-        <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <div class="mp-title" style="flex:1">酒馆总结</div>
-          <button class="mp-icon-btn" data-act="bk-refresh" type="button" aria-label="刷新">${icon('refresh')}</button>
-        </div>
-        <div class="mp-subtitle">酒馆里的所有总结 · 摘要 / 人物 / 物品 / 场景 / 悬念</div>
-
-        <div class="mp-bk-bar">
-          <button class="mp-bk-bar-btn" data-act="bk-settings" type="button">
-            ${icon('code')}<span>接口 · ${esc(apiLabel)}</span>${icon('chevron')}
-          </button>
-          <button class="mp-bk-bar-btn${missing ? ' is-warn' : ''}" data-act="bk-backfill" type="button">
-            ${icon('refresh')}<span>${busy ? '补摘要中…' : `补摘要${missing ? ` · ${missing} 楼` : ''}`}</span>
-          </button>
-        </div>
-
-        <div class="mp-draw-state${connected ? ' is-on' : ''}">
-          ${icon('spark')}
-          <span>${connected ? `已接酒馆总结 · 第 ${esc(snap?.chat?.length ?? 0)} 楼` : '预览环境 · 下面是演示记忆'}</span>
-          <button class="mp-draw-state-btn" data-act="bk-settings" type="button">设置</button>
-        </div>
-
-        <div class="mp-bk-tabs">${tabs}</div>
-        <div class="mp-bk-body">${body}</div>
-      </div>`;
-  },
-
-  handle(ctx, act, data) {
-    if (act === 'bk-tab') {
-      ctx.shell.bookTab = data.tab || 'overview';
-      ctx.shell.bookNode = '';
-      ctx.rerender();
-      return true;
-    }
-
-    if (act === 'bk-node') {
-      ctx.shell.bookNode = ctx.shell.bookNode === data.id ? '' : String(data.id || '');
-      ctx.rerender();
-      return true;
-    }
-
-    if (act === 'bk-settings') {
-      ctx.go('book-settings');
-      return true;
-    }
-
-    if (act === 'bk-backfill') {
-      if (ctx.shell.bookBusy) {
-        ctx.toast('正在补，等这一批跑完');
-        return true;
-      }
-      const bridgeReady = Boolean(globalThis.__STBaiBaiBookPhoneApi?.backfill);
-      if (!bridgeReady) {
-        ctx.toast('酒馆总结还没加载，装好并刷新酒馆后再补');
-        return true;
-      }
-      ctx.shell.bookBusy = true;
-      ctx.rerender();
-      ctx.toast('开始补摘要，跑完后自动刷新');
-      backfillSummaries().then(result => {
-        ctx.shell.bookBusy = false;
-        ctx.rerender();
-        if (result?.error) ctx.toast(`补摘要失败：${result.error}`);
-        else if (!result || !result.total) ctx.toast('没有待补的楼层');
-        else ctx.toast(result.cancelled ? `已取消 · 补完 ${result.done}/${result.total} 楼` : `补完 ${result.done}/${result.total} 楼`);
-      });
-      return true;
-    }
-
-    if (act === 'bk-refresh') {
-      const ok = Boolean(api());
-      ctx.rerender();
-      ctx.toast(ok ? '酒馆总结已刷新' : '预览里没有酒馆总结，装到酒馆后才会读到真数据');
-      return true;
-    }
-
-    return false;
-  },
-};
-
-/* ------------------------------------------------------ 酒馆总结 · 设置 */
-
-function setRow({ iconName, title, sub, act, toggle, value, dataId }) {
-  return `
-    <button class="mp-set-row" data-act="${act}"${dataId ? ` data-id="${esc(dataId)}"` : ''} type="button">
-      <span class="mp-set-ico">${icon(iconName)}</span>
-      <span class="mp-set-name">${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
-      ${toggle !== undefined
-        ? `<span class="mp-switch${toggle ? ' on' : ''}"></span>`
-        : value ? `<span class="mp-set-value">${esc(value)}</span>` : `<span style="color:var(--text-4)">${icon('chevron')}</span>`}
-    </button>`;
-}
-
-const bookSettingsApp = {
-  id: 'book-settings',
-
-  render(ctx) {
-    const summary = ctx.state.settings.summary || {};
-    const skip = Boolean(summary.skipFirstFloor);
-    const presets = summaryApiPresets(ctx.state);
-    const activeId = summary.apiId || '';
-
-    const apiRows = presets.map(preset => setRow({
-      iconName: 'code',
-      title: preset.name || '未命名接口',
-      sub: [preset.model, preset.url].filter(Boolean).join(' · ').slice(0, 48),
-      act: 'bks-api',
-      value: activeId === preset.id ? '使用中' : '',
-      dataId: preset.id,
-    })).join('');
-
-    return `
-      <div class="mp-page-body mp-bk">
-        <div class="mp-title" style="margin-top:2px">总结设置</div>
-        <div class="mp-subtitle">首楼开关 · 总结走哪套接口（主界面「接口」也进这里）</div>
-
-        <div class="mp-group" style="margin-top:14px">
-          <div class="mp-group-label">首楼</div>
-          <div class="mp-group-box">
-            ${setRow({
-              iconName: 'bookmark',
-              title: '首楼不总结，显示原文',
-              sub: skip ? '首楼的总结已关掉，摘要页直接给原文' : '默认把首楼也总结进摘要',
-              act: 'bks-first',
-              toggle: skip,
-            })}
-          </div>
-        </div>
-
-        <div class="mp-group" style="margin-top:14px">
-          <div class="mp-group-label">总结接口</div>
-          <div class="mp-group-box">
-            ${setRow({
-              iconName: 'book',
-              title: '跟随酒馆总结自带设置',
-              sub: '用酒馆总结自己配的副 API',
-              act: 'bks-api-auto',
-              value: activeId ? '' : '使用中',
-            })}
-            ${apiRows || ''}
-          </div>
-          ${presets.length ? '' : '<div class="mp-empty" style="padding:18px 4px 0">还没存接口。先去「接口」里加一套地址 + 模型，再回来选。</div>'}
-        </div>
-
-        <div class="mp-bk-note">选了手机接口后，酒馆总结的摘要与总结两个任务都会走这条渠道；以后在「接口」里改了同一套预设，再点一次它就同步过去。</div>
-      </div>`;
-  },
-
-  handle(ctx, act, data) {
-    if (act === 'bks-first') {
-      const summary = ctx.state.settings.summary || (ctx.state.settings.summary = {});
-      summary.skipFirstFloor = !summary.skipFirstFloor;
-      ctx.save();
-      ctx.rerender();
-      ctx.toast(summary.skipFirstFloor ? '首楼改为显示原文' : '首楼恢复总结');
-      return true;
-    }
-
-    if (act === 'bks-api') {
-      const preset = summaryApiPresets(ctx.state).find(item => item.id === data.id);
-      if (!preset) return true;
-      const summary = ctx.state.settings.summary || (ctx.state.settings.summary = {});
-      const ok = applySummaryApi(preset);
-      if (!ok) {
-        ctx.toast('酒馆总结还没加载，装好并刷新酒馆后再选');
-        return true;
-      }
-      summary.apiId = preset.id;
-      ctx.save();
-      ctx.rerender();
-      ctx.toast(`总结接口已切到「${preset.name || '手机接口'}」`);
-      return true;
-    }
-
-    if (act === 'bks-api-auto') {
-      const summary = ctx.state.settings.summary || (ctx.state.settings.summary = {});
-      clearSummaryApi();
-      summary.apiId = '';
-      ctx.save();
-      ctx.rerender();
-      ctx.toast('已跟随酒馆总结自带设置');
-      return true;
-    }
-
-    return false;
-  },
-};
-
-exports["bookApp"] = bookApp;
-exports["bookSettingsApp"] = bookSettingsApp;
-};
 __mods["meme/apps/music.js"] = function(module, exports, __req){
 /**
  * meme-phone · 音乐
@@ -11150,6 +10572,209 @@ exports["stopMusic"] = stopMusic;
 exports["musicApp"] = musicApp;
 exports["musicPlaylistApp"] = musicPlaylistApp;
 };
+__mods["meme/apps/memory.js"] = function(module, exports, __req){
+/**
+ * meme-phone · 酒馆记忆预设页
+ *
+ * 从聊天设置里的「酒馆记忆」进来：给手机选默认方案，也能新建 / 改名 / 改来源 / 改层数 / 删除。
+ */
+
+const { icon } = __req("meme/icons.js");
+const { newId, memoryPresetsOf } = __req("meme/data.js");
+const { esc } = __req("meme/shell.js");
+const { MEMORY_MODES, memoryModeLabel, memoryPresetSummary } = __req("meme/memory.js");
+
+function presetById(state, id) {
+  return memoryPresetsOf(state).find(item => item.id === id) || null;
+}
+
+function row(state, preset) {
+  const active = state.settings.memory?.activeId === preset.id;
+  return `
+    <button class="mp-set-row" data-act="mem-edit" data-id="${esc(preset.id)}" type="button">
+      <span class="mp-set-ico">${icon('book')}</span>
+      <span class="mp-set-name">${esc(preset.name)}<small>${esc(memoryPresetSummary(preset))}</small></span>
+      ${active ? '<span class="mp-set-value">使用中</span>' : ''}
+      <span style="color:var(--text-4)">${icon('chevron')}</span>
+    </button>`;
+}
+
+function renderPage(ctx) {
+  const presets = memoryPresetsOf(ctx.state);
+  const active = presetById(ctx.state, ctx.state.settings.memory?.activeId) || presets[0] || null;
+  return `
+    <div class="mp-page-body">
+      <div class="mp-title">酒馆记忆</div>
+      <div class="mp-subtitle">默认读这个角色最新的酒馆聊天；有柏宝书总结时先用总结</div>
+
+      <div class="mp-group" style="margin-top:16px">
+        <div class="mp-group-label">手机默认方案</div>
+        <div class="mp-group-box">
+          ${presets.map(item => row(ctx.state, item)).join('') || '<div class="mp-empty">还没有方案。</div>'}
+        </div>
+      </div>
+
+      <div class="mp-group">
+        <div class="mp-group-box">
+          <button class="mp-set-row" data-act="mem-new" type="button">
+            <span class="mp-set-ico">${icon('plus')}</span>
+            <span class="mp-set-name">新建一套<small>在「${esc(active?.name || '默认')}」的基础上改</small></span>
+            <span style="color:var(--text-4)">${icon('chevron')}</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="mp-group-label" style="margin-top:16px">怎么读</div>
+      <div class="mp-card">
+        <div class="mp-card-title">自动（默认）</div>
+        <div class="mp-card-sub">这个角色当前酒馆聊天有柏宝书总结，就注入总结；没有总结，才读最近几层酒馆聊天原文。</div>
+        <div class="mp-card-title" style="margin-top:12px">层数</div>
+        <div class="mp-card-sub">一层就是酒馆里的一条消息。层数越多，模型记得越远，但占的上下文也越多。</div>
+      </div>
+    </div>`;
+}
+
+function openEdit(ctx, preset) {
+  if (!preset) return;
+  ctx.openSheet({
+    title: preset.name,
+    items: [
+      { label: '设为手机默认', value: 'use', note: '所有跟随手机的会话都用这套' },
+      { label: '改名', value: 'rename' },
+      { label: '改记忆来源', value: 'mode', note: memoryModeLabel(preset.mode) },
+      { label: '改保留层数', value: 'floors', note: `最近 ${preset.floors || 10} 层` },
+      { label: '复制一套', value: 'clone' },
+      { label: '删除这套', value: 'delete', danger: true },
+    ],
+    onPick: (value) => {
+      const store = ctx.state.settings.memory;
+      const live = presetById(ctx.state, preset.id);
+      if (!live) return;
+
+      if (value === 'use') {
+        store.activeId = live.id;
+        ctx.save();
+        ctx.rerender();
+        ctx.toast(`手机默认记忆改成「${live.name}」`);
+        return;
+      }
+
+      if (value === 'rename') {
+        ctx.openSheet({
+          kind: 'text', title: '改个名字', value: live.name, placeholder: '比如：最近原文、长记忆',
+          onText: (text) => {
+            const name = String(text || '').trim().slice(0, 20);
+            if (!name) return;
+            live.name = name;
+            ctx.save();
+            ctx.rerender();
+          },
+        });
+        return;
+      }
+
+      if (value === 'mode') {
+        ctx.openSheet({
+          title: '记忆来源',
+          items: MEMORY_MODES.map(item => ({ label: item.label, value: item.value, note: item.hint })),
+          onPick: (mode) => {
+            if (!['auto', 'summary', 'recent'].includes(mode)) return;
+            live.mode = mode;
+            ctx.save();
+            ctx.rerender();
+          },
+        });
+        return;
+      }
+
+      if (value === 'floors') {
+        ctx.openSheet({
+          kind: 'text', title: '保留多少层', value: String(live.floors || 10),
+          placeholder: '1 到 50，默认 10',
+          onText: (text) => {
+            const floors = Math.max(1, Math.min(50, Number(String(text).replace(/[^\d]/g, '')) || 10));
+            live.floors = floors;
+            ctx.save();
+            ctx.rerender();
+            ctx.toast(`最近 ${floors} 层`);
+          },
+        });
+        return;
+      }
+
+      if (value === 'clone') {
+        const copy = {
+          id: newId('mem'),
+          name: `${live.name} 副本`.slice(0, 20),
+          mode: live.mode,
+          floors: live.floors,
+        };
+        store.presets.push(copy);
+        ctx.save();
+        ctx.rerender();
+        openEdit(ctx, copy);
+        return;
+      }
+
+      if (value === 'delete') {
+        if (store.presets.length <= 1) {
+          ctx.toast('至少留一套记忆方案');
+          return;
+        }
+        ctx.openSheet({
+          title: `删除「${live.name}」？`,
+          items: [
+            { label: '确认删除', value: 'delete', danger: true },
+            { label: '先留着', value: 'keep' },
+          ],
+          onPick: (pick) => {
+            if (pick !== 'delete') return;
+            const index = store.presets.findIndex(item => item.id === live.id);
+            if (index < 0) return;
+            store.presets.splice(index, 1);
+            if (store.activeId === live.id) store.activeId = store.presets[0].id;
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('这套记忆方案删掉了');
+          },
+        });
+      }
+    },
+  });
+}
+
+function handle(ctx, act, data) {
+  if (act === 'mem-edit') {
+    openEdit(ctx, presetById(ctx.state, data.id));
+    return true;
+  }
+
+  if (act === 'mem-new') {
+    const active = presetById(ctx.state, ctx.state.settings.memory?.activeId) || memoryPresetsOf(ctx.state)[0] || null;
+    const preset = {
+      id: newId('mem'),
+      name: '新的记忆方案',
+      mode: active?.mode || 'auto',
+      floors: active?.floors || 10,
+    };
+    ctx.state.settings.memory.presets.push(preset);
+    ctx.save();
+    ctx.rerender();
+    openEdit(ctx, preset);
+    return true;
+  }
+
+  return false;
+}
+
+const memoryPresetsApp = {
+  id: 'memory-presets', name: '酒馆记忆', icon: 'book',
+  render(ctx) { return renderPage(ctx); },
+  handle(ctx, act, data) { return handle(ctx, act, data); },
+};
+
+exports["memoryPresetsApp"] = memoryPresetsApp;
+};
 __mods["meme/index.js"] = function(module, exports, __req){
 /**
  * meme-phone · 模块入口
@@ -11161,7 +10786,7 @@ const { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPreset
 const { createShell, applyWall } = __req("meme/shell.js");
 const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } = __req("meme/host.js");
 const { chatApp, threadApp, threadSettingsApp } = __req("meme/apps/chat.js");
-const { summaryContext } = __req("meme/book.js");
+const { buildMemoryContext } = __req("meme/memory.js");
 const { diaryApp, threadDiaryApp } = __req("meme/apps/diary.js");
 const { contactsApp, contactApp } = __req("meme/apps/contacts.js");
 const { settingsApp, appearanceApp } = __req("meme/apps/settings.js");
@@ -11170,8 +10795,8 @@ const { apiListApp, apiPresetApp } = __req("meme/apps/api.js");
 const { userListApp, userEditApp } = __req("meme/apps/user.js");
 const { charactersApp, characterApp } = __req("meme/apps/characters.js");
 const { charPhoneApp, charPhoneThreadApp, ensureLookup } = __req("meme/apps/charphone.js");
-const { bookApp, bookSettingsApp } = __req("meme/apps/book.js");
 const { musicApp, musicPlaylistApp, stopMusic } = __req("meme/apps/music.js");
+const { memoryPresetsApp } = __req("meme/apps/memory.js");
 const {
   extrasApp, extraDetailApp, emojiApp,
   plansApp, dressApp, helpApp,
@@ -11198,8 +10823,7 @@ const APPS = {
   'character-card': characterApp,
   'p-charphone': charPhoneApp,
   'p-chatphone': charPhoneThreadApp,
-  'app-book': bookApp,
-  'book-settings': bookSettingsApp,
+  'memory-presets': memoryPresetsApp,
   'app-music': musicApp,
   'music-playlist': musicPlaylistApp,
   thread: threadApp,
@@ -11215,7 +10839,6 @@ const DESKTOP_APPS = [
   { id: 'plans', name: '计划', icon: 'plan' },
   { id: 'dress', name: '装扮', icon: 'brush' },
   { id: 'api', name: '接口', icon: 'code' },
-  { id: 'book', name: '酒馆总结', icon: 'book' },
   { id: 'characters', name: '查角色', icon: 'contacts' },
 ];
 
@@ -11244,18 +10867,18 @@ function transcript(state, chat, limit = 10) {
 }
 
 function makeAi(state) {
-  /* 手机聊天 / 日记的背景只用「酒馆总结」，不再读酒馆原文 */
-  function story(limit = 1200) {
-    return summaryContext(limit, { skipFirstFloor: state.settings.summary?.skipFirstFloor });
+  /* 手机聊天 / 日记的背景走「酒馆记忆」：有柏宝书总结先用总结，没有就读最近几层酒馆聊天 */
+  function story(chat, limit = 1200) {
+    return buildMemoryContext(state, chat, limit);
   }
 
   return {
     async reply(context, chat, contact, demoReply) {
-      const storyBlock = story(1200);
+      const storyBlock = await story(chat, 1200);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`,
         '要求：口语、短、不超过 40 字，不要旁白、不要括号动作。',
-        storyBlock.text ? `【酒馆里已有的总结】\n${storyBlock.text}` : '',
+        storyBlock.text ? `【酒馆记忆】\n${storyBlock.text}` : '',
         transcript(state, chat),
         `${state.settings.user.name}：${chat.messages[chat.messages.length - 1]?.text || ''}`,
         `${contact?.name || '对方'}：`,
@@ -11265,12 +10888,12 @@ function makeAi(state) {
     },
 
     async proactive(context, chat, contact, demoReply) {
-      const storyBlock = story(900);
+      const storyBlock = await story(chat, 900);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。`,
         `距离上次说话已经过去 ${state.settings.proactive.idleMinutes} 分钟，你要主动发一条消息。`,
         '要求：口语、短、不超过 30 字，像是忽然想起什么，不要提问过多。',
-        storyBlock.text ? `【酒馆里已有的总结】\n${storyBlock.text}` : '',
+        storyBlock.text ? `【酒馆记忆】\n${storyBlock.text}` : '',
         transcript(state, chat, 6),
         `${contact?.name || '对方'}：`,
       ].filter(Boolean).join('\n');
@@ -11357,11 +10980,11 @@ function makeAi(state) {
         const chats = Object.values(state.chats);
         material = chats.map(item => transcript(state, item, 10)).join('\n');
       }
-      const storyBlock = story(900);
+      const storyBlock = await story(chat, 900);
       const prompt = [
         state.diary.prompt || '写一段当天的日记。',
         `日期：${day}`,
-        storyBlock.text ? `酒馆里的总结：\n${storyBlock.text}` : '',
+        storyBlock.text ? `酒馆记忆：\n${storyBlock.text}` : '',
         '当天的聊天：',
         material || '（这一天没有聊天记录）',
         '写成一段自然的中文日记，不要分点，不要写标题。',
@@ -11655,7 +11278,6 @@ function goView(view, params = {}) {
     if (first) payload = { contactId: first.id };
   }
   if (view === 'p-charphone' && params.tab) ctx.shell.cpTab = params.tab;
-  if (view === 'app-book' && params.tab) ctx.shell.bookTab = params.tab;
   if (view === 'p-chatphone' && (!payload.contactId || !payload.peer)) {
     const first = Object.values(ctx.state.contacts || {}).find(item => item.kind !== 'group');
     const lookup = first ? ensureLookup(ctx.state, first) : null;

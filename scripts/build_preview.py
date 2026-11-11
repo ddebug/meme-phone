@@ -16,6 +16,7 @@ MODULES = [
     "meme/icons.js",
     "meme/shell.js",
     "meme/book.js",
+    "meme/memory.js",
     "meme/apps/chat.js",
     "meme/apps/diary.js",
     "meme/apps/contacts.js",
@@ -26,8 +27,8 @@ MODULES = [
     "meme/apps/user.js",
   "meme/apps/characters.js",
   "meme/apps/charphone.js",
-  "meme/apps/book.js",
   "meme/apps/music.js",
+  "meme/apps/memory.js",
     "meme/index.js",
 ]
 ENTRY = "meme/index.js"

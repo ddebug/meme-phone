@@ -11,6 +11,8 @@ import { chatApp, threadApp } from './apps/chat.js';
 import { diaryApp } from './apps/diary.js';
 import { contactsApp, contactApp } from './apps/contacts.js';
 import { settingsApp, appearanceApp } from './apps/settings.js';
+import { drawApp } from './apps/draw.js';
+import { apiListApp, apiPresetApp } from './apps/api.js';
 import {
   extrasApp, extraDetailApp, walletApp, favoritesApp, emojiApp,
   membershipApp, plansApp, dressApp, helpApp,
@@ -30,6 +32,9 @@ const APPS = {
   'app-plans': plansApp,
   'app-dress': dressApp,
   'app-help': helpApp,
+  'app-draw': drawApp,
+  'app-api': apiListApp,
+  'api-item': apiPresetApp,
   thread: threadApp,
   contact: contactApp,
   'extra-detail': extraDetailApp,
@@ -39,11 +44,11 @@ const DESKTOP_APPS = [
   { id: 'extras', name: '小剧场', icon: 'theater' },
   { id: 'wallet', name: '钱包', icon: 'wallet' },
   { id: 'favorites', name: '收藏', icon: 'bookmark' },
-  { id: 'emoji', name: '表情', icon: 'smile' },
+  { id: 'draw', name: '绘图', icon: 'image' },
   { id: 'membership', name: '会员', icon: 'crown' },
   { id: 'plans', name: '计划', icon: 'plan' },
   { id: 'dress', name: '装扮', icon: 'brush' },
-  { id: 'help', name: '帮助', icon: 'help' },
+  { id: 'api', name: '接口', icon: 'code' },
 ];
 
 const DOCK_APPS = [

@@ -69,3 +69,17 @@ python scripts/build_preview.py
 ## 和旧项目的关系
 
 独立项目，不引用旧项目的代码、命名或存储文件。旧项目保持原样，等这套界面对过之后再谈替换。
+
+## 绘图与接口
+
+桌面多了两个图标：**绘图**（NovelAI）和**接口**（预设）。
+
+- 接口页里一套预设 = 名称 + 引擎（酒馆默认 / OpenAI 兼容 / NovelAI / 自定义）+ 地址 + 路径 + 模型 + Key + 温度。聊天和绘图各挑一套，点「设为绘图」时 NovelAI 那套会自动灌进绘图页。
+- 绘图页：画风预设（正向 / 反向）、中文画面描述、尺寸 / 步数 / 引导 / 采样器 / 噪声 / 种子，出图后可以「再来一张」。
+- 没填地址和 Key 时不出网，只落一条演示记录并提示去哪填；填了之后走 `POST {地址}/ai/generate-image`，请求体是 NovelAI v4 格式（`n_samples:1`、`qualityToggle:true`、`v4_prompt.caption.base_caption`）。
+- 已知限制：NovelAI 官方端点回的是 zip，当前只解 JSON / 直出图片的返回，zip 需要额外的解压库。
+
+## 召唤
+
+- 扩展菜单里点 `meme-phone` 打开。
+- 也可以在快捷回复（QR）里放一条 `/meme`，点一下召唤手机；仓库里的 `quick-reply/summon-phone.json` 直接导入酒馆的快捷回复即可。

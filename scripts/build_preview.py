@@ -20,6 +20,8 @@ MODULES = [
     "meme/apps/contacts.js",
     "meme/apps/settings.js",
     "meme/apps/more.js",
+    "meme/apps/draw.js",
+    "meme/apps/api.js",
     "meme/index.js",
 ]
 ENTRY = "meme/index.js"

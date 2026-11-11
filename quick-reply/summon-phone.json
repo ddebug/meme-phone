@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "name": "summon-meme-phone",
+  "disableSend": false,
+  "placeBeforeInput": false,
+  "injectUsername": false,
+  "showInput": false,
+  "qrList": [
+    {
+      "id": 0,
+      "label": "召唤手机",
+      "showLabel": true,
+      "title": "打开 meme-phone 小手机",
+      "message": "/meme",
+      "contextList": [],
+      "preventAutoExecute": true,
+      "isHidden": false,
+      "autoExecute": false
+    }
+  ]
+}

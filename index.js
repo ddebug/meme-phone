@@ -77,6 +77,7 @@ function mountPanel() {
   panel.innerHTML = `
     <summary>meme-phone · 桌面式小手机</summary>
     <p class="meme-note">桌面 + App 图标的前端，数据单独存在 <code>/user/files/meme-phone.json</code>，不会写进酒馆的角色卡或聊天记录。</p>
+    <p class="meme-note">召唤：点扩展菜单，或者在快捷回复里放一条 <code>/meme</code>，点一下就打开手机。</p>
     <div class="meme-actions">
       <button type="button" data-role="open">打开手机</button>
       <button type="button" data-role="export">导出备份</button>
@@ -131,8 +132,36 @@ function mountPanel() {
   });
 }
 
+/* ------------------------------------------------------------ 召唤入口 */
+
+/**
+ * 注册 /meme 斜杠命令：快捷回复（QR）点一下就能召唤出手机。
+ * 酒馆没给这套接口时静默跳过，不影响菜单入口。
+ */
+function registerSlashCommand() {
+  try {
+    const ctx = globalThis.SillyTavern?.getContext?.() || {};
+    const Parser = ctx.SlashCommandParser || globalThis.SlashCommandParser;
+    const Command = ctx.SlashCommand || globalThis.SlashCommand;
+    if (!Parser?.addCommandObject || !Command?.fromProps) return false;
+    if (globalThis.__MEME_QR_REGISTERED__) return true;
+    Parser.addCommandObject(Command.fromProps({
+      name: 'meme',
+      aliases: ['召唤手机'],
+      helpString: '打开 meme-phone 小手机（也可以给它当快捷回复用）',
+      returns: 'nothing',
+      callback: () => { void openPhone(); return ''; },
+    }));
+    globalThis.__MEME_QR_REGISTERED__ = true;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function startMemePhone() {
   mountPanel();
+  registerSlashCommand();
   try {
     await boot();
     setStatus(describeStatus({ ready: true }));

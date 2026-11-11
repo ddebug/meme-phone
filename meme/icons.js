@@ -63,5 +63,9 @@ export const TINT = {
   extras: ['#e2ccf6', '#bf9cec'],
   emoji: ['#fbd0c4', '#f39f92'],
   plans: ['#bfe9d6', '#7fd2bc'],
+  image: ['#c9e2f5', '#93c6ec'],
+  code: ['#d3cdf0', '#aea3e6'],
+  draw: ['#c9e2f5', '#93c6ec'],
+  api: ['#d3cdf0', '#aea3e6'],
   dress: ['#c3d6f2', '#8fb3e8'],
 };

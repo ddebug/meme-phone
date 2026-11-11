@@ -17,7 +17,22 @@ export function emptyState() {
       user: { name: '我', avatar: '' },
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
       chat: { showTime: true, enterToSend: false, remind: true, wake: true },
-      api: { source: 'default', model: '', preset: 'default' },
+      api: {
+        activeChat: '', activeImage: '', presets: [
+          { id: 'api_default', name: '酒馆默认', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
+        ],
+      },
+    },
+    draw: {
+      config: {
+        url: '', key: '', model: 'nai-diffusion-4-curated-preview',
+        size: '832x1216', steps: 28, scale: 5,
+        sampler: 'k_euler_ancestral', noise: 'karras', seed: '',
+      },
+      presets: [{ name: '默认', pos: '', neg: '' }],
+      presetIdx: 0,
+      lastPrompt: '',
+      history: [],
     },
     contacts: {},
     chats: {},
@@ -231,7 +246,22 @@ export function demoState() {
   const state = emptyState();
   state.settings.user = { name: '颜', avatar: '' };
   state.settings.user.name = '颜';
-  state.settings.api = { source: 'demo', model: '', preset: 'default' };
+  state.settings.api.activeChat = 'api_default';
+  state.settings.api.activeImage = 'api_default';
+  state.settings.api.presets = [
+    { id: 'api_default', name: '酒馆默认', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
+    { id: 'api_nai', name: '我的 NovelAI', engine: 'novelai', url: 'https://image.novelai.net', path: '/ai/generate-image', model: 'nai-diffusion-4', key: 'pst-demo', temp: 0.8 },
+    { id: 'api_local', name: '本地 OpenAI', engine: 'openai', url: 'http://127.0.0.1:8080', path: '/v1/chat/completions', model: 'gpt-4o-mini', key: 'sk-demo', temp: 0.9 },
+  ];
+  state.draw.lastPrompt = '沈砚坐在便利店门口的台阶上，夜里，侧脸，路灯下点了一支烟';
+  state.draw.presets = [
+    { name: '默认', pos: '', neg: '' },
+    { name: '胶片人像', pos: 'film grain, kodak portra, natural light, 50mm', neg: 'oversaturated, plastic skin' },
+  ];
+  state.draw.history = [
+    { id: 'img_demo1', prompt: '便利店台阶上的夜，侧脸，路灯', seed: 20261111, url: '', tint: 'linear-gradient(150deg,#e6dcff,#c9bcf7 60%,#b3d6f2)', at: Date.now() },
+    { id: 'img_demo2', prompt: '雨夜车窗上的水痕', seed: 88421337, url: '', tint: 'linear-gradient(150deg,#ffe3ef,#f8c6dd 60%,#efe6ff)', at: Date.now() - 60000 },
+  ];
 
   const shen = addContact(state, { name: '沈砚', signature: '加班别等我了', status: 'online' });
   const jiang = addContact(state, { name: '江迟', signature: '在听老歌', status: 'busy' });
@@ -337,7 +367,18 @@ export function normalize(raw) {
     wallet: { ...base.wallet, ...(raw.wallet || {}) },
     membership: { ...base.membership, ...(raw.membership || {}) },
     dress: { ...base.dress, ...(raw.dress || {}) },
+    draw: {
+      ...base.draw,
+      ...(raw.draw || {}),
+      config: { ...base.draw.config, ...(raw.draw?.config || {}) },
+      presets: Array.isArray(raw.draw?.presets) && raw.draw.presets.length ? raw.draw.presets : base.draw.presets,
+      history: Array.isArray(raw.draw?.history) ? raw.draw.history : [],
+    },
   };
+  merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
+  merged.settings.api.presets = Array.isArray(merged.settings.api.presets) && merged.settings.api.presets.length
+    ? merged.settings.api.presets
+    : base.settings.api.presets;
   merged.version = SCHEMA_VERSION;
   merged.contacts = merged.contacts || {};
   merged.chats = merged.chats || {};

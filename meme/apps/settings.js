@@ -7,9 +7,9 @@ import { icon, TINT } from '../icons.js';
 import { esc, tintStyle } from '../shell.js';
 import { contactsOf, chatsOf, unreadTotal } from '../data.js';
 
-function row(ctx, { iconName, title, sub, act, value, toggle }) {
+function row(ctx, { iconName, title, sub, act, value, toggle, app }) {
   return `
-    <button class="mp-set-row" data-act="${act || 'noop'}" type="button">
+    <button class="mp-set-row" data-act="${act || 'noop'}"${app ? ` data-app="${app}"` : ''} type="button">
       <span class="mp-set-ico">${icon(iconName)}</span>
       <span class="mp-set-name">${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
       ${toggle !== undefined
@@ -66,6 +66,16 @@ export const settingsApp = {
         </div>
 
         <div class="mp-group">
+          <div class="mp-group-label">生成</div>
+          <div class="mp-group-box">
+            ${row(ctx, { iconName: 'image', title: '绘图', sub: state.draw?.config?.key ? `${state.draw.config.model} · 已填 Key` : 'NovelAI · 还没填地址和 Key', act: 'set-open', app: 'draw' })}
+            ${row(ctx, { iconName: 'code', title: '接口与预设', sub: '聊天和绘图各挑一套地址 / Key / 模型', act: 'set-open', app: 'api' })}
+            ${row(ctx, { iconName: 'smile', title: '表情包', sub: '表情面板里那些贴纸', act: 'set-open', app: 'emoji' })}
+            ${row(ctx, { iconName: 'help', title: '帮助', sub: '怎么用、快捷键、常见问题', act: 'set-open', app: 'help' })}
+          </div>
+        </div>
+
+        <div class="mp-group">
           <div class="mp-group-label">数据</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'copy', title: '导出备份', sub: '一份 json，包含全部聊天与日记', act: 'set-export' })}
@@ -86,6 +96,11 @@ export const settingsApp = {
     const state = ctx.state;
 
     if (act === 'set-open-appearance') { ctx.go('app-appearance'); return true; }
+
+    if (act === 'set-open') {
+      if (data?.app) ctx.go(`app-${data.app}`);
+      return true;
+    }
 
     if (act === 'set-profile') {
       ctx.openSheet({

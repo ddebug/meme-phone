@@ -87,6 +87,56 @@ export async function generate({ prompt, system = '', demoReply = '' }) {
   return { text: demoReply, demo: true };
 }
 
+/**
+ * NovelAI 出图。
+ * 请求体按 NovelAI 官方 v4 格式：n_samples 固定 1，seed 由调用方给。
+ * 返回 { url } 时是 data URI（图小，直接塞进内存够用）；失败抛错，由界面提示。
+ */
+export async function novelaiImage({
+  url, key, model, width, height, steps = 28, scale = 5,
+  sampler = 'k_euler_ancestral', noise = 'karras', seed, prompt = '', negative = '',
+}) {
+  const base = String(url || 'https://image.novelai.net').trim().replace(/\/+$/, '');
+  const token = String(key || '').trim();
+  if (!token) throw new Error('先填 NovelAI 的 Key');
+
+  const payload = {
+    width, height, n_samples: 1, steps, scale,
+    sampler, noise_schedule: noise, cfg_rescale: 0,
+    seed: Number(seed) || Math.floor(Math.random() * 4294967295),
+    qualityToggle: true, sm: false, sm_dyn: false,
+    negative_prompt: negative || '',
+    v4_prompt: { caption: { base_caption: prompt, char_captions: [] }, use_coords: false, use_order: false },
+  };
+  if (model) payload.model = model;
+
+  let res;
+  try {
+    res = await fetch(`${base}/ai/generate-image`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    throw new Error(`连不上 ${base}：${error.message}`);
+  }
+  if (!res.ok) throw new Error(`NovelAI 返回 ${res.status}（Key 或额度不对）`);
+
+  const type = res.headers.get('content-type') || '';
+  if (type.includes('application/json')) {
+    const json = await res.json().catch(() => null);
+    const b64 = json?.image || json?.data?.[0]?.b64_json || '';
+    if (!b64) throw new Error('返回里没有图');
+    return { url: b64.startsWith('data:') ? b64 : `data:image/png;base64,${b64}` };
+  }
+  if (type.includes('image/')) {
+    const blob = await res.blob();
+    return { url: URL.createObjectURL(blob) };
+  }
+  // NovelAI 官方端点回的是 zip，浏览器里要解压才能拿到 png。
+  throw new Error('NovelAI 返回了 zip，当前只支持直出图片的兼容接口');
+}
+
 /** 宿主可用性，用于设置页展示「已接入 / 未接入」。 */
 export async function probeHost() {
   const script = await loadHostScript();

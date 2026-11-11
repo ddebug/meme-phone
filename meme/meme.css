@@ -1626,3 +1626,299 @@
 .mp-page .mp-page-body {
   margin-bottom: 78px;
 }
+
+
+/* ============================ 绘图 + 接口（本段新增） ============================ */
+
+.mp-root .mp-draw-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 14px;
+  background: rgba(233, 177, 92, .12);
+  color: #8a6a33;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.mp-root .mp-draw-state.is-on {
+  background: rgba(127, 210, 188, .16);
+  color: #2c7f68;
+}
+.mp-root .mp-draw-state .mp-i {
+  width: 15px; height: 15px; flex: none;
+  opacity: .8;
+}
+.mp-root .mp-draw-state span { flex: 1; min-width: 0; }
+.mp-root .mp-draw-state-btn {
+  flex: none;
+  border: 0;
+  background: rgba(255, 255, 255, .7);
+  color: inherit;
+  font: inherit;
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.mp-root .mp-draw-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 0 4px;
+  scrollbar-width: none;
+}
+.mp-root .mp-draw-chips::-webkit-scrollbar { display: none; }
+
+.mp-root .mp-draw-desc {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+}
+.mp-root .mp-draw-desc-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  line-height: 1.62;
+}
+.mp-root .mp-draw-desc-empty {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 1.62;
+  color: var(--text-3);
+}
+.mp-root .mp-draw-desc .mp-i { width: 16px; height: 16px; color: var(--lav); flex: none; }
+
+.mp-root .mp-draw-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.mp-root .mp-draw-param {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.mp-root .mp-draw-val {
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 58%;
+}
+
+.mp-root .mp-draw-run {
+  width: 100%;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(120deg, #a796f7, #8e7bf2 45%, #f2a0c2);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  cursor: pointer;
+  box-shadow: 0 12px 26px rgba(142, 123, 242, .28);
+}
+.mp-root .mp-draw-run .mp-i { width: 16px; height: 16px; }
+.mp-root .mp-draw-run.is-busy { opacity: .7; }
+
+.mp-root .mp-draw-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.mp-root .mp-draw-card {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: var(--shadow-s);
+}
+.mp-root .mp-draw-img {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 11px;
+  overflow: hidden;
+}
+.mp-root .mp-draw-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mp-root .mp-draw-ph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: rgba(43, 41, 55, .38);
+  font-size: 11px;
+}
+.mp-root .mp-draw-ph .mp-i { width: 20px; height: 20px; }
+.mp-root .mp-draw-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 2px 4px;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.mp-root .mp-draw-meta > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-root .mp-draw-seed { color: var(--text-4); font-size: 10.5px; }
+.mp-root .mp-draw-acts { display: flex; gap: 6px; }
+.mp-root .mp-draw-acts .mp-action-btn {
+  flex: 1;
+  font-size: 11px;
+  padding: 5px 0;
+  gap: 4px;
+}
+.mp-root .mp-draw-acts .mp-action-btn .mp-i { width: 12px; height: 12px; }
+
+/* ---------------------------------------------------------------- 接口 */
+
+.mp-root .mp-api-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+.mp-root .mp-api-card {
+  padding: 12px;
+  border-radius: 16px;
+  background: linear-gradient(150deg, rgba(255, 255, 255, .92), rgba(238, 234, 252, .82));
+  box-shadow: var(--shadow-s);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mp-root .mp-api-card-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.mp-root .mp-api-card-label .mp-i { width: 13px; height: 13px; }
+.mp-root .mp-api-card-value {
+  font-size: 13.5px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-root .mp-api-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(142, 123, 242, .14);
+  color: var(--lav-deep);
+  font-size: 10.5px;
+  vertical-align: 1px;
+}
+.mp-root .mp-api-row .mp-row-sub { display: block; }
+.mp-root .mp-api-note {
+  margin: 16px 4px 6px;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--text-3);
+}
+.mp-root .mp-api-use {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.mp-root .mp-api-use-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  box-shadow: var(--shadow-s);
+  cursor: pointer;
+}
+.mp-root .mp-api-use-btn .mp-i { width: 15px; height: 15px; }
+.mp-root .mp-api-use-btn.is-on {
+  background: linear-gradient(120deg, #a796f7, #8e7bf2);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(142, 123, 242, .26);
+}
+
+/* -------------------------------------------------------------- 夜间 */
+
+.mp-root[data-mp-theme="night"] .mp-draw-desc,
+.mp-root[data-mp-theme="night"] .mp-draw-param,
+.mp-root[data-mp-theme="night"] .mp-draw-card,
+.mp-root[data-mp-theme="night"] .mp-api-card,
+.mp-root[data-mp-theme="night"] .mp-api-use-btn {
+  background: rgba(34, 30, 52, .78);
+  box-shadow: none;
+}
+.mp-root[data-mp-theme="night"] .mp-api-card {
+  background: linear-gradient(150deg, rgba(40, 35, 62, .82), rgba(28, 25, 44, .86));
+}
+.mp-root[data-mp-theme="night"] .mp-api-use-btn.is-on {
+  background: linear-gradient(120deg, #7b68e0, #6a55d8);
+}
+.mp-root[data-mp-theme="night"] .mp-draw-run {
+  box-shadow: 0 12px 26px rgba(0, 0, 0, .34);
+}
+.mp-root[data-mp-theme="night"] .mp-draw-state {
+  background: rgba(233, 177, 92, .16);
+  color: #e2c188;
+}
+.mp-root[data-mp-theme="night"] .mp-draw-state.is-on {
+  background: rgba(127, 210, 188, .18);
+  color: #9ee4cd;
+}
+.mp-root[data-mp-theme="night"] .mp-draw-state-btn {
+  background: rgba(255, 255, 255, .10);
+}
+.mp-root[data-mp-theme="night"] .mp-api-card-value,
+.mp-root[data-mp-theme="night"] .mp-draw-desc-text { color: #f2effb; }
+.mp-root .mp-api-value {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: 12.5px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mp-root .mp-api-value.is-empty { color: var(--text-3); }

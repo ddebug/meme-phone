@@ -130,10 +130,10 @@ function makeAi(state) {
         card ? `人物设定：${(card.description || '').slice(0, 300)}` : '',
         card?.personality ? `性格：${card.personality.slice(0, 120)}` : '',
         card?.scenario ? `常出现的场景：${card.scenario.slice(0, 120)}` : '',
-        '写 TA 手机里的东西：和别人的聊天、通讯录、朋友圈。全部口语中文，贴合这个人，不要写成说明书。',
+        '写 TA 手机里的东西：和别人的聊天、通讯录、朋友圈、日程。全部口语中文，贴合这个人，不要写成说明书。',
         '只输出 JSON，不要解释、不要 markdown 代码块：',
-        '{"chats":[{"peer":"名字","tag":"家人/朋友/同事/群聊","group":false,"unread":0,"msgs":[{"me":false,"text":"一句话","at":"21:04"}]}],"contacts":[{"name":"","note":""}],"moments":[{"text":"","at":"21:04","likes":3,"comments":[{"who":"","text":""}]}]}',
-        'chats 4 条（每条 4~6 句，me 表示是不是 TA 自己说的），contacts 6 条，moments 3 条。',
+        '{"chats":[{"peer":"名字","tag":"家人/朋友/同事/群聊","group":false,"unread":0,"msgs":[{"me":false,"text":"一句话","at":"21:04"}]}],"contacts":[{"name":"","note":""}],"moments":[{"text":"","at":"21:04","likes":3,"comments":[{"who":"","text":""}]}],"schedule":{"week":[{"when":"11月13日 周五","time":"20:00","title":"","note":""}],"month":[{"when":"11月20日","time":"下午","title":"","note":""}],"year":[{"when":"明年春天","title":"","note":""}]}}',
+        'chats 4 条（每条 4~6 句，me 表示是不是 TA 自己说的），contacts 6 条，moments 3 条，schedule 的 week/month/year 各 3 条。',
       ].filter(Boolean).join('\n');
       const result = await generate({ prompt, demoReply: JSON.stringify(local) });
       const text = String(result.text || '');
@@ -145,6 +145,21 @@ function makeAi(state) {
         const chats = Array.isArray(parsed.chats) ? parsed.chats.filter(item => item && item.peer && Array.isArray(item.msgs)) : [];
         const moments = Array.isArray(parsed.moments) ? parsed.moments.filter(item => item && item.text) : [];
         if (!chats.length) return local;
+        const cleanSchedule = (items, fallback) => {
+          if (!Array.isArray(items)) return fallback;
+          const cleaned = items.filter(item => item && item.title).slice(0, 4).map(item => ({
+            when: String(item.when || '').slice(0, 16),
+            time: String(item.time || '').slice(0, 10),
+            title: String(item.title || '').slice(0, 24),
+            note: String(item.note || '').slice(0, 36),
+          }));
+          return cleaned.length ? cleaned : fallback;
+        };
+        const schedule = {
+          week: cleanSchedule(parsed.schedule?.week, local.schedule?.week || []),
+          month: cleanSchedule(parsed.schedule?.month, local.schedule?.month || []),
+          year: cleanSchedule(parsed.schedule?.year, local.schedule?.year || []),
+        };
         return {
           at: Date.now(),
           chats: chats.map((item, index) => ({
@@ -170,6 +185,7 @@ function makeAi(state) {
               ? item.comments.filter(c => c && c.text).slice(0, 3).map(c => ({ who: String(c.who || '').slice(0, 12), text: String(c.text).slice(0, 60) }))
               : [],
           })) : local.moments,
+          schedule,
         };
       } catch {
         return local;

@@ -17,6 +17,119 @@ const ROLE_LINES = {
 
 const SELF_LINES = ['好，我知道了', '等我一下', '马上', '今天有点累', '晚点说', '在忙，回头聊'];
 
+const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+/* 本地日程模板：按角色稳定挑一套，不用联网也能看到未来一周/一月/一年 */
+const SCHEDULE_SETS = [
+  {
+    week: [
+      { offset: 1, time: '20:00', title: '值晚班', note: '三号工地 · 记得带手电' },
+      { offset: 3, time: '下午', title: '把图纸终稿发出去', note: '老板催了两次' },
+      { offset: 5, time: '晚上', title: '陪妈去医院复查', note: '提前半小时出门' },
+    ],
+    month: [
+      { offset: 12, time: '上午', title: '项目验收', note: '如果过了就能松一口气' },
+      { offset: 19, time: '晚上', title: '阿泽生日', note: '订个蛋糕，别又忘了' },
+      { offset: 27, time: '月底', title: '交下一季度房租', note: '这次想换个离地铁近的' },
+    ],
+    year: [
+      { when: '明年春天', title: '把旧车换掉', note: '修车的钱快赶上买车了' },
+      { when: '明年夏天', title: '休一次长假', note: '想去有海的地方' },
+      { when: '年底', title: '存够应急的钱', note: '至少六个月开销' },
+    ],
+  },
+  {
+    week: [
+      { offset: 1, time: '17:30', title: '去看新展', note: '美术馆六点闭馆' },
+      { offset: 4, time: '晚上', title: '把短篇写完', note: '卡在最后一段' },
+      { offset: 7, time: '19:00', title: '和朋友吃火锅', note: '老地方，九号桌' },
+    ],
+    month: [
+      { offset: 10, time: '中午', title: '交这期稿子', note: '编辑说月底前' },
+      { offset: 18, time: '周末', title: '去一趟海边', note: '当天来回也行' },
+      { offset: 25, time: '上午', title: '把体检做了', note: '拖了半年' },
+    ],
+    year: [
+      { when: '明年春天', title: '搬个有阳台的房子', note: '想养点好活的绿植' },
+      { when: '明年秋天', title: '出一本小册子', note: '先把稿子攒够' },
+      { when: '年底', title: '学会开车', note: '不能再拖了' },
+    ],
+  },
+  {
+    week: [
+      { offset: 2, time: '晚上', title: '回去吃饭', note: '妈说炖了汤' },
+      { offset: 4, time: '下午', title: '把物业费交了', note: '拖到月底要收滞纳金' },
+      { offset: 6, time: '周末', title: '给表妹挑生日礼物', note: '她最近喜欢香薰' },
+    ],
+    month: [
+      { offset: 9, time: '08:00', title: '陪爸复查', note: '早上八点挂号' },
+      { offset: 16, time: '晚上', title: '表妹生日', note: '订个小蛋糕' },
+      { offset: 29, time: '月底', title: '把年假单交上去', note: '再不休就过期了' },
+    ],
+    year: [
+      { when: '明年春天', title: '带爸妈体检', note: '两个人一起约' },
+      { when: '明年夏天', title: '把家里收拾一遍', note: '旧东西该扔了' },
+      { when: '年底', title: '提前还一点房贷', note: '每月少还一点' },
+    ],
+  },
+];
+
+const GROUP_SCHEDULE = {
+  week: [
+    { offset: 1, time: '19:00', title: '群里约饭', note: '老地方，七点' },
+    { offset: 4, time: '下午', title: '交场地费', note: '每人先垫五十' },
+    { offset: 6, time: '晚上', title: '确认周末人数', note: '还差三个人没回' },
+  ],
+  month: [
+    { offset: 14, time: '晚上', title: '阿泽生日局', note: '群里统计一下' },
+    { offset: 21, time: '周末', title: '月底聚一次', note: '这次别改时间' },
+    { offset: 28, time: '月底', title: '把群名改了', note: '现在这个太随便' },
+  ],
+  year: [
+    { when: '明年春天', title: '一起出趟远门', note: '先看机票' },
+    { when: '明年夏天', title: '包个院子', note: '住两天' },
+    { when: '年底', title: '把群费结清', note: '别再有人垫钱' },
+  ],
+};
+
+function dateAfter(days) {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${WEEKDAYS[date.getDay()]}`;
+}
+
+function scheduleTemplate(contact) {
+  if (contact?.kind === 'group') return GROUP_SCHEDULE;
+  const profile = `${contact?.signature || ''} ${contact?.note || ''} ${contact?.name || ''}`;
+  if (/加班|工地|图纸|工程|业主|班/.test(profile)) return SCHEDULE_SETS[0];
+  if (/书店|展|画|写|稿|歌|拍/.test(profile)) return SCHEDULE_SETS[1];
+  if (/家|妈|爸|饭|雨|回/.test(profile)) return SCHEDULE_SETS[2];
+  return SCHEDULE_SETS[hash(contact?.name) % SCHEDULE_SETS.length];
+}
+
+function buildSchedule(contact) {
+  const template = scheduleTemplate(contact);
+  const fill = list => list.map(item => ({
+    when: item.when || dateAfter(item.offset),
+    time: item.time || '',
+    title: item.title,
+    note: item.note,
+  }));
+  return { week: fill(template.week), month: fill(template.month), year: fill(template.year) };
+}
+
+function scheduleOf(data, contact) {
+  const fallback = buildSchedule(contact);
+  const current = data?.schedule || {};
+  data.schedule = {
+    week: Array.isArray(current.week) && current.week.length ? current.week : fallback.week,
+    month: Array.isArray(current.month) && current.month.length ? current.month : fallback.month,
+    year: Array.isArray(current.year) && current.year.length ? current.year : fallback.year,
+  };
+  return data.schedule;
+}
+
 const PHOTO_LINES = ['在楼下便利店坐了一会儿，风比昨天凉。', '今天的云很低，像要压到楼顶。', '收工，路口的灯刚好亮了。'];
 const COMMENTS = [['阿泽', '这张拍得不错'], ['小满', '又在加班？'], ['妈妈', '早点睡']];
 
@@ -102,7 +215,7 @@ export function buildLocal(contact, card) {
     },
   ];
 
-  return { at: Date.now(), chats, contacts: roster, moments };
+  return { at: Date.now(), chats, contacts: roster, moments, schedule: buildSchedule(contact) };
 }
 
 function photoText(seed, offset) {
@@ -118,7 +231,10 @@ function COMMENT_SET(seed, offset) {
 
 export function ensureLookup(state, contact) {
   if (!state.lookups) state.lookups = {};
-  if (state.lookups[contact.id]) return state.lookups[contact.id];
+  if (state.lookups[contact.id]) {
+    scheduleOf(state.lookups[contact.id], contact);
+    return state.lookups[contact.id];
+  }
   const card = (state.characters || []).find(item => item.name === contact.name) || null;
   state.lookups[contact.id] = buildLocal(contact, card);
   return state.lookups[contact.id];
@@ -129,11 +245,34 @@ function tabsHtml(active) {
     ['chat', '聊天', 'chat'],
     ['roster', '通讯录', 'contacts'],
     ['moments', '朋友圈', 'spark'],
+    ['schedule', '日程', 'plan'],
   ];
   return `<div class="mp-cp-tabs">${tabs.map(([key, label, ico]) => `
     <button class="mp-cp-tab${active === key ? ' is-on' : ''}" data-act="cp-tab" data-tab="${key}" type="button">
       ${icon(ico)}<span>${label}</span>
     </button>`).join('')}</div>`;
+}
+
+function scheduleHtml(schedule) {
+  const groups = [
+    ['week', '未来一周', '接下来 7 天'],
+    ['month', '未来一个月', '接下来 30 天'],
+    ['year', '未来一年', '更远一点的打算'],
+  ];
+  return `<div class="mp-cp-schedule">${groups.map(([key, title, hint]) => {
+    const items = schedule[key] || [];
+    return `<div class="mp-cp-sched-group">
+      <div class="mp-cp-sched-head"><b>${title}</b><span>${hint}</span></div>
+      ${items.map(item => `
+        <div class="mp-cp-sched-item">
+          <div class="mp-cp-sched-when"><b>${esc(item.when || '')}</b>${item.time ? `<span>${esc(item.time)}</span>` : ''}</div>
+          <div class="mp-cp-sched-main">
+            <div class="mp-cp-sched-title">${esc(item.title || '')}</div>
+            ${item.note ? `<div class="mp-cp-sched-note">${esc(item.note)}</div>` : ''}
+          </div>
+        </div>`).join('')}
+    </div>`;
+  }).join('')}</div>`;
 }
 
 export const charPhoneApp = {
@@ -144,6 +283,7 @@ export const charPhoneApp = {
     if (!contact) return '<div class="mp-page-body"><div class="mp-empty">这个人不在了。</div></div>';
 
     const data = ensureLookup(ctx.state, contact);
+    const schedule = scheduleOf(data, contact);
     const tab = ctx.shell.cpTab || 'chat';
     const generating = ctx.shell.cpBusy;
 
@@ -174,7 +314,9 @@ export const charPhoneApp = {
               ${(item.comments || []).map(comment => `
                 <div class="mp-cp-comment"><b>${esc(comment.who)}</b>${esc(comment.text)}</div>`).join('')}
             </div>`).join('')}</div>`
-        : `<div class="mp-card mp-cp-chats">${data.chats.map(chat => {
+        : tab === 'schedule'
+          ? scheduleHtml(schedule)
+          : `<div class="mp-card mp-cp-chats">${data.chats.map(chat => {
             const last = chat.msgs[chat.msgs.length - 1];
             return `<button class="mp-cp-chat" data-act="cp-open-chat" data-contact="${contact.id}" data-peer="${chat.id}" type="button">
               ${avatarHtml(chat.peer, '', 'mp-avatar')}

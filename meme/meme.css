@@ -2700,6 +2700,78 @@
   color: var(--accent-deep);
 }
 
+/* 角色手机里的日程表：未来一周 / 一个月 / 一年 */
+.mp-cp-schedule {
+  padding: 4px 12px 16px;
+}
+
+.mp-cp-sched-group {
+  padding-top: 12px;
+}
+
+.mp-cp-sched-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 2px 4px;
+}
+
+.mp-cp-sched-head b {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mp-cp-sched-head span {
+  font-size: 10px;
+  color: var(--text-4);
+}
+
+.mp-cp-sched-item {
+  display: flex;
+  gap: 10px;
+  padding: 9px 2px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.mp-cp-sched-when {
+  flex: 0 0 70px;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--text-3);
+}
+
+.mp-cp-sched-when b {
+  display: block;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.mp-cp-sched-when span {
+  display: block;
+  color: var(--text-4);
+}
+
+.mp-cp-sched-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.mp-cp-sched-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.mp-cp-sched-note {
+  margin-top: 2px;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+
 .mp-cp-thread-head {
   padding: 2px 2px 12px;
   font-size: 12px;

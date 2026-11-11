@@ -75,7 +75,7 @@ export const settingsApp = {
             ${row(ctx, { iconName: 'image', title: '绘图', sub: imageReady ? `${imageLabel} · ${imageLink.model || '模型没填'}` : `${imageLabel} · 还没填${state.settings.image.engine === 'custom' ? '地址' : ' Key'}`, act: 'set-open', app: 'draw' })}
             ${row(ctx, { iconName: 'code', title: '聊天接口与预设', sub: '每套 = 地址 + Key + 模型，只影响聊天', act: 'set-open', app: 'api' })}
             ${row(ctx, { iconName: 'search', title: '查角色', sub: (state.charactersFromTavern ? `酒馆里 ${state.characters.length} 张角色卡` : '看酒馆里每张角色卡的设定'), act: 'set-open', app: 'characters' })}
-            ${row(ctx, { iconName: 'book', title: '柏宝书', sub: (typeof globalThis !== 'undefined' && globalThis.STBaiBaiBook ? '记忆已接上：摘要 / 人物 / 物品 / 场景 / 悬念' : '长期记忆引擎，装好后自动接管摘要'), act: 'set-open', app: 'book' })}
+            ${row(ctx, { iconName: 'book', title: '酒馆总结', sub: (typeof globalThis !== 'undefined' && globalThis.STBaiBaiBook ? '已接上：所有总结 / 人物 / 物品 / 场景 / 悬念' : '酒馆里的长期总结，装好后自动接管摘要'), act: 'set-open', app: 'book' })}
             ${row(ctx, { iconName: 'smile', title: '表情包', sub: '表情面板里那些贴纸', act: 'set-open', app: 'emoji' })}
             ${row(ctx, { iconName: 'help', title: '帮助', sub: '怎么用、快捷键、常见问题', act: 'set-open', app: 'help' })}
           </div>

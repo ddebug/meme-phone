@@ -2620,7 +2620,7 @@
 }
 
 /* ============================================================================
-   本段：柏宝书（app-book）
+   本段：酒馆总结（app-book）
    ============================================================================ */
 
 .mp-bk .mp-bk-tabs {
@@ -2914,4 +2914,30 @@
 
 .mp-root[data-mp-theme="night"] .mp-bk .mp-bk-tag { background: rgba(255, 255, 255, .08); }
 .mp-root[data-mp-theme="night"] .mp-bk .mp-bk-hero-focus { border-top-color: rgba(255, 255, 255, .1); }
+
+/* 首楼关掉总结后，直接铺原文；样式跟摘要卡区分开 */
+.mp-bk .mp-bk-first {
+  padding: 12px 13px;
+  border-radius: 14px;
+  border: 1px solid rgba(142, 123, 242, .22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .62), rgba(255, 255, 255, .34));
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--text-2);
+  white-space: pre-wrap;
+}
+.mp-bk .mp-bk-first + * { margin-top: 10px; }
+.mp-root[data-mp-theme="night"] .mp-bk .mp-bk-first {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .04));
+  border-color: rgba(255, 255, 255, .14);
+  color: var(--text-2);
+}
+.mp-bk .mp-bk-note {
+  margin-top: 14px;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-3);
+}
+
 

@@ -1,5 +1,5 @@
 /**
- * meme-phone · 柏宝书
+ * meme-phone · 酒馆总结（原柏宝书）
  *
  * 柏宝书（ST-BaiBai-Book）是酒馆里的长期记忆引擎：自动摘要、总结、时间线、
  * 人物 / 物品 / 场景 / 悬念台账、向量召回。它的完整代码在仓库 baibai-book/ 里，
@@ -8,6 +8,7 @@
 
 import { icon } from '../icons.js';
 import { esc } from '../shell.js';
+import { bookApi, readSummaries } from '../book.js';
 
 const TABS = [
   ['overview', '概览'],
@@ -22,11 +23,7 @@ const AFFINITY_INNER = { '-2': '强烈反感', '-1': '不喜欢', 0: '无明显�
 const AFFINITY_OUTER = { '-2': '明显敌对', '-1': '冷淡疏远', 0: '不明显', 1: '友善亲近', 2: '明显亲近' };
 
 function api() {
-  try {
-    return globalThis.STBaiBaiBook || null;
-  } catch (error) {
-    return null;
-  }
+  return bookApi();
 }
 
 function call(name, fallback, ...args) {
@@ -94,27 +91,8 @@ function demoSnapshot() {
   };
 }
 
-function demoHistory() {
-  return {
-    coverage: { complete: false, missingAiFloors: [38] },
-    relativeText: [
-      '【1988 年 9 月 28 日 下午】搬家前一晚，主角把最后一箱书留在楼下，先上来打扫 302 室。',
-      '【昨天】沈砚敲门送伞，说楼道的灯坏了，顺手把备用钥匙给了主角。',
-      '【今天傍晚】雨没停，两人一起拆箱。沈砚的右手擦伤，说是搬书划的，手表停在三点十七分。',
-    ].join('\n\n'),
-    nodes: [
-      { id: 'h3', kind: 'leaf', level: 1, text: '雨夜拆箱，沈砚送来备用钥匙与旧伞，手表停在三点十七分。', timeLabel: '今天傍晚', floorStart: 84, floorEnd: 86 },
-      { id: 'h2', kind: 'comp', level: 2, text: '搬家前后两天：打扫 302 室、借伞、拆箱，沈砚持续帮忙但话很少。', timeLabel: '最近两天', floorStart: 78, floorEnd: 86 },
-    ],
-  };
-}
-
 function snapshotOf() {
   return call('getSnapshot', null) || (api() ? null : demoSnapshot());
-}
-
-function historyOf() {
-  return call('getHistory', null) || (api() ? null : demoHistory());
 }
 
 /* ------------------------------------------------------------ 小组件 */
@@ -143,7 +121,7 @@ function section(title, body, extra = '') {
 /* ------------------------------------------------------------ 各分页 */
 
 function overviewPage(snap) {
-  if (!snap) return emptyPage('还没接到柏宝书', '在酒馆里装上柏宝书扩展后，这里会自动出现它的记忆。');
+  if (!snap) return emptyPage('还没接到酒馆总结', '在酒馆里装上酒馆总结后，这里会自动出现它的记忆。');
   const state = snap.state || {};
   const hero = snap.protagonist || {};
   const coverage = snap.coverage || {};
@@ -178,10 +156,11 @@ function overviewPage(snap) {
   `;
 }
 
-function summaryPage(history) {
-  if (!history) return emptyPage('还没有摘要', '柏宝书会在每轮回复后自动整理这一楼的剧情。');
-  const nodes = history.nodes || [];
-  const expanded = this?.shell?.bookNode || '';
+function summaryPage(ctx) {
+  const skipFirst = Boolean(ctx.state.settings.summary?.skipFirstFloor);
+  const data = readSummaries({ skipFirstFloor: skipFirst });
+  const nodes = data.nodes || [];
+  const expanded = ctx.shell.bookNode || '';
   const rows = nodes.slice().reverse().map(node => {
     const open = expanded === node.id;
     return `<div class="mp-bk-node${open ? ' is-open' : ''}">
@@ -197,15 +176,16 @@ function summaryPage(history) {
     </div>`;
   }).join('');
 
-  const coverage = history.coverage || {};
-  const body = (history.relativeText || '').split(/\n{2,}/).filter(Boolean)
-    .map(part => `<p class="mp-bk-para">${esc(part)}</p>`).join('');
+  const coverage = data.coverage || {};
+  const first = data.firstText
+    ? section('首楼原文（已关掉首楼总结）', `<div class="mp-bk-first">${esc(data.firstText)}</div>`)
+    : '';
 
   return `
     ${coverage.complete === false
       ? `<div class="mp-bk-warn">第 ${esc((coverage.missingAiFloors || []).join('、') || '?')} 楼还没有摘要，这段历史不完整。</div>` : ''}
-    ${section('压缩后的历史', body || '<div class="mp-empty">还没有攒出可以压缩的历史。</div>')}
-    ${section('摘要节点', rows || '<div class="mp-empty">还没有节点。</div>', `<span class="mp-bk-count">${nodes.length}</span>`)}
+    ${first}
+    ${section('所有总结', rows || `<div class="mp-empty">${skipFirst ? '除了首楼还没有别的总结。' : '还没有总结，酒馆里聊起来之后会自动生成。'}</div>`, `<span class="mp-bk-count">${nodes.length}</span>`)}
   `;
 }
 
@@ -336,11 +316,10 @@ export const bookApp = {
     watchChanges(ctx);
     const tab = ctx.shell.bookTab || 'overview';
     const snap = snapshotOf();
-    const history = historyOf();
     const connected = Boolean(api());
 
     const body = tab === 'summary'
-      ? summaryPage.call(ctx, history)
+      ? summaryPage(ctx)
       : tab === 'npcs' ? npcsPage(snap)
         : tab === 'items' ? itemsPage(snap)
           : tab === 'scenes' ? scenesPage(snap)
@@ -353,14 +332,15 @@ export const bookApp = {
     return `
       <div class="mp-page-body mp-bk">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <div class="mp-title" style="flex:1">柏宝书</div>
+          <div class="mp-title" style="flex:1">酒馆总结</div>
+          <button class="mp-icon-btn" data-act="bk-settings" type="button" aria-label="设置">${icon('settings')}</button>
           <button class="mp-icon-btn" data-act="bk-refresh" type="button" aria-label="刷新">${icon('refresh')}</button>
         </div>
-        <div class="mp-subtitle">长期记忆引擎 · 摘要 / 人物 / 物品 / 场景 / 悬念</div>
+        <div class="mp-subtitle">酒馆里的所有总结 · 摘要 / 人物 / 物品 / 场景 / 悬念</div>
 
         <div class="mp-draw-state${connected ? ' is-on' : ''}">
           ${icon('spark')}
-          <span>${connected ? `已接柏宝书 · 第 ${esc(snap?.chat?.length ?? 0)} 楼` : '预览环境 · 下面是演示记忆'}</span>
+          <span>${connected ? `已接酒馆总结 · 第 ${esc(snap?.chat?.length ?? 0)} 楼` : '预览环境 · 下面是演示记忆'}</span>
           <button class="mp-draw-state-btn" data-act="bk-refresh" type="button">刷新</button>
         </div>
 
@@ -383,10 +363,69 @@ export const bookApp = {
       return true;
     }
 
+    if (act === 'bk-settings') {
+      ctx.go('book-settings');
+      return true;
+    }
+
     if (act === 'bk-refresh') {
       const ok = Boolean(api());
       ctx.rerender();
-      ctx.toast(ok ? '柏宝书数据已刷新' : '预览里没有柏宝书，装到酒馆后才会读到真数据');
+      ctx.toast(ok ? '酒馆总结已刷新' : '预览里没有酒馆总结，装到酒馆后才会读到真数据');
+      return true;
+    }
+
+    return false;
+  },
+};
+
+/* ------------------------------------------------------ 酒馆总结 · 设置 */
+
+function setRow({ iconName, title, sub, act, toggle }) {
+  return `
+    <button class="mp-set-row" data-act="${act}" type="button">
+      <span class="mp-set-ico">${icon(iconName)}</span>
+      <span class="mp-set-name">${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
+      <span class="mp-switch${toggle ? ' on' : ''}"></span>
+    </button>`;
+}
+
+export const bookSettingsApp = {
+  id: 'book-settings',
+
+  render(ctx) {
+    const summary = ctx.state.settings.summary || {};
+    const skip = Boolean(summary.skipFirstFloor);
+
+    return `
+      <div class="mp-page-body mp-bk">
+        <div class="mp-title" style="margin-top:2px">总结设置</div>
+        <div class="mp-subtitle">只影响手机这边怎么读总结</div>
+
+        <div class="mp-group" style="margin-top:14px">
+          <div class="mp-group-label">首楼</div>
+          <div class="mp-group-box">
+            ${setRow({
+              iconName: 'bookmark',
+              title: '首楼不总结，显示原文',
+              sub: skip ? '首楼的总结已关掉，摘要页直接给原文' : '默认把首楼也总结进摘要',
+              act: 'bks-first',
+              toggle: skip,
+            })}
+          </div>
+        </div>
+
+        <div class="mp-bk-note">开着的时候：聊天与摘要只吃其余总结，首楼单独用原文；关着的时候：首楼和其它楼一样走总结。</div>
+      </div>`;
+  },
+
+  handle(ctx, act) {
+    if (act === 'bks-first') {
+      const summary = ctx.state.settings.summary || (ctx.state.settings.summary = {});
+      summary.skipFirstFloor = !summary.skipFirstFloor;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(summary.skipFirstFloor ? '首楼改为显示原文' : '首楼恢复总结');
       return true;
     }
 

@@ -2637,7 +2637,7 @@ body {
 }
 
 /* ============================================================================
-   本段：柏宝书（app-book）
+   本段：酒馆总结（app-book）
    ============================================================================ */
 
 .mp-bk .mp-bk-tabs {
@@ -2932,6 +2932,32 @@ body {
 .mp-root[data-mp-theme="night"] .mp-bk .mp-bk-tag { background: rgba(255, 255, 255, .08); }
 .mp-root[data-mp-theme="night"] .mp-bk .mp-bk-hero-focus { border-top-color: rgba(255, 255, 255, .1); }
 
+/* 首楼关掉总结后，直接铺原文；样式跟摘要卡区分开 */
+.mp-bk .mp-bk-first {
+  padding: 12px 13px;
+  border-radius: 14px;
+  border: 1px solid rgba(142, 123, 242, .22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .62), rgba(255, 255, 255, .34));
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--text-2);
+  white-space: pre-wrap;
+}
+.mp-bk .mp-bk-first + * { margin-top: 10px; }
+.mp-root[data-mp-theme="night"] .mp-bk .mp-bk-first {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .04));
+  border-color: rgba(255, 255, 255, .14);
+  color: var(--text-2);
+}
+.mp-bk .mp-bk-note {
+  margin-top: 14px;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-3);
+}
+
+
 
 </style>
 </head>
@@ -2970,6 +2996,8 @@ function emptyState() {
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
       chat: { showTime: true, enterToSend: false, remind: true, wake: true },
+      /* 酒馆总结（柏宝书）：首楼默认是要总结的，关掉后那一楼直接显示原文 */
+      summary: { skipFirstFloor: false },
       api: {
         activeChat: '', activeImage: '', presets: [
           { id: 'api_default', name: '酒馆 API', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
@@ -3388,6 +3416,7 @@ function normalize(raw) {
   };
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
+  merged.settings.summary = { ...base.settings.summary, ...(raw.settings?.summary || {}) };
   merged.settings.image = {
     ...base.settings.image,
     ...(raw.settings?.image || {}),
@@ -4527,6 +4556,96 @@ exports["createShell"] = createShell;
 exports["pageNav"] = pageNav;
 exports["chatAvatarHtml"] = chatAvatarHtml;
 };
+__mods["meme/book.js"] = function(module, exports, __req){
+/**
+ * meme-phone · 酒馆总结（原柏宝书）
+ *
+ * 把柏宝书的只读接口收成一层：手机里的「酒馆总结」页、聊天和日记都用这里的口径。
+ * 关键口径：聊天背景用「所有酒馆总结」，不读酒馆原文；首楼可以被设置成不总结、直接显示原文。
+ */
+
+const DEMO_FIRST = '1988 年 9 月 28 日 傍晚，雨刚停。你拖着最后一箱书上到六楼，302 室的门半开着，屋里只有一盏没罩子的灯泡。';
+const DEMO_NODES = [
+  { id: 'd1', kind: 'leaf', level: 1, text: '雨夜搬家，沈砚敲门送伞与备用钥匙；他的手擦伤了，手表停在三点十七分。', timeLabel: '今天傍晚', floorStart: 84, floorEnd: 86 },
+  { id: 'd2', kind: 'comp', level: 2, text: '搬家前后两天：打扫 302 室、借伞、拆箱；沈砚持续帮忙但话很少。', timeLabel: '最近两天', floorStart: 78, floorEnd: 86 },
+];
+
+function bookApi() {
+  try {
+    return globalThis.STBaiBaiBook || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function isFirstFloor(node) {
+  return node && node.floorStart === 0 && (node.floorEnd == null || node.floorEnd === 0);
+}
+
+/**
+ * 读取当前聊天全部总结。
+ * skipFirstFloor=true 时：首楼的总结不参与，改成给首楼原文。
+ */
+function readSummaries({ skipFirstFloor = false } = {}) {
+  const api = bookApi();
+  let nodes = [];
+  let coverage = { complete: true, missingAiFloors: [] };
+  let firstText = '';
+  let demo = false;
+
+  if (api && typeof api.getHistory === 'function') {
+    try {
+      const history = api.getHistory() || {};
+      nodes = Array.isArray(history.nodes) ? history.nodes.map(node => ({ ...node })) : [];
+      coverage = history.coverage || coverage;
+      if (typeof api.getFloor === 'function') {
+        try { firstText = String(api.getFloor(0)?.body || ''); } catch (error) { firstText = ''; }
+      }
+    } catch (error) {
+      nodes = [];
+    }
+  } else {
+    demo = true;
+    nodes = DEMO_NODES.map(node => ({ ...node }));
+    firstText = DEMO_FIRST;
+  }
+
+  if (skipFirstFloor) nodes = nodes.filter(node => !isFirstFloor(node));
+
+  return {
+    nodes,
+    coverage,
+    demo,
+    firstText: skipFirstFloor ? (firstText || (demo ? DEMO_FIRST : '')) : '',
+    skipFirstFloor,
+  };
+}
+
+/** 拼成给模型看的背景：首楼原文（如果选了）+ 每条总结。 */
+function summaryText(options = {}) {
+  const data = readSummaries(options);
+  const parts = [];
+  if (data.firstText) parts.push(`【首楼原文】\n${data.firstText}`);
+  data.nodes.forEach(node => {
+    const label = node.timeLabel || (node.floorStart != null ? `第 ${node.floorStart}–${node.floorEnd} 楼` : '');
+    parts.push(label ? `【${label}】\n${node.text}` : node.text);
+  });
+  return { ...data, text: parts.join('\n\n') };
+}
+
+/** 聊天 / 日记用的截断版本，别把整本总结全塞进 prompt。 */
+function summaryContext(limit = 1800, options = {}) {
+  const data = summaryText(options);
+  let text = data.text || '';
+  if (text.length > limit) text = `${text.slice(0, limit)}\n…（后面还有 ${data.nodes.length} 条总结）`;
+  return { ...data, text };
+}
+
+exports["bookApi"] = bookApi;
+exports["readSummaries"] = readSummaries;
+exports["summaryText"] = summaryText;
+exports["summaryContext"] = summaryContext;
+};
 __mods["meme/apps/chat.js"] = function(module, exports, __req){
 /**
  * meme-phone · 聊天
@@ -5460,7 +5579,7 @@ const settingsApp = {
             ${row(ctx, { iconName: 'image', title: '绘图', sub: imageReady ? `${imageLabel} · ${imageLink.model || '模型没填'}` : `${imageLabel} · 还没填${state.settings.image.engine === 'custom' ? '地址' : ' Key'}`, act: 'set-open', app: 'draw' })}
             ${row(ctx, { iconName: 'code', title: '聊天接口与预设', sub: '每套 = 地址 + Key + 模型，只影响聊天', act: 'set-open', app: 'api' })}
             ${row(ctx, { iconName: 'search', title: '查角色', sub: (state.charactersFromTavern ? `酒馆里 ${state.characters.length} 张角色卡` : '看酒馆里每张角色卡的设定'), act: 'set-open', app: 'characters' })}
-            ${row(ctx, { iconName: 'book', title: '柏宝书', sub: (typeof globalThis !== 'undefined' && globalThis.STBaiBaiBook ? '记忆已接上：摘要 / 人物 / 物品 / 场景 / 悬念' : '长期记忆引擎，装好后自动接管摘要'), act: 'set-open', app: 'book' })}
+            ${row(ctx, { iconName: 'book', title: '酒馆总结', sub: (typeof globalThis !== 'undefined' && globalThis.STBaiBaiBook ? '已接上：所有总结 / 人物 / 物品 / 场景 / 悬念' : '酒馆里的长期总结，装好后自动接管摘要'), act: 'set-open', app: 'book' })}
             ${row(ctx, { iconName: 'smile', title: '表情包', sub: '表情面板里那些贴纸', act: 'set-open', app: 'emoji' })}
             ${row(ctx, { iconName: 'help', title: '帮助', sub: '怎么用、快捷键、常见问题', act: 'set-open', app: 'help' })}
           </div>
@@ -7832,7 +7951,7 @@ exports["charPhoneThreadApp"] = charPhoneThreadApp;
 };
 __mods["meme/apps/book.js"] = function(module, exports, __req){
 /**
- * meme-phone · 柏宝书
+ * meme-phone · 酒馆总结（原柏宝书）
  *
  * 柏宝书（ST-BaiBai-Book）是酒馆里的长期记忆引擎：自动摘要、总结、时间线、
  * 人物 / 物品 / 场景 / 悬念台账、向量召回。它的完整代码在仓库 baibai-book/ 里，
@@ -7841,6 +7960,7 @@ __mods["meme/apps/book.js"] = function(module, exports, __req){
 
 const { icon } = __req("meme/icons.js");
 const { esc } = __req("meme/shell.js");
+const { bookApi, readSummaries } = __req("meme/book.js");
 
 const TABS = [
   ['overview', '概览'],
@@ -7855,11 +7975,7 @@ const AFFINITY_INNER = { '-2': '强烈反感', '-1': '不喜欢', 0: '无明显�
 const AFFINITY_OUTER = { '-2': '明显敌对', '-1': '冷淡疏远', 0: '不明显', 1: '友善亲近', 2: '明显亲近' };
 
 function api() {
-  try {
-    return globalThis.STBaiBaiBook || null;
-  } catch (error) {
-    return null;
-  }
+  return bookApi();
 }
 
 function call(name, fallback, ...args) {
@@ -7927,27 +8043,8 @@ function demoSnapshot() {
   };
 }
 
-function demoHistory() {
-  return {
-    coverage: { complete: false, missingAiFloors: [38] },
-    relativeText: [
-      '【1988 年 9 月 28 日 下午】搬家前一晚，主角把最后一箱书留在楼下，先上来打扫 302 室。',
-      '【昨天】沈砚敲门送伞，说楼道的灯坏了，顺手把备用钥匙给了主角。',
-      '【今天傍晚】雨没停，两人一起拆箱。沈砚的右手擦伤，说是搬书划的，手表停在三点十七分。',
-    ].join('\n\n'),
-    nodes: [
-      { id: 'h3', kind: 'leaf', level: 1, text: '雨夜拆箱，沈砚送来备用钥匙与旧伞，手表停在三点十七分。', timeLabel: '今天傍晚', floorStart: 84, floorEnd: 86 },
-      { id: 'h2', kind: 'comp', level: 2, text: '搬家前后两天：打扫 302 室、借伞、拆箱，沈砚持续帮忙但话很少。', timeLabel: '最近两天', floorStart: 78, floorEnd: 86 },
-    ],
-  };
-}
-
 function snapshotOf() {
   return call('getSnapshot', null) || (api() ? null : demoSnapshot());
-}
-
-function historyOf() {
-  return call('getHistory', null) || (api() ? null : demoHistory());
 }
 
 /* ------------------------------------------------------------ 小组件 */
@@ -7976,7 +8073,7 @@ function section(title, body, extra = '') {
 /* ------------------------------------------------------------ 各分页 */
 
 function overviewPage(snap) {
-  if (!snap) return emptyPage('还没接到柏宝书', '在酒馆里装上柏宝书扩展后，这里会自动出现它的记忆。');
+  if (!snap) return emptyPage('还没接到酒馆总结', '在酒馆里装上酒馆总结后，这里会自动出现它的记忆。');
   const state = snap.state || {};
   const hero = snap.protagonist || {};
   const coverage = snap.coverage || {};
@@ -8011,10 +8108,11 @@ function overviewPage(snap) {
   `;
 }
 
-function summaryPage(history) {
-  if (!history) return emptyPage('还没有摘要', '柏宝书会在每轮回复后自动整理这一楼的剧情。');
-  const nodes = history.nodes || [];
-  const expanded = this?.shell?.bookNode || '';
+function summaryPage(ctx) {
+  const skipFirst = Boolean(ctx.state.settings.summary?.skipFirstFloor);
+  const data = readSummaries({ skipFirstFloor: skipFirst });
+  const nodes = data.nodes || [];
+  const expanded = ctx.shell.bookNode || '';
   const rows = nodes.slice().reverse().map(node => {
     const open = expanded === node.id;
     return `<div class="mp-bk-node${open ? ' is-open' : ''}">
@@ -8030,15 +8128,16 @@ function summaryPage(history) {
     </div>`;
   }).join('');
 
-  const coverage = history.coverage || {};
-  const body = (history.relativeText || '').split(/\n{2,}/).filter(Boolean)
-    .map(part => `<p class="mp-bk-para">${esc(part)}</p>`).join('');
+  const coverage = data.coverage || {};
+  const first = data.firstText
+    ? section('首楼原文（已关掉首楼总结）', `<div class="mp-bk-first">${esc(data.firstText)}</div>`)
+    : '';
 
   return `
     ${coverage.complete === false
       ? `<div class="mp-bk-warn">第 ${esc((coverage.missingAiFloors || []).join('、') || '?')} 楼还没有摘要，这段历史不完整。</div>` : ''}
-    ${section('压缩后的历史', body || '<div class="mp-empty">还没有攒出可以压缩的历史。</div>')}
-    ${section('摘要节点', rows || '<div class="mp-empty">还没有节点。</div>', `<span class="mp-bk-count">${nodes.length}</span>`)}
+    ${first}
+    ${section('所有总结', rows || `<div class="mp-empty">${skipFirst ? '除了首楼还没有别的总结。' : '还没有总结，酒馆里聊起来之后会自动生成。'}</div>`, `<span class="mp-bk-count">${nodes.length}</span>`)}
   `;
 }
 
@@ -8169,11 +8268,10 @@ const bookApp = {
     watchChanges(ctx);
     const tab = ctx.shell.bookTab || 'overview';
     const snap = snapshotOf();
-    const history = historyOf();
     const connected = Boolean(api());
 
     const body = tab === 'summary'
-      ? summaryPage.call(ctx, history)
+      ? summaryPage(ctx)
       : tab === 'npcs' ? npcsPage(snap)
         : tab === 'items' ? itemsPage(snap)
           : tab === 'scenes' ? scenesPage(snap)
@@ -8186,14 +8284,15 @@ const bookApp = {
     return `
       <div class="mp-page-body mp-bk">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <div class="mp-title" style="flex:1">柏宝书</div>
+          <div class="mp-title" style="flex:1">酒馆总结</div>
+          <button class="mp-icon-btn" data-act="bk-settings" type="button" aria-label="设置">${icon('settings')}</button>
           <button class="mp-icon-btn" data-act="bk-refresh" type="button" aria-label="刷新">${icon('refresh')}</button>
         </div>
-        <div class="mp-subtitle">长期记忆引擎 · 摘要 / 人物 / 物品 / 场景 / 悬念</div>
+        <div class="mp-subtitle">酒馆里的所有总结 · 摘要 / 人物 / 物品 / 场景 / 悬念</div>
 
         <div class="mp-draw-state${connected ? ' is-on' : ''}">
           ${icon('spark')}
-          <span>${connected ? `已接柏宝书 · 第 ${esc(snap?.chat?.length ?? 0)} 楼` : '预览环境 · 下面是演示记忆'}</span>
+          <span>${connected ? `已接酒馆总结 · 第 ${esc(snap?.chat?.length ?? 0)} 楼` : '预览环境 · 下面是演示记忆'}</span>
           <button class="mp-draw-state-btn" data-act="bk-refresh" type="button">刷新</button>
         </div>
 
@@ -8216,10 +8315,69 @@ const bookApp = {
       return true;
     }
 
+    if (act === 'bk-settings') {
+      ctx.go('book-settings');
+      return true;
+    }
+
     if (act === 'bk-refresh') {
       const ok = Boolean(api());
       ctx.rerender();
-      ctx.toast(ok ? '柏宝书数据已刷新' : '预览里没有柏宝书，装到酒馆后才会读到真数据');
+      ctx.toast(ok ? '酒馆总结已刷新' : '预览里没有酒馆总结，装到酒馆后才会读到真数据');
+      return true;
+    }
+
+    return false;
+  },
+};
+
+/* ------------------------------------------------------ 酒馆总结 · 设置 */
+
+function setRow({ iconName, title, sub, act, toggle }) {
+  return `
+    <button class="mp-set-row" data-act="${act}" type="button">
+      <span class="mp-set-ico">${icon(iconName)}</span>
+      <span class="mp-set-name">${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
+      <span class="mp-switch${toggle ? ' on' : ''}"></span>
+    </button>`;
+}
+
+const bookSettingsApp = {
+  id: 'book-settings',
+
+  render(ctx) {
+    const summary = ctx.state.settings.summary || {};
+    const skip = Boolean(summary.skipFirstFloor);
+
+    return `
+      <div class="mp-page-body mp-bk">
+        <div class="mp-title" style="margin-top:2px">总结设置</div>
+        <div class="mp-subtitle">只影响手机这边怎么读总结</div>
+
+        <div class="mp-group" style="margin-top:14px">
+          <div class="mp-group-label">首楼</div>
+          <div class="mp-group-box">
+            ${setRow({
+              iconName: 'bookmark',
+              title: '首楼不总结，显示原文',
+              sub: skip ? '首楼的总结已关掉，摘要页直接给原文' : '默认把首楼也总结进摘要',
+              act: 'bks-first',
+              toggle: skip,
+            })}
+          </div>
+        </div>
+
+        <div class="mp-bk-note">开着的时候：聊天与摘要只吃其余总结，首楼单独用原文；关着的时候：首楼和其它楼一样走总结。</div>
+      </div>`;
+  },
+
+  handle(ctx, act) {
+    if (act === 'bks-first') {
+      const summary = ctx.state.settings.summary || (ctx.state.settings.summary = {});
+      summary.skipFirstFloor = !summary.skipFirstFloor;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(summary.skipFirstFloor ? '首楼改为显示原文' : '首楼恢复总结');
       return true;
     }
 
@@ -8228,6 +8386,7 @@ const bookApp = {
 };
 
 exports["bookApp"] = bookApp;
+exports["bookSettingsApp"] = bookSettingsApp;
 };
 __mods["meme/index.js"] = function(module, exports, __req){
 /**
@@ -8240,6 +8399,7 @@ const { normalize, emptyState, demoState, syncTavernContacts, chatFor } = __req(
 const { createShell } = __req("meme/shell.js");
 const { readTavernCharacters, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, generate, probeHost } = __req("meme/host.js");
 const { chatApp, threadApp } = __req("meme/apps/chat.js");
+const { summaryContext } = __req("meme/book.js");
 const { diaryApp } = __req("meme/apps/diary.js");
 const { contactsApp, contactApp } = __req("meme/apps/contacts.js");
 const { settingsApp, appearanceApp } = __req("meme/apps/settings.js");
@@ -8248,7 +8408,7 @@ const { apiListApp, apiPresetApp } = __req("meme/apps/api.js");
 const { userListApp, userEditApp } = __req("meme/apps/user.js");
 const { charactersApp, characterApp } = __req("meme/apps/characters.js");
 const { charPhoneApp, charPhoneThreadApp, ensureLookup } = __req("meme/apps/charphone.js");
-const { bookApp } = __req("meme/apps/book.js");
+const { bookApp, bookSettingsApp } = __req("meme/apps/book.js");
 const {
   extrasApp, extraDetailApp, walletApp, favoritesApp, emojiApp,
   membershipApp, plansApp, dressApp, helpApp,
@@ -8278,6 +8438,7 @@ const APPS = {
   'p-charphone': charPhoneApp,
   'p-chatphone': charPhoneThreadApp,
   'app-book': bookApp,
+  'book-settings': bookSettingsApp,
   thread: threadApp,
   contact: contactApp,
   'extra-detail': extraDetailApp,
@@ -8292,7 +8453,7 @@ const DESKTOP_APPS = [
   { id: 'plans', name: '计划', icon: 'plan' },
   { id: 'dress', name: '装扮', icon: 'brush' },
   { id: 'api', name: '接口', icon: 'code' },
-  { id: 'book', name: '柏宝书', icon: 'book' },
+  { id: 'book', name: '酒馆总结', icon: 'book' },
   { id: 'characters', name: '查角色', icon: 'contacts' },
 ];
 
@@ -8321,27 +8482,36 @@ function transcript(state, chat, limit = 10) {
 }
 
 function makeAi(state) {
+  /* 手机聊天 / 日记的背景只用「酒馆总结」，不再读酒馆原文 */
+  function story(limit = 1200) {
+    return summaryContext(limit, { skipFirstFloor: state.settings.summary?.skipFirstFloor });
+  }
+
   return {
     async reply(context, chat, contact, demoReply) {
+      const storyBlock = story(1200);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`,
         '要求：口语、短、不超过 40 字，不要旁白、不要括号动作。',
+        storyBlock.text ? `【酒馆里已有的总结】\n${storyBlock.text}` : '',
         transcript(state, chat),
         `${state.settings.user.name}：${chat.messages[chat.messages.length - 1]?.text || ''}`,
         `${contact?.name || '对方'}：`,
-      ].join('\n');
+      ].filter(Boolean).join('\n');
       const result = await generate({ prompt, demoReply });
       return result.text;
     },
 
     async proactive(context, chat, contact, demoReply) {
+      const storyBlock = story(900);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。`,
         `距离上次说话已经过去 ${state.settings.proactive.idleMinutes} 分钟，你要主动发一条消息。`,
         '要求：口语、短、不超过 30 字，像是忽然想起什么，不要提问过多。',
+        storyBlock.text ? `【酒馆里已有的总结】\n${storyBlock.text}` : '',
         transcript(state, chat, 6),
         `${contact?.name || '对方'}：`,
-      ].join('\n');
+      ].filter(Boolean).join('\n');
       const result = await generate({ prompt, demoReply });
       return result.text;
     },
@@ -8409,13 +8579,15 @@ function makeAi(state) {
         const chats = Object.values(state.chats);
         material = chats.map(item => transcript(state, item, 10)).join('\n');
       }
+      const storyBlock = story(900);
       const prompt = [
         state.diary.prompt || '写一段当天的日记。',
         `日期：${day}`,
+        storyBlock.text ? `酒馆里的总结：\n${storyBlock.text}` : '',
         '当天的聊天：',
         material || '（这一天没有聊天记录）',
         '写成一段自然的中文日记，不要分点，不要写标题。',
-      ].join('\n');
+      ].filter(Boolean).join('\n');
       const result = await generate({
         prompt,
         demoReply: '今天没什么特别的。\n只是在便利店的灯下坐了一会儿，风从门口进来，吹动了货架上的塑料帘子。\n回去的路上想起白天没回的那条消息，觉得有点迟了。',

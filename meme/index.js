@@ -8,6 +8,7 @@ import { normalize, emptyState, demoState, syncTavernContacts, chatFor } from '.
 import { createShell } from './shell.js';
 import { readTavernCharacters, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, generate, probeHost } from './host.js';
 import { chatApp, threadApp } from './apps/chat.js';
+import { summaryContext } from './book.js';
 import { diaryApp } from './apps/diary.js';
 import { contactsApp, contactApp } from './apps/contacts.js';
 import { settingsApp, appearanceApp } from './apps/settings.js';
@@ -16,7 +17,7 @@ import { apiListApp, apiPresetApp } from './apps/api.js';
 import { userListApp, userEditApp } from './apps/user.js';
 import { charactersApp, characterApp } from './apps/characters.js';
 import { charPhoneApp, charPhoneThreadApp, ensureLookup } from './apps/charphone.js';
-import { bookApp } from './apps/book.js';
+import { bookApp, bookSettingsApp } from './apps/book.js';
 import {
   extrasApp, extraDetailApp, walletApp, favoritesApp, emojiApp,
   membershipApp, plansApp, dressApp, helpApp,
@@ -46,6 +47,7 @@ const APPS = {
   'p-charphone': charPhoneApp,
   'p-chatphone': charPhoneThreadApp,
   'app-book': bookApp,
+  'book-settings': bookSettingsApp,
   thread: threadApp,
   contact: contactApp,
   'extra-detail': extraDetailApp,
@@ -60,7 +62,7 @@ const DESKTOP_APPS = [
   { id: 'plans', name: '计划', icon: 'plan' },
   { id: 'dress', name: '装扮', icon: 'brush' },
   { id: 'api', name: '接口', icon: 'code' },
-  { id: 'book', name: '柏宝书', icon: 'book' },
+  { id: 'book', name: '酒馆总结', icon: 'book' },
   { id: 'characters', name: '查角色', icon: 'contacts' },
 ];
 
@@ -89,27 +91,36 @@ function transcript(state, chat, limit = 10) {
 }
 
 function makeAi(state) {
+  /* 手机聊天 / 日记的背景只用「酒馆总结」，不再读酒馆原文 */
+  function story(limit = 1200) {
+    return summaryContext(limit, { skipFirstFloor: state.settings.summary?.skipFirstFloor });
+  }
+
   return {
     async reply(context, chat, contact, demoReply) {
+      const storyBlock = story(1200);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`,
         '要求：口语、短、不超过 40 字，不要旁白、不要括号动作。',
+        storyBlock.text ? `【酒馆里已有的总结】\n${storyBlock.text}` : '',
         transcript(state, chat),
         `${state.settings.user.name}：${chat.messages[chat.messages.length - 1]?.text || ''}`,
         `${contact?.name || '对方'}：`,
-      ].join('\n');
+      ].filter(Boolean).join('\n');
       const result = await generate({ prompt, demoReply });
       return result.text;
     },
 
     async proactive(context, chat, contact, demoReply) {
+      const storyBlock = story(900);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。`,
         `距离上次说话已经过去 ${state.settings.proactive.idleMinutes} 分钟，你要主动发一条消息。`,
         '要求：口语、短、不超过 30 字，像是忽然想起什么，不要提问过多。',
+        storyBlock.text ? `【酒馆里已有的总结】\n${storyBlock.text}` : '',
         transcript(state, chat, 6),
         `${contact?.name || '对方'}：`,
-      ].join('\n');
+      ].filter(Boolean).join('\n');
       const result = await generate({ prompt, demoReply });
       return result.text;
     },
@@ -177,13 +188,15 @@ function makeAi(state) {
         const chats = Object.values(state.chats);
         material = chats.map(item => transcript(state, item, 10)).join('\n');
       }
+      const storyBlock = story(900);
       const prompt = [
         state.diary.prompt || '写一段当天的日记。',
         `日期：${day}`,
+        storyBlock.text ? `酒馆里的总结：\n${storyBlock.text}` : '',
         '当天的聊天：',
         material || '（这一天没有聊天记录）',
         '写成一段自然的中文日记，不要分点，不要写标题。',
-      ].join('\n');
+      ].filter(Boolean).join('\n');
       const result = await generate({
         prompt,
         demoReply: '今天没什么特别的。\n只是在便利店的灯下坐了一会儿，风从门口进来，吹动了货架上的塑料帘子。\n回去的路上想起白天没回的那条消息，觉得有点迟了。',

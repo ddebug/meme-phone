@@ -19,6 +19,8 @@ export function emptyState() {
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
       chat: { showTime: true, enterToSend: false, remind: true, wake: true },
+      /* 酒馆总结（柏宝书）：首楼默认是要总结的，关掉后那一楼直接显示原文 */
+      summary: { skipFirstFloor: false },
       api: {
         activeChat: '', activeImage: '', presets: [
           { id: 'api_default', name: '酒馆 API', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
@@ -437,6 +439,7 @@ export function normalize(raw) {
   };
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
+  merged.settings.summary = { ...base.settings.summary, ...(raw.settings?.summary || {}) };
   merged.settings.image = {
     ...base.settings.image,
     ...(raw.settings?.image || {}),

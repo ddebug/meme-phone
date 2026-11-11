@@ -15,6 +15,7 @@ MODULES = [
     "meme/host.js",
     "meme/icons.js",
     "meme/shell.js",
+    "meme/book.js",
     "meme/apps/chat.js",
     "meme/apps/diary.js",
     "meme/apps/contacts.js",

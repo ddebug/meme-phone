@@ -21,7 +21,7 @@ export function emptyState() {
       chat: { showTime: true, enterToSend: false, remind: true, wake: true },
       api: {
         activeChat: '', activeImage: '', presets: [
-          { id: 'api_default', name: '酒馆默认', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
+          { id: 'api_default', name: '酒馆 API', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
         ],
       },
     },
@@ -261,7 +261,7 @@ export function demoState() {
   state.settings.api.activeChat = 'api_default';
   state.settings.api.activeImage = 'api_nai';
   state.settings.api.presets = [
-    { id: 'api_default', name: '酒馆默认', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
+    { id: 'api_default', name: '酒馆 API', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
     { id: 'api_nai', name: '我的 NovelAI', engine: 'novelai', url: 'https://image.novelai.net', path: '/ai/generate-image', model: 'nai-diffusion-4', key: 'pst-demo', temp: 0.8 },
     { id: 'api_local', name: '本地 OpenAI', engine: 'openai', url: 'http://127.0.0.1:8080', path: '/v1/chat/completions', model: 'gpt-4o-mini', key: 'sk-demo', temp: 0.9 },
   ];

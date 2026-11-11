@@ -43,6 +43,20 @@ function defaultPath(engine) {
   return '';
 }
 
+/* 复制一套做模板：地址 / Key / 模型 / 引擎整套带走，只换名字和 id */
+export function clonePreset(source, suffix = ' 副本') {
+  return {
+    id: newId('api'),
+    name: `${source?.name || '预设'}${suffix}`,
+    engine: source?.engine || 'openai',
+    url: source?.url || '',
+    path: source?.path || defaultPath(source?.engine || 'openai'),
+    model: source?.model || '',
+    key: source?.key || '',
+    temp: typeof source?.temp === 'number' ? source.temp : 0.8,
+  };
+}
+
 function api(state) {
   const base = { activeChat: '', activeImage: '', presets: [] };
   if (!state.settings.api || typeof state.settings.api !== 'object') state.settings.api = base;
@@ -77,12 +91,15 @@ export const apiListApp = {
       const active = preset.id === store.activeChat ? '聊天' : '';
       const image = preset.id === store.activeImage ? '绘图' : '';
       const use = [active, image].filter(Boolean).join(' · ');
+      const sub = preset.engine === 'tavern' && !preset.model
+        ? '借酒馆自己的模型，不用填地址'
+        : `${engineLabel(preset.engine)}${preset.model ? ` · ${preset.model}` : ''} · Key ${mask(preset.key)}`;
       return `
         <button class="mp-row mp-api-row" data-act="api-open" data-id="${preset.id}" type="button">
           ${ctx.icon ? ctx.icon('code') : icon('code')}
           <span class="mp-row-main">
             <span class="mp-row-name">${esc(preset.name || '未命名')}${use ? `<span class="mp-api-tag">${esc(use)}</span>` : ''}</span>
-            <span class="mp-row-sub">${esc(engineLabel(preset.engine))}${preset.model ? ` · ${esc(preset.model)}` : ''} · Key ${esc(mask(preset.key))}</span>
+            <span class="mp-row-sub">${esc(sub)}</span>
           </span>
           ${icon('chevron')}
         </button>`;
@@ -96,7 +113,7 @@ export const apiListApp = {
       </div>
       <div class="mp-page-body">
         <div class="mp-title" style="margin-top:0">接口</div>
-        <div class="mp-subtitle">聊天和绘图各用一套预设</div>
+        <div class="mp-subtitle">一套预设 = 地址 + Key + 模型，聊天和绘图各挑一套</div>
 
         <div class="mp-api-cards">
           <div class="mp-api-card">
@@ -113,7 +130,7 @@ export const apiListApp = {
         <div class="mp-group">${rows}</div>
 
         <div class="mp-api-note">
-          地址和 Key 只存在这台设备（酒馆 /user/files/meme-phone.json），不会进聊天存档。
+          右上角 ＋ 会拿当前聊天这套复制一份当模板；地址、Key、模型都在这一套里，不会串到别套。
         </div>
       </div>`;
   },
@@ -128,14 +145,27 @@ export const apiListApp = {
     }
 
     if (act === 'api-new') {
-      const preset = {
-        id: newId('api'), name: '新预设', engine: 'openai', url: '', path: '/v1/chat/completions',
-        model: '', key: '', temp: 0.8,
-      };
+      /* 新建 = 拿当前这套做模板复制一份，不用从空白重填 */
+      const source = store.presets.find(item => item.id === store.activeChat)
+        || store.presets.find(item => item.id === store.activeImage)
+        || store.presets[0];
+      const preset = clonePreset(source, ' 副本');
       store.presets.push(preset);
       editingId = preset.id;
       ctx.save();
       ctx.go('api-item');
+      ctx.toast(`基于「${source?.name || '未命名'}」复制了一份`);
+      return true;
+    }
+
+    if (act === 'api-clone') {
+      const source = store.presets.find(item => item.id === editingId) || store.presets[0];
+      const preset = clonePreset(source, ' 2');
+      store.presets.push(preset);
+      editingId = preset.id;
+      ctx.save();
+      ctx.shell.rerender();
+      ctx.toast(`复制成「${preset.name}」`);
       return true;
     }
 
@@ -167,6 +197,9 @@ export const apiPresetApp = {
 
     const asChat = preset.id === store.activeChat;
     const asImage = preset.id === store.activeImage;
+    const sub = preset.model
+      ? `${engineLabel(preset.engine)} · ${preset.model}`
+      : (preset.engine === 'tavern' ? '借酒馆自己的模型，不用填地址' : `${engineLabel(preset.engine)} · 模型没填`);
 
     return `
       <div class="mp-nav">
@@ -176,7 +209,7 @@ export const apiPresetApp = {
       </div>
       <div class="mp-page-body">
         <div class="mp-title" style="margin-top:0">${esc(preset.name || '未命名')}</div>
-        <div class="mp-subtitle">${esc(engineLabel(preset.engine))}${preset.model ? ` · ${esc(preset.model)}` : ''}</div>
+        <div class="mp-subtitle">${esc(sub)}</div>
 
         <div class="mp-group">${rows}</div>
 
@@ -190,8 +223,10 @@ export const apiPresetApp = {
           </button>
         </div>
 
+        <button class="mp-btn mp-api-clone" data-act="api-clone" type="button">${icon('copy')}<span>复制成新的一套</span></button>
+
         <div class="mp-api-note">
-          NovelAI 的路径是 /ai/generate-image，Key 以 pst- 开头；OpenAI 兼容的聊天地址一般是 /v1/chat/completions。
+          地址 + Key + 模型是一整套，换模型就是换一套接口；要试新的，先复制这一套再改，原来的不动。
         </div>
       </div>`;
   },
@@ -245,17 +280,15 @@ export const apiPresetApp = {
 
     if (act === 'api-use-image') {
       store.activeImage = preset.id;
-      // NovelAI 的预设顺手灌进绘图页，省得同一个 Key 填两遍
-      if (preset.engine === 'novelai') {
-        if (!ctx.state.draw || typeof ctx.state.draw !== 'object') ctx.state.draw = {};
-        const cfg = ctx.state.draw.config || {};
-        ctx.state.draw.config = {
-          ...cfg,
-          url: preset.url || cfg.url,
-          key: preset.key || cfg.key,
-          model: preset.model || cfg.model,
-        };
-      }
+      /* 绘图页不自己存地址 Key 模型，但把这一套同步进 cfg 兜底，老数据也能直接画 */
+      if (!ctx.state.draw || typeof ctx.state.draw !== 'object') ctx.state.draw = {};
+      const cfg = ctx.state.draw.config || {};
+      ctx.state.draw.config = {
+        ...cfg,
+        url: preset.url || cfg.url || '',
+        key: preset.key || cfg.key || '',
+        model: preset.model || cfg.model || '',
+      };
       ctx.save();
       ctx.shell.rerender();
       ctx.toast(`绘图换成「${preset.name || '未命名'}」`);

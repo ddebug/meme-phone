@@ -259,7 +259,7 @@ export function demoState() {
     { key: 'persona_gu.png', name: '顾青', description: '白天在书店，晚上写东西，不太主动开口。', avatarUrl: '' },
   ];
   state.settings.api.activeChat = 'api_default';
-  state.settings.api.activeImage = 'api_default';
+  state.settings.api.activeImage = 'api_nai';
   state.settings.api.presets = [
     { id: 'api_default', name: '酒馆默认', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
     { id: 'api_nai', name: '我的 NovelAI', engine: 'novelai', url: 'https://image.novelai.net', path: '/ai/generate-image', model: 'nai-diffusion-4', key: 'pst-demo', temp: 0.8 },

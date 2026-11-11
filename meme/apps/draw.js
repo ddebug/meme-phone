@@ -60,6 +60,26 @@ function maskKey(key) {
   return `${text.slice(0, 4)}···${text.slice(-4)}`;
 }
 
+/* 绘图不自己存一套地址 Key 模型：一律读「接口」里当前绘图那套预设 */
+export function imageEndpoint(state) {
+  const api = state.settings?.api || {};
+  const list = Array.isArray(api.presets) ? api.presets : [];
+  const preset = list.find(item => item.id === api.activeImage)
+    || list.find(item => item.engine === 'novelai')
+    || list[0] || null;
+  const cfg = state.draw?.config || {};
+  return {
+    preset,
+    id: preset?.id || '',
+    name: preset?.name || '',
+    engine: preset?.engine || '',
+    url: String((preset?.url ?? cfg.url) || '').trim(),
+    path: String(preset?.path || '/ai/generate-image').trim(),
+    key: String((preset?.key ?? cfg.key) || '').trim(),
+    model: String((preset?.model ?? cfg.model) || '').trim(),
+  };
+}
+
 export const drawApp = {
   id: 'draw', name: '绘图', icon: 'image',
 
@@ -68,7 +88,8 @@ export const drawApp = {
     const cfg = draw.config;
     const preset = draw.presets[draw.presetIdx] || draw.presets[0];
     const size = sizeOf(cfg.size);
-    const ready = Boolean(cfg.key && cfg.url);
+    const ep = imageEndpoint(ctx.state);
+    const ready = Boolean(ep.key && ep.url);
     const busy = Boolean(draw.busy);
 
     const chips = draw.presets.map((item, index) => `
@@ -84,6 +105,14 @@ export const drawApp = {
       { act: 'draw-noise', label: '噪声', value: cfg.noise },
       { act: 'draw-seed', label: '种子', value: cfg.seed ? cfg.seed : '随机' },
     ];
+
+    const apiRow = `
+      <button class="mp-row" data-act="open-app" data-app="api" type="button">
+        <span class="mp-row-main">
+          <span class="mp-row-name">${esc(ep.name || '还没选绘图预设')}</span>
+          <span class="mp-row-sub">${esc(ep.model || '模型没填')} · Key ${esc(maskKey(ep.key))}</span>
+        </span>${icon('chevron')}
+      </button>`;
 
     const history = draw.history.slice(0, 6).map((item, index) => `
       <div class="mp-draw-card">
@@ -112,9 +141,14 @@ export const drawApp = {
 
         <div class="mp-draw-state${ready ? ' is-on' : ''}">
           ${icon(ready ? 'spark' : 'help')}
-          <span>${ready ? `已接 ${esc(cfg.model)}` : '还没填 NovelAI 地址与 Key，现在是演示出图'}</span>
+          <span>${ready
+            ? `已接「${esc(ep.name || '绘图预设')}」${ep.model ? ` · ${esc(ep.model)}` : ''}`
+            : '还没接上绘图预设，现在是演示出图'}</span>
           <button class="mp-draw-state-btn" data-act="open-app" data-app="api" type="button">去设置</button>
         </div>
+
+        <div class="mp-group-label" style="margin-top:12px">接口 · 预设带模型</div>
+        <div class="mp-group">${apiRow}</div>
 
         <div class="mp-group-label" style="margin-top:12px">画风预设</div>
         <div class="mp-draw-chips">${chips}</div>
@@ -286,11 +320,12 @@ async function run(ctx, prompt) {
   ctx.shell.rerender();
   try {
     let entry = null;
-    if (cfg.key && cfg.url) {
+    const ep = imageEndpoint(ctx.state);
+    if (ep.key && ep.url) {
       const result = await novelaiImage({
-        url: cfg.url,
-        key: cfg.key,
-        model: cfg.model,
+        url: ep.url,
+        key: ep.key,
+        model: ep.model || cfg.model,
         width: size.w,
         height: size.h,
         steps: Number(cfg.steps) || 28,
@@ -311,7 +346,7 @@ async function run(ctx, prompt) {
         width: size.w, height: size.h,
         tint: TINTS[draw.history.length % TINTS.length],
       };
-      ctx.toast('演示出图：去接口页填 NovelAI 地址和 Key 才会真的画');
+      ctx.toast('演示出图：去接口页给绘图选一套带地址和 Key 的预设才会真的画');
     }
     draw.history.unshift(entry);
     draw.history = draw.history.slice(0, 18);

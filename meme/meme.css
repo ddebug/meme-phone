@@ -2537,3 +2537,26 @@
   background: rgba(255, 255, 255, .07);
   color: var(--text);
 }
+
+/* ===== 本段：预设即 API（复制成新的一套） ===== */
+.mp-api-clone {
+  display: flex;
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .72);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.mp-api-clone .mp-i { width: 16px; height: 16px; }
+
+.mp-root[data-mp-theme="night"] .mp-api-clone {
+  background: rgba(255, 255, 255, .06);
+}
+
+.mp-api-row .mp-api-tag {
+  margin-left: 6px;
+}

@@ -2555,6 +2555,29 @@ body {
   color: var(--text);
 }
 
+/* ===== 本段：预设即 API（复制成新的一套） ===== */
+.mp-api-clone {
+  display: flex;
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .72);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.mp-api-clone .mp-i { width: 16px; height: 16px; }
+
+.mp-root[data-mp-theme="night"] .mp-api-clone {
+  background: rgba(255, 255, 255, .06);
+}
+
+.mp-api-row .mp-api-tag {
+  margin-left: 6px;
+}
+
 </style>
 </head>
 <body>
@@ -2832,7 +2855,7 @@ function demoState() {
     { key: 'persona_gu.png', name: '顾青', description: '白天在书店，晚上写东西，不太主动开口。', avatarUrl: '' },
   ];
   state.settings.api.activeChat = 'api_default';
-  state.settings.api.activeImage = 'api_default';
+  state.settings.api.activeImage = 'api_nai';
   state.settings.api.presets = [
     { id: 'api_default', name: '酒馆默认', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
     { id: 'api_nai', name: '我的 NovelAI', engine: 'novelai', url: 'https://image.novelai.net', path: '/ai/generate-image', model: 'nai-diffusion-4', key: 'pst-demo', temp: 0.8 },
@@ -5608,6 +5631,26 @@ function maskKey(key) {
   return `${text.slice(0, 4)}···${text.slice(-4)}`;
 }
 
+/* 绘图不自己存一套地址 Key 模型：一律读「接口」里当前绘图那套预设 */
+function imageEndpoint(state) {
+  const api = state.settings?.api || {};
+  const list = Array.isArray(api.presets) ? api.presets : [];
+  const preset = list.find(item => item.id === api.activeImage)
+    || list.find(item => item.engine === 'novelai')
+    || list[0] || null;
+  const cfg = state.draw?.config || {};
+  return {
+    preset,
+    id: preset?.id || '',
+    name: preset?.name || '',
+    engine: preset?.engine || '',
+    url: String((preset?.url ?? cfg.url) || '').trim(),
+    path: String(preset?.path || '/ai/generate-image').trim(),
+    key: String((preset?.key ?? cfg.key) || '').trim(),
+    model: String((preset?.model ?? cfg.model) || '').trim(),
+  };
+}
+
 const drawApp = {
   id: 'draw', name: '绘图', icon: 'image',
 
@@ -5616,7 +5659,8 @@ const drawApp = {
     const cfg = draw.config;
     const preset = draw.presets[draw.presetIdx] || draw.presets[0];
     const size = sizeOf(cfg.size);
-    const ready = Boolean(cfg.key && cfg.url);
+    const ep = imageEndpoint(ctx.state);
+    const ready = Boolean(ep.key && ep.url);
     const busy = Boolean(draw.busy);
 
     const chips = draw.presets.map((item, index) => `
@@ -5632,6 +5676,14 @@ const drawApp = {
       { act: 'draw-noise', label: '噪声', value: cfg.noise },
       { act: 'draw-seed', label: '种子', value: cfg.seed ? cfg.seed : '随机' },
     ];
+
+    const apiRow = `
+      <button class="mp-row" data-act="open-app" data-app="api" type="button">
+        <span class="mp-row-main">
+          <span class="mp-row-name">${esc(ep.name || '还没选绘图预设')}</span>
+          <span class="mp-row-sub">${esc(ep.model || '模型没填')} · Key ${esc(maskKey(ep.key))}</span>
+        </span>${icon('chevron')}
+      </button>`;
 
     const history = draw.history.slice(0, 6).map((item, index) => `
       <div class="mp-draw-card">
@@ -5660,9 +5712,14 @@ const drawApp = {
 
         <div class="mp-draw-state${ready ? ' is-on' : ''}">
           ${icon(ready ? 'spark' : 'help')}
-          <span>${ready ? `已接 ${esc(cfg.model)}` : '还没填 NovelAI 地址与 Key，现在是演示出图'}</span>
+          <span>${ready
+            ? `已接「${esc(ep.name || '绘图预设')}」${ep.model ? ` · ${esc(ep.model)}` : ''}`
+            : '还没接上绘图预设，现在是演示出图'}</span>
           <button class="mp-draw-state-btn" data-act="open-app" data-app="api" type="button">去设置</button>
         </div>
+
+        <div class="mp-group-label" style="margin-top:12px">接口 · 预设带模型</div>
+        <div class="mp-group">${apiRow}</div>
 
         <div class="mp-group-label" style="margin-top:12px">画风预设</div>
         <div class="mp-draw-chips">${chips}</div>
@@ -5834,11 +5891,12 @@ async function run(ctx, prompt) {
   ctx.shell.rerender();
   try {
     let entry = null;
-    if (cfg.key && cfg.url) {
+    const ep = imageEndpoint(ctx.state);
+    if (ep.key && ep.url) {
       const result = await novelaiImage({
-        url: cfg.url,
-        key: cfg.key,
-        model: cfg.model,
+        url: ep.url,
+        key: ep.key,
+        model: ep.model || cfg.model,
         width: size.w,
         height: size.h,
         steps: Number(cfg.steps) || 28,
@@ -5859,7 +5917,7 @@ async function run(ctx, prompt) {
         width: size.w, height: size.h,
         tint: TINTS[draw.history.length % TINTS.length],
       };
-      ctx.toast('演示出图：去接口页填 NovelAI 地址和 Key 才会真的画');
+      ctx.toast('演示出图：去接口页给绘图选一套带地址和 Key 的预设才会真的画');
     }
     draw.history.unshift(entry);
     draw.history = draw.history.slice(0, 18);
@@ -5870,6 +5928,7 @@ async function run(ctx, prompt) {
   }
 }
 
+exports["imageEndpoint"] = imageEndpoint;
 exports["drawApp"] = drawApp;
 };
 __mods["meme/apps/api.js"] = function(module, exports, __req){
@@ -5918,6 +5977,20 @@ function defaultPath(engine) {
   return '';
 }
 
+/* 复制一套做模板：地址 / Key / 模型 / 引擎整套带走，只换名字和 id */
+function clonePreset(source, suffix = ' 副本') {
+  return {
+    id: newId('api'),
+    name: `${source?.name || '预设'}${suffix}`,
+    engine: source?.engine || 'openai',
+    url: source?.url || '',
+    path: source?.path || defaultPath(source?.engine || 'openai'),
+    model: source?.model || '',
+    key: source?.key || '',
+    temp: typeof source?.temp === 'number' ? source.temp : 0.8,
+  };
+}
+
 function api(state) {
   const base = { activeChat: '', activeImage: '', presets: [] };
   if (!state.settings.api || typeof state.settings.api !== 'object') state.settings.api = base;
@@ -5952,12 +6025,15 @@ const apiListApp = {
       const active = preset.id === store.activeChat ? '聊天' : '';
       const image = preset.id === store.activeImage ? '绘图' : '';
       const use = [active, image].filter(Boolean).join(' · ');
+      const sub = preset.engine === 'tavern' && !preset.model
+        ? '借酒馆自己的模型，不用填地址'
+        : `${engineLabel(preset.engine)}${preset.model ? ` · ${preset.model}` : ''} · Key ${mask(preset.key)}`;
       return `
         <button class="mp-row mp-api-row" data-act="api-open" data-id="${preset.id}" type="button">
           ${ctx.icon ? ctx.icon('code') : icon('code')}
           <span class="mp-row-main">
             <span class="mp-row-name">${esc(preset.name || '未命名')}${use ? `<span class="mp-api-tag">${esc(use)}</span>` : ''}</span>
-            <span class="mp-row-sub">${esc(engineLabel(preset.engine))}${preset.model ? ` · ${esc(preset.model)}` : ''} · Key ${esc(mask(preset.key))}</span>
+            <span class="mp-row-sub">${esc(sub)}</span>
           </span>
           ${icon('chevron')}
         </button>`;
@@ -5971,7 +6047,7 @@ const apiListApp = {
       </div>
       <div class="mp-page-body">
         <div class="mp-title" style="margin-top:0">接口</div>
-        <div class="mp-subtitle">聊天和绘图各用一套预设</div>
+        <div class="mp-subtitle">一套预设 = 地址 + Key + 模型，聊天和绘图各挑一套</div>
 
         <div class="mp-api-cards">
           <div class="mp-api-card">
@@ -5988,7 +6064,7 @@ const apiListApp = {
         <div class="mp-group">${rows}</div>
 
         <div class="mp-api-note">
-          地址和 Key 只存在这台设备（酒馆 /user/files/meme-phone.json），不会进聊天存档。
+          右上角 ＋ 会拿当前聊天这套复制一份当模板；地址、Key、模型都在这一套里，不会串到别套。
         </div>
       </div>`;
   },
@@ -6003,14 +6079,27 @@ const apiListApp = {
     }
 
     if (act === 'api-new') {
-      const preset = {
-        id: newId('api'), name: '新预设', engine: 'openai', url: '', path: '/v1/chat/completions',
-        model: '', key: '', temp: 0.8,
-      };
+      /* 新建 = 拿当前这套做模板复制一份，不用从空白重填 */
+      const source = store.presets.find(item => item.id === store.activeChat)
+        || store.presets.find(item => item.id === store.activeImage)
+        || store.presets[0];
+      const preset = clonePreset(source, ' 副本');
       store.presets.push(preset);
       editingId = preset.id;
       ctx.save();
       ctx.go('api-item');
+      ctx.toast(`基于「${source?.name || '未命名'}」复制了一份`);
+      return true;
+    }
+
+    if (act === 'api-clone') {
+      const source = store.presets.find(item => item.id === editingId) || store.presets[0];
+      const preset = clonePreset(source, ' 2');
+      store.presets.push(preset);
+      editingId = preset.id;
+      ctx.save();
+      ctx.shell.rerender();
+      ctx.toast(`复制成「${preset.name}」`);
       return true;
     }
 
@@ -6042,6 +6131,9 @@ const apiPresetApp = {
 
     const asChat = preset.id === store.activeChat;
     const asImage = preset.id === store.activeImage;
+    const sub = preset.model
+      ? `${engineLabel(preset.engine)} · ${preset.model}`
+      : (preset.engine === 'tavern' ? '借酒馆自己的模型，不用填地址' : `${engineLabel(preset.engine)} · 模型没填`);
 
     return `
       <div class="mp-nav">
@@ -6051,7 +6143,7 @@ const apiPresetApp = {
       </div>
       <div class="mp-page-body">
         <div class="mp-title" style="margin-top:0">${esc(preset.name || '未命名')}</div>
-        <div class="mp-subtitle">${esc(engineLabel(preset.engine))}${preset.model ? ` · ${esc(preset.model)}` : ''}</div>
+        <div class="mp-subtitle">${esc(sub)}</div>
 
         <div class="mp-group">${rows}</div>
 
@@ -6065,8 +6157,10 @@ const apiPresetApp = {
           </button>
         </div>
 
+        <button class="mp-btn mp-api-clone" data-act="api-clone" type="button">${icon('copy')}<span>复制成新的一套</span></button>
+
         <div class="mp-api-note">
-          NovelAI 的路径是 /ai/generate-image，Key 以 pst- 开头；OpenAI 兼容的聊天地址一般是 /v1/chat/completions。
+          地址 + Key + 模型是一整套，换模型就是换一套接口；要试新的，先复制这一套再改，原来的不动。
         </div>
       </div>`;
   },
@@ -6120,17 +6214,15 @@ const apiPresetApp = {
 
     if (act === 'api-use-image') {
       store.activeImage = preset.id;
-      // NovelAI 的预设顺手灌进绘图页，省得同一个 Key 填两遍
-      if (preset.engine === 'novelai') {
-        if (!ctx.state.draw || typeof ctx.state.draw !== 'object') ctx.state.draw = {};
-        const cfg = ctx.state.draw.config || {};
-        ctx.state.draw.config = {
-          ...cfg,
-          url: preset.url || cfg.url,
-          key: preset.key || cfg.key,
-          model: preset.model || cfg.model,
-        };
-      }
+      /* 绘图页不自己存地址 Key 模型，但把这一套同步进 cfg 兜底，老数据也能直接画 */
+      if (!ctx.state.draw || typeof ctx.state.draw !== 'object') ctx.state.draw = {};
+      const cfg = ctx.state.draw.config || {};
+      ctx.state.draw.config = {
+        ...cfg,
+        url: preset.url || cfg.url || '',
+        key: preset.key || cfg.key || '',
+        model: preset.model || cfg.model || '',
+      };
       ctx.save();
       ctx.shell.rerender();
       ctx.toast(`绘图换成「${preset.name || '未命名'}」`);
@@ -6155,6 +6247,7 @@ const apiPresetApp = {
   },
 };
 
+exports["clonePreset"] = clonePreset;
 exports["apiListApp"] = apiListApp;
 exports["apiPresetApp"] = apiPresetApp;
 };

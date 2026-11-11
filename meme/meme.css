@@ -1127,6 +1127,9 @@
   -webkit-backdrop-filter: blur(30px) saturate(150%);
   box-shadow: 0 22px 50px rgba(90, 80, 130, .28), inset 0 0 0 1px rgba(255, 255, 255, .9);
   animation: mp-sheet .26s cubic-bezier(.2, .8, .3, 1);
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 @keyframes mp-sheet {
@@ -1789,6 +1792,12 @@
   vertical-align: 1px;
 }
 .mp-root .mp-api-row .mp-row-sub { display: block; }
+.mp-root .mp-api-status .mp-row-sub {
+  white-space: normal;
+  line-height: 1.55;
+  word-break: break-all;
+}
+.mp-root .mp-api-status .mp-row-sub.is-ok { color: #4f8a63; }
 .mp-root .mp-api-note {
   margin: 16px 4px 6px;
   font-size: 11.5px;

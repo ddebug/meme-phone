@@ -331,6 +331,7 @@ export async function readTavernApi() {
   try {
     const ctx = script.getContext?.() || {};
     const settings = script.oai_settings
+      || ctx.oai_settings
       || ctx.oaiSettings
       || script.settings?.oai_settings
       || globalThis.oai_settings
@@ -350,7 +351,7 @@ export async function readTavernApi() {
     );
     const proxy = String(settings.reverse_proxy || '').trim();
     const customUrl = String(settings.custom_url || '').trim();
-    const key = String(settings.proxy_password || '').trim();
+    const key = String(settings.custom_key || settings.proxy_password || '').trim();
     const url = (proxy || customUrl).replace(/\/+$/, '');
 
     return {
@@ -364,6 +365,67 @@ export async function readTavernApi() {
     };
   } catch {
     return { available: false, reason: '读酒馆设置时出错' };
+  }
+}
+
+/**
+ * 借酒馆后端拉一次模型列表。
+ * 小手机在酒馆窗口里跑，直接 fetch 外部接口会被 CORS 拦；
+ * 酒馆自己的 /api/backends/chat-completions/status 就是干这个的，还带着酒馆存的 Key。
+ * 传进来的 preset 有地址 / Key 时优先用它，没有就用酒馆当前设置。
+ */
+export async function listTavernModels(preset = {}) {
+  const script = await loadHostScript();
+  if (!script) return { available: false, models: [], reason: '没接上酒馆' };
+  try {
+    const ctx = globalThis.SillyTavern?.getContext?.() || script.getContext?.() || {};
+    const settings = script.oai_settings
+      || ctx.oai_settings
+      || ctx.oaiSettings
+      || script.settings?.oai_settings
+      || globalThis.oai_settings
+      || {};
+    const source = String(preset.tavernSource || settings.chat_completion_source || 'openai');
+    const url = String(preset.url || settings.reverse_proxy || settings.custom_url || '').trim();
+    const key = String(preset.key || settings.proxy_password || '').trim();
+    const getHeaders = ctx.getRequestHeaders || script.getRequestHeaders;
+    const headers = typeof getHeaders === 'function' ? { ...getHeaders() } : {};
+    if (!headers['X-CSRF-Token']) {
+      const token = ctx.csrf_token || globalThis.csrf_token || '';
+      if (token) headers['X-CSRF-Token'] = token;
+    }
+    headers['Content-Type'] = 'application/json';
+
+    const body = {
+      chat_completion_source: source,
+      reverse_proxy: url,
+      proxy_password: key,
+    };
+    if (source === 'custom') {
+      body.custom_url = url;
+      body.custom_include_headers = String(settings.custom_include_headers || '');
+    }
+    const response = await fetch('/api/backends/chat-completions/status', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      return { available: true, models: [], reason: `酒馆后端返回 ${response.status}` };
+    }
+    const data = await response.json().catch(() => null);
+    if (!data || data.error) {
+      return { available: true, models: [], reason: data?.message || '酒馆后端没连上这个接口' };
+    }
+    const list = (Array.isArray(data.data) ? data.data : [])
+      .map(item => (typeof item === 'string' ? item : item?.id || item?.name || ''))
+      .map(item => String(item || '').trim())
+      .filter(Boolean);
+    return { available: true, models: [...new Set(list)].sort(), reason: list.length ? '' : '酒馆后端没返回模型' };
+  } catch (error) {
+    return { available: true, models: [], reason: error.message || String(error) };
   }
 }
 

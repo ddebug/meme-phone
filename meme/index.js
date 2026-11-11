@@ -6,7 +6,7 @@
 import { createStore } from './store.js';
 import { normalize, emptyState, demoState, syncTavernContacts, chatFor } from './data.js';
 import { createShell } from './shell.js';
-import { readTavernCharacters, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, generate, probeHost } from './host.js';
+import { readTavernCharacters, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp } from './apps/chat.js';
 import { summaryContext } from './book.js';
 import { diaryApp } from './apps/diary.js';
@@ -298,6 +298,7 @@ export async function openMemePhone(options = {}) {
     syncUsers,
     writeUser: writeTavernPersona,
     readApi: readTavernApi,
+    listModels: listTavernModels,
   };
 
   rootEl = document.createElement('div');

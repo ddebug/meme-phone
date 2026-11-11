@@ -13,7 +13,7 @@ export function emptyState() {
     createdAt: Date.now(),
     settings: {
       theme: 'day',              // day | night
-      wallpaper: 'day',          // day | night
+      wallpaper: 'none',         // none | day | night
       user: { name: '我', avatar: '' },
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
       chat: { showTime: true, enterToSend: false, remind: true, wake: true },

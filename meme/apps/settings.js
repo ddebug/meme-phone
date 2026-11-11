@@ -37,7 +37,7 @@ export const settingsApp = {
           <div class="mp-group-label">账号</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'contacts', title: '个人资料', sub: state.settings.user.name + ' · 收发消息都用这个名字', act: 'set-profile' })}
-            ${row(ctx, { iconName: 'brush', title: '外观与主题', sub: state.settings.theme === 'night' ? '夜间玻璃' : '晨光粉彩', act: 'set-open-appearance' })}
+            ${row(ctx, { iconName: 'brush', title: '外观与主题', sub: `${state.settings.wallpaper === 'none' ? '背景透明' : state.settings.wallpaper === 'day' ? '晨光粉彩' : '夜色'} · ${state.settings.theme === 'night' ? '夜间' : '日间'}`, act: 'set-open-appearance' })}
           </div>
         </div>
 
@@ -213,25 +213,49 @@ export const appearanceApp = {
   id: 'appearance', name: '外观', icon: 'brush',
 
   render(ctx) {
-    const current = ctx.state.settings.theme;
-    const cards = [
-      { key: 'day', title: '晨光粉彩', sub: '樱粉与薄荷的柔光玻璃，默认' },
-      { key: 'night', title: '夜间玻璃', sub: '暗环境下的深色玻璃' },
+    const theme = ctx.state.settings.theme;
+    const wall = ctx.state.settings.wallpaper || 'none';
+
+    const themes = [
+      { key: 'day', title: '日间', sub: '浅色玻璃，白天看着干净', swatch: 'linear-gradient(150deg,#ffffff,#f3edfa 60%,#eef7f3)' },
+      { key: 'night', title: '夜间', sub: '深色玻璃，晚上不刺眼', swatch: 'linear-gradient(150deg,#3a3454,#221d38 60%,#36304f)' },
     ];
+
+    const walls = [
+      { key: 'none', title: '透明', sub: '不铺底色，直接透出酒馆自己的背景', swatch: 'repeating-conic-gradient(rgba(160,150,200,.18) 0% 25%, rgba(255,255,255,0) 0% 50%) 50% / 16px 16px' },
+      { key: 'day', title: '晨光粉彩', sub: '樱粉与薄荷的柔光壁纸', swatch: 'linear-gradient(150deg,#ffe3ef,#e4f7f0 55%,#efe6ff)' },
+      { key: 'night', title: '夜色', sub: '深墨蓝到紫罗兰的流体光带', swatch: 'linear-gradient(150deg,#1a1f2b,#2b2350 60%,#0a0c11)' },
+    ];
+
+    const row = (item, act, dataKey) => `
+      <button class="mp-row" data-act="${act}" data-${dataKey}="${item.key}" type="button" style="padding:12px;align-items:flex-start">
+        <span style="width:66px;height:66px;border-radius:16px;flex:0 0 auto;background:${item.swatch};box-shadow:var(--shadow-s)"></span>
+        <span class="mp-row-main">
+          <span class="mp-row-name">${esc(item.title)}${wall === item.key ? '<span class="mp-pill">当前</span>' : ''}</span>
+          <span class="mp-row-sub" style="white-space:normal">${esc(item.sub)}</span>
+        </span>
+      </button>`;
 
     return `
       <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button><span style="flex:1"></span></div>
       <div class="mp-page-body">
         <div class="mp-title" style="margin-top:0">外观</div>
-        <div class="mp-subtitle">主题、壁纸与图标</div>
-        ${cards.map(card => `
-          <button class="mp-row" data-act="pick-theme" data-theme="${card.key}" type="button" style="padding:12px;align-items:flex-start">
-            <span style="width:74px;height:74px;border-radius:16px;flex:0 0 auto;background:${card.key === 'day' ? 'linear-gradient(150deg,#ffe3ef,#e4f7f0 55%,#efe6ff)' : 'linear-gradient(150deg,#1a1f2b,#0a0c11)'};box-shadow:var(--shadow-s)"></span>
-            <span class="mp-row-main">
-              <span class="mp-row-name">${card.title}${current === card.key ? '<span class="mp-pill">当前</span>' : ''}</span>
-              <span class="mp-row-sub" style="white-space:normal">${card.sub}</span>
-            </span>
-          </button>`).join('')}
+        <div class="mp-subtitle">背景、主题与图标</div>
+
+        <div class="mp-group-label" style="margin-top:10px">背景</div>
+        ${walls.map(item => row(item, 'pick-wall', 'wall')).join('')}
+
+        <div class="mp-group-label" style="margin-top:14px">主题</div>
+        <div style="display:flex;gap:8px">
+          ${themes.map(item => `
+            <button class="mp-chip-btn${theme === item.key ? ' is-on' : ''}" data-act="pick-theme" data-theme="${item.key}" type="button" style="flex:1">
+              <span style="width:22px;height:22px;border-radius:7px;background:${item.swatch};box-shadow:inset 0 0 0 1px rgba(120,110,170,.16)"></span>
+              <span style="display:flex;flex-direction:column;gap:2px;text-align:left">
+                <span style="font-size:12.5px">${esc(item.title)}</span>
+                <span style="font-size:10.5px;color:var(--text-3)">${esc(item.sub)}</span>
+              </span>
+            </button>`).join('')}
+        </div>
 
         <div class="mp-group-label" style="margin-top:14px">图标</div>
         <div class="mp-group-box" style="padding:14px">
@@ -245,10 +269,16 @@ export const appearanceApp = {
   handle(ctx, act, data) {
     if (act === 'pick-theme') {
       ctx.state.settings.theme = data.theme;
-      ctx.state.settings.wallpaper = data.theme;
       ctx.save();
       ctx.shell.rerender();
-      ctx.toast(data.theme === 'day' ? '换回晨光粉彩' : '夜间玻璃已打开');
+      ctx.toast(data.theme === 'night' ? '夜间玻璃已打开' : '换回日间玻璃');
+      return true;
+    }
+    if (act === 'pick-wall') {
+      ctx.state.settings.wallpaper = data.wall;
+      ctx.save();
+      ctx.shell.rerender();
+      ctx.toast(data.wall === 'none' ? '背景已透明' : data.wall === 'day' ? '换成晨光粉彩壁纸' : '换成夜色壁纸');
       return true;
     }
     return false;

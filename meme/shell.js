@@ -151,13 +151,31 @@ export function createShell(options) {
     return `${Number(month)}月${Number(day)}日`;
   }
 
+  function floatHomeHtml() {
+    return `
+      <button class="mp-float-home" data-act="home" type="button">${ico('home')}<span>桌面</span></button>`;
+  }
+
+  function actionsHtml() {
+    const depth = shell.stack.length;
+    return `
+      <div class="mp-actions">
+        <button class="mp-action-btn primary" data-act="home" type="button">${ico('home')}<span>回桌面</span></button>
+        ${depth > 1 ? `<button class="mp-action-btn" data-act="back" type="button">${ico('back')}<span>后退</span></button>` : ''}
+        <button class="mp-action-btn" data-act="phone-close" type="button">${ico('close')}<span>收起</span></button>
+        <span class="mp-actions-hint">上滑也能回桌面</span>
+      </div>`;
+  }
+
   function pageHtml() {
     const entry = shell.stack[shell.stack.length - 1];
     const app = apps[entry.view];
     if (!app) return desktopHtml();
+    const withThread = entry.view === 'thread' || entry.view === 'contact' || entry.view === 'extra-detail';
     return `
       <div class="mp-page" data-view="${esc(entry.view)}">
         ${app.render(ctx, entry.params || {})}
+        ${withThread ? floatHomeHtml() : actionsHtml()}
       </div>`;
   }
 
@@ -197,6 +215,7 @@ export function createShell(options) {
     const status = state.settings.theme === 'night' ? 'night' : 'day';
     root.className = 'mp-root';
     root.dataset.mpTheme = status;
+    root.dataset.mpWall = ['none', 'day', 'night'].includes(state.settings.wallpaper) ? state.settings.wallpaper : 'none';
     root.innerHTML = `
       <div class="mp-overlay">
         <div class="mp-device">
@@ -281,6 +300,7 @@ export function createShell(options) {
       if (typeof handler === 'function') handler(value);
     },
     'toast': (data) => ctx.toast(data.message || ''),
+    'phone-close': () => { if (typeof ctx.onClose === 'function') ctx.onClose(); },
     'toggle-theme': () => {
       const settings = ctx.state.settings;
       settings.theme = settings.theme === 'night' ? 'day' : 'night';
@@ -303,6 +323,36 @@ export function createShell(options) {
     if (acts[act]) { acts[act](data, event); return; }
     if (typeof ctx.onGlobalAct === 'function' && ctx.onGlobalAct(act, data, event)) return;
   });
+
+  /* 上滑：页面里快速上滑一段就回桌面 */
+  let swipe = null;
+
+  root.addEventListener('pointerdown', event => {
+    if (!shell.stack.length) return;
+    const screen = root.querySelector('.mp-screen');
+    if (!screen) return;
+    const rect = screen.getBoundingClientRect();
+    const fromBottom = event.clientY - rect.top;
+    const zone = event.pointerType === 'mouse' ? rect.height - 150 : rect.height * 0.5;
+    if (fromBottom < zone) return;
+    swipe = { x: event.clientX, y: event.clientY, t: Date.now() };
+  });
+
+  root.addEventListener('pointerup', event => {
+    if (!swipe) return;
+    const dy = event.clientY - swipe.y;
+    const dx = Math.abs(event.clientX - swipe.x);
+    const dt = Date.now() - swipe.t;
+    const need = event.pointerType === 'mouse' ? -60 : -90;
+    const hit = dy <= need && dx <= 80 && dt <= 620;
+    swipe = null;
+    if (!hit || !shell.stack.length) return;
+    if (document.activeElement?.blur) document.activeElement.blur();
+    shell.live = { inputValue: '', focus: false };
+    ctx.home();
+  });
+
+  root.addEventListener('pointercancel', () => { swipe = null; });
 
   /* 长按：data-hold 元素 420ms 触发 hold 动作 */
   let holdTimer = 0;

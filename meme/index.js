@@ -240,14 +240,10 @@ export function applyTheme(state, root = rootEl) {
   if (!root) return;
   const theme = state.settings.theme === 'night' ? 'night' : 'day';
   root.dataset.mpTheme = theme;
-  const dress = state.settings.dress?.wallpaper;
-  if (dress === 'plain') {
-    root.style.setProperty('--wallpaper', 'linear-gradient(160deg,#fdf1f7,#eef7fb 55%,#eafaf3)');
-  } else {
-    /* 图片壁纸由 CSS 按主题给出，避免把相对路径写死在 JS 里 */
-    root.style.removeProperty('--wallpaper');
-  }
-  root.dataset.mpDress = dress || 'photo';
+  /* 背景三选一：none 透明 / day 樱粉 / night 夜色。图片由 CSS 给，不把路径写死在 JS 里 */
+  const wall = state.settings.wallpaper || 'none';
+  root.dataset.mpWall = ['none', 'day', 'night'].includes(wall) ? wall : 'none';
+  root.dataset.mpDress = state.settings.dress?.wallpaper || 'photo';
 }
 
 export { chatFor };

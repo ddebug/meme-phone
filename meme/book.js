@@ -58,6 +58,19 @@ export function clearSummaryApi() {
   return false;
 }
 
+/** 补摘要：补当前聊天里还没摘的 AI 楼。没桥或没待补时返回 done=0。 */
+export async function backfillSummaries() {
+  try {
+    const bridge = globalThis.__STBaiBaiBookPhoneApi;
+    if (bridge && typeof bridge.backfill === 'function') {
+      return await bridge.backfill();
+    }
+  } catch (error) {
+    return { done: 0, total: 0, cancelled: false, error: String(error?.message || error) };
+  }
+  return { done: 0, total: 0, cancelled: false };
+}
+
 function isFirstFloor(node) {
   return node && node.floorStart === 0 && (node.floorEnd == null || node.floorEnd === 0);
 }

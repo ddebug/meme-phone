@@ -8,7 +8,7 @@
 
 import { icon } from '../icons.js';
 import { esc } from '../shell.js';
-import { bookApi, readSummaries, summaryApiPresets, applySummaryApi, clearSummaryApi } from '../book.js';
+import { bookApi, readSummaries, summaryApiPresets, applySummaryApi, clearSummaryApi, backfillSummaries } from '../book.js';
 
 const TABS = [
   ['overview', '概览'],
@@ -146,7 +146,7 @@ function overviewPage(snap) {
 
     ${section('主角', [
       kv('身份', hero.identity),
-      kv('性别 · 年龄', [hero.gender, hero.age].filter(Boolean).join(' · ')),
+      kv('性别', [hero.gender, hero.age ? `${hero.age} 岁` : ''].filter(Boolean).join(' · ')),
       kv('外貌', hero.appearance),
       kv('着装', hero.outfit),
       kv('状态', hero.condition),
@@ -163,12 +163,18 @@ function summaryPage(ctx) {
   const expanded = ctx.shell.bookNode || '';
   const rows = nodes.slice().reverse().map(node => {
     const open = expanded === node.id;
+    const floorLabel = node.floorStart != null
+      ? `第 ${node.floorStart}${node.floorEnd != null && node.floorEnd !== node.floorStart ? `–${node.floorEnd}` : ''} 楼`
+      : '';
+    const sub = [node.kind === 'comp' ? '合并总结' : '单楼摘要', floorLabel].filter(Boolean).join(' · ');
+    const preview = !open && node.text ? node.text.replace(/\s+/g, ' ').slice(0, 72) : '';
     return `<div class="mp-bk-node${open ? ' is-open' : ''}">
       <button class="mp-bk-node-head" data-act="bk-node" data-id="${esc(node.id)}" type="button">
         <span class="mp-bk-node-level">L${esc(node.level)}</span>
         <span class="mp-bk-node-main">
-          <span class="mp-bk-node-title">${esc(node.timeLabel || (node.floorStart != null ? `第 ${node.floorStart}–${node.floorEnd} 楼` : '摘要'))}</span>
-          <span class="mp-bk-node-sub">${esc(node.kind === 'comp' ? '总结' : '单楼摘要')}${node.timeStart ? ` · ${esc(node.timeStart)}` : ''}</span>
+          <span class="mp-bk-node-title">${esc(node.timeLabel || '未标时间')}</span>
+          <span class="mp-bk-node-sub">${esc(sub)}</span>
+          ${preview ? `<span class="mp-bk-node-preview">${esc(preview)}${node.text.length > 72 ? '…' : ''}</span>` : ''}
         </span>
         ${icon('chevron')}
       </button>
@@ -183,9 +189,9 @@ function summaryPage(ctx) {
 
   return `
     ${coverage.complete === false
-      ? `<div class="mp-bk-warn">第 ${esc((coverage.missingAiFloors || []).join('、') || '?')} 楼还没有摘要，这段历史不完整。</div>` : ''}
+      ? `<div class="mp-bk-warn">第 ${esc((coverage.missingAiFloors || []).join('、') || '?')} 楼还没有摘要，点上方「补摘要」补齐。</div>` : ''}
     ${first}
-    ${section('所有总结', rows || `<div class="mp-empty">${skipFirst ? '除了首楼还没有别的总结。' : '还没有总结，酒馆里聊起来之后会自动生成。'}</div>`, `<span class="mp-bk-count">${nodes.length}</span>`)}
+    ${section('所有总结', rows || `<div class="mp-empty">${skipFirst ? '除了首楼还没有别的总结。' : '还没有总结，酒馆里聊起来之后会自动生成。'}</div>`, `<span class="mp-bk-count">${nodes.length} 条</span>`)}
   `;
 }
 
@@ -317,6 +323,12 @@ export const bookApp = {
     const tab = ctx.shell.bookTab || 'overview';
     const snap = snapshotOf();
     const connected = Boolean(api());
+    const summary = ctx.state.settings.summary || {};
+    const presets = summaryApiPresets(ctx.state);
+    const activePreset = presets.find(item => item.id === summary.apiId);
+    const apiLabel = activePreset ? (activePreset.name || '手机接口') : '跟随自带';
+    const missing = (snap?.coverage?.missingAiFloors || []).length;
+    const busy = Boolean(ctx.shell.bookBusy);
 
     const body = tab === 'summary'
       ? summaryPage(ctx)
@@ -333,15 +345,23 @@ export const bookApp = {
       <div class="mp-page-body mp-bk">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
           <div class="mp-title" style="flex:1">酒馆总结</div>
-          <button class="mp-icon-btn" data-act="bk-settings" type="button" aria-label="设置">${icon('settings')}</button>
           <button class="mp-icon-btn" data-act="bk-refresh" type="button" aria-label="刷新">${icon('refresh')}</button>
         </div>
         <div class="mp-subtitle">酒馆里的所有总结 · 摘要 / 人物 / 物品 / 场景 / 悬念</div>
 
+        <div class="mp-bk-bar">
+          <button class="mp-bk-bar-btn" data-act="bk-settings" type="button">
+            ${icon('code')}<span>接口 · ${esc(apiLabel)}</span>${icon('chevron')}
+          </button>
+          <button class="mp-bk-bar-btn${missing ? ' is-warn' : ''}" data-act="bk-backfill" type="button">
+            ${icon('refresh')}<span>${busy ? '补摘要中…' : `补摘要${missing ? ` · ${missing} 楼` : ''}`}</span>
+          </button>
+        </div>
+
         <div class="mp-draw-state${connected ? ' is-on' : ''}">
           ${icon('spark')}
           <span>${connected ? `已接酒馆总结 · 第 ${esc(snap?.chat?.length ?? 0)} 楼` : '预览环境 · 下面是演示记忆'}</span>
-          <button class="mp-draw-state-btn" data-act="bk-refresh" type="button">刷新</button>
+          <button class="mp-draw-state-btn" data-act="bk-settings" type="button">设置</button>
         </div>
 
         <div class="mp-bk-tabs">${tabs}</div>
@@ -365,6 +385,29 @@ export const bookApp = {
 
     if (act === 'bk-settings') {
       ctx.go('book-settings');
+      return true;
+    }
+
+    if (act === 'bk-backfill') {
+      if (ctx.shell.bookBusy) {
+        ctx.toast('正在补，等这一批跑完');
+        return true;
+      }
+      const bridgeReady = Boolean(globalThis.__STBaiBaiBookPhoneApi?.backfill);
+      if (!bridgeReady) {
+        ctx.toast('酒馆总结还没加载，装好并刷新酒馆后再补');
+        return true;
+      }
+      ctx.shell.bookBusy = true;
+      ctx.rerender();
+      ctx.toast('开始补摘要，跑完后自动刷新');
+      backfillSummaries().then(result => {
+        ctx.shell.bookBusy = false;
+        ctx.rerender();
+        if (result?.error) ctx.toast(`补摘要失败：${result.error}`);
+        else if (!result || !result.total) ctx.toast('没有待补的楼层');
+        else ctx.toast(result.cancelled ? `已取消 · 补完 ${result.done}/${result.total} 楼` : `补完 ${result.done}/${result.total} 楼`);
+      });
       return true;
     }
 
@@ -413,7 +456,7 @@ export const bookSettingsApp = {
     return `
       <div class="mp-page-body mp-bk">
         <div class="mp-title" style="margin-top:2px">总结设置</div>
-        <div class="mp-subtitle">只影响手机这边怎么读总结</div>
+        <div class="mp-subtitle">首楼开关 · 总结走哪套接口（主界面「接口」也进这里）</div>
 
         <div class="mp-group" style="margin-top:14px">
           <div class="mp-group-label">首楼</div>

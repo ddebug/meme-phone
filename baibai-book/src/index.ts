@@ -1,5 +1,5 @@
 import { hydrateSettings, resetPhoneApiChannel, usePhoneApiChannel } from '@/api/settings';
-import { bindEngine, handleGenerationIntercept } from '@/memory/engine';
+import { bindEngine, handleGenerationIntercept, batchBackfill } from '@/memory/engine';
 import { runVectorRecall, shouldRecallForType } from '@/memory/vector/recall';
 import { refreshInjection } from '@/memory/inject';
 import { syncTimeTagRegex } from '@/memory/timeTag';
@@ -32,6 +32,8 @@ const HOST_ID = 'bbs-app-host';
   useChannel: (input: { id: string; name: string; url: string; key?: string; model: string; temperature?: number }) =>
     usePhoneApiChannel(input),
   reset: () => resetPhoneApiChannel(),
+  /** 补摘要:把当前聊天里还没摘的 AI 楼按块补齐,返回 {done,total,cancelled} */
+  backfill: () => batchBackfill(),
 };
 
 /**

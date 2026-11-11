@@ -101,7 +101,6 @@ body {
   background: transparent;
   font-family: var(--font-ui);
   color: var(--text);
-  animation: mp-fade .18s ease;
 }
 
 @keyframes mp-fade {
@@ -435,7 +434,6 @@ body {
   background: linear-gradient(180deg, rgba(251, 249, 254, .955), rgba(246, 243, 251, .97));
   backdrop-filter: blur(26px) saturate(130%);
   -webkit-backdrop-filter: blur(26px) saturate(130%);
-  animation: mp-in .26s cubic-bezier(.2, .7, .3, 1);
 }
 
 @keyframes mp-in {
@@ -628,7 +626,6 @@ body {
   background: linear-gradient(180deg, rgba(252, 250, 255, .96), rgba(248, 245, 253, .97));
   backdrop-filter: blur(28px) saturate(130%);
   -webkit-backdrop-filter: blur(28px) saturate(130%);
-  animation: mp-in .26s cubic-bezier(.2, .7, .3, 1);
 }
 
 .mp-thread-head {
@@ -2659,6 +2656,47 @@ body {
 }
 .mp-bk .mp-bk-tab:active { transform: scale(.96); }
 
+/* 主界面常显的两条入口：总结接口 / 补摘要 */
+.mp-bk-bar {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 0;
+}
+
+.mp-bk .mp-bk-bar-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, .66);
+  color: var(--text-2);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.mp-bk .mp-bk-bar-btn span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-bk .mp-bk-bar-btn .mp-i { width: 15px; height: 15px; flex: 0 0 auto; }
+.mp-bk .mp-bk-bar-btn:active { transform: scale(.98); }
+.mp-bk .mp-bk-bar-btn.is-warn {
+  border-color: rgba(214, 158, 92, .45);
+  background: rgba(255, 247, 233, .78);
+  color: #a2743a;
+}
+
 .mp-bk-body { display: flex; flex-direction: column; gap: 14px; padding-bottom: 20px; }
 
 .mp-bk .mp-bk-hero {
@@ -2774,6 +2812,16 @@ body {
 .mp-bk .mp-bk-node-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .mp-bk .mp-bk-node-title { font-size: 13px; font-weight: 600; }
 .mp-bk .mp-bk-node-sub { font-size: 11.5px; color: var(--text-3); }
+.mp-bk .mp-bk-node-preview {
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-4);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
 .mp-bk .mp-bk-node-head .mp-i { width: 16px; height: 16px; color: var(--text-4); transition: transform .2s ease; }
 .mp-bk .mp-bk-node.is-open .mp-bk-node-head .mp-i { transform: rotate(180deg); }
 .mp-bk .mp-bk-node-text {
@@ -4600,6 +4648,19 @@ function clearSummaryApi() {
   return false;
 }
 
+/** 补摘要：补当前聊天里还没摘的 AI 楼。没桥或没待补时返回 done=0。 */
+async function backfillSummaries() {
+  try {
+    const bridge = globalThis.__STBaiBaiBookPhoneApi;
+    if (bridge && typeof bridge.backfill === 'function') {
+      return await bridge.backfill();
+    }
+  } catch (error) {
+    return { done: 0, total: 0, cancelled: false, error: String(error?.message || error) };
+  }
+  return { done: 0, total: 0, cancelled: false };
+}
+
 function isFirstFloor(node) {
   return node && node.floorStart === 0 && (node.floorEnd == null || node.floorEnd === 0);
 }
@@ -4667,6 +4728,7 @@ exports["bookApi"] = bookApi;
 exports["summaryApiPresets"] = summaryApiPresets;
 exports["applySummaryApi"] = applySummaryApi;
 exports["clearSummaryApi"] = clearSummaryApi;
+exports["backfillSummaries"] = backfillSummaries;
 exports["readSummaries"] = readSummaries;
 exports["summaryText"] = summaryText;
 exports["summaryContext"] = summaryContext;
@@ -5604,7 +5666,6 @@ const settingsApp = {
             ${row(ctx, { iconName: 'image', title: '绘图', sub: imageReady ? `${imageLabel} · ${imageLink.model || '模型没填'}` : `${imageLabel} · 还没填${state.settings.image.engine === 'custom' ? '地址' : ' Key'}`, act: 'set-open', app: 'draw' })}
             ${row(ctx, { iconName: 'code', title: '聊天接口与预设', sub: '每套 = 地址 + Key + 模型，只影响聊天', act: 'set-open', app: 'api' })}
             ${row(ctx, { iconName: 'search', title: '查角色', sub: (state.charactersFromTavern ? `酒馆里 ${state.characters.length} 张角色卡` : '看酒馆里每张角色卡的设定'), act: 'set-open', app: 'characters' })}
-            ${row(ctx, { iconName: 'book', title: '酒馆总结', sub: (typeof globalThis !== 'undefined' && globalThis.STBaiBaiBook ? '已接上：所有总结 / 人物 / 物品 / 场景 / 悬念' : '酒馆里的长期总结，装好后自动接管摘要'), act: 'set-open', app: 'book' })}
             ${row(ctx, { iconName: 'smile', title: '表情包', sub: '表情面板里那些贴纸', act: 'set-open', app: 'emoji' })}
             ${row(ctx, { iconName: 'help', title: '帮助', sub: '怎么用、快捷键、常见问题', act: 'set-open', app: 'help' })}
           </div>
@@ -7985,7 +8046,7 @@ __mods["meme/apps/book.js"] = function(module, exports, __req){
 
 const { icon } = __req("meme/icons.js");
 const { esc } = __req("meme/shell.js");
-const { bookApi, readSummaries, summaryApiPresets, applySummaryApi, clearSummaryApi } = __req("meme/book.js");
+const { bookApi, readSummaries, summaryApiPresets, applySummaryApi, clearSummaryApi, backfillSummaries } = __req("meme/book.js");
 
 const TABS = [
   ['overview', '概览'],
@@ -8123,7 +8184,7 @@ function overviewPage(snap) {
 
     ${section('主角', [
       kv('身份', hero.identity),
-      kv('性别 · 年龄', [hero.gender, hero.age].filter(Boolean).join(' · ')),
+      kv('性别', [hero.gender, hero.age ? `${hero.age} 岁` : ''].filter(Boolean).join(' · ')),
       kv('外貌', hero.appearance),
       kv('着装', hero.outfit),
       kv('状态', hero.condition),
@@ -8140,12 +8201,18 @@ function summaryPage(ctx) {
   const expanded = ctx.shell.bookNode || '';
   const rows = nodes.slice().reverse().map(node => {
     const open = expanded === node.id;
+    const floorLabel = node.floorStart != null
+      ? `第 ${node.floorStart}${node.floorEnd != null && node.floorEnd !== node.floorStart ? `–${node.floorEnd}` : ''} 楼`
+      : '';
+    const sub = [node.kind === 'comp' ? '合并总结' : '单楼摘要', floorLabel].filter(Boolean).join(' · ');
+    const preview = !open && node.text ? node.text.replace(/\s+/g, ' ').slice(0, 72) : '';
     return `<div class="mp-bk-node${open ? ' is-open' : ''}">
       <button class="mp-bk-node-head" data-act="bk-node" data-id="${esc(node.id)}" type="button">
         <span class="mp-bk-node-level">L${esc(node.level)}</span>
         <span class="mp-bk-node-main">
-          <span class="mp-bk-node-title">${esc(node.timeLabel || (node.floorStart != null ? `第 ${node.floorStart}–${node.floorEnd} 楼` : '摘要'))}</span>
-          <span class="mp-bk-node-sub">${esc(node.kind === 'comp' ? '总结' : '单楼摘要')}${node.timeStart ? ` · ${esc(node.timeStart)}` : ''}</span>
+          <span class="mp-bk-node-title">${esc(node.timeLabel || '未标时间')}</span>
+          <span class="mp-bk-node-sub">${esc(sub)}</span>
+          ${preview ? `<span class="mp-bk-node-preview">${esc(preview)}${node.text.length > 72 ? '…' : ''}</span>` : ''}
         </span>
         ${icon('chevron')}
       </button>
@@ -8160,9 +8227,9 @@ function summaryPage(ctx) {
 
   return `
     ${coverage.complete === false
-      ? `<div class="mp-bk-warn">第 ${esc((coverage.missingAiFloors || []).join('、') || '?')} 楼还没有摘要，这段历史不完整。</div>` : ''}
+      ? `<div class="mp-bk-warn">第 ${esc((coverage.missingAiFloors || []).join('、') || '?')} 楼还没有摘要，点上方「补摘要」补齐。</div>` : ''}
     ${first}
-    ${section('所有总结', rows || `<div class="mp-empty">${skipFirst ? '除了首楼还没有别的总结。' : '还没有总结，酒馆里聊起来之后会自动生成。'}</div>`, `<span class="mp-bk-count">${nodes.length}</span>`)}
+    ${section('所有总结', rows || `<div class="mp-empty">${skipFirst ? '除了首楼还没有别的总结。' : '还没有总结，酒馆里聊起来之后会自动生成。'}</div>`, `<span class="mp-bk-count">${nodes.length} 条</span>`)}
   `;
 }
 
@@ -8294,6 +8361,12 @@ const bookApp = {
     const tab = ctx.shell.bookTab || 'overview';
     const snap = snapshotOf();
     const connected = Boolean(api());
+    const summary = ctx.state.settings.summary || {};
+    const presets = summaryApiPresets(ctx.state);
+    const activePreset = presets.find(item => item.id === summary.apiId);
+    const apiLabel = activePreset ? (activePreset.name || '手机接口') : '跟随自带';
+    const missing = (snap?.coverage?.missingAiFloors || []).length;
+    const busy = Boolean(ctx.shell.bookBusy);
 
     const body = tab === 'summary'
       ? summaryPage(ctx)
@@ -8310,15 +8383,23 @@ const bookApp = {
       <div class="mp-page-body mp-bk">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
           <div class="mp-title" style="flex:1">酒馆总结</div>
-          <button class="mp-icon-btn" data-act="bk-settings" type="button" aria-label="设置">${icon('settings')}</button>
           <button class="mp-icon-btn" data-act="bk-refresh" type="button" aria-label="刷新">${icon('refresh')}</button>
         </div>
         <div class="mp-subtitle">酒馆里的所有总结 · 摘要 / 人物 / 物品 / 场景 / 悬念</div>
 
+        <div class="mp-bk-bar">
+          <button class="mp-bk-bar-btn" data-act="bk-settings" type="button">
+            ${icon('code')}<span>接口 · ${esc(apiLabel)}</span>${icon('chevron')}
+          </button>
+          <button class="mp-bk-bar-btn${missing ? ' is-warn' : ''}" data-act="bk-backfill" type="button">
+            ${icon('refresh')}<span>${busy ? '补摘要中…' : `补摘要${missing ? ` · ${missing} 楼` : ''}`}</span>
+          </button>
+        </div>
+
         <div class="mp-draw-state${connected ? ' is-on' : ''}">
           ${icon('spark')}
           <span>${connected ? `已接酒馆总结 · 第 ${esc(snap?.chat?.length ?? 0)} 楼` : '预览环境 · 下面是演示记忆'}</span>
-          <button class="mp-draw-state-btn" data-act="bk-refresh" type="button">刷新</button>
+          <button class="mp-draw-state-btn" data-act="bk-settings" type="button">设置</button>
         </div>
 
         <div class="mp-bk-tabs">${tabs}</div>
@@ -8342,6 +8423,29 @@ const bookApp = {
 
     if (act === 'bk-settings') {
       ctx.go('book-settings');
+      return true;
+    }
+
+    if (act === 'bk-backfill') {
+      if (ctx.shell.bookBusy) {
+        ctx.toast('正在补，等这一批跑完');
+        return true;
+      }
+      const bridgeReady = Boolean(globalThis.__STBaiBaiBookPhoneApi?.backfill);
+      if (!bridgeReady) {
+        ctx.toast('酒馆总结还没加载，装好并刷新酒馆后再补');
+        return true;
+      }
+      ctx.shell.bookBusy = true;
+      ctx.rerender();
+      ctx.toast('开始补摘要，跑完后自动刷新');
+      backfillSummaries().then(result => {
+        ctx.shell.bookBusy = false;
+        ctx.rerender();
+        if (result?.error) ctx.toast(`补摘要失败：${result.error}`);
+        else if (!result || !result.total) ctx.toast('没有待补的楼层');
+        else ctx.toast(result.cancelled ? `已取消 · 补完 ${result.done}/${result.total} 楼` : `补完 ${result.done}/${result.total} 楼`);
+      });
       return true;
     }
 
@@ -8390,7 +8494,7 @@ const bookSettingsApp = {
     return `
       <div class="mp-page-body mp-bk">
         <div class="mp-title" style="margin-top:2px">总结设置</div>
-        <div class="mp-subtitle">只影响手机这边怎么读总结</div>
+        <div class="mp-subtitle">首楼开关 · 总结走哪套接口（主界面「接口」也进这里）</div>
 
         <div class="mp-group" style="margin-top:14px">
           <div class="mp-group-label">首楼</div>

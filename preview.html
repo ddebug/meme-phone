@@ -4240,12 +4240,6 @@ function createShell(options) {
 
         <div class="mp-apps">${iconButtons}</div>
 
-        <div class="mp-quick">
-          <button class="mp-quick-btn" data-act="open-app" data-app="chat" type="button">${ico('chat')}<span>发消息</span></button>
-          <button class="mp-quick-btn" data-act="open-app" data-app="diary" type="button">${ico('diary')}<span>写日记</span></button>
-          <button class="mp-quick-btn" data-act="toggle-theme" type="button">${ico(state.settings.theme === 'night' ? 'sun' : 'moon')}<span>${state.settings.theme === 'night' ? '日间' : '夜间'}</span></button>
-        </div>
-
         <div class="mp-dock">${dockButtons}</div>
       </div>`;
   }

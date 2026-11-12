@@ -231,11 +231,6 @@ export const appearanceApp = {
     const wall = ctx.state.settings.wallpaper || 'none';
     const customWall = ctx.state.settings.customWall || '';
 
-    const themes = [
-      { key: 'day', title: '日间', sub: '浅色玻璃，白天看着干净', swatch: 'linear-gradient(150deg,#ffffff,#f3edfa 60%,#eef7f3)' },
-      { key: 'night', title: '夜间', sub: '深色玻璃，晚上不刺眼', swatch: 'linear-gradient(150deg,#3a3454,#221d38 60%,#36304f)' },
-    ];
-
     const walls = [
       { key: 'none', title: '素色', sub: '不铺图片，屏幕里用干净的浅色纸（壳外仍透出酒馆）', swatch: 'repeating-conic-gradient(rgba(160,150,200,.18) 0% 25%, rgba(255,255,255,0) 0% 50%) 50% / 16px 16px' },
       { key: 'day', title: '晨光粉彩', sub: '樱粉与薄荷的柔光壁纸', swatch: 'linear-gradient(150deg,#ffe3ef,#e4f7f0 55%,#efe6ff)' },
@@ -270,16 +265,11 @@ export const appearanceApp = {
         <div class="mp-subtitle" style="margin-top:6px;font-size: calc(11.5px * var(--font-scale))">图片会存进小手机存档，导出备份时一起带走；只铺在屏幕里。</div>
 
         <div class="mp-group-label" style="margin-top:14px">主题</div>
-        <div style="display:flex;gap:8px">
-          ${themes.map(item => `
-            <button class="mp-chip-btn${theme === item.key ? ' is-on' : ''}" data-act="pick-theme" data-theme="${item.key}" type="button" style="flex:1">
-              <span style="width:22px;height:22px;border-radius:7px;background:${item.swatch};box-shadow:inset 0 0 0 1px rgba(120,110,170,.16)"></span>
-              <span style="display:flex;flex-direction:column;gap:2px;text-align:left">
-                <span style="font-size: calc(12.5px * var(--font-scale))">${esc(item.title)}</span>
-                <span style="font-size: calc(10.5px * var(--font-scale));color:var(--text-3)">${esc(item.sub)}</span>
-              </span>
-            </button>`).join('')}
-        </div>
+        <button class="mp-set-row" data-act="pick-theme" data-theme="${theme === 'night' ? 'day' : 'night'}" type="button">
+          <span class="mp-set-ico">${icon('moon')}</span>
+          <span class="mp-set-name">夜间玻璃<small>${theme === 'night' ? '现在是深色，晚上不刺眼' : '现在是日间浅色，打开后换成深色'}</small></span>
+          <span class="mp-switch${theme === 'night' ? ' on' : ''}"></span>
+        </button>
 
         <button class="mp-dress-link" data-act="set-open-dress" type="button">${icon('brush')}字体、灵动岛和 App 图标去「装扮」换</button>
       </div>`;

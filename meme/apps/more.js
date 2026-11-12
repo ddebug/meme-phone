@@ -229,11 +229,10 @@ function iconImage(state, appId) {
   return typeof image === 'string' && image.startsWith('data:image/') ? image : '';
 }
 
-function choiceRow(act, key, items, current) {
-  return `<div class="mp-dress-choice-row">${items.map(item => `
-    <button class="mp-dress-choice${String(current) === String(item.value) ? ' is-on' : ''}" data-act="${act}" data-value="${item.value}" type="button">
-      ${item.sample ? `<b>${esc(item.sample)}</b>` : ''}<span>${esc(item.label)}</span>
-    </button>`).join('')}</div>`;
+function choiceRow(act, items, current) {
+  const options = items.map(item => `
+    <option value="${esc(item.value)}"${String(current) === String(item.value) ? ' selected' : ''}>${esc(item.sample ? `${item.sample} · ${item.label}` : item.label)}</option>`).join('');
+  return `<div class="mp-select-wrap"><select data-act="${act}">${options}</select>${icon('chevron')}</div>`;
 }
 
 function appTileMarkup(state, target, extraClass = '') {
@@ -270,13 +269,13 @@ export const dressApp = {
         </div>
 
         <div class="mp-group-label" style="margin-top:14px">字体</div>
-        ${choiceRow('dress-font', 'font', FONT_CHOICES, dress.font || 'system')}
+        ${choiceRow('dress-font', FONT_CHOICES, dress.font || 'system')}
         <div class="mp-group-label" style="margin-top:12px">字号</div>
-        ${choiceRow('dress-size', 'size', SIZE_CHOICES, dress.fontSize || 1)}
+        ${choiceRow('dress-size', SIZE_CHOICES, dress.fontSize || 1)}
         <div class="mp-group-label" style="margin-top:12px">行距</div>
-        ${choiceRow('dress-line', 'line', LINE_CHOICES, dress.lineHeight || 1)}
+        ${choiceRow('dress-line', LINE_CHOICES, dress.lineHeight || 1)}
         <div class="mp-group-label" style="margin-top:12px">字重</div>
-        ${choiceRow('dress-weight', 'weight', WEIGHT_CHOICES, dress.fontWeight || 400)}
+        ${choiceRow('dress-weight', WEIGHT_CHOICES, dress.fontWeight || 400)}
 
         <div class="mp-group-label" style="margin-top:14px">灵动岛</div>
         <button class="mp-dress-toggle" data-act="dress-island" type="button">

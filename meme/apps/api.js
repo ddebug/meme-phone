@@ -7,7 +7,7 @@ import { icon } from '../icons.js';
 import { esc } from '../shell.js';
 import {
   newId, chatSchemesOf, activeChatScheme, applyChatScheme,
-  memoryPresetsOf, replyPresetFor,
+  memoryPresetsOf, replyPresetFor, replyPresetsOf,
 } from '../data.js';
 import { memoryPresetSummary } from '../memory.js';
 
@@ -94,6 +94,13 @@ function api(state) {
 function presetName(store, id) {
   const item = store.presets.find(preset => preset.id === id);
   return item ? item.name || '未命名' : '没选';
+}
+
+/* 统一的 iOS 风格下拉框：白底、圆角、右侧箭头，原生 select 只负责取值 */
+function iosSelect(act, items, value) {
+  const options = items.map(item => `
+    <option value="${esc(item.value)}"${String(item.value) === String(value) ? ' selected' : ''}>${esc(item.label)}</option>`).join('');
+  return `<div class="mp-select-wrap"><select data-act="${act}">${options}</select>${icon('chevron')}</div>`;
 }
 
 function saveCurrentScheme(ctx, text) {
@@ -293,10 +300,12 @@ export const apiListApp = {
     const scheme = activeChatScheme(ctx.state);
     const memoryList = memoryPresetsOf(ctx.state);
     const activeMemory = memoryList.find(item => item.id === ctx.state.settings.memory?.activeId) || memoryList[0] || null;
-    const schemeChips = schemes.map((item, index) => `
-      <button class="mp-chip-btn${item.id === scheme?.id ? ' is-on' : ''}" data-act="api-scheme" data-id="${esc(item.id)}" type="button">
-        <span style="font-size: calc(12.5px * var(--font-scale))">${esc(item.name || `方案 ${index + 1}`)}</span>
-      </button>`).join('');
+    const currentReply = replyPresetFor(ctx.state, null);
+    const schemeName = scheme?.name || '未选';
+    const schemeSummary = `${presetName(store, store.activeChat)} · ${currentReply?.name || '默认回复'} · ${activeMemory?.name || '记忆'}`;
+    const apiOptions = store.presets.map(preset => ({ value: preset.id, label: preset.name || '未命名' }));
+    const replyOptions = replyPresetsOf(ctx.state).map(item => ({ value: item.id, label: item.name || '未命名' }));
+    const memoryOptions = memoryList.map(item => ({ value: item.id, label: item.name || '未命名' }));
     const rows = store.presets.map(preset => {
       const active = preset.id === store.activeChat ? '聊天' : '';
       const use = active;
@@ -327,39 +336,40 @@ export const apiListApp = {
         <div class="mp-title" style="margin-top:0">聊天接口</div>
         <div class="mp-subtitle">一套预设 = 地址 + Key + 模型；LLM 整体方案再把 API、酒馆记忆和回复预设绑在一起</div>
 
-        <div class="mp-group-label" style="margin-top:12px">LLM 整体方案</div>
-        <div class="mp-draw-chips">
-          ${schemeChips || '<div class="mp-empty" style="padding:4px 2px">还没有整体方案。</div>'}
-          <button class="mp-chip-btn" data-act="api-scheme-new" type="button"><span style="font-size: calc(12.5px * var(--font-scale))">＋ 存一套</span></button>
-        </div>
-        <div class="mp-draw-hint">
-          一套整体方案 = 一条聊天 API + 一套酒馆记忆 + 一套回复预设，切换时一起换${scheme ? ` · 当前「${esc(scheme.name || '未命名')}」：${esc(presetName(store, store.activeChat))} / ${esc(activeMemory?.name || '记忆')}` : ''}
-        </div>
-
-        <div class="mp-api-cards">
-          <button class="mp-api-card" data-act="api-pick-chat" type="button">
-            <span class="mp-api-card-label">${icon('chat')}<span>聊天 API</span></span>
-            <span class="mp-api-card-value">${esc(presetName(store, store.activeChat))}</span>
-            <span class="mp-api-card-swap">${icon('refresh')}</span>
+        <div class="mp-ios-card">
+          <div class="mp-ios-card-head">
+            <div class="mp-ios-card-copy">
+              <div class="mp-ios-card-label">LLM 整体方案</div>
+              <button class="mp-ios-scheme" data-act="api-scheme-pick" type="button">
+                <span class="mp-ios-card-title">${esc(schemeName)}</span>${icon('chevron')}
+              </button>
+              <div class="mp-ios-card-sub">${esc(schemeSummary)}</div>
+            </div>
+            <button class="mp-icon-btn mp-ios-card-menu" data-act="api-scheme-menu" type="button" title="管理 LLM 整体方案">${icon('settings')}</button>
+          </div>
+          <div class="mp-ios-two">
+            <label class="mp-ios-field">
+              <span class="mp-ios-field-label">切换 API</span>
+              ${iosSelect('api-chat-select', apiOptions, store.activeChat)}
+            </label>
+            <label class="mp-ios-field">
+              <span class="mp-ios-field-label">切换预设</span>
+              ${iosSelect('api-reply-select', replyOptions, currentReply?.id || '')}
+            </label>
+          </div>
+          <button class="mp-row mp-ios-memory-row" data-act="api-pick-memory" type="button">
+            ${icon('book')}
+            <span class="mp-row-main">
+              <span class="mp-row-name">酒馆记忆</span>
+              <span class="mp-row-sub">${esc(activeMemory?.name || '没选')}</span>
+            </span>
+            ${icon('chevron')}
           </button>
-          <button class="mp-api-card" data-act="api-pick-memory" type="button">
-            <span class="mp-api-card-label">${icon('book')}<span>酒馆记忆</span></span>
-            <span class="mp-api-card-value">${esc(activeMemory?.name || '没选')}</span>
-            <span class="mp-api-card-swap">${icon('refresh')}</span>
-          </button>
+          <button class="mp-ios-edit-reply" data-act="api-open-presets" type="button">编辑回复预设${icon('chevron')}</button>
+          <button class="mp-ios-add" data-act="api-scheme-new" type="button">＋ 把当前搭配存成新方案</button>
         </div>
 
-        <div class="mp-group-label" style="margin-top:16px">回复方式</div>
-        <button class="mp-row" data-act="api-open-presets" type="button">
-          ${icon('reply')}
-          <span class="mp-row-main">
-            <span class="mp-row-name">回复预设</span>
-            <span class="mp-row-sub">${esc(replyPresetFor(ctx.state, null)?.name || '默认回复方式')} · 决定模型怎么回消息</span>
-          </span>
-          ${icon('chevron')}
-        </button>
-
-        <div class="mp-group-label" style="margin-top:16px">全部 API 预设</div>
+        <div class="mp-group-label" style="margin-top:16px">LLM 链接</div>
         <div class="mp-group">${rows}</div>
 
         <button class="mp-row mp-api-import" data-act="api-import-tavern" type="button">
@@ -379,6 +389,67 @@ export const apiListApp = {
 
   handle(ctx, act, data) {
     const store = api(ctx.state);
+
+    if (act === 'api-scheme-pick') {
+      const list = chatSchemesOf(ctx.state);
+      if (list.length <= 1) {
+        ctx.toast('只有这一套，右上角齿轮可以管理');
+        return true;
+      }
+      ctx.openSheet({
+        kind: 'pick', title: '切换整体方案', note: '一套 = API + 酒馆记忆 + 回复预设',
+        items: list.map(item => ({ label: item.name || '未命名', value: item.id, icon: 'spark' })),
+        onPick: id => {
+          const picked = list.find(item => item.id === String(id));
+          if (!picked) return;
+          applyChatScheme(ctx.state, picked);
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`整体方案换成「${picked.name || '未命名'}」`);
+        },
+      });
+      return true;
+    }
+
+    if (act === 'api-scheme-select') {
+      const picked = chatSchemesOf(ctx.state).find(item => item.id === String(data.value || ''));
+      if (!picked) return true;
+      applyChatScheme(ctx.state, picked);
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`整体方案换成「${picked.name || '未命名'}」`);
+      return true;
+    }
+
+    if (act === 'api-chat-select') {
+      const target = store.presets.find(preset => preset.id === String(data.value || ''));
+      if (!target) return true;
+      store.activeChat = target.id;
+      const scheme = activeChatScheme(ctx.state);
+      if (scheme) {
+        scheme.apiId = target.id;
+        store.chatSchemeId = scheme.id;
+      }
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`聊天 API 换成「${target.name || '未命名'}」`);
+      return true;
+    }
+
+    if (act === 'api-reply-select') {
+      const target = replyPresetsOf(ctx.state).find(item => item.id === String(data.value || ''));
+      if (!target) return true;
+      ctx.state.settings.reply.activeId = target.id;
+      const scheme = activeChatScheme(ctx.state);
+      if (scheme) {
+        scheme.replyId = target.id;
+        store.chatSchemeId = scheme.id;
+      }
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`回复预设换成「${target.name || '未命名'}」`);
+      return true;
+    }
 
     if (act === 'api-open-presets') {
       ctx.go('app-presets');

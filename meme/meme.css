@@ -45,6 +45,7 @@
   --line-scale: 1;
   --font-weight: 400;
   --field-bg: rgba(255, 255, 255, .86);
+  --field-solid: #ffffff;
   --field-border: rgba(43, 41, 55, .12);
 
   --wall-day: url("../assets/wallpaper-day.jpg");
@@ -67,6 +68,7 @@
   --glass-strong: rgba(34, 30, 52, .82);
   --card: rgba(255, 255, 255, .05);
   --field-bg: rgba(255, 255, 255, .10);
+  --field-solid: #2b2640;
   --field-border: rgba(255, 255, 255, .16);
 
   --accent: #a795ff;
@@ -209,7 +211,9 @@
 .mp-status .mp-status-back .mp-i { width: 19px; height: 19px; }
 
 /* 返回键统一放到状态栏左边，页面里的旧返回键不再重复显示 */
-.mp-nav .mp-back[data-act="back"] { display: none; }
+.mp-nav .mp-back[data-act="back"],
+.mp-thread-head .mp-back[data-act="back"],
+.mp-root .mp-back[data-act="back"] { display: none; }
 
 /* 顶部中间：拖动手机壳 */
 .mp-drag-handle {
@@ -1133,14 +1137,15 @@
 
 .mp-switch {
   position: relative;
-  width: 40px;
-  height: 24px;
+  width: 51px;
+  height: 31px;
   flex: 0 0 auto;
   border: 0;
-  border-radius: 12px;
-  background: rgba(43, 41, 55, .14);
+  border-radius: 16px;
+  background: #e9e9ea;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .04);
   cursor: pointer;
-  transition: background .22s ease;
+  transition: background .25s ease;
 }
 
 .mp-switch::after {
@@ -1148,16 +1153,19 @@
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 20px;
-  height: 20px;
-  border-radius: 10px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
   background: #fff;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, .16);
-  transition: transform .22s cubic-bezier(.3, .7, .4, 1);
+  box-shadow: 0 3px 7px rgba(0, 0, 0, .16), 0 1px 1px rgba(0, 0, 0, .1);
+  transition: transform .25s cubic-bezier(.3, .7, .4, 1);
 }
 
-.mp-switch.on { background: linear-gradient(90deg, #a08cf6, #8471e6); }
-.mp-switch.on::after { transform: translateX(16px); }
+.mp-switch.on { background: #34c759; }
+.mp-switch.on::after { transform: translateX(20px); }
+
+.mp-root[data-mp-theme="night"] .mp-switch { background: #39393d; }
+.mp-root[data-mp-theme="night"] .mp-switch.on { background: #34c759; }
 
 /* ------------------------------------------------------- 通用卡片/按钮 */
 .mp-card {
@@ -1339,14 +1347,14 @@
   box-sizing: border-box;
   border-radius: 14px;
   border: 1px solid var(--field-border);
-  background: var(--field-bg);
+  background: var(--field-solid);
   color: var(--text);
   font: inherit;
   font-size: calc(14px * var(--font-scale));
   padding: 11px 12px;
   outline: none;
 }
-.mp-sheet-select { padding: 11px 12px; }
+.mp-sheet-select { padding: 11px 36px 11px 12px; }
 .mp-sheet-form-textarea { height: 116px; }
 
 .mp-toast {
@@ -1929,6 +1937,118 @@
 
 /* ---------------------------------------------------------------- 接口 */
 
+/* LLM 整体方案：上面一条方案，下面两颗 iOS 下拉框 */
+.mp-root .mp-ios-card {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 20px;
+  background: linear-gradient(150deg, rgba(255, 255, 255, .94), rgba(242, 238, 253, .84));
+  box-shadow: var(--shadow-s), inset 0 0 0 1px rgba(255, 255, 255, .72);
+}
+.mp-root .mp-ios-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.mp-root .mp-ios-card-copy { flex: 1; min-width: 0; }
+.mp-root .mp-ios-card-label {
+  font-size: calc(11px * var(--font-scale));
+  letter-spacing: .04em;
+  color: var(--text-3);
+  margin-bottom: 7px;
+}
+.mp-root .mp-ios-card-sub {
+  margin-top: 7px;
+  font-size: calc(11px * var(--font-scale));
+  line-height: calc(1.55 * var(--line-scale));
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-root .mp-ios-scheme {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.mp-root .mp-ios-scheme .mp-i { width: 15px; height: 15px; color: var(--text-3); flex: 0 0 auto; }
+.mp-root .mp-ios-card-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(17px * var(--font-scale));
+  font-weight: 600;
+  line-height: calc(1.35 * var(--line-scale));
+}
+.mp-root .mp-ios-card-menu {
+  flex: 0 0 auto;
+  margin-top: 17px;
+}
+.mp-root .mp-ios-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 12px;
+}
+.mp-root .mp-ios-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.mp-root .mp-ios-field-label {
+  padding-left: 3px;
+  font-size: calc(10.5px * var(--font-scale));
+  color: var(--text-3);
+}
+.mp-root .mp-ios-memory-row {
+  margin-top: 9px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .46);
+}
+.mp-root .mp-ios-edit-reply {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 10px 0 0 2px;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--accent-deep);
+  font: inherit;
+  font-size: calc(11.5px * var(--font-scale));
+  cursor: pointer;
+}
+.mp-root .mp-ios-edit-reply .mp-i { width: 14px; height: 14px; }
+.mp-root .mp-ios-add {
+  display: block;
+  width: 100%;
+  margin-top: 11px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .74);
+  color: var(--accent-deep);
+  font: inherit;
+  font-size: calc(12px * var(--font-scale));
+  cursor: pointer;
+}
+.mp-root .mp-ios-add:active { transform: scale(.985); }
+.mp-root[data-mp-theme="night"] .mp-ios-card {
+  background: linear-gradient(150deg, rgba(45, 39, 70, .74), rgba(31, 27, 48, .62));
+  box-shadow: var(--shadow-s), inset 0 0 0 1px rgba(255, 255, 255, .1);
+}
+.mp-root[data-mp-theme="night"] .mp-ios-memory-row,
+.mp-root[data-mp-theme="night"] .mp-ios-add { background: rgba(255, 255, 255, .08); }
+.mp-root[data-mp-theme="night"] .mp-ios-add { color: var(--accent); }
+
 .mp-root .mp-api-cards {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -2034,6 +2154,16 @@
   text-overflow: ellipsis;
 }
 .mp-root .mp-preset-item-actions { display: flex; align-items: center; gap: 2px; }
+.mp-root .mp-item-switch {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.mp-root .mp-item-switch:active .mp-switch { transform: scale(.96); }
 .mp-root .mp-item-mini {
   width: 27px;
   height: 27px;
@@ -3459,14 +3589,63 @@
 .mp-root select {
   color: var(--text) !important;
   -webkit-text-fill-color: var(--text);
-  background-color: var(--field-bg) !important;
+  background-color: var(--field-solid) !important;
   border-color: var(--field-border) !important;
   caret-color: var(--accent);
 }
 .mp-root input::placeholder,
 .mp-root textarea::placeholder { color: var(--text-4) !important; opacity: 1; }
+.mp-root input:-webkit-autofill,
+.mp-root textarea:-webkit-autofill {
+  -webkit-text-fill-color: var(--text) !important;
+  box-shadow: 0 0 0 1000px var(--field-solid) inset !important;
+}
 .mp-root input[type="range"] { accent-color: var(--accent); background: transparent; border: 0; }
 .mp-root input[type="file"] { background: transparent; border: 0; }
+
+/* iOS 风格下拉框：胶囊圆角、无原生箭头、右侧统一箭头 */
+.mp-select-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+.mp-root .mp-select-wrap select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 11px 36px 11px 13px;
+  border-radius: 14px;
+  border: 1px solid var(--field-border);
+  background: var(--field-solid);
+  color: var(--text);
+  font: inherit;
+  font-size: calc(13.5px * var(--font-scale));
+  line-height: calc(1.25 * var(--line-scale));
+  outline: none;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+.mp-root .mp-select-wrap select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(142, 123, 242, .13);
+}
+.mp-select-wrap .mp-i {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 15px;
+  height: 15px;
+  transform: translateY(-50%);
+  color: var(--text-3);
+  pointer-events: none;
+}
+.mp-root[data-mp-theme="night"] .mp-select-wrap select {
+  background: var(--field-solid);
+  border-color: rgba(255, 255, 255, .16);
+}
 
 .mp-sheet-textarea {
   display: block;

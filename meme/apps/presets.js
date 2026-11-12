@@ -283,7 +283,7 @@ export const replyPresetApp = {
           <span class="mp-preset-item-sub">${esc(itemKindLabel(item))} · ${esc(roleLabel(item.role))} · ${item.enabled ? '已启用' : '已关闭'} · ${item.content.length} 字</span>
         </button>
         <div class="mp-preset-item-actions">
-          <button class="mp-item-mini${item.enabled ? ' is-on' : ' is-muted'}" data-act="reply-item-toggle" data-id="${esc(item.id)}" type="button" title="${item.enabled ? '关闭' : '启用'}">${item.enabled ? '开' : '关'}</button>
+          <button class="mp-item-switch" data-act="reply-item-toggle" data-id="${esc(item.id)}" type="button" title="${item.enabled ? '关闭' : '启用'}" role="switch" aria-checked="${item.enabled ? 'true' : 'false'}"><span class="mp-switch${item.enabled ? ' on' : ''}"></span></button>
           <button class="mp-item-mini is-up" data-act="reply-item-up" data-id="${esc(item.id)}" type="button" title="上移"${index === 0 ? ' disabled' : ''}>${icon('chevron')}</button>
           <button class="mp-item-mini" data-act="reply-item-down" data-id="${esc(item.id)}" type="button" title="下移"${index === items.length - 1 ? ' disabled' : ''}>${icon('chevron')}</button>
           <button class="mp-item-mini" data-act="reply-item-del" data-id="${esc(item.id)}" type="button" title="删除">${icon('trash')}</button>
@@ -306,7 +306,7 @@ export const replyPresetApp = {
             <span class="mp-row-name">${esc(label)}</span>
             <span class="mp-row-sub">${esc(on ? note : '已关闭，不注入')}</span>
           </span>
-          <span class="mp-api-value${on ? '' : ' is-empty'}">${on ? '开' : '关'}</span>
+          <span class="mp-switch${on ? ' on' : ''}"></span>
         </button>`;
     }).join('');
 

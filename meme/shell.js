@@ -237,7 +237,7 @@ export function createShell(options) {
           control = `<textarea id="${id}" class="mp-sheet-textarea mp-sheet-form-textarea" maxlength="${field.maxLength || 4000}" placeholder="${esc(field.placeholder || '')}">${esc(field.value || '')}</textarea>`;
         } else if (field.type === 'select') {
           const options = (field.options || []).map(option => `<option value="${esc(option.value)}"${String(option.value) === String(field.value) ? ' selected' : ''}>${esc(option.label)}</option>`).join('');
-          control = `<select id="${id}" class="mp-sheet-input mp-sheet-select">${options}</select>`;
+          control = `<div class="mp-select-wrap"><select id="${id}" class="mp-sheet-input mp-sheet-select">${options}</select>${ico('chevron')}</div>`;
         } else {
           control = `<input id="${id}" class="mp-sheet-input" type="text" maxlength="${field.maxLength || 30}" value="${esc(field.value || '')}" placeholder="${esc(field.placeholder || '')}">`;
         }
@@ -408,6 +408,19 @@ export function createShell(options) {
     const app = entry ? apps[entry.view] : null;
 
     /* 页面先处理，未消费再交给全局 */
+    if (app && typeof app.handle === 'function' && app.handle(ctx, act, data, event)) return;
+    if (acts[act]) { acts[act](data, event); return; }
+    if (typeof ctx.onGlobalAct === 'function' && ctx.onGlobalAct(act, data, event)) return;
+  });
+
+  /* 下拉框：原生 select 只负责取值，动作仍走统一 handle */
+  root.addEventListener('change', event => {
+    const target = event.target.closest('select[data-act]');
+    if (!target || !root.contains(target)) return;
+    const act = target.dataset.act;
+    const data = Object.assign({}, target.dataset, { value: target.value });
+    const entry = shell.stack[shell.stack.length - 1];
+    const app = entry ? apps[entry.view] : null;
     if (app && typeof app.handle === 'function' && app.handle(ctx, act, data, event)) return;
     if (acts[act]) { acts[act](data, event); return; }
     if (typeof ctx.onGlobalAct === 'function' && ctx.onGlobalAct(act, data, event)) return;

@@ -72,18 +72,13 @@ export const userListApp = {
 
         <div class="mp-group">
           <div class="mp-group-label">小手机用谁</div>
-          <div class="mp-group-box">
-            <button class="mp-set-row${mode === 'follow' ? ' is-on' : ''}" data-act="user-mode" data-mode="follow" type="button">
-              <span class="mp-set-ico">${icon('refresh')}</span>
-              <span class="mp-set-name">跟随酒馆切换<small>酒馆换用户，小手机也跟着换</small></span>
-              <span class="mp-roles-radio${mode === 'follow' ? ' is-on' : ''}"></span>
-            </button>
-            <button class="mp-set-row${mode === 'pin' ? ' is-on' : ''}" data-act="user-mode" data-mode="pin" type="button">
-              <span class="mp-set-ico">${icon('pin')}</span>
-              <span class="mp-set-name">固定一位<small>${esc(pinned ? `${pinned.name} · 酒馆换人也不跟着动` : '挑一个人钉在这里')}</small></span>
-              <span class="mp-roles-radio${mode === 'pin' ? ' is-on' : ''}"></span>
-            </button>
+          <div class="mp-select-wrap">
+            <select data-act="user-mode">
+              <option value="follow"${mode === 'follow' ? ' selected' : ''}>跟随酒馆切换</option>
+              <option value="pin"${mode === 'pin' ? ' selected' : ''}>固定一位${pinned ? ` · ${esc(pinned.name)}` : ''}</option>
+            </select>${icon('chevron')}
           </div>
+          <div class="mp-subtitle" style="margin-top:6px;font-size:calc(11px * var(--font-scale))">${mode === 'follow' ? '酒馆换用户，小手机也跟着换。' : (pinned ? `已固定 ${esc(pinned.name)}，酒馆换人也不跟着动。` : '挑一个人钉在这里。')}</div>
         </div>
 
         <div class="mp-group">
@@ -112,7 +107,7 @@ export const userListApp = {
     }
 
     if (act === 'user-mode') {
-      const wanted = data?.mode === 'pin' ? 'pin' : 'follow';
+      const wanted = (data?.mode ?? data?.value) === 'pin' ? 'pin' : 'follow';
       if (wanted === 'pin' && !usersOf(state).length) { ctx.toast('名单是空的，先同步'); return true; }
       if (wanted === 'pin') {
         const list = usersOf(state);

@@ -243,20 +243,14 @@ export const drawApp = {
     const apiPreset = activeApi(ctx.state);
     const schemeIndex = draw.schemes.findIndex(item => item.id === draw.schemeId);
 
-    const promptChips = draw.presets.map((item, index) => `
-      <button class="mp-chip-btn${index === draw.presetIdx ? ' is-on' : ''}" data-act="draw-preset" data-i="${index}" type="button">
-        <span style="font-size: calc(12.5px * var(--font-scale))">${esc(item.name || `预设 ${index + 1}`)}</span>
-      </button>`).join('');
+    const promptOptions = draw.presets.map((item, index) => `
+      <option value="${index}"${index === draw.presetIdx ? ' selected' : ''}>${esc(item.name || `预设 ${index + 1}`)}</option>`).join('');
 
-    const apiChips = (ctx.state.settings.image.presets || []).map((item, index) => `
-      <button class="mp-chip-btn${item.id === ctx.state.settings.image.activeId ? ' is-on' : ''}" data-act="draw-api" data-i="${index}" type="button">
-        <span style="font-size: calc(12.5px * var(--font-scale))">${esc(item.name || `接口 ${index + 1}`)}</span>
-      </button>`).join('');
+    const apiOptions = (ctx.state.settings.image.presets || []).map((item, index) => `
+      <option value="${index}"${item.id === ctx.state.settings.image.activeId ? ' selected' : ''}>${esc(item.name || `接口 ${index + 1}`)}</option>`).join('');
 
-    const schemeChips = draw.schemes.map((item, index) => `
-      <button class="mp-chip-btn${item.id === draw.schemeId ? ' is-on' : ''}" data-act="draw-scheme" data-i="${index}" type="button">
-        <span style="font-size: calc(12.5px * var(--font-scale))">${esc(item.name || `方案 ${index + 1}`)}</span>
-      </button>`).join('');
+    const schemeOptions = draw.schemes.map((item, index) => `
+      <option value="${index}"${item.id === draw.schemeId ? ' selected' : ''}>${esc(item.name || `方案 ${index + 1}`)}</option>`).join('');
 
     const rows = [
       { act: 'draw-size', label: '尺寸', value: size.label },
@@ -301,17 +295,16 @@ export const drawApp = {
         </div>
 
         <div class="mp-group-label" style="margin-top:12px">整体方案</div>
-        <div class="mp-draw-chips">
-          ${schemeChips || '<div class="mp-empty" style="padding:4px 2px">还没有方案，新建一套就会把当前的接口和提示词绑在一起。</div>'}
-          <button class="mp-chip-btn" data-act="draw-scheme-new" type="button"><span style="font-size: calc(12.5px * var(--font-scale))">＋ 新建</span></button>
-        </div>
+        <div class="mp-select-wrap"><select data-act="draw-scheme">${schemeOptions}</select>${icon('chevron')}</div>
+        <button class="mp-draw-mini" data-act="draw-scheme-new" type="button" style="margin-top:8px">＋ 新建方案</button>
         <div class="mp-draw-hint">方案 = 一套接口预设 + 一套提示词预设，切换时两边一起换${schemeIndex >= 0 ? ` · 当前「${esc(draw.schemes[schemeIndex].name || '未命名')}」：${esc(apiPreset?.name || '接口')} / ${esc(preset.name || '提示词')}` : ''}</div>
 
         <div class="mp-draw-group-head">
           <span class="mp-group-label">绘图接口预设</span>
           <button class="mp-draw-mini" data-act="draw-api-menu" type="button">管理</button>
         </div>
-        <div class="mp-draw-chips">${apiChips}<button class="mp-chip-btn" data-act="draw-api-new" type="button"><span style="font-size: calc(12.5px * var(--font-scale))">＋ 新建</span></button></div>
+        <div class="mp-select-wrap"><select data-act="draw-api">${apiOptions}</select>${icon('chevron')}</div>
+        <button class="mp-draw-mini" data-act="draw-api-new" type="button" style="margin-top:8px">＋ 新建接口预设</button>
         <div class="mp-group">
           <button class="mp-row" data-act="draw-engine" type="button">
             <span class="mp-row-main">
@@ -343,7 +336,8 @@ export const drawApp = {
           <span class="mp-group-label">提示词预设</span>
           <button class="mp-draw-mini" data-act="draw-preset-menu" type="button">管理</button>
         </div>
-        <div class="mp-draw-chips">${promptChips}<button class="mp-chip-btn" data-act="draw-preset-new" type="button"><span style="font-size: calc(12.5px * var(--font-scale))">＋ 新建</span></button></div>
+        <div class="mp-select-wrap"><select data-act="draw-preset">${promptOptions}</select>${icon('chevron')}</div>
+        <button class="mp-draw-mini" data-act="draw-preset-new" type="button" style="margin-top:8px">＋ 新建提示词预设</button>
 
         <div class="mp-group-label" style="margin-top:14px">画面</div>
         <button class="mp-draw-desc" data-act="draw-prompt" type="button">
@@ -397,7 +391,7 @@ export const drawApp = {
     const scheme = draw.schemes.find(item => item.id === draw.schemeId);
 
     if (act === 'draw-scheme') {
-      const picked = draw.schemes[Number(data.i)];
+      const picked = draw.schemes[Number(data.i ?? data.value)];
       if (!picked) return true;
       applyScheme(ctx.state, picked);
       ctx.save();
@@ -459,7 +453,7 @@ export const drawApp = {
     }
 
     if (act === 'draw-api') {
-      const picked = image.presets[Number(data.i)];
+      const picked = image.presets[Number(data.i ?? data.value)];
       if (!picked) return true;
       image.activeId = picked.id;
       image.engine = picked.engine;
@@ -617,7 +611,7 @@ export const drawApp = {
     }
 
     if (act === 'draw-preset') {
-      const pickedIndex = Number(data.i) || 0;
+      const pickedIndex = Number(data.i ?? data.value) || 0;
       draw.presetIdx = pickedIndex;
       ctx.save();
       ctx.rerender();

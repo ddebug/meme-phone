@@ -240,8 +240,11 @@ export const drawApp = {
     const ep = imageEndpoint(ctx.state);
     const ready = endpointReady(ep);
     const busy = Boolean(draw.busy);
-    const apiPreset = activeApi(ctx.state);
     const schemeIndex = draw.schemes.findIndex(item => item.id === draw.schemeId);
+    const scheme = draw.schemes[schemeIndex] || null;
+    const schemeApi = scheme ? (ctx.state.settings.image.presets || []).find(item => item.id === scheme.apiId) : null;
+    const schemePrompt = scheme ? draw.presets.find(item => item.id === scheme.promptId) : null;
+    const schemeDirty = Boolean(scheme && (scheme.apiId !== ctx.state.settings.image.activeId || scheme.promptId !== preset.id));
 
     const promptOptions = draw.presets.map((item, index) => `
       <option value="${index}"${index === draw.presetIdx ? ' selected' : ''}>${esc(item.name || `预设 ${index + 1}`)}</option>`).join('');
@@ -296,15 +299,29 @@ export const drawApp = {
 
         <div class="mp-group-label" style="margin-top:12px">整体方案</div>
         <div class="mp-select-wrap"><select data-act="draw-scheme">${schemeOptions}</select>${icon('chevron')}</div>
-        <button class="mp-draw-mini" data-act="draw-scheme-new" type="button" style="margin-top:8px">＋ 新建方案</button>
-        <div class="mp-draw-hint">方案 = 一套接口预设 + 一套提示词预设，切换时两边一起换${schemeIndex >= 0 ? ` · 当前「${esc(draw.schemes[schemeIndex].name || '未命名')}」：${esc(apiPreset?.name || '接口')} / ${esc(preset.name || '提示词')}` : ''}</div>
+        <div class="mp-draw-actions">
+          <button class="mp-draw-action is-primary" data-act="draw-scheme-save" type="button">保存</button>
+          <button class="mp-draw-action" data-act="draw-scheme-new" type="button">新建</button>
+          <button class="mp-draw-action" data-act="draw-scheme-rename" type="button">改名</button>
+          <button class="mp-draw-action is-danger" data-act="draw-scheme-del" type="button">删除</button>
+        </div>
+        <div class="mp-draw-hint">改完接口或提示词后点「保存」，把当前组合写进这套方案；切走再回来不会丢。${scheme
+          ? `当前方案存的是「${esc(schemeApi?.name || '接口')}」 / 「${esc(schemePrompt?.name || '提示词')}」。${schemeDirty ? '当前选择还没保存。' : ''}`
+          : ''}</div>
 
         <div class="mp-draw-group-head">
           <span class="mp-group-label">绘图接口预设</span>
-          <button class="mp-draw-mini" data-act="draw-api-menu" type="button">管理</button>
         </div>
-        <div class="mp-select-wrap"><select data-act="draw-api">${apiOptions}</select>${icon('chevron')}</div>
-        <button class="mp-draw-mini" data-act="draw-api-new" type="button" style="margin-top:8px">＋ 新建接口预设</button>
+        <div class="mp-draw-switch-row">
+          <div class="mp-select-wrap"><select data-act="draw-api">${apiOptions}</select>${icon('chevron')}</div>
+          <button class="mp-draw-side is-primary" data-act="draw-api-save" type="button">保存</button>
+          <button class="mp-draw-side is-danger" data-act="draw-api-del" type="button">删除</button>
+        </div>
+        <div class="mp-draw-actions">
+          <button class="mp-draw-action" data-act="draw-api-new" type="button">＋ 新建接口预设</button>
+          <button class="mp-draw-action" data-act="draw-api-rename" type="button">改名</button>
+        </div>
+        <div class="mp-draw-hint">接口地址、Key、模型改完会存进这套接口预设；点「保存」再把当前接口记到整体方案里。</div>
         <div class="mp-group">
           <button class="mp-row" data-act="draw-engine" type="button">
             <span class="mp-row-main">
@@ -334,10 +351,17 @@ export const drawApp = {
 
         <div class="mp-draw-group-head">
           <span class="mp-group-label">提示词预设</span>
-          <button class="mp-draw-mini" data-act="draw-preset-menu" type="button">管理</button>
         </div>
-        <div class="mp-select-wrap"><select data-act="draw-preset">${promptOptions}</select>${icon('chevron')}</div>
-        <button class="mp-draw-mini" data-act="draw-preset-new" type="button" style="margin-top:8px">＋ 新建提示词预设</button>
+        <div class="mp-draw-switch-row">
+          <div class="mp-select-wrap"><select data-act="draw-preset">${promptOptions}</select>${icon('chevron')}</div>
+          <button class="mp-draw-side is-primary" data-act="draw-prompt-save" type="button">保存</button>
+          <button class="mp-draw-side is-danger" data-act="draw-prompt-del" type="button">删除</button>
+        </div>
+        <div class="mp-draw-actions">
+          <button class="mp-draw-action" data-act="draw-preset-new" type="button">＋ 新建提示词预设</button>
+          <button class="mp-draw-action" data-act="draw-preset-rename" type="button">改名</button>
+        </div>
+        <div class="mp-draw-hint">正向、反向改完会存进这套提示词预设；点「保存」再把当前提示词记到整体方案里。</div>
 
         <div class="mp-group-label" style="margin-top:14px">画面</div>
         <button class="mp-draw-desc" data-act="draw-prompt" type="button">
@@ -415,6 +439,51 @@ export const drawApp = {
       return true;
     }
 
+    if (act === 'draw-scheme-save') {
+      if (!scheme) { ctx.toast('先选一套整体方案'); return true; }
+      scheme.apiId = image.activeId;
+      scheme.promptId = preset.id;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`已保存到方案「${scheme.name || '未命名'}」`);
+      return true;
+    }
+
+    if (act === 'draw-scheme-rename') {
+      if (!scheme) { ctx.toast('先选一套整体方案'); return true; }
+      ctx.openSheet({
+        kind: 'text', title: '方案名字', value: scheme.name || '',
+        onText: text => {
+          scheme.name = String(text || '').trim().slice(0, 20) || scheme.name;
+          ctx.save();
+          ctx.rerender();
+        },
+      });
+      return true;
+    }
+
+    if (act === 'draw-scheme-del') {
+      if (!scheme) { ctx.toast('先选一套整体方案'); return true; }
+      if (draw.schemes.length <= 1) { ctx.toast('至少留一套整体方案'); return true; }
+      ctx.openSheet({
+        kind: 'pick',
+        title: '删除整体方案',
+        note: `只会删「${scheme.name || '未命名'}」这套组合，接口预设和提示词预设都还在。`,
+        items: [{ label: '删除这套方案', value: 'del', icon: 'trash', danger: true }],
+        onPick: value => {
+          if (value !== 'del') return;
+          draw.schemes = draw.schemes.filter(item => item.id !== scheme.id);
+          const next = draw.schemes[0] || null;
+          if (next) applyScheme(ctx.state, next);
+          else draw.schemeId = '';
+          ctx.save();
+          ctx.rerender();
+          ctx.toast('整体方案已删除');
+        },
+      });
+      return true;
+    }
+
     if (act === 'draw-scheme-menu') {
       ctx.openSheet({
         kind: 'pick', title: `整体方案 · ${scheme?.name || '未选'}`,
@@ -460,6 +529,55 @@ export const drawApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(`接口换成「${picked.name || '未命名'}」`);
+      return true;
+    }
+
+    if (act === 'draw-api-save') {
+      if (!target?.id) { ctx.toast('现在还没有接口预设'); return true; }
+      if (scheme) scheme.apiId = target.id;
+      image.activeId = target.id;
+      image.engine = target.engine;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(scheme ? `接口「${target.name || '未命名'}」已保存到当前方案` : `接口「${target.name || '未命名'}」已保存`);
+      return true;
+    }
+
+    if (act === 'draw-api-rename') {
+      if (!target?.id) { ctx.toast('现在还没有接口预设'); return true; }
+      ctx.openSheet({
+        kind: 'text', title: '接口名字', value: target.name || '',
+        onText: text => {
+          target.name = String(text || '').trim().slice(0, 20) || target.name;
+          ctx.save();
+          ctx.rerender();
+        },
+      });
+      return true;
+    }
+
+    if (act === 'draw-api-del') {
+      if (!target?.id) { ctx.toast('现在还没有接口预设'); return true; }
+      if (image.presets.length <= 1) { ctx.toast('至少留一套接口预设'); return true; }
+      ctx.openSheet({
+        kind: 'pick',
+        title: '删除接口预设',
+        note: `只会删「${target.name || '未命名'}」这套接口，用它的整体方案会换回第一套接口。`,
+        items: [{ label: '删除这套接口', value: 'del', icon: 'trash', danger: true }],
+        onPick: value => {
+          if (value !== 'del') return;
+          const removedId = target.id;
+          image.presets = image.presets.filter(item => item.id !== removedId);
+          image.activeId = image.presets[0].id;
+          image.engine = image.presets[0].engine;
+          draw.schemes.forEach(item => { if (item.apiId === removedId) item.apiId = image.activeId; });
+          const current = draw.schemes.find(item => item.id === draw.schemeId);
+          if (current) applyScheme(ctx.state, current);
+          ctx.save();
+          ctx.rerender();
+          ctx.toast('接口预设已删除');
+        },
+      });
       return true;
     }
 
@@ -615,6 +733,52 @@ export const drawApp = {
       draw.presetIdx = pickedIndex;
       ctx.save();
       ctx.rerender();
+      return true;
+    }
+
+    if (act === 'draw-prompt-save') {
+      if (!preset?.id) { ctx.toast('现在还没有提示词预设'); return true; }
+      if (scheme) scheme.promptId = preset.id;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(scheme ? `提示词「${preset.name || '未命名'}」已保存到当前方案` : `提示词「${preset.name || '未命名'}」已保存`);
+      return true;
+    }
+
+    if (act === 'draw-preset-rename') {
+      if (!preset?.id) { ctx.toast('现在还没有提示词预设'); return true; }
+      ctx.openSheet({
+        kind: 'text', title: '预设名字', value: preset.name || '',
+        onText: text => {
+          preset.name = String(text || '').trim().slice(0, 20) || preset.name;
+          ctx.save();
+          ctx.rerender();
+        },
+      });
+      return true;
+    }
+
+    if (act === 'draw-prompt-del') {
+      if (!preset?.id) { ctx.toast('现在还没有提示词预设'); return true; }
+      if (draw.presets.length <= 1) { ctx.toast('至少留一套提示词预设'); return true; }
+      ctx.openSheet({
+        kind: 'pick',
+        title: '删除提示词预设',
+        note: `只会删「${preset.name || '未命名'}」这套提示词，用它的整体方案会换回第一套提示词。`,
+        items: [{ label: '删除这套提示词', value: 'del', icon: 'trash', danger: true }],
+        onPick: value => {
+          if (value !== 'del') return;
+          const removedId = preset.id;
+          draw.presets.splice(draw.presetIdx, 1);
+          draw.presetIdx = Math.max(0, draw.presetIdx - 1);
+          draw.schemes.forEach(item => { if (item.promptId === removedId) item.promptId = draw.presets[0].id; });
+          const current = draw.schemes.find(item => item.id === draw.schemeId);
+          if (current) applyScheme(ctx.state, current);
+          ctx.save();
+          ctx.rerender();
+          ctx.toast('提示词预设已删除');
+        },
+      });
       return true;
     }
 

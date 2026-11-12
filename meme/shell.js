@@ -64,7 +64,9 @@ export function applyLook(root, settings) {
   root.style.setProperty('--line-scale', String(line));
   root.style.setProperty('--font-weight', String(weight));
   root.dataset.mpIsland = dress.island === 'hide' ? 'hide' : 'show';
-  root.dataset.mpSkin = ['frost', 'pixel'].includes(dress.theme) ? dress.theme : 'default';
+  /* 像素小兔也走磨砂玻璃组件，只保留小兔壁纸 / 横幅 / 头像框这层美术 */
+  root.dataset.mpSkin = dress.theme === 'pixel' ? 'frost' : (dress.theme === 'frost' ? 'frost' : 'default');
+  root.dataset.mpArt = dress.theme === 'pixel' ? 'pixel' : '';
   if (dress.theme === 'pixel') {
     root.style.setProperty('--theme-frame', `url("${PIXEL_BUNNY.avatarFrame}")`);
   } else {
@@ -173,7 +175,7 @@ export function createShell(options) {
     const myBio = themed ? themed.profile.bio : String(me?.description || '把每天的事，记在这台小手机里。').trim();
     const myHandle = themed ? themed.profile.handle : `@${String(myName).trim().replace(/\s+/g, '_') || 'me'}`;
     const myLocation = themed ? themed.profile.location : '在酒馆里';
-    const myBanner = themed ? ` style="background-image:url(&quot;${themed.banner}&quot;);background-size:cover;background-position:center"` : '';
+    const myBanner = themed ? ` style="--theme-banner:url(&quot;${themed.banner}&quot;)"` : '';
     const stampText = dateText().replace('<br>', ' · ');
 
     const iconButtons = desktopApps.map(app => `

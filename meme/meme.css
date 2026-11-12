@@ -57,8 +57,8 @@
 .mp-root[data-mp-theme="night"] {
   --text: #ece9f7;
   --text-2: rgba(236, 233, 247, .66);
-  --text-3: rgba(236, 233, 247, .42);
-  --text-4: rgba(236, 233, 247, .26);
+  --text-3: rgba(236, 233, 247, .52);
+  --text-4: rgba(236, 233, 247, .32);
   --line: rgba(255, 255, 255, .08);
   --line-soft: rgba(255, 255, 255, .04);
 
@@ -211,8 +211,8 @@
 .mp-status .mp-status-back .mp-i { width: 19px; height: 19px; }
 
 /* 返回键统一放到状态栏左边，页面里的旧返回键不再重复显示 */
-.mp-nav .mp-back[data-act="back"],
-.mp-thread-head .mp-back[data-act="back"],
+.mp-nav .mp-back[data-act="back"]
+.mp-thread-head .mp-back[data-act="back"]
 .mp-root .mp-back[data-act="back"] { display: none; }
 
 /* 顶部中间：拖动手机壳 */
@@ -557,7 +557,7 @@
   text-overflow: ellipsis;
 }
 
-.mp-mini-msg,
+.mp-mini-msg
 .mp-mini-empty {
   color: var(--text-3);
   font-size: calc(11px * var(--font-scale));
@@ -1112,7 +1112,7 @@
 .mp-typing i:nth-child(3) { animation-delay: .36s; }
 
 @keyframes mp-blink {
-  0%, 60%, 100% { opacity: .25; }
+  0% 60% 100% { opacity: .25; }
   30% { opacity: 1; }
 }
 
@@ -1520,7 +1520,7 @@
 }
 
 /* 弹层内部重渲染时不要再播放入场动画，否则会闪一下 */
-.mp-mask.is-still,
+.mp-mask.is-still
 .mp-sheet.is-still {
   animation: none;
 }
@@ -1700,7 +1700,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mp-page, .mp-thread, .mp-sheet { animation: none; }
+  .mp-page .mp-thread .mp-sheet { animation: none; }
 }
 
 /* =========================================================================
@@ -1723,7 +1723,7 @@
 .mp-island { z-index: 45; }
 
 /* 页面从状态栏下面开始，别把时钟压在导航上 */
-.mp-page,
+.mp-page
 .mp-thread {
   padding-top: 44px;
   box-sizing: border-box;
@@ -2422,6 +2422,194 @@
   line-height: calc(1.7 * var(--line-scale));
   color: var(--text-3);
 }
+
+/* --------------------------------------------------- 接口：列表内展开详情 */
+.mp-root .mp-api-stack + .mp-api-stack { margin-top: 8px; }
+.mp-root .mp-api-row.is-open {
+  box-shadow: var(--shadow-s), inset 0 0 0 1.5px rgba(124, 111, 255, .24);
+}
+.mp-api-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.mp-api-caret .mp-i { width: 15px; height: 15px; transition: transform .18s ease; }
+.mp-root .mp-api-row.is-open .mp-api-caret .mp-i { transform: rotate(90deg); }
+
+.mp-root .mp-api-detail {
+  margin-top: 6px;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--shadow-s), inset 0 0 0 1px var(--field-border);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.mp-root .mp-api-edit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+.mp-root .mp-api-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.mp-root .mp-api-field > span {
+  padding-left: 2px;
+  font-size: calc(10.5px * var(--font-scale));
+  color: var(--text-3);
+}
+.mp-root .mp-api-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  border: 1px solid var(--field-border);
+  border-radius: 11px;
+  background: var(--field-solid);
+  color: var(--text);
+  font: inherit;
+  font-size: calc(12.5px * var(--font-scale));
+  line-height: calc(1.3 * var(--line-scale));
+  outline: none;
+}
+.mp-root .mp-api-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(142, 123, 242, .13);
+}
+.mp-root .mp-api-input::placeholder { color: var(--text-4); }
+.mp-root .mp-api-model { display: grid; gap: 6px; min-width: 0; }
+.mp-root .mp-api-static {
+  padding: 9px 10px;
+  border: 1px solid var(--field-border);
+  border-radius: 11px;
+  background: var(--field-solid);
+  color: var(--text-3);
+  font-size: calc(12.5px * var(--font-scale));
+  line-height: calc(1.3 * var(--line-scale));
+}
+.mp-root .mp-api-mini-select select {
+  padding: 9px 32px 9px 10px;
+  border-radius: 11px;
+  font-size: calc(12.5px * var(--font-scale));
+}
+.mp-root .mp-api-status-inline {
+  margin: 10px 1px 0;
+  font-size: calc(11px * var(--font-scale));
+  line-height: calc(1.55 * var(--line-scale));
+  color: var(--text-3);
+  word-break: break-all;
+}
+.mp-root .mp-api-status-inline.is-ok { color: #4f8a63; }
+.mp-root .mp-api-name-edit {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 9px;
+}
+.mp-root .mp-api-name-edit .mp-api-input { flex: 1; }
+.mp-root .mp-api-name-edit .mp-draw-side { min-width: auto; padding: 0 10px; }
+
+/* 预设页的内联新建 / 改名 / 删除确认 */
+.mp-root .mp-api-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+}
+.mp-root .mp-api-inline .mp-api-input { flex: 1; min-width: 0; }
+.mp-root .mp-api-inline .mp-draw-side { min-width: auto; padding: 0 10px; }
+
+/* 预设页：实际注入双视图 */
+.mp-root .mp-preview-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 8px 2px 6px;
+}
+.mp-root .mp-preview-tab {
+  border: 0;
+  border-radius: 10px;
+  padding: 6px 10px;
+  background: rgba(142, 123, 242, .08);
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: calc(11px * var(--font-scale));
+  line-height: calc(1.3 * var(--line-scale));
+}
+.mp-root .mp-preview-tab.is-on {
+  background: rgba(142, 123, 242, .18);
+  color: var(--lav-deep);
+}
+.mp-root .mp-preview-panel {
+  margin-top: 2px;
+  padding: 10px 12px;
+  border-radius: var(--r-m);
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+  max-height: 360px;
+  overflow: auto;
+}
+.mp-root .mp-preview-msg + .mp-preview-msg {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+.mp-root .mp-preview-role {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale));
+}
+.mp-root .mp-preview-role span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 6px;
+  background: rgba(142, 123, 242, .12);
+  color: var(--lav-deep);
+}
+.mp-root .mp-preview-msg pre,
+.mp-root .mp-preview-flat {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: calc(12px * var(--font-scale));
+  line-height: calc(1.6 * var(--line-scale));
+  color: var(--text);
+}
+.mp-root .mp-preview-foot {
+  margin: 8px 4px 0;
+  color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale));
+  line-height: calc(1.6 * var(--line-scale));
+}
+.mp-root .mp-api-note.is-warn { color: #d94b4b; }
+
+/* 酒馆记忆页：已读记忆只读展示 */
+.mp-root .mp-mem-card { padding: 12px 14px; }
+.mp-root .mp-mem-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow: auto;
+  color: var(--text);
+  font-size: calc(12px * var(--font-scale));
+  line-height: calc(1.65 * var(--line-scale));
+}
+.mp-root .mp-mem-meta {
+  margin-top: 8px;
+  color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale));
+  line-height: calc(1.5 * var(--line-scale));
+}
+
 .mp-root .mp-reply-preview {
   display: -webkit-box;
   white-space: pre-wrap;
@@ -3006,7 +3194,7 @@
   color: var(--text-2);
 }
 
-.mp-wi-scan,
+.mp-wi-scan
 .mp-wi-retry {
   display: inline-flex;
   align-items: center;
@@ -3228,7 +3416,7 @@
   transform: translateX(-50%);
 }
 
-.mp-cp-chats,
+.mp-cp-chats
 .mp-cp-roster {
   padding: 2px 12px 6px;
   box-shadow: none;
@@ -3250,7 +3438,7 @@
   cursor: pointer;
 }
 
-.mp-cp-chat + .mp-cp-chat,
+.mp-cp-chat + .mp-cp-chat
 .mp-cp-roster .mp-user-row + .mp-user-row {
   border-top: 1px solid var(--line-soft);
 }
@@ -3261,7 +3449,7 @@
   cursor: default;
 }
 
-.mp-cp-chat .mp-avatar,
+.mp-cp-chat .mp-avatar
 .mp-cp-roster .mp-avatar {
   width: 34px;
   height: 34px;
@@ -3269,7 +3457,7 @@
   font-size: calc(12px * var(--font-scale));
 }
 
-.mp-cp-chat .mp-user-desc,
+.mp-cp-chat .mp-user-desc
 .mp-cp-roster .mp-user-desc {
   -webkit-line-clamp: 1;
 }
@@ -4168,7 +4356,7 @@
 .mp-root[data-mp-theme="night"] .mp-dress-choice { background: rgba(255, 255, 255, .06); }
 .mp-root[data-mp-theme="night"] .mp-dress-choice.is-on { background: rgba(167, 149, 255, .2); }
 
-.mp-dress-toggle,
+.mp-dress-toggle
 .mp-dress-link {
   width: 100%;
   display: flex;
@@ -4341,53 +4529,6 @@
 .mp-icon-actions { display: flex; gap: 8px; }
 .mp-icon-actions .mp-btn { flex: 1; }
 
-/* ========================================================= 主题皮肤 */
-
-/* 像素小兔：冷白雾面壁纸 + 宽横幅 + 头像框 */
-.mp-root[data-mp-skin="pixel"] .mp-wallpaper {
-  background-image: var(--wall-theme);
-  background-position: center;
-  background-size: cover;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-profile-banner {
-  height: 98px;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-apps {
-  padding-top: 7px;
-  row-gap: 5px;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-profile-banner::before {
-  display: none;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-profile-banner::after {
-  background: linear-gradient(180deg, rgba(255, 255, 255, .5), rgba(255, 255, 255, .2) 45%, rgba(255, 255, 255, .62));
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-profile-stamp {
-  display: none;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-profile-avatar::after {
-  content: "";
-  position: absolute;
-  inset: -8px;
-  border-radius: 50%;
-  background-image: var(--theme-frame);
-  background-position: center;
-  background-size: contain;
-  background-repeat: no-repeat;
-  pointer-events: none;
-  z-index: 3;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-mini-widget {
-  background: linear-gradient(160deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, .7));
-}
-
 /* 白色磨砂：聊天气泡统一成无光白玻璃，收发都用自己的白气泡 */
 .mp-root[data-mp-skin="frost"] .mp-bubble,
 .mp-root[data-mp-skin="frost"] .mp-msg.me .mp-bubble {
@@ -4454,47 +4595,6 @@
   --field-border: rgba(60, 60, 67, .18);
 }
 
-.mp-root[data-mp-skin="pixel"] {
-  --lav: #111;
-  --lav-deep: #000;
-  --pink: #111;
-  --mint: #111;
-  --honey: #111;
-  --sky: #111;
-
-  --text: #0b0b0b;
-  --text-2: rgba(11, 11, 11, .68);
-  --text-3: rgba(11, 11, 11, .48);
-  --text-4: rgba(11, 11, 11, .32);
-  --line: rgba(11, 11, 11, .18);
-  --line-soft: rgba(11, 11, 11, .10);
-
-  --page: #f4f4f1;
-  --page-2: #ecece8;
-  --glass: rgba(255, 255, 255, .86);
-  --glass-strong: #fff;
-  --card: #fff;
-
-  --accent: #111;
-  --accent-deep: #000;
-  --ok: #111;
-  --warn: #6b5200;
-
-  --shadow-s: 2px 2px 0 rgba(11, 11, 11, .12);
-  --shadow-m: 3px 3px 0 rgba(11, 11, 11, .16);
-  --shadow-l: 4px 4px 0 rgba(11, 11, 11, .20);
-
-  --r-s: 6px;
-  --r-m: 10px;
-  --r-l: 12px;
-  --r-xl: 14px;
-  --r-card: 12px;
-
-  --field-bg: #fff;
-  --field-solid: #fff;
-  --field-border: #111;
-}
-
 /* ---------------------------------------------------- 2. 机身 / 壁纸 / 页面 */
 .mp-root[data-mp-skin="frost"] .mp-device {
   background: linear-gradient(160deg, #f8f8f9, #e6e6e9 58%, #fdfdfd);
@@ -4535,40 +4635,6 @@
   -webkit-backdrop-filter: blur(24px) saturate(.6);
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-device {
-  background: linear-gradient(160deg, #fbfbf8, #deded8 58%, #ffffff);
-  box-shadow:
-    0 40px 90px rgba(0, 0, 0, .22),
-    0 0 0 1px rgba(255, 255, 255, .92),
-    inset 0 0 0 1px rgba(17, 17, 17, .12);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-scrim {
-  background: linear-gradient(180deg, rgba(255, 255, 255, .24), rgba(255, 255, 255, 0) 34%, rgba(244, 244, 240, .36));
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-screen {
-  background: #f4f4f1;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-page,
-.mp-root[data-mp-skin="pixel"] .mp-thread {
-  background: linear-gradient(180deg, rgba(252, 252, 249, .91), rgba(245, 245, 241, .96));
-  backdrop-filter: blur(20px) saturate(.5);
-  -webkit-backdrop-filter: blur(20px) saturate(.5);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-page-body {
-  background:
-    linear-gradient(90deg, rgba(17, 17, 17, .018) 1px, transparent 1px) 0 0 / 18px 18px,
-    linear-gradient(180deg, rgba(17, 17, 17, .018) 1px, transparent 1px) 0 0 / 18px 18px;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-composer {
-  background: rgba(250, 250, 247, .92);
-  border-top: 1px solid rgba(17, 17, 17, .18);
-}
-
 /* 状态栏与顶部操作 */
 .mp-root[data-mp-skin="frost"] .mp-status-back,
 .mp-root[data-mp-skin="frost"] .mp-icon-btn {
@@ -4577,32 +4643,13 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .82), 0 2px 10px rgba(0, 0, 0, .06);
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-status-back,
-.mp-root[data-mp-skin="pixel"] .mp-icon-btn {
-  background: #fff;
-  color: #111;
-  border-radius: 7px;
-  box-shadow: inset 0 0 0 1.5px #111, 2px 2px 0 rgba(17, 17, 17, .18);
-}
-
 .mp-root[data-mp-skin="frost"] .mp-island {
   background: #1b1b1d;
   box-shadow: 0 3px 12px rgba(0, 0, 0, .18);
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-island {
-  background: #000;
-  border-radius: 10px;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .3);
-}
-
 .mp-root[data-mp-skin="frost"] .mp-home-bar {
   background: rgba(28, 28, 30, .30);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-home-bar {
-  background: #111;
-  border-radius: 1px;
 }
 
 /* ------------------------------------------------ 3. 桌面 / 面板 / 列表底 */
@@ -4691,92 +4738,6 @@
   text-shadow: 0 1px 0 rgba(255, 255, 255, .72);
 }
 
-/* 像素：所有面板统一白纸、黑边、硬投影 */
-.mp-root[data-mp-skin="pixel"] :is(
-  .mp-widget, .mp-profile, .mp-mini-widget, .mp-di-card,
-  .mp-row, .mp-group-box, .mp-card, .mp-diary-hero, .mp-diary-card,
-  .mp-chat-set-head, .mp-extra-source, .mp-quote-chip, .mp-sheet,
-  .mp-theme-card, .mp-dress-hero, .mp-dress-toggle, .mp-dress-app-grid,
-  .mp-icon-preview, .mp-icon-grid, .mp-music-card, .mp-music-empty,
-  .mp-music-player, .mp-draw-desc, .mp-draw-param, .mp-draw-card,
-  .mp-ios-card, .mp-api-card, .mp-api-clone, .mp-cp-shell,
-  .mp-char-block, .mp-wi-note
-) {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow:
-    inset 0 0 0 1.5px #111,
-    3px 3px 0 rgba(17, 17, 17, .16);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-.mp-root[data-mp-skin="pixel"] :is(.mp-widget, .mp-profile, .mp-sheet, .mp-dress-hero, .mp-icon-preview) {
-  border-radius: 14px;
-}
-
-.mp-root[data-mp-skin="pixel"] :is(
-  .mp-btn, .mp-btn.ghost, .mp-quick-btn, .mp-action-btn, .mp-chip-btn,
-  .mp-sq-btn, .mp-draw-action, .mp-draw-side, .mp-ios-add, .mp-ios-memory-row,
-  .mp-music-next, .mp-music-card-play, .mp-api-card-swap, .mp-sheet-cancel,
-  .mp-draw-state-btn
-) {
-  background: #fff;
-  color: #111;
-  border-radius: 8px;
-  box-shadow:
-    inset 0 0 0 1.5px #111,
-    2px 2px 0 rgba(17, 17, 17, .16);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-chip-btn.is-on {
-  background: #111;
-  color: #fff;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .30);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-chip-btn.is-on .mp-set-ico,
-.mp-root[data-mp-skin="pixel"] .mp-set-ico {
-  background: #111;
-  color: #fff;
-  border-radius: 6px;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-dock {
-  background: #fff;
-  border-radius: 16px;
-  box-shadow:
-    inset 0 0 0 1.5px #111,
-    3px 3px 0 rgba(17, 17, 17, .18);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-.mp-root[data-mp-skin="pixel"] :is(.mp-app .mp-tile:not(.mp-tile-image), .mp-glass-ico) {
-  background: #fff;
-  color: #111;
-  border-radius: 11px;
-  box-shadow:
-    inset 0 0 0 1.5px #111,
-    2px 2px 0 rgba(17, 17, 17, .18);
-}
-
-.mp-root[data-mp-skin="pixel"] :is(.mp-app .mp-tile:not(.mp-tile-image) .mp-i, .mp-glass-ico .mp-i) {
-  color: #111;
-  filter: none;
-  opacity: 1;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-app .mp-tile::after {
-  background: none;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-app .mp-app-label {
-  color: #0b0b0b;
-  font-weight: 600;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, .9);
-}
-
 /* 桌面资料卡：磨砂做无光灰，像素保留主题横幅 */
 .mp-root[data-mp-skin="frost"] .mp-profile-banner {
   background:
@@ -4803,16 +4764,6 @@
 .mp-root[data-mp-skin="frost"] .mp-profile-avatar {
   border-color: rgba(255, 255, 255, .96);
   box-shadow: 0 8px 18px rgba(0, 0, 0, .12);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-profile-banner::after {
-  background: linear-gradient(180deg, rgba(255, 255, 255, .18), transparent 38%, rgba(255, 255, 255, .56));
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-profile-avatar {
-  border: 2px solid #111;
-  border-radius: 14px;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .2);
 }
 
 /* ------------------------------------------------------ 4. 聊天 / 日记 / 设置 */
@@ -4877,72 +4828,6 @@
   color: rgba(28, 28, 30, .60);
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-bubble {
-  background: #fff;
-  border: 1.5px solid #111;
-  border-radius: 9px;
-  color: #0b0b0b;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .14);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-msg.me .mp-bubble {
-  background: #111;
-  border-color: #111;
-  color: #fff;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .28);
-}
-
-.mp-root[data-mp-skin="pixel"] :is(.mp-typing, .mp-quote-chip) {
-  background: #fff;
-  border: 1.5px solid #111;
-  border-radius: 8px;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .14);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-compose-box {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: inset 0 0 0 1.5px #111;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-send {
-  background: #fff;
-  color: #111;
-  border-radius: 9px;
-  box-shadow: inset 0 0 0 1.5px #111, 2px 2px 0 rgba(17, 17, 17, .16);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-send.is-text {
-  background: #111;
-  color: #fff;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .3);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-send.is-wake {
-  background: #e9e9e5;
-  color: #111;
-  box-shadow: inset 0 0 0 1.5px #111;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-sys {
-  background: #fff;
-  color: #555;
-  border: 1px solid rgba(17, 17, 17, .35);
-  border-radius: 4px;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-quote {
-  background: #f1f1ed;
-  border-left: 3px solid #111;
-  border-radius: 2px;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-msg.me .mp-quote {
-  background: rgba(255, 255, 255, .14);
-  border-left-color: rgba(255, 255, 255, .7);
-  color: rgba(255, 255, 255, .86);
-}
-
 /* 日历 / 日记 */
 .mp-root[data-mp-skin="frost"] .mp-cal button.sel {
   background: rgba(28, 28, 30, .08);
@@ -4951,26 +4836,6 @@
 
 .mp-root[data-mp-skin="frost"] .mp-cal button .mark {
   background: #3a3a3c;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-cal button {
-  border-radius: 3px;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-cal button.sel {
-  background: #111;
-  color: #fff;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-cal button .mark {
-  width: 4px;
-  height: 4px;
-  border-radius: 0;
-  background: #111;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-cal button.sel .mark {
-  background: #fff;
 }
 
 /* 设置行 / 分组 / 图标 */
@@ -4995,35 +4860,9 @@
   background: rgba(192, 57, 43, .08);
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-set-row {
-  background: transparent;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-set-row:active {
-  background: #f1f1ed;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-set-row.is-on {
-  background: #f1f1ed;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-set-row.is-danger .mp-set-name {
-  color: #a31515;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-set-row.is-danger .mp-set-ico {
-  color: #fff;
-  background: #a31515;
-}
-
 .mp-root[data-mp-skin="frost"] .mp-switch {
   background: #e6e6e8;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .04);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-switch {
-  background: #e4e4df;
-  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, .10);
 }
 
 /* 统一 iOS 下拉框 */
@@ -5039,32 +4878,11 @@
   box-shadow: 0 0 0 3px rgba(28, 28, 30, .10);
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-select-wrap select {
-  background: #fff;
-  border: 1.5px solid #111;
-  border-radius: 8px;
-  color: #111;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .12);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-select-wrap select:focus {
-  border-color: #111;
-  box-shadow: 0 0 0 2px rgba(17, 17, 17, .18);
-}
-
 .mp-root[data-mp-skin="frost"] .mp-sheet-input,
 .mp-root[data-mp-skin="frost"] .mp-sheet-textarea {
   background: rgba(255, 255, 255, .90);
   border-color: rgba(60, 60, 67, .18);
   border-radius: 13px;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-sheet-input,
-.mp-root[data-mp-skin="pixel"] .mp-sheet-textarea {
-  background: #fff;
-  border: 1.5px solid #111;
-  border-radius: 8px;
-  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, .04);
 }
 
 /* 弹层 / 遮罩 / toast */
@@ -5081,41 +4899,8 @@
     inset 0 0 0 1px rgba(255, 255, 255, .92);
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-mask {
-  background: rgba(10, 10, 10, .34);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-sheet {
-  background: #fff;
-  border-radius: 10px;
-  box-shadow:
-    4px 4px 0 rgba(17, 17, 17, .24),
-    inset 0 0 0 1.5px #111;
-}
-
 .mp-root[data-mp-skin="frost"] :is(.mp-toast, .mp-draw-state) {
   background: rgba(28, 28, 30, .90);
-  color: #fff;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-toast {
-  background: #111;
-  color: #fff;
-  border-radius: 4px;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .26);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-draw-state {
-  background: #fff;
-  border: 1.5px solid #111;
-  border-radius: 8px;
-  color: #111;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-draw-state.is-on {
-  background: #111;
   color: #fff;
 }
 
@@ -5162,45 +4947,9 @@
   border-color: rgba(46, 125, 74, .22);
 }
 
-.mp-root[data-mp-skin="pixel"] :is(
-  .mp-pill, .mp-user-tag, .mp-api-tag, .mp-music-source, .mp-music-track-side,
-  .mp-char-tag, .mp-cp-badge, .mp-cp-count, .mp-preset-tag:not(.is-context):not(.is-app),
-  .mp-draw-mini, .mp-char-query, .mp-wi-scan, .mp-wi-retry, .mp-ios-edit-reply
-) {
-  background: #fff;
-  border: 1px solid rgba(17, 17, 17, .55);
-  border-radius: 3px;
-  color: #111;
-}
-
-.mp-root[data-mp-skin="pixel"] :is(.mp-pill.mint, .mp-pill.pink, .mp-pill.plain) {
-  background: #fff;
-  border: 1px solid rgba(17, 17, 17, .55);
-  color: #111;
-}
-
-.mp-root[data-mp-skin="pixel"] :is(.mp-cp-comment, .mp-preset-item.is-context) {
-  background: #f1f1ed;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-preset-tag.is-context,
-.mp-root[data-mp-skin="pixel"] .mp-preset-tag.is-app,
-.mp-root[data-mp-skin="pixel"] .mp-tag-proactive {
-  background: #111;
-  border: 1px solid #111;
-  border-radius: 3px;
-  color: #fff;
-}
-
 .mp-root[data-mp-skin="frost"] .mp-badge-count {
   background: #2c2c2e;
   color: #fff;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-badge-count {
-  background: #111;
-  color: #fff;
-  border-radius: 4px;
 }
 
 .mp-root[data-mp-skin="frost"] .mp-btn.accent {
@@ -5209,21 +4958,9 @@
   box-shadow: 0 8px 18px rgba(0, 0, 0, .14);
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-btn.accent {
-  background: #111;
-  color: #fff;
-  border-radius: 8px;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .30);
-}
-
 .mp-root[data-mp-skin="frost"] .mp-btn.ghost {
   background: rgba(28, 28, 30, .045);
   color: #1c1c1e;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-btn.ghost {
-  background: #fff;
-  color: #111;
 }
 
 .mp-root[data-mp-skin="frost"] .mp-seg {
@@ -5236,28 +4973,8 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-seg {
-  background: #fff;
-  border-radius: 6px;
-  box-shadow: inset 0 0 0 1.5px #111;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-seg button {
-  border-radius: 4px;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-seg button.on {
-  background: #111;
-  color: #fff;
-  box-shadow: none;
-}
-
 .mp-root[data-mp-skin="frost"] .mp-back {
   color: #1c1c1e;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-back {
-  color: #111;
 }
 
 /* 绘图 / 接口 */
@@ -5289,31 +5006,6 @@
 
 .mp-root[data-mp-skin="frost"] .mp-ios-add {
   color: #1c1c1e;
-}
-
-.mp-root[data-mp-skin="pixel"] :is(.mp-draw-action.is-primary, .mp-draw-side.is-primary) {
-  background: #111;
-  border-color: #111;
-  color: #fff;
-  font-weight: 600;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .22);
-}
-
-.mp-root[data-mp-skin="pixel"] :is(.mp-draw-action.is-danger, .mp-draw-side.is-danger, .mp-sheet-item.danger) {
-  color: #a31515;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-draw-run {
-  background: #111;
-  color: #fff;
-  border-radius: 8px;
-  box-shadow: 3px 3px 0 rgba(17, 17, 17, .26);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-api-use-btn.is-on {
-  background: #111;
-  color: #fff;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .26);
 }
 
 /* 音乐 */
@@ -5350,72 +5042,10 @@
   background: #1c1c1e;
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-music-card.is-on {
-  background: #f1f1ed;
-}
-
-.mp-root[data-mp-skin="pixel"] :is(.mp-music-cover, .mp-music-cover.is-empty) {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: inset 0 0 0 1.5px #111;
-  color: #111;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-music-empty-art {
-  background: #111;
-  color: #fff;
-  border-radius: 8px;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .18);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-music-play {
-  background: #111;
-  border-radius: 8px;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .24);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-music-progress {
-  background: #d8d8d4;
-  border-radius: 1px;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-music-progress i {
-  background: #111;
-  border-radius: 1px;
-}
-
 /* 查 TA 的手机 / 角色 / 世界书 */
 .mp-root[data-mp-skin="frost"] .mp-cp-bubble-row.is-me .mp-cp-bubble {
   background: #1c1c1e;
   color: #fff;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-cp-bubble {
-  background: #fff;
-  border: 1px solid rgba(17, 17, 17, .55);
-  border-radius: 6px;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .12);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-cp-bubble-row.is-me .mp-cp-bubble {
-  background: #111;
-  border-color: #111;
-  color: #fff;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-cp-tab.is-on {
-  color: #111;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-cp-tab.is-on::after {
-  background: #111;
-  height: 3px;
-  border-radius: 0;
-}
-
-.mp-root[data-mp-skin="pixel"] :is(.mp-avatar, .mp-msg .mp-avatar, .mp-thread-head .mp-avatar, .mp-profile-avatar) {
-  border-radius: 8px;
-  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, .22);
 }
 
 /* 装扮 / 主题卡 / 壁纸 / 图标 */
@@ -5423,13 +5053,6 @@
   background: rgba(28, 28, 30, .07);
   color: #1c1c1e;
   box-shadow: inset 0 0 0 1px rgba(28, 28, 30, .10);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-dress-aa {
-  background: #fff;
-  color: #111;
-  border-radius: 8px;
-  box-shadow: inset 0 0 0 1.5px #111, 2px 2px 0 rgba(17, 17, 17, .16);
 }
 
 .mp-root[data-mp-skin="frost"] :is(.mp-dress-choice, .mp-icon-choice) {
@@ -5447,23 +5070,6 @@
   color: #1c1c1e;
 }
 
-.mp-root[data-mp-skin="pixel"] :is(.mp-dress-choice, .mp-icon-choice) {
-  background: #f1f1ed;
-  color: #111;
-  border-radius: 5px;
-  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, .18);
-}
-
-.mp-root[data-mp-skin="pixel"] :is(.mp-dress-choice.is-on, .mp-icon-choice.is-on) {
-  background: #111;
-  color: #fff;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .2);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-dress-choice.is-on b {
-  color: #fff;
-}
-
 .mp-root[data-mp-skin="frost"] .mp-theme-preview {
   border-radius: 13px;
   box-shadow: inset 0 0 0 1px rgba(28, 28, 30, .12);
@@ -5471,36 +5077,13 @@
 
 .mp-root[data-mp-skin="frost"] .mp-theme-card.is-on {
   box-shadow:
-    inset 0 0 0 1.5px #1c1c1e,
-    0 8px 18px rgba(0, 0, 0, .07);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-theme-preview {
-  border-radius: 5px;
-  box-shadow: inset 0 0 0 1.5px #111;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-theme-card.is-on {
-  background: #f2f2ee;
-  box-shadow:
-    inset 0 0 0 2.5px #111,
-    3px 3px 0 rgba(17, 17, 17, .22);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-dress-wall-swatch {
-  border-radius: 5px;
-  box-shadow: inset 0 0 0 1.5px #111;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-dress-wall-swatch.is-on {
-  border-color: #111;
-  box-shadow: inset 0 0 0 1.5px #111, 2px 2px 0 rgba(17, 17, 17, .2);
+    inset 0 0 0 1.5px rgba(124, 111, 255, .45),
+    0 10px 22px rgba(124, 111, 255, .14);
 }
 
 /* ---------------------------------------------- 6. 遗漏控件 / 状态 / 文字层级 */
 /* iOS 开关保持原形，只换轨道底色；开启仍用系统绿 */
-.mp-root[data-mp-skin="frost"] .mp-switch.on,
-.mp-root[data-mp-skin="pixel"] .mp-switch.on {
+.mp-root[data-mp-skin="frost"] .mp-switch.on{
   background: #34c759;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .04);
 }
@@ -5511,19 +5094,8 @@
   box-shadow: 0 8px 18px rgba(0, 0, 0, .14);
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-action-btn.primary {
-  background: #111;
-  color: #fff;
-  border-radius: 8px;
-  box-shadow: 2px 2px 0 rgba(17, 17, 17, .28);
-}
-
 .mp-root[data-mp-skin="frost"] .mp-quick-btn .mp-i {
   color: #3a3a3c;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-quick-btn .mp-i {
-  color: #111;
 }
 
 .mp-root[data-mp-skin="frost"] .mp-music-track.is-on {
@@ -5534,21 +5106,8 @@
   background: rgba(28, 28, 30, .05);
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-music-track.is-on {
-  background: #f1f1ed;
-  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, .20);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-music-track:active {
-  background: #f1f1ed;
-}
-
 .mp-root[data-mp-skin="frost"] .mp-draw-ph {
   color: rgba(28, 28, 30, .38);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-draw-ph {
-  color: rgba(17, 17, 17, .42);
 }
 
 .mp-root[data-mp-skin="frost"] :is(.mp-dress-tile:not(.has-image), .mp-icon-preview .mp-dress-tile:not(.has-image)) {
@@ -5557,26 +5116,12 @@
   box-shadow: 0 6px 14px rgba(0, 0, 0, .06), inset 0 0 0 1px rgba(255, 255, 255, .82);
 }
 
-.mp-root[data-mp-skin="pixel"] :is(.mp-dress-tile:not(.has-image), .mp-icon-preview .mp-dress-tile:not(.has-image)) {
-  background: #fff;
-  color: #111;
-  border-radius: 7px;
-  box-shadow: inset 0 0 0 1.5px #111, 2px 2px 0 rgba(17, 17, 17, .15);
-}
-
 .mp-root[data-mp-skin="frost"] .mp-user-tag.is-dirty {
   background: rgba(138, 106, 51, .12);
   color: #8a6a33;
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-user-tag.is-dirty {
-  background: #fff;
-  border-color: rgba(17, 17, 17, .55);
-  color: #6b5200;
-}
-
-.mp-root[data-mp-skin="frost"] .mp-ios-edit-reply,
-.mp-root[data-mp-skin="pixel"] .mp-ios-edit-reply {
+.mp-root[data-mp-skin="frost"] .mp-ios-edit-reply{
   background: transparent;
   border: 0;
   color: #1c1c1e;
@@ -5584,49 +5129,8 @@
   box-shadow: none;
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-ios-edit-reply {
-  color: #111;
-  font-weight: 600;
-}
-
 .mp-root[data-mp-skin="frost"] .mp-api-status .mp-row-sub.is-ok {
   color: #2e7d4a;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-api-status .mp-row-sub.is-ok {
-  color: #111;
-  font-weight: 600;
-}
-
-.mp-root[data-mp-skin="pixel"] :is(.mp-profile-loc, .mp-profile-stamp) {
-  background: #fff;
-  border-radius: 4px;
-  color: #111;
-  box-shadow: inset 0 0 0 1px #111;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-app .mp-badge {
-  border-radius: 3px;
-  box-shadow: 1px 1px 0 rgba(17, 17, 17, .2);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-theme-preview[data-kind="pixel"]::after {
-  content: "";
-  position: absolute;
-  left: 14%;
-  right: 14%;
-  top: 48%;
-  height: 14px;
-  transform: translateY(-50%);
-  border: 1.5px solid #111;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, .9);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-theme-preview[data-kind="frost"]::after {
-  border-color: rgba(17, 17, 17, .55);
-  border-radius: 4px;
-  background: rgba(246, 246, 247, .86);
 }
 
 /* 文本层级：标题、说明、摘要在两套皮肤里保持同一关系 */
@@ -5634,27 +5138,12 @@
   letter-spacing: -.036em;
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-title {
-  letter-spacing: -.03em;
-  font-weight: 700;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-group-label {
-  letter-spacing: .06em;
-  font-weight: 600;
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-card-title,
-.mp-root[data-mp-skin="pixel"] .mp-row-name {
-  font-weight: 700;
-}
-
 /* ------------------------------------------------ 7. 皮肤 + 夜间（深色变体） */
 .mp-root[data-mp-skin="frost"][data-mp-theme="night"] {
   --text: #f2f2f7;
   --text-2: rgba(235, 235, 245, .66);
-  --text-3: rgba(235, 235, 245, .44);
-  --text-4: rgba(235, 235, 245, .26);
+  --text-3: rgba(235, 235, 245, .52);
+  --text-4: rgba(235, 235, 245, .32);
   --line: rgba(235, 235, 245, .16);
   --line-soft: rgba(235, 235, 245, .08);
 
@@ -5676,34 +5165,6 @@
   --field-bg: rgba(44, 44, 46, .60);
   --field-solid: #2c2c2e;
   --field-border: rgba(235, 235, 245, .18);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] {
-  --text: #f5f5f2;
-  --text-2: rgba(245, 245, 242, .68);
-  --text-3: rgba(245, 245, 242, .48);
-  --text-4: rgba(245, 245, 242, .30);
-  --line: rgba(245, 245, 242, .22);
-  --line-soft: rgba(245, 245, 242, .12);
-
-  --page: #121212;
-  --page-2: #0c0c0c;
-  --glass: rgba(27, 27, 27, .88);
-  --glass-strong: #1b1b1b;
-  --card: #1b1b1b;
-
-  --accent: #f5f5f2;
-  --accent-deep: #fff;
-  --ok: #f5f5f2;
-  --warn: #e8d48a;
-
-  --shadow-s: 2px 2px 0 rgba(255, 255, 255, .14);
-  --shadow-m: 3px 3px 0 rgba(255, 255, 255, .18);
-  --shadow-l: 4px 4px 0 rgba(255, 255, 255, .22);
-
-  --field-bg: #1b1b1b;
-  --field-solid: #1b1b1b;
-  --field-border: #f5f5f2;
 }
 
 /* frost 夜间外壳 */
@@ -5898,235 +5359,6 @@
   opacity: .12;
 }
 
-/* pixel 夜间外壳 */
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-device {
-  background: linear-gradient(160deg, #1e1e1e, #0a0a0a 58%, #222);
-  box-shadow: 0 40px 90px rgba(0, 0, 0, .62), 0 0 0 1px rgba(255, 255, 255, .10);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-wallpaper {
-  filter: grayscale(.5) brightness(.34) contrast(1.18);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-scrim {
-  background: linear-gradient(180deg, rgba(0, 0, 0, .30), rgba(0, 0, 0, .58) 40%, rgba(0, 0, 0, .72));
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-screen {
-  background: #0c0c0c;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] :is(.mp-page, .mp-thread) {
-  background: linear-gradient(180deg, rgba(22, 22, 22, .92), rgba(12, 12, 12, .97));
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-page-body {
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, .028) 1px, transparent 1px) 0 0 / 18px 18px,
-    linear-gradient(180deg, rgba(255, 255, 255, .028) 1px, transparent 1px) 0 0 / 18px 18px;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-composer {
-  background: rgba(14, 14, 14, .94);
-  border-top-color: rgba(255, 255, 255, .22);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] :is(.mp-status-back, .mp-icon-btn) {
-  background: #1b1b1b;
-  color: #f5f5f2;
-  box-shadow: inset 0 0 0 1.5px #f5f5f2, 2px 2px 0 rgba(255, 255, 255, .18);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-island {
-  background: #000;
-  box-shadow: inset 0 0 0 1px rgba(245, 245, 242, .55);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-home-bar {
-  background: #f5f5f2;
-}
-
-/* pixel 夜间面板、按钮、磁贴 */
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] :is(
-  .mp-widget, .mp-profile, .mp-mini-widget, .mp-di-card,
-  .mp-row, .mp-group-box, .mp-card, .mp-diary-hero, .mp-diary-card,
-  .mp-chat-set-head, .mp-extra-source, .mp-quote-chip, .mp-sheet,
-  .mp-theme-card, .mp-dress-hero, .mp-dress-toggle, .mp-dress-app-grid,
-  .mp-icon-preview, .mp-icon-grid, .mp-music-card, .mp-music-empty,
-  .mp-music-player, .mp-draw-desc, .mp-draw-param, .mp-draw-card,
-  .mp-ios-card, .mp-api-card, .mp-api-clone, .mp-cp-shell,
-  .mp-char-block, .mp-wi-note
-) {
-  background: #1b1b1b;
-  box-shadow: inset 0 0 0 1.5px #f5f5f2, 3px 3px 0 rgba(255, 255, 255, .18);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] :is(
-  .mp-btn, .mp-btn.ghost, .mp-quick-btn, .mp-action-btn, .mp-chip-btn,
-  .mp-sq-btn, .mp-draw-action, .mp-draw-side, .mp-ios-add, .mp-ios-memory-row,
-  .mp-music-next, .mp-music-card-play, .mp-api-card-swap, .mp-sheet-cancel,
-  .mp-draw-state-btn
-) {
-  background: #1b1b1b;
-  color: #f5f5f2;
-  box-shadow: inset 0 0 0 1.5px #f5f5f2, 2px 2px 0 rgba(255, 255, 255, .18);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-chip-btn.is-on {
-  background: #f5f5f2;
-  color: #111;
-  box-shadow: 2px 2px 0 rgba(255, 255, 255, .24);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-dock {
-  background: #1b1b1b;
-  box-shadow: inset 0 0 0 1.5px #f5f5f2, 3px 3px 0 rgba(255, 255, 255, .18);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] :is(.mp-app .mp-tile:not(.mp-tile-image), .mp-glass-ico) {
-  background: #1b1b1b;
-  color: #f5f5f2;
-  box-shadow: inset 0 0 0 1.5px #f5f5f2, 2px 2px 0 rgba(255, 255, 255, .18);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] :is(.mp-app .mp-tile:not(.mp-tile-image) .mp-i, .mp-glass-ico .mp-i) {
-  color: #f5f5f2;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-app .mp-app-label {
-  color: #f5f5f2;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, .8);
-}
-
-/* pixel 夜间聊天与弹层 */
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-bubble {
-  background: #1b1b1b;
-  border-color: #f5f5f2;
-  color: #f5f5f2;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-msg.me .mp-bubble {
-  background: #f5f5f2;
-  border-color: #f5f5f2;
-  color: #111;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-compose-box {
-  background: #1b1b1b;
-  box-shadow: inset 0 0 0 1.5px #f5f5f2;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-send {
-  background: #1b1b1b;
-  color: #f5f5f2;
-  box-shadow: inset 0 0 0 1.5px #f5f5f2, 2px 2px 0 rgba(255, 255, 255, .18);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-sys {
-  background: #1b1b1b;
-  color: rgba(245, 245, 242, .72);
-  border-color: rgba(245, 245, 242, .42);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-quote {
-  background: #242424;
-  border-left-color: #f5f5f2;
-  color: #f5f5f2;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] :is(.mp-sheet, .mp-sheet-cancel) {
-  background: #1b1b1b;
-  color: #f5f5f2;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-mask {
-  background: rgba(0, 0, 0, .62);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-toast {
-  background: #f5f5f2;
-  color: #111;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-select-wrap select {
-  background: #1b1b1b;
-  border-color: #f5f5f2;
-  color: #f5f5f2;
-  box-shadow: 2px 2px 0 rgba(255, 255, 255, .14);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-switch:not(.on) {
-  background: #33332f;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-seg {
-  background: #1b1b1b;
-  box-shadow: inset 0 0 0 1.5px #f5f5f2;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-seg button.on {
-  background: #f5f5f2;
-  color: #111;
-}
-
-/* pixel 夜间反色强调 */
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] :is(
-  .mp-btn.accent, .mp-action-btn.primary, .mp-send.is-text, .mp-draw-run,
-  .mp-music-play, .mp-api-use-btn.is-on, .mp-cp-bubble-row.is-me .mp-cp-bubble,
-  .mp-draw-action.is-primary, .mp-draw-side.is-primary
-) {
-  background: #f5f5f2;
-  color: #111;
-  box-shadow: 2px 2px 0 rgba(255, 255, 255, .24);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] :is(.mp-pill, .mp-user-tag, .mp-api-tag, .mp-music-source, .mp-music-track-side, .mp-char-tag, .mp-cp-badge, .mp-cp-count, .mp-draw-mini, .mp-char-query, .mp-wi-scan, .mp-wi-retry) {
-  background: #1b1b1b;
-  border-color: rgba(245, 245, 242, .55);
-  color: #f5f5f2;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] :is(.mp-preset-tag.is-context, .mp-preset-tag.is-app, .mp-tag-proactive) {
-  background: #f5f5f2;
-  border-color: #f5f5f2;
-  color: #111;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-profile-banner::after {
-  background: linear-gradient(180deg, rgba(0, 0, 0, .36), transparent 38%, rgba(0, 0, 0, .72));
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] :is(.mp-profile-loc, .mp-profile-stamp) {
-  background: #1b1b1b;
-  border-color: #f5f5f2;
-  color: #f5f5f2;
-  box-shadow: inset 0 0 0 1px #f5f5f2;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-draw-state {
-  background: #1b1b1b;
-  border-color: #f5f5f2;
-  color: #f5f5f2;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-draw-state.is-on {
-  background: #f5f5f2;
-  color: #111;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-theme-card.is-on {
-  box-shadow: inset 0 0 0 1.5px #f5f5f2, 3px 3px 0 rgba(255, 255, 255, .22);
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] :is(.mp-dress-choice.is-on, .mp-icon-choice.is-on) {
-  background: #f5f5f2;
-  color: #111;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-dress-choice.is-on b {
-  color: #111;
-}
-
 /* --------------------------------------------- 8. 运行时内联色的皮肤归一 */
 /* 头像没有图片时只带 is-tint，内联紫渐变必须在这里压掉 */
 .mp-root[data-mp-skin="frost"] .is-tint {
@@ -6136,29 +5368,9 @@
   font-weight: 500;
 }
 
-.mp-root[data-mp-skin="pixel"] .is-tint {
-  background-image: none !important;
-  background-color: #fff !important;
-  color: #111;
-  font-weight: 700;
-  border-radius: 7px;
-  box-shadow: inset 0 0 0 1.5px #111, 1.5px 1.5px 0 rgba(17, 17, 17, .16);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-profile-avatar.is-tint {
-  border-radius: 14px;
-  box-shadow: inset 0 0 0 2px #111, 2px 2px 0 rgba(17, 17, 17, .2);
-}
-
 .mp-root[data-mp-skin="frost"][data-mp-theme="night"] .is-tint {
   background-color: #3a3a3c !important;
   color: #f2f2f7;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .is-tint {
-  background-color: #1b1b1b !important;
-  color: #f5f5f2;
-  box-shadow: inset 0 0 0 1.5px #f5f5f2, 1.5px 1.5px 0 rgba(255, 255, 255, .18);
 }
 
 /* 音乐封面：保留图片，收成黑白；空封面的内联彩色底改为皮肤底色 */
@@ -6167,17 +5379,8 @@
   box-shadow: inset 0 0 0 1px rgba(60, 60, 67, .16);
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-music-cover {
-  border-radius: 8px;
-  box-shadow: inset 0 0 0 1.5px #111;
-}
-
 .mp-root[data-mp-skin="frost"] .mp-music-cover img {
   filter: grayscale(1) contrast(.96) brightness(1.04);
-}
-
-.mp-root[data-mp-skin="pixel"] .mp-music-cover img {
-  filter: grayscale(1) contrast(1.02) brightness(1.03);
 }
 
 .mp-root[data-mp-skin="frost"] .mp-music-cover.is-empty {
@@ -6185,23 +5388,9 @@
   color: #1c1c1e;
 }
 
-.mp-root[data-mp-skin="pixel"] .mp-music-cover.is-empty {
-  background: #fff !important;
-  color: #111;
-}
-
 .mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-music-cover.is-empty {
   background: linear-gradient(150deg, #4a4a4d, #2c2c2e) !important;
   color: #f2f2f7;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-music-cover.is-empty {
-  background: #1b1b1b !important;
-  color: #f5f5f2;
-}
-
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-music-cover {
-  box-shadow: inset 0 0 0 1.5px #f5f5f2;
 }
 
 /* 夜间资料横幅：压掉浅色覆层，保证标题与印章可读 */
@@ -6215,8 +5404,81 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12);
 }
 
-.mp-root[data-mp-skin="pixel"][data-mp-theme="night"] .mp-profile-banner::after {
-  background: linear-gradient(180deg, rgba(0, 0, 0, .62), rgba(0, 0, 0, .42) 38%, rgba(0, 0, 0, .88));
+/* =========================================================================
+   像素小兔 · 毛玻璃版
+   组件整体沿用 frost 的白玻璃 token，只把小兔的壁纸、横幅和头像框留作美术层。
+   ========================================================================= */
+.mp-root[data-mp-art="pixel"] .mp-wallpaper {
+  background-image: var(--wall-theme);
+  background-position: center;
+  background-size: cover;
 }
+
+.mp-root[data-mp-art="pixel"] .mp-profile-banner {
+  height: 98px;
+}
+
+.mp-root[data-mp-art="pixel"] .mp-apps {
+  padding-top: 7px;
+  row-gap: 5px;
+}
+
+.mp-root[data-mp-art="pixel"] .mp-profile-banner::before {
+  display: block;
+  background-image: var(--theme-banner, none);
+  background-size: cover;
+  background-position: center;
+  opacity: .9;
+  filter: grayscale(1) brightness(.86) contrast(1.1);
+  mix-blend-mode: multiply;
+}
+
+.mp-root[data-mp-art="pixel"] .mp-profile-banner::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .30), rgba(255, 255, 255, .08) 45%, rgba(255, 255, 255, .38));
+  backdrop-filter: blur(6px) saturate(.7);
+  -webkit-backdrop-filter: blur(6px) saturate(.7);
+}
+
+.mp-root[data-mp-art="pixel"] .mp-profile-stamp {
+  display: none;
+}
+
+.mp-root[data-mp-art="pixel"] .mp-profile-avatar::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background-image: var(--theme-frame);
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 3;
+  opacity: .82;
+}
+
+.mp-root[data-mp-art="pixel"] .mp-mini-widget {
+  background: rgba(251, 251, 252, .72);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, .74),
+    0 8px 24px rgba(0, 0, 0, .05);
+  backdrop-filter: blur(22px) saturate(.55);
+  -webkit-backdrop-filter: blur(22px) saturate(.55);
+}
+
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-profile-banner {
+  background: linear-gradient(135deg, #26262a, #46464a 52%, #1c1c1f);
+}
+
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-profile-banner::before {
+  opacity: .26;
+  filter: invert(1) grayscale(1);
+  mix-blend-mode: screen;
+}
+
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-profile-banner::after {
+  background: linear-gradient(180deg, rgba(0, 0, 0, .22), transparent 42%, rgba(0, 0, 0, .48));
+}
+
 
 

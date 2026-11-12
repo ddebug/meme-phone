@@ -78,6 +78,21 @@ export async function readTavernCards() {
   }
 }
 
+/** 把酒馆世界书对象摊平成纯数据，条目按 order 排。 */
+function normalizeBookEntries(data) {
+  const entries = Object.entries(data?.entries || {}).map(([uid, entry]) => ({
+    uid: String(entry?.uid ?? uid),
+    title: String(entry?.comment || (Array.isArray(entry?.key) ? entry.key[0] : entry?.key) || `条目 ${uid}`),
+    keys: Array.isArray(entry?.key) ? entry.key.map(String) : (entry?.key ? [String(entry.key)] : []),
+    content: String(entry?.content || ''),
+    disabled: Boolean(entry?.disable),
+    constant: Boolean(entry?.constant),
+    order: Number(entry?.order ?? 0),
+  }));
+  entries.sort((a, b) => a.order - b.order);
+  return entries;
+}
+
 /**
  * 读一个角色关联的所有世界书（主书 + 附加书），把条目摊平成纯数据。
  * 角色书不是导出时那张卡里的副本，而是酒馆世界书里正在生效的那本。
@@ -117,17 +132,7 @@ export async function readCharacterBooks(name) {
       try {
         const data = await load(bookName);
         if (!data) { books.push({ name: bookName, entries: [], error: '这本没读到' }); continue; }
-        const entries = Object.entries(data.entries || {}).map(([uid, entry]) => ({
-          uid: String(entry?.uid ?? uid),
-          title: String(entry?.comment || (Array.isArray(entry?.key) ? entry.key[0] : entry?.key) || `条目 ${uid}`),
-          keys: Array.isArray(entry?.key) ? entry.key.map(String) : (entry?.key ? [String(entry.key)] : []),
-          content: String(entry?.content || ''),
-          disabled: Boolean(entry?.disable),
-          constant: Boolean(entry?.constant),
-          order: Number(entry?.order ?? 0),
-        }));
-        entries.sort((a, b) => a.order - b.order);
-        books.push({ name: bookName, entries, error: '' });
+        books.push({ name: bookName, entries: normalizeBookEntries(data), error: '' });
       } catch (error) {
         books.push({ name: bookName, entries: [], error: error.message || '这本没读到' });
       }
@@ -135,6 +140,27 @@ export async function readCharacterBooks(name) {
     return { available: true, books, reason: '' };
   } catch (error) {
     return { available: true, books: [], reason: error.message || String(error) };
+  }
+}
+
+/**
+ * 读一本指定的世界书（人设绑定用）。
+ * 和 readCharacterBooks 共用摊平逻辑，读不到时给 available:false，让上层退回演示数据。
+ */
+export async function readWorldBook(bookName) {
+  const name = String(bookName || '').trim();
+  if (!name) return { available: false, name: '', entries: [], reason: '没填世界书名' };
+  const script = await loadHostScript();
+  if (!script) return { available: false, name, entries: [], reason: '没接上酒馆' };
+  try {
+    const ctx = globalThis.SillyTavern?.getContext?.() || script.getContext?.() || {};
+    const load = ctx.loadWorldInfo || script.loadWorldInfo;
+    if (typeof load !== 'function') return { available: false, name, entries: [], reason: '酒馆没开放世界书读取' };
+    const data = await load(name);
+    if (!data) return { available: true, name, entries: [], reason: '这本世界书没读到' };
+    return { available: true, name, entries: normalizeBookEntries(data), reason: '' };
+  } catch (error) {
+    return { available: false, name, entries: [], reason: error.message || String(error) };
   }
 }
 
@@ -333,6 +359,23 @@ export async function readUserAvatar() {
  * 传了具体接口预设时先走那套地址 / Key / 模型；没传、是酒馆 API，或那套没填地址时走宿主。
  * 真机上走宿主 generateQuietPrompt；预览环境返回演示文案并标记 demo=true。
  */
+/**
+ * 酒馆的 generateQuietPrompt 只吃一段文本，这里统一把消息列表摊平。
+ * 预览页也调这个函数，保证预览里「酒馆扁平文本」和真机发出的完全一致。
+ */
+export function tavernQuietPrompt(messages, system = '', prompt = '') {
+  const messageText = Array.isArray(messages) && messages.length
+    ? messages.map(message => {
+      const role = message?.role === 'assistant' ? '[角色示例]' : '';
+      return [role, String(message?.content || '')].filter(Boolean).join('\n');
+    }).filter(Boolean).join('\n\n')
+    : '';
+  return [
+    system ? `【回复要求】\n${String(system)}` : '',
+    messageText || String(prompt || ''),
+  ].filter(Boolean).join('\n\n');
+}
+
 export async function generate({ prompt, system = '', messages = null, demoReply = '', preset = null }) {
   const script = await loadHostScript();
   if (script && preset && preset.engine !== 'tavern' && String(preset.url || '').trim()) {
@@ -342,16 +385,7 @@ export async function generate({ prompt, system = '', messages = null, demoReply
     } catch { /* 这套接口没接通就退回酒馆自己的模型，别让聊天卡死 */ }
   }
   if (script && typeof script.generateQuietPrompt === 'function') {
-    const messageText = Array.isArray(messages) && messages.length
-      ? messages.map(message => {
-        const role = message.role === 'assistant' ? '[角色示例]' : '';
-        return [role, String(message.content || '')].filter(Boolean).join('\n');
-      }).filter(Boolean).join('\n\n')
-      : '';
-    const quiet = [
-      system ? `【回复要求】\n${String(system)}` : '',
-      messageText || String(prompt || ''),
-    ].filter(Boolean).join('\n\n');
+    const quiet = tavernQuietPrompt(messages, system, prompt);
     const text = await script.generateQuietPrompt({ quietPrompt: quiet, quietName: '' });
     if (typeof text === 'string' && text.trim()) return { text: text.trim(), demo: false };
     return { text: '', demo: false, error: '模型没有返回内容' };

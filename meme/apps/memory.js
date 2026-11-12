@@ -5,9 +5,55 @@
  */
 
 import { icon } from '../icons.js';
-import { newId, memoryPresetsOf } from '../data.js';
+import { newId, memoryPresetsOf, contactById, chatsOf } from '../data.js';
 import { esc } from '../shell.js';
-import { MEMORY_MODES, memoryModeLabel, memoryPresetSummary } from '../memory.js';
+import { MEMORY_MODES, memoryModeLabel, memoryPresetSummary, buildMemoryContext } from '../memory.js';
+
+let memoryChosen = '';
+let memoryView = { contactId: '', loading: false, error: '', text: '', source: '', file: '', demo: false, summaryCount: 0 };
+let memoryAutoKey = '';
+
+function singleContacts(state) {
+  return Object.values(state.contacts || {}).filter(contact => contact && contact.kind !== 'group');
+}
+
+function defaultMemoryContact(state) {
+  const chat = chatsOf(state)[0];
+  const byChat = chat ? contactById(state, chat.contactId) : null;
+  return byChat || singleContacts(state)[0] || null;
+}
+
+function readMemory(ctx, contactId) {
+  const contact = contactById(ctx.state, contactId);
+  if (!contact) {
+    memoryView = { contactId, loading: false, error: '', text: '', source: 'empty', file: '', demo: false, summaryCount: 0 };
+    return;
+  }
+  memoryView = { contactId, loading: true, error: '', text: '', source: '', file: '', demo: false, summaryCount: 0 };
+  ctx.rerender();
+  buildMemoryContext(ctx.state, { contactId }, 1600).then(result => {
+    memoryView = {
+      contactId,
+      loading: false,
+      error: '',
+      text: String(result?.text || ''),
+      source: String(result?.source || 'empty'),
+      file: String(result?.file || ''),
+      demo: Boolean(result?.demo),
+      summaryCount: Number(result?.summaryCount) || 0,
+    };
+    ctx.rerender();
+  }).catch(error => {
+    memoryView = { contactId, loading: false, error: error?.message || '读取失败', text: '', source: '', file: '', demo: false, summaryCount: 0 };
+    ctx.rerender();
+  });
+}
+
+function memorySourceLabel(view) {
+  if (view.source === 'summary') return `柏宝书总结 · ${view.summaryCount} 段`;
+  if (view.source === 'recent') return '最近几层酒馆聊天原文';
+  return '没有可用的记忆';
+}
 
 function presetById(state, id) {
   return memoryPresetsOf(state).find(item => item.id === id) || null;
@@ -27,10 +73,47 @@ function row(state, preset) {
 function renderPage(ctx) {
   const presets = memoryPresetsOf(ctx.state);
   const active = presetById(ctx.state, ctx.state.settings.memory?.activeId) || presets[0] || null;
+  const contacts = singleContacts(ctx.state);
+  const fallback = defaultMemoryContact(ctx.state);
+  const chosen = contacts.find(contact => contact.id === memoryChosen) || fallback || null;
+  if (chosen) memoryChosen = chosen.id;
+
+  /* 进页面自动读一次当前角色；换角色时重新读。只读，不写聊天文件。 */
+  if (chosen && memoryView.contactId !== chosen.id && memoryAutoKey !== chosen.id) {
+    memoryAutoKey = chosen.id;
+    setTimeout(() => readMemory(ctx, chosen.id), 0);
+  }
+  const view = memoryView.contactId === chosen?.id ? memoryView : { loading: true, text: '', error: '', source: '', file: '', demo: false, summaryCount: 0 };
+  const memoryBody = !chosen
+    ? '<div class="mp-empty" style="padding:14px">还没有角色，先去通讯录或酒馆拉一份名单。</div>'
+    : view.loading
+      ? '<div class="mp-api-note" style="margin:0">正在读这个角色最新的聊天文件…</div>'
+      : view.error
+        ? `<div class="mp-api-note is-warn" style="margin:0">${esc(view.error)}</div>`
+        : view.text
+          ? `<div class="mp-mem-text">${esc(view.text)}</div>
+             <div class="mp-mem-meta">${esc(memorySourceLabel(view))}${view.file ? ` · ${esc(view.file.replace(/\.jsonl$/i, ''))}` : ''}${view.demo ? ' · 演示数据' : ''}</div>`
+          : `<div class="mp-empty" style="padding:14px">这位角色暂时没读到柏宝书记忆，也没有酒馆聊天原文。</div>
+             <div class="mp-api-note" style="margin:0">只读当前角色最新的聊天文件；没有记忆时就是空的，不会去改酒馆里的聊天。</div>`;
+
   return `
     <div class="mp-page-body">
       <div class="mp-title">酒馆记忆</div>
       <div class="mp-subtitle">读角色最新聊天文件；有柏宝书记忆时先用记忆</div>
+
+      <div class="mp-group-head" style="margin-top:16px">
+        <div class="mp-group-label">已读记忆 · 当前会话角色</div>
+        <button class="mp-draw-side" data-act="mem-read" type="button"${view.loading ? ' disabled' : ''}>${view.loading ? '读取中…' : '重新读取'}</button>
+      </div>
+      <div class="mp-group">
+        ${contacts.length ? `
+        <div class="mp-select-wrap" style="margin:0 0 10px">
+          <select data-act="mem-character">
+            ${contacts.map(contact => `<option value="${esc(contact.id)}"${contact.id === chosen?.id ? ' selected' : ''}>${esc(contact.name || '未命名')}</option>`).join('')}
+          </select>${icon('chevron')}
+        </div>` : ''}
+        <div class="mp-card mp-mem-card">${memoryBody}</div>
+      </div>
 
       <div class="mp-group" style="margin-top:16px">
         <div class="mp-group-label">手机默认方案</div>
@@ -171,9 +254,6 @@ function openEdit(ctx, preset) {
             store.presets.splice(index, 1);
             const fallback = store.presets[0].id;
             if (store.activeId === live.id) store.activeId = fallback;
-            (ctx.state.settings.api.chatSchemes || []).forEach(item => {
-              if (item.memoryId === live.id) item.memoryId = fallback;
-            });
             ctx.save();
             ctx.rerender();
             ctx.toast('这套记忆方案删掉了');
@@ -185,6 +265,24 @@ function openEdit(ctx, preset) {
 }
 
 function handle(ctx, act, data) {
+  if (act === 'mem-character') {
+    const contactId = String(data?.value || data?.id || '');
+    if (!contactId || !contactById(ctx.state, contactId)) return true;
+    memoryChosen = contactId;
+    memoryAutoKey = contactId;
+    readMemory(ctx, contactId);
+    return true;
+  }
+
+  if (act === 'mem-read') {
+    const contact = contactById(ctx.state, memoryChosen) || defaultMemoryContact(ctx.state);
+    if (!contact) { ctx.toast('还没有角色可读'); return true; }
+    memoryChosen = contact.id;
+    memoryAutoKey = contact.id;
+    readMemory(ctx, contact.id);
+    return true;
+  }
+
   if (act === 'mem-edit') {
     openEdit(ctx, presetById(ctx.state, data.id));
     return true;

@@ -4,17 +4,17 @@
  */
 
 import { createStore } from './store.js';
-import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, replyPresetFor, replyItemsFor, fillPromptTokens } from './data.js';
+import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor } from './data.js';
 import { createShell, applyWall, applyLook } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { buildMemoryContext } from './memory.js';
-import { replyContextItemBlock, transcript } from './reply-context.js';
+import { buildReplyMessages, transcript } from './reply-context.js';
 import { diaryApp, threadDiaryApp } from './apps/diary.js';
 import { contactsApp, contactApp } from './apps/contacts.js';
 import { settingsApp, appearanceApp } from './apps/settings.js';
 import { drawApp } from './apps/draw.js';
-import { apiListApp, apiPresetApp } from './apps/api.js';
+import { apiListApp } from './apps/api.js';
 import { userListApp, userEditApp } from './apps/user.js';
 import { characterApp } from './apps/characters.js';
 import { charPhoneApp, charPhoneThreadApp, ensureLookup } from './apps/charphone.js';
@@ -41,7 +41,6 @@ const APPS = {
   'app-help': helpApp,
   'app-draw': drawApp,
   'app-api': apiListApp,
-  'api-item': apiPresetApp,
   'app-presets': presetsApp,
   'reply-item': replyPresetApp,
   'app-user': userListApp,
@@ -50,6 +49,7 @@ const APPS = {
   'p-charphone': charPhoneApp,
   'p-chatphone': charPhoneThreadApp,
   'memory-presets': memoryPresetsApp,
+  /* 桌面图标会走 ctx.go('app-' + id)，这一条是它实际命中的路由，不是重复入口 */
   'app-memory-presets': memoryPresetsApp,
   'app-music': musicApp,
   'music-playlist': musicPlaylistApp,
@@ -86,37 +86,6 @@ let followTimer = 0;
 
 /* ------------------------------------------------------------ 模型调用 */
 
-/**
- * 按预设里条目的顺序组 messages：旧 QQ 的预设是「一条条目 = 一条 message」，
- * 上下文注入条目也在同一串里，各自带 role；不再把所有上下文拼成一个文本块。
- */
-function buildReplyMessages(state, chat, contact, context, memoryText, options = {}) {
-  const preset = replyPresetFor(state, chat);
-  const items = replyItemsFor(state, chat);
-  const messages = [];
-  const main = fillPromptTokens(preset?.text, state, chat);
-  if (main) messages.push({ role: 'system', content: main });
-  if (options.lead) messages.push({ role: 'system', content: options.lead });
-  for (const item of items) {
-    if (!item.enabled || item.kind === 'app') continue;
-    const content = item.kind === 'context'
-      ? replyContextItemBlock(item.auto, state, chat, contact, context, memoryText)
-      : fillPromptTokens(item.content, state, chat);
-    if (content && content.trim()) {
-      messages.push({ role: item.role || 'system', content: content.trim() });
-    }
-  }
-  const last = chat.messages?.[chat.messages.length - 1];
-  if (last && !options.proactive) {
-    const who = last.from === 'me' ? (state.settings.user.name || '我') : (contact?.name || '对方');
-    messages.push({ role: 'user', content: `${who}：${last.text}` });
-  }
-  if (options.proactive && !messages.some(message => message.role === 'user')) {
-    messages.push({ role: 'user', content: '（现在没有新消息，主动发一条。）' });
-  }
-  return messages;
-}
-
 function makeAi(state) {
   /* 手机聊天 / 日记的背景走「酒馆记忆」：有酒馆总结先用总结，没有就读最近几层酒馆聊天 */
   function story(chat, limit = 1200) {
@@ -127,21 +96,23 @@ function makeAi(state) {
     async reply(context, chat, contact, demoReply) {
       const ctxSettings = replyContextFor(state, chat);
       const storyBlock = ctxSettings.memory ? await story(chat, 1200) : { text: '' };
-      const messages = buildReplyMessages(state, chat, contact, ctxSettings, storyBlock.text, {
+      const built = await buildReplyMessages(state, chat, contact, {
+        memoryText: String(storyBlock?.text || ''),
         lead: `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`,
       });
-      const result = await generate({ messages, demoReply, preset: llmPresetFor(state, chat) });
+      const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
       return result.text;
     },
 
     async proactive(context, chat, contact, demoReply) {
       const ctxSettings = replyContextFor(state, chat);
       const storyBlock = ctxSettings.memory ? await story(chat, 900) : { text: '' };
-      const messages = buildReplyMessages(state, chat, contact, ctxSettings, storyBlock.text, {
+      const built = await buildReplyMessages(state, chat, contact, {
+        memoryText: String(storyBlock?.text || ''),
         proactive: true,
         lead: `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。距离上次说话已经过去 ${state.settings.proactive.idleMinutes} 分钟，你要主动发一条消息。`,
       });
-      const result = await generate({ messages, demoReply, preset: llmPresetFor(state, chat) });
+      const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
       return result.text;
     },
 
@@ -272,6 +243,22 @@ export function initMemePhone(options = {}) {
           store.touch();
         }
       } catch { /* 没有酒馆就连不上，忽略 */ }
+    }
+
+    /* 角色卡全文也先拉一遍，这样「角色档案 / 场景」条目在旧存档上也能用 */
+    if (!demo && options.syncCards !== false) {
+      try {
+        const cards = await readTavernCards();
+        if (cards.length) {
+          const previous = Array.isArray(state.characters) ? state.characters : [];
+          state.characters = cards.map(card => {
+            const old = previous.find(item => item.name === card.name || (item.avatar && item.avatar === card.avatar));
+            return old?.demoBooks ? { ...card, demoBooks: old.demoBooks } : card;
+          });
+          state.charactersFromTavern = true;
+          store.touch();
+        }
+      } catch { /* 读不到角色卡就等用户手动同步 */ }
     }
     return state;
   })().catch(error => { initPromise = null; throw error; });

@@ -69,7 +69,7 @@ export const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">模型</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'code', title: 'API 设置', sub: apiReady ? '已接入酒馆当前模型' : '未接入（预览环境）', act: 'set-api', value: apiReady ? '已连接' : '未连接' })}
+            ${row(ctx, { iconName: 'code', title: '模型来源', sub: apiReady ? '酒馆模型已接入' : '未接入（预览环境）', act: 'set-api', value: apiReady ? '已连接' : '未连接' })}
             ${row(ctx, { iconName: 'reply', title: '日记提示词', sub: '决定它怎么替你写日记', act: 'set-prompt' })}
           </div>
         </div>

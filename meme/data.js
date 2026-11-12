@@ -12,29 +12,45 @@ export const SCHEMA_VERSION = 1;
 export const DEFAULT_REPLY_CONTEXT = {
   character: true,
   user: true,
+  lorebook: true,
   memory: true,
+  scene: true,
   history: true,
   historyLimit: 10,
   time: true,
+  /* 世界书：扫最近几条聊天做关键词命中；单次注入字数上限；整套上下文的硬预算 */
+  bookFloors: 10,
+  bookBudget: 2000,
+  charBudget: 8000,
 };
+
+function clampNumber(value, min, max, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(num)));
+}
 
 export function normalizeReplyContext(raw) {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
-  const limit = Number(source.historyLimit ?? DEFAULT_REPLY_CONTEXT.historyLimit);
   return {
     character: source.character !== false,
     user: source.user !== false,
+    lorebook: source.lorebook !== false,
     memory: source.memory !== false,
+    scene: source.scene !== false,
     history: source.history !== false,
-    historyLimit: Number.isFinite(limit) ? Math.max(1, Math.min(50, Math.round(limit))) : DEFAULT_REPLY_CONTEXT.historyLimit,
+    historyLimit: clampNumber(source.historyLimit, 1, 50, DEFAULT_REPLY_CONTEXT.historyLimit),
     time: source.time !== false,
+    bookFloors: clampNumber(source.bookFloors, 1, 50, DEFAULT_REPLY_CONTEXT.bookFloors),
+    bookBudget: clampNumber(source.bookBudget, 400, 6000, DEFAULT_REPLY_CONTEXT.bookBudget),
+    charBudget: clampNumber(source.charBudget, 2000, 20000, DEFAULT_REPLY_CONTEXT.charBudget),
   };
 }
 
 /* 旧 QQ 预设把上下文注入也做成列表里的条目，而不是列表下面的一组开关：
  * 用户设定、角色档案、聊天记录、时间信息各自有 role 和顺序，能单独开关、能排序。
  * 这里沿用同一套做法，新增 kind:'context' + auto 字段；内容是运行时从手机/酒馆读取的。 */
-export const REPLY_CONTEXT_KEYS = ['user', 'character', 'memory', 'history', 'time'];
+export const REPLY_CONTEXT_KEYS = ['user', 'character', 'lorebook', 'memory', 'scene', 'history', 'time'];
 
 export const REPLY_CONTEXT_SPECS = {
   user: {
@@ -53,13 +69,29 @@ export const REPLY_CONTEXT_SPECS = {
     note: '人设、性格和场景',
     hintOrder: 1.52,
   },
+  lorebook: {
+    id: 'reply_context_lorebook',
+    label: '人设世界书',
+    role: 'system',
+    content: '__AUTO_LOREBOOK__',
+    note: '只看当前人设绑定的那本，常驻 + 关键词命中',
+    hintOrder: 1.53,
+  },
   memory: {
     id: 'reply_context_memory',
     label: '酒馆记忆',
     role: 'system',
     content: '__AUTO_MEMORY__',
     note: '酒馆总结或最近几层',
-    hintOrder: 1.53,
+    hintOrder: 1.54,
+  },
+  scene: {
+    id: 'reply_context_scene',
+    label: '场景信息',
+    role: 'system',
+    content: '__AUTO_SCENE__',
+    note: '角色卡里的场景',
+    hintOrder: 1.55,
   },
   history: {
     id: 'reply_context_history',
@@ -67,7 +99,7 @@ export const REPLY_CONTEXT_SPECS = {
     role: 'system',
     content: '__AUTO_CHAT_HISTORY__',
     note: '本机会话最近几条',
-    hintOrder: 1.54,
+    hintOrder: 1.56,
   },
   time: {
     id: 'reply_context_time',
@@ -75,7 +107,7 @@ export const REPLY_CONTEXT_SPECS = {
     role: 'system',
     content: '__AUTO_TIME__',
     note: '日期、星期和时间',
-    hintOrder: 1.55,
+    hintOrder: 1.57,
   },
 };
 
@@ -88,6 +120,7 @@ function contextItem(key, overrides = {}) {
     kind: 'context',
     auto: key,
     app: '',
+    characters: [],
     content: spec.content,
     enabled: true,
     editable: false,
@@ -116,38 +149,51 @@ export function defaultReplyItems() {
     },
     contextItem('user', { order: 2 }),
     contextItem('character', { order: 3 }),
-    contextItem('memory', { order: 4 }),
-    contextItem('history', { order: 5 }),
-    contextItem('time', { order: 6 }),
+    contextItem('lorebook', { order: 4 }),
+    contextItem('memory', { order: 5 }),
+    contextItem('scene', { order: 6 }),
+    contextItem('history', { order: 7 }),
+    contextItem('time', { order: 8 }),
     {
       id: 'reply_item_detail',
       label: '关注消息细节',
       role: 'system',
       content: '[关注消息细节]\n留意对方消息里的停顿、标点和长短变化，判断对方的状态。\n不要直接点破，用语气和关心程度自然回应。\n[/关注消息细节]',
-      enabled: true, editable: true, deletable: true, order: 7,
+      enabled: true, editable: true, deletable: true, order: 9,
     },
     {
       id: 'reply_item_chinese',
       label: '中文回复',
       role: 'system',
       content: '角色必须用中文回复。',
-      enabled: true, editable: true, deletable: true, order: 8,
+      enabled: true, editable: true, deletable: true, order: 10,
     },
     {
       id: 'reply_item_format',
       label: '回复格式要求',
       role: 'system',
       content: '[回复格式要求]\n只输出角色要发的那一条消息。不要加角色名、时间、序号、冒号，也不要写旁白、括号动作或场景描写。\n[/回复格式要求]',
-      enabled: true, editable: true, deletable: false, order: 9,
+      enabled: true, editable: true, deletable: false, order: 11,
     },
     {
       id: 'reply_item_footer',
       label: '尾部',
       role: 'user',
       content: '请保持手机上的聊天语气，只输出一条回复。',
-      enabled: true, editable: true, deletable: false, order: 10,
+      enabled: true, editable: true, deletable: false, order: 12,
     },
   ];
+}
+
+/** 条目适用的角色卡：空数组 = 全部角色；最多 12 个，去重。 */
+export function normalizeCharacters(raw) {
+  if (!Array.isArray(raw)) return [];
+  const list = [];
+  raw.forEach(value => {
+    const name = String(value || '').trim().slice(0, 40);
+    if (name && !list.includes(name)) list.push(name);
+  });
+  return list.slice(0, 12);
 }
 
 export function normalizeReplyItems(raw, rawContext) {
@@ -165,6 +211,7 @@ export function normalizeReplyItems(raw, rawContext) {
         ...contextItem(auto),
         id: spec.id,
         enabled: item?.enabled !== undefined ? item.enabled !== false : context[auto] !== false,
+        characters: normalizeCharacters(item?.characters),
         order: Number.isFinite(order) ? order : spec.hintOrder,
       };
     }
@@ -177,6 +224,7 @@ export function normalizeReplyItems(raw, rawContext) {
       kind,
       auto: '',
       app: kind === 'app' ? String(item?.app || '').trim().slice(0, 20) : '',
+      characters: normalizeCharacters(item?.characters),
       content: String(item?.content || '').trim().slice(0, 4000),
       enabled: item?.enabled !== false,
       editable: item?.editable !== false,
@@ -259,9 +307,9 @@ export function emptyState() {
         activeChat: '', activeImage: '', presets: [
           { id: 'api_default', name: '酒馆 API', engine: 'tavern', url: '', path: '', model: '', key: '', temp: 0.8 },
         ],
-        /* LLM 整体方案 = 一套聊天 API + 一套酒馆记忆 */
+        /* LLM 整体方案 = 一套聊天 API + 一套回复预设，不关联酒馆记忆 */
         chatSchemes: [
-          { id: 'lsch_default', name: '默认', apiId: 'api_default', memoryId: 'mem_auto', replyId: 'reply_natural' },
+          { id: 'lsch_default', name: '默认', apiId: 'api_default', replyId: 'reply_natural' },
         ],
         chatSchemeId: 'lsch_default',
       },
@@ -460,37 +508,39 @@ export function fillPromptTokens(text, state, chat) {
     .replace(/\{\{当前时间\}\}/g, now);
 }
 
-/** 真正发给模型的 system 文本：主回复指令 + 开启的聊天 system 条目。 */
-export function replySystemFor(state, chat) {
-  const preset = replyPresetFor(state, chat);
-  const items = normalizeReplyItems(preset?.items, normalizeReplyContext(preset?.context))
-    .filter(item => item.kind === 'chat' && item.enabled && item.role === 'system' && item.content)
-    .map(item => fillPromptTokens(item.content, state, chat));
-  return [fillPromptTokens(preset?.text, state, chat), ...items].filter(Boolean).join('\n\n');
+/** 找到这个联系人对应的角色卡：优先头像文件名，名字兜底。 */
+export function characterCardFor(state, contact) {
+  const cards = Array.isArray(state?.characters) ? state.characters : [];
+  if (!cards.length || !contact) return null;
+  return cards.find(card => contact.tavernAvatar && card.avatar === contact.tavernAvatar)
+    || cards.find(card => card.name === contact.name)
+    || null;
 }
 
-/** 聊天软件用的条目：过滤掉「其他软件」条目。 */
-export function replyChatItemsFor(state, chat) {
-  return replyItemsFor(state, chat).filter(item => item.kind === 'chat');
+/** 一个联系人能被哪些写法匹配到：头像文件名、卡名、联系人名。 */
+export function characterRefsFor(state, contact) {
+  const card = characterCardFor(state, contact);
+  return new Set([
+    contact?.tavernAvatar,
+    contact?.name,
+    card?.avatar,
+    card?.name,
+  ].map(value => String(value || '').trim()).filter(Boolean));
 }
 
-/** 某个其他软件用的条目；不传软件名时返回全部其他软件条目。 */
-export function appReplyItemsFor(state, chat, app = '') {
-  const items = replyItemsFor(state, chat).filter(item => item.kind === 'app');
-  const target = String(app || '').trim();
-  if (!target) return items;
-  return items.filter(item => !item.app || item.app === target);
+/**
+ * 条目是否适用于这个会话/联系人。
+ * characters 为空 = 全部角色；群聊按约定只吃公共条目，具体角色条目只在一对一生效。
+ */
+export function itemAppliesToChat(state, item, chat, contact) {
+  const targets = normalizeCharacters(item?.characters);
+  if (!targets.length) return true;
+  if (!chat || chat.kind === 'group') return false;
+  const refs = characterRefsFor(state, contact);
+  return targets.some(name => refs.has(name));
 }
 
-/** 其他软件的 system 提示词；这些条目不会混进聊天回复。 */
-export function appSystemFor(state, chat, app = '') {
-  return appReplyItemsFor(state, chat, app)
-    .filter(item => item.enabled && item.role === 'system' && item.content)
-    .map(item => fillPromptTokens(item.content, state, chat))
-    .join('\n\n');
-}
-
-/** 手机里保存的 LLM 整体方案：一套聊天 API + 一套酒馆记忆 + 一套回复预设。 */
+/** 手机里保存的 LLM 整体方案：只保存一套聊天 API + 一套回复预设，不碰酒馆记忆。 */
 export function chatSchemesOf(state) {
   const store = state?.settings?.api;
   return Array.isArray(store?.chatSchemes) ? store.chatSchemes : [];
@@ -502,12 +552,11 @@ export function activeChatScheme(state) {
   return list.find(item => item.id === store?.chatSchemeId) || list[0] || null;
 }
 
-/** 切一套整体方案：API、记忆和回复预设一起换。 */
+/** 切一套整体方案：只换聊天 API 和回复预设，记忆留在原处，不跟着方案走。 */
 export function applyChatScheme(state, scheme) {
   if (!scheme) return false;
   const store = state.settings.api;
   if (apiPresetsOf(state).some(item => item.id === scheme.apiId)) store.activeChat = scheme.apiId;
-  if (memoryPresetsOf(state).some(item => item.id === scheme.memoryId)) state.settings.memory.activeId = scheme.memoryId;
   if (replyPresetsOf(state).some(item => item.id === scheme.replyId)) state.settings.reply.activeId = scheme.replyId;
   store.chatSchemeId = scheme.id;
   return true;
@@ -624,7 +673,18 @@ export function demoState() {
   state.settings.user = { name: '颜', avatar: '', key: 'persona_yan.png' };
   state.settings.user.name = '颜';
   state.users = [
-    { key: 'persona_yan.png', name: '颜', description: '在便利店上夜班，说话很短，习惯先把事做完再说。', avatarUrl: '' },
+    {
+      key: 'persona_yan.png', name: '颜', description: '在便利店上夜班，说话很短，习惯先把事做完再说。', avatarUrl: '',
+      lorebook: '夜班人物',
+      demoBook: {
+        name: '夜班人物',
+        entries: [
+          { uid: '0', title: '店长', keys: ['店长', '老赵'], content: '便利店店长，五十多岁，总把「早点回去」挂在嘴边，但从不真的赶人。', disabled: false, constant: true, order: 1 },
+          { uid: '1', title: '夜班', keys: ['夜班', '便利店', '牛奶'], content: '你上的夜班从十点到早上六点，冰柜第二层会留两瓶温过的牛奶给常客。', disabled: false, constant: false, order: 2 },
+          { uid: '2', title: '旧毛衣', keys: ['毛衣'], content: '一件洗得起球的旧毛衣，只在最冷的几天穿。', disabled: true, constant: false, order: 3 },
+        ],
+      },
+    },
     { key: 'persona_lan.png', name: '阿蓝', description: '自由插画师，回消息慢，句子里爱用破折号。', avatarUrl: '' },
     { key: 'persona_gu.png', name: '顾青', description: '白天在书店，晚上写东西，不太主动开口。', avatarUrl: '' },
   ];
@@ -644,8 +704,8 @@ export function demoState() {
     { id: 'api_local', name: '本地 OpenAI', engine: 'openai', url: 'http://127.0.0.1:8080', path: '/v1/chat/completions', model: 'gpt-4o-mini', key: 'sk-demo', temp: 0.9 },
   ];
   state.settings.api.chatSchemes = [
-    { id: 'lsch_auto', name: '默认 · 自动记忆', apiId: 'api_default', memoryId: 'mem_auto' },
-    { id: 'lsch_local', name: '本地 · 最近原文', apiId: 'api_local', memoryId: 'mem_recent' },
+    { id: 'lsch_auto', name: '默认方案', apiId: 'api_default', replyId: 'reply_natural' },
+    { id: 'lsch_local', name: '本地方案', apiId: 'api_local', replyId: 'reply_natural' },
   ];
   state.settings.api.chatSchemeId = 'lsch_auto';
   state.draw.lastPrompt = '沈砚坐在便利店门口的台阶上，夜里，侧脸，路灯下点了一支烟';
@@ -983,7 +1043,7 @@ export function normalize(raw) {
     ? merged.settings.api.presets
     : base.settings.api.presets;
 
-  /* LLM 整体方案：旧存档没有就按当前 API + 当前记忆补一套默认方案 */
+  /* LLM 整体方案：旧存档没有就按当前 API + 当前回复预设补一套默认方案，不掺记忆 */
   const apiIds = new Set(merged.settings.api.presets.map(item => item.id));
   const memoryIds = new Set(merged.settings.memory.presets.map(item => item.id));
   const replyIds = new Set(merged.settings.reply.presets.map(item => item.id));
@@ -1005,13 +1065,12 @@ export function normalize(raw) {
       id,
       name: String(item.name || `方案 ${index + 1}`).trim().slice(0, 20) || `方案 ${index + 1}`,
       apiId: apiIds.has(item.apiId) ? item.apiId : fallbackApiId,
-      memoryId: memoryIds.has(item.memoryId) ? item.memoryId : fallbackMemoryId,
       replyId: replyIds.has(item.replyId) ? item.replyId : merged.settings.reply.activeId,
     });
   });
   if (!chatSchemes.length) {
     chatSchemes.push({
-      id: 'lsch_default', name: '默认', apiId: fallbackApiId, memoryId: fallbackMemoryId,
+      id: 'lsch_default', name: '默认', apiId: fallbackApiId,
       replyId: merged.settings.reply.activeId,
     });
   }
@@ -1020,7 +1079,7 @@ export function normalize(raw) {
   merged.settings.api.chatSchemes = chatSchemes;
   merged.settings.api.chatSchemeId = chatScheme.id;
   if (!apiIds.has(merged.settings.api.activeChat)) merged.settings.api.activeChat = chatScheme.apiId;
-  if (!memoryIds.has(merged.settings.memory.activeId)) merged.settings.memory.activeId = chatScheme.memoryId;
+  if (!memoryIds.has(merged.settings.memory.activeId)) merged.settings.memory.activeId = fallbackMemoryId;
   if (!replyIds.has(merged.settings.reply.activeId)) merged.settings.reply.activeId = chatScheme.replyId;
   merged.version = SCHEMA_VERSION;
   merged.contacts = merged.contacts || {};

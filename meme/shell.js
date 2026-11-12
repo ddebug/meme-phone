@@ -6,6 +6,7 @@
  */
 
 import { icon as ico, TINT } from './icons.js';
+import { PIXEL_BUNNY } from './theme-data.js';
 import {
   chatsOf, chatById, lastMessage, contactById, latestDiary, unreadTotal, dayKey,
 } from './data.js';
@@ -29,6 +30,12 @@ export function applyWall(root, settings) {
     root.style.setProperty('--wall-custom', `url("${settings.customWall}")`);
   } else {
     root.style.removeProperty('--wall-custom');
+  }
+  /* 像素小兔主题自带壁纸，不改用户自己的自定义壁纸存档 */
+  if (settings.dress?.theme === 'pixel') {
+    root.style.setProperty('--wall-theme', `url("${PIXEL_BUNNY.wallpaper}")`);
+  } else {
+    root.style.removeProperty('--wall-theme');
   }
 }
 
@@ -57,6 +64,12 @@ export function applyLook(root, settings) {
   root.style.setProperty('--line-scale', String(line));
   root.style.setProperty('--font-weight', String(weight));
   root.dataset.mpIsland = dress.island === 'hide' ? 'hide' : 'show';
+  root.dataset.mpSkin = ['frost', 'pixel'].includes(dress.theme) ? dress.theme : 'default';
+  if (dress.theme === 'pixel') {
+    root.style.setProperty('--theme-frame', `url("${PIXEL_BUNNY.avatarFrame}")`);
+  } else {
+    root.style.removeProperty('--theme-frame');
+  }
 }
 
 export function dateText(date = new Date()) {
@@ -84,7 +97,9 @@ function tintStyle(id) {
 }
 
 function avatarHtml(name, url, className = 'mp-avatar') {
-  const style = url ? `${tintStyle('contacts')};background-image:url("${esc(url)}")` : tintStyle('contacts');
+  const style = url
+    ? `background-image:url(&quot;${esc(url)}&quot;);background-size:cover;background-position:center`
+    : tintStyle('contacts');
   const initial = String(name || '?').trim().slice(0, 1) || '?';
   return `<span class="${className}" style="${style}">${url ? '' : esc(initial)}</span>`;
 }
@@ -152,10 +167,13 @@ export function createShell(options) {
     const me = Array.isArray(state.users)
       ? state.users.find(item => item && item.key && item.key === state.settings.user.key) || null
       : null;
-    const myName = state.settings.user.name || me?.name || '我';
-    const myAvatar = state.settings.user.avatar || me?.avatarUrl || '';
-    const myBio = String(me?.description || '把每天的事，记在这台小手机里。').trim();
-    const myHandle = `@${String(myName).trim().replace(/\s+/g, '_') || 'me'}`;
+    const themed = state.settings.dress?.theme === 'pixel' ? PIXEL_BUNNY : null;
+    const myName = themed ? themed.profile.name : (state.settings.user.name || me?.name || '我');
+    const myAvatar = themed ? themed.avatar : (state.settings.user.avatar || me?.avatarUrl || '');
+    const myBio = themed ? themed.profile.bio : String(me?.description || '把每天的事，记在这台小手机里。').trim();
+    const myHandle = themed ? themed.profile.handle : `@${String(myName).trim().replace(/\s+/g, '_') || 'me'}`;
+    const myLocation = themed ? themed.profile.location : '在酒馆里';
+    const myBanner = themed ? ` style="background-image:url(&quot;${themed.banner}&quot;);background-size:cover;background-position:center"` : '';
     const stampText = dateText().replace('<br>', ' · ');
 
     const iconButtons = desktopApps.map(app => `
@@ -176,14 +194,14 @@ export function createShell(options) {
     return `
       <div class="mp-desktop">
         <button class="mp-profile" data-act="open-app" data-app="user" type="button" aria-label="我的资料">
-          <span class="mp-profile-banner">
+          <span class="mp-profile-banner"${myBanner}>
             <span class="mp-profile-stamp">${stampText}</span>
           </span>
           ${avatarHtml(myName, myAvatar, 'mp-profile-avatar')}
           <span class="mp-profile-name">${esc(myName)}</span>
           <span class="mp-profile-handle">${esc(myHandle)}</span>
           <span class="mp-profile-bio">${esc(myBio)}</span>
-          <span class="mp-profile-loc">${ico('home')}<span>在酒馆里</span></span>
+          <span class="mp-profile-loc">${ico('home')}<span>${esc(myLocation)}</span></span>
         </button>
 
         <div class="mp-widget-strip">

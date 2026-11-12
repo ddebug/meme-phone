@@ -100,6 +100,7 @@ export function emptyState() {
         fontSize: 1,             // 0.85–1.3，只影响文字，不放大手机壳
         lineHeight: 1,           // 0.9–1.3
         fontWeight: 400,         // 400 | 500 | 600
+        theme: 'default',        // default | frost 白色磨砂气泡 | pixel 像素小兔桌面
         island: 'show',          // show | hide
         icons: {},               // appId -> { shape?: iconName, image?: dataURL }
       },
@@ -820,6 +821,7 @@ export function normalize(raw) {
     fontSize: Math.max(0.85, Math.min(1.3, Number(dressRaw.fontSize) || 1)),
     lineHeight: Math.max(0.9, Math.min(1.3, Number(dressRaw.lineHeight) || 1)),
     fontWeight: [400, 500, 600].includes(Number(dressRaw.fontWeight)) ? Number(dressRaw.fontWeight) : 400,
+    theme: ['default', 'frost', 'pixel'].includes(dressRaw.theme) ? dressRaw.theme : 'default',
     island: dressRaw.island === 'hide' ? 'hide' : 'show',
     icons,
   };

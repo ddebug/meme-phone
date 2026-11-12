@@ -3963,6 +3963,85 @@
 .mp-dress-hero-text { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .mp-dress-hero-text b { font-size: calc(13.5px * var(--font-scale)); }
 .mp-dress-hero-text span { font-size: calc(11px * var(--font-scale)); line-height: calc(1.55 * var(--line-scale)); color: var(--text-3); }
+
+.mp-theme-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mp-theme-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 8px 9px;
+  border: 0;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .62);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .72), 0 8px 18px rgba(120, 108, 180, .08);
+  transition: transform .18s cubic-bezier(.22, .68, .38, 1);
+}
+
+.mp-theme-card:active { transform: scale(.97); }
+.mp-theme-card.is-on { box-shadow: inset 0 0 0 1.5px var(--accent), 0 8px 18px rgba(120, 108, 180, .12); }
+
+.mp-theme-preview {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 49px;
+  margin-bottom: 4px;
+  border-radius: 13px;
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
+}
+
+.mp-theme-preview[data-kind="frost"]::after {
+  content: "";
+  position: absolute;
+  left: 16%;
+  right: 16%;
+  top: 50%;
+  height: 15px;
+  transform: translateY(-50%);
+  border: 1px solid rgba(255, 255, 255, .72);
+  border-radius: 8px;
+  background: linear-gradient(145deg, rgba(230, 230, 230, .8), rgba(250, 250, 250, .66));
+  box-shadow: 0 4px 10px rgba(210, 210, 210, .28);
+}
+
+.mp-theme-name {
+  overflow: hidden;
+  color: var(--text);
+  font-size: calc(11.5px * var(--font-scale));
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mp-theme-sub {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: calc(9.5px * var(--font-scale));
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mp-root[data-mp-theme="night"] .mp-theme-card {
+  background: rgba(255, 255, 255, .08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .10), 0 8px 18px rgba(0, 0, 0, .24);
+}
+
+.mp-root[data-mp-theme="night"] .mp-theme-card.is-on {
+  box-shadow: inset 0 0 0 1.5px var(--accent), 0 8px 18px rgba(0, 0, 0, .3);
+}
 .mp-root[data-mp-theme="night"] .mp-dress-hero {
   background: linear-gradient(155deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .04));
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), var(--shadow-s);
@@ -4172,5 +4251,69 @@
 
 .mp-icon-actions { display: flex; gap: 8px; }
 .mp-icon-actions .mp-btn { flex: 1; }
+
+/* ========================================================= 主题皮肤 */
+
+/* 像素小兔：冷白雾面壁纸 + 宽横幅 + 头像框 */
+.mp-root[data-mp-skin="pixel"] .mp-wallpaper {
+  background-image: var(--wall-theme);
+  background-position: center;
+  background-size: cover;
+}
+
+.mp-root[data-mp-skin="pixel"] .mp-profile-banner {
+  height: 98px;
+}
+
+.mp-root[data-mp-skin="pixel"] .mp-apps {
+  padding-top: 7px;
+  row-gap: 5px;
+}
+
+.mp-root[data-mp-skin="pixel"] .mp-profile-banner::before {
+  display: none;
+}
+
+.mp-root[data-mp-skin="pixel"] .mp-profile-banner::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .5), rgba(255, 255, 255, .2) 45%, rgba(255, 255, 255, .62));
+}
+
+.mp-root[data-mp-skin="pixel"] .mp-profile-stamp {
+  display: none;
+}
+
+.mp-root[data-mp-skin="pixel"] .mp-profile-avatar::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background-image: var(--theme-frame);
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.mp-root[data-mp-skin="pixel"] .mp-mini-widget {
+  background: linear-gradient(160deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, .7));
+}
+
+/* 白色磨砂：聊天气泡统一成无光白玻璃，收发都用自己的白气泡 */
+.mp-root[data-mp-skin="frost"] .mp-bubble,
+.mp-root[data-mp-skin="frost"] .mp-msg.me .mp-bubble {
+  padding: 7px 15px;
+  border: 1px solid rgba(255, 255, 255, .34);
+  border-radius: 15px;
+  background: linear-gradient(145deg, rgba(230, 230, 230, .72) 10%, rgba(240, 240, 240, .62) 40%, rgba(250, 250, 250, .52) 80%);
+  backdrop-filter: blur(10px) saturate(150%);
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  color: #000;
+  box-shadow: 0 8px 25px rgba(220, 220, 220, .38);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-msg.me .mp-bubble {
+  color: #000;
+}
 
 

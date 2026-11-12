@@ -405,6 +405,7 @@ export async function openMemePhone(options = {}) {
 
     state.settings.customWall = canvas.toDataURL('image/jpeg', 0.82);
     state.settings.wallpaper = 'custom';
+    if (state.settings.dress) state.settings.dress.theme = 'default';
     ctx.save();
     ctx.rerender();
     ctx.toast('自定义壁纸已换上');

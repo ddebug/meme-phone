@@ -294,6 +294,7 @@ export const appearanceApp = {
       }
       const wall = ['none', 'day', 'night', 'custom'].includes(data.wall) ? data.wall : 'none';
       ctx.state.settings.wallpaper = wall;
+      if (ctx.state.settings.dress) ctx.state.settings.dress.theme = 'default';
       if (wall === 'day') ctx.state.settings.theme = 'day';
       if (wall === 'night') ctx.state.settings.theme = 'night';
       ctx.rerender();

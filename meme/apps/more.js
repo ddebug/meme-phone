@@ -6,6 +6,7 @@
 import { icon, ICON_NAMES, ICON_LABELS, APP_ICON_TARGETS } from '../icons.js';
 import { esc, tintStyle } from '../shell.js';
 import { contactsOf, contactById, extrasOf } from '../data.js';
+import { PIXEL_BUNNY } from '../theme-data.js';
 
 function head(title, sub) {
   return `<div class="mp-title" style="margin-top:2px">${esc(title)}</div><div class="mp-subtitle">${esc(sub)}</div>`;
@@ -251,15 +252,21 @@ export const dressApp = {
     const settings = ctx.state.settings;
     const dress = dressOf(ctx.state);
     const wall = settings.wallpaper || 'day';
+    const theme = ['default', 'frost', 'pixel'].includes(dress.theme) ? dress.theme : 'default';
     const walls = [
       { key: 'day', title: '晨光', preview: 'linear-gradient(150deg,#ffe3ef,#e4f7f0)' },
       { key: 'night', title: '夜色', preview: 'linear-gradient(150deg,#1a1f2b,#2b2350 60%,#0a0c11)' },
       { key: 'none', title: '素色', preview: 'linear-gradient(150deg,#fbf9fe,#f1edf9)' },
       { key: 'custom', title: '自定义', preview: settings.customWall ? `url("${esc(settings.customWall)}") center / cover` : 'linear-gradient(150deg,#e7e1f7,#f7e8ef 55%,#e8f5f2)' },
     ];
+    const themes = [
+      { key: 'default', title: '默认', sub: '晨光紫气泡', preview: 'background:linear-gradient(150deg,#ffe3ef,#e4f7f0)' },
+      { key: 'frost', title: '白色磨砂', sub: '二改无光', preview: 'background:linear-gradient(145deg,rgba(230,230,230,.92),rgba(250,250,250,.76))' },
+      { key: 'pixel', title: '像素小兔', sub: '冷白桌面', preview: `background-image:url(&quot;${PIXEL_BUNNY.avatar}&quot;);background-size:cover;background-position:center` },
+    ];
     return `
       <div class="mp-page-body">
-        ${head('装扮', '字体、灵动岛和 App 图标')}
+        ${head('装扮', '主题、字体、灵动岛和 App 图标')}
         <div class="mp-dress-hero">
           <div class="mp-dress-aa">Aa</div>
           <div class="mp-dress-hero-text">
@@ -267,6 +274,17 @@ export const dressApp = {
             <span>这是字体预览。换字号只影响文字，不拉伸手机壳。</span>
           </div>
         </div>
+
+        <div class="mp-group-label" style="margin-top:14px">主题</div>
+        <div class="mp-theme-row">
+          ${themes.map(item => `
+            <button class="mp-theme-card${theme === item.key ? ' is-on' : ''}" data-act="dress-theme" data-key="${item.key}" type="button">
+              <span class="mp-theme-preview" data-kind="${item.key}" style="${item.preview}"></span>
+              <span class="mp-theme-name">${esc(item.title)}</span>
+              <span class="mp-theme-sub">${esc(item.sub)}</span>
+            </button>`).join('')}
+        </div>
+        <div class="mp-dress-note">主题只换外观，不动聊天记录和 App 数据。</div>
 
         <div class="mp-group-label" style="margin-top:14px">字体</div>
         ${choiceRow('dress-font', FONT_CHOICES, dress.font || 'system')}
@@ -310,6 +328,20 @@ export const dressApp = {
     const settings = ctx.state.settings;
     const dress = dressOf(ctx.state);
 
+    if (act === 'dress-theme') {
+      const key = ['default', 'frost', 'pixel'].includes(data.key) ? data.key : 'default';
+      dress.theme = key;
+      if (key === 'pixel') {
+        settings.theme = 'day';
+        if (!['none', 'custom'].includes(settings.wallpaper)) settings.wallpaper = 'day';
+      }
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(key === 'default' ? '恢复默认主题'
+        : key === 'frost' ? '已换上「白色磨砂」聊天主题'
+          : '已换上「像素小兔」桌面主题');
+      return true;
+    }
     if (act === 'dress-font') {
       dress.font = ['system', 'rounded', 'serif', 'kai'].includes(data.value) ? data.value : 'system';
     } else if (act === 'dress-size') {
@@ -322,6 +354,7 @@ export const dressApp = {
       dress.island = dress.island === 'hide' ? 'show' : 'hide';
     } else if (act === 'dress-wall') {
       const wall = ['day', 'night', 'none', 'custom'].includes(data.key) ? data.key : 'day';
+      dress.theme = 'default';
       if (wall === 'custom' && !settings.customWall) {
         ctx.go('app-appearance');
         ctx.toast('先去外观里选一张自定义壁纸');

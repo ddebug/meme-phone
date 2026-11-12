@@ -6,7 +6,7 @@
 import { createStore } from './store.js';
 import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, replyPresetFor, replyItemsFor, fillPromptTokens } from './data.js';
 import { createShell, applyWall, applyLook } from './shell.js';
-import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
+import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { buildMemoryContext } from './memory.js';
 import { replyContextItemBlock, transcript } from './reply-context.js';
@@ -301,7 +301,7 @@ export async function openMemePhone(options = {}) {
     state.users = result.list.map(item => {
       const local = previous.get(item.key);
       return local?.dirty
-        ? { ...item, name: local.name, description: local.description, dirty: true }
+        ? { ...item, name: local.name, description: local.description, lorebook: local.lorebook ?? item.lorebook, dirty: true }
         : item;
     });
     state.usersFromTavern = true;
@@ -332,6 +332,7 @@ export async function openMemePhone(options = {}) {
     readCharacters: readTavernCharacters,
     readCards: readTavernCards,
     readBooks: readCharacterBooks,
+    readWorldBooks: readWorldBookNames,
     toggleBookEntry: setWorldEntryEnabled,
     readUserAvatar,
     syncUsers,

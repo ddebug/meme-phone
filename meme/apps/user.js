@@ -202,6 +202,12 @@ export const userEditApp = {
               <span class="mp-set-name">设定<small>${esc((user.description || '').slice(0, 26) || '还没有设定')}</small></span>
               ${icon('chevron')}
             </button>
+            <button class="mp-set-row" data-act="user-lore" data-key="${esc(user.key)}" type="button">
+              <span class="mp-set-ico">${icon('book')}</span>
+              <span class="mp-set-name">世界书<small>选中这个人设时一起加载</small></span>
+              <span class="mp-set-value">${esc(user.lorebook || '未绑定')}</span>
+              ${icon('chevron')}
+            </button>
             <div class="mp-set-row is-static">
               <span class="mp-set-ico">${icon('image')}</span>
               <span class="mp-set-name">头像<small>${user.avatarUrl ? '跟酒馆用同一张' : '酒馆里这一位还没设头像'}</small></span>
@@ -255,11 +261,46 @@ export const userEditApp = {
       return true;
     }
 
+    if (act === 'user-lore') {
+      if (!user) return true;
+      const reader = ctx.host?.readWorldBooks;
+      if (typeof reader !== 'function') { ctx.toast('没接上酒馆，读不到世界书名单'); return true; }
+      Promise.resolve().then(() => reader()).then(result => {
+        if (!result?.available) { ctx.toast('没接上酒馆，读不到世界书名单'); return; }
+        const books = Array.isArray(result.list) ? result.list : [];
+        const items = [{ value: '', label: '不绑定', note: '只用人设描述，不额外加载世界书' }];
+        if (user.lorebook && !books.includes(user.lorebook)) {
+          items.push({ value: user.lorebook, label: user.lorebook, note: '酒馆里暂时没找到这本，先留在这里' });
+        }
+        books.forEach(name => {
+          items.push({
+            value: name,
+            label: name,
+            note: name === user.lorebook ? '正在用 · 选中这个人设时加载' : '选中这个人设时加载',
+          });
+        });
+        ctx.openSheet({
+          kind: 'pick',
+          title: `「${user.name || '这位'}」的世界书`,
+          note: '对应酒馆人设里的 Persona Lorebook；改完记得写回酒馆。',
+          items,
+          onPick: (name) => {
+            user.lorebook = String(name || '').trim();
+            user.dirty = true;
+            ctx.save();
+            ctx.toast(user.lorebook ? `绑成「${user.lorebook}」` : '世界书解绑了');
+            ctx.rerender();
+          },
+        });
+      }).catch(error => ctx.toast(error.message || '读不到世界书名单'));
+      return true;
+    }
+
     if (act === 'user-save') {
       if (!user) return true;
       const writer = ctx.host?.writeUser;
       if (typeof writer !== 'function') { ctx.toast('没接上酒馆，改不了酒馆那一边'); return true; }
-      writer({ key, name: user.name, description: user.description }).then(() => {
+      writer({ key, name: user.name, description: user.description, lorebook: user.lorebook || '' }).then(() => {
         user.dirty = false;
         ctx.save();
         ctx.rerender();

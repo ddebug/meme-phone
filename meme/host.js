@@ -545,6 +545,35 @@ async function imageFromResponse(res, label) {
 }
 
 /**
+ * 酒馆里可以绑给人的世界书名单。
+ * 人设的 lorebook 只存书名，真正的世界书还是酒馆自己那份。
+ */
+export async function readWorldBookNames() {
+  const script = await loadHostScript();
+  if (!script) return { available: false, list: [], current: '' };
+  try {
+    const ctx = globalThis.SillyTavern?.getContext?.() || script.getContext?.() || {};
+    let names = script.world_names || ctx.world_names || [];
+    if (!Array.isArray(names) || !names.length) {
+      try {
+        const headers = ctx.getRequestHeaders?.() || script.getRequestHeaders?.() || {};
+        const response = await fetch('/api/settings/get', { method: 'POST', headers, body: '{}' });
+        if (response.ok) {
+          const saved = await response.json();
+          if (Array.isArray(saved.world_names)) names = saved.world_names;
+        }
+      } catch { /* 读不到名单就只显示已绑定的那本 */ }
+    }
+    const current = typeof script.world_info === 'string' ? script.world_info : '';
+    const list = [...new Set([...names, current].map(String).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'zh'));
+    return { available: true, list, current };
+  } catch {
+    return { available: false, list: [], current: '' };
+  }
+}
+
+/**
  * 酒馆的用户（persona）名单。
  * 名字与设定都住在酒馆设置里：power_user.personas 存「头像文件名 → 显示名」，
  * power_user.persona_descriptions 存每个头像对应的设定文本。读不到就返回 available:false。
@@ -559,15 +588,16 @@ export async function readTavernPersonas() {
     if (!names) return { available: false, list: [], current: '' };
     const descs = pu.persona_descriptions && typeof pu.persona_descriptions === 'object' ? pu.persona_descriptions : {};
     const thumb = script.getThumbnailUrl;
+    const current = String(script.user_avatar || ctx.user_avatar || '');
     const list = Object.entries(names)
       .filter(([, name]) => Boolean(name))
       .map(([key, name]) => ({
         key,
         name: String(name || '').trim(),
         description: String(descs[key]?.description || ''),
+        lorebook: String(descs[key]?.lorebook || (key === current ? pu.persona_description_lorebook : '') || ''),
         avatarUrl: typeof thumb === 'function' ? thumb('persona', key) : '',
       }));
-    const current = String(script.user_avatar || ctx.user_avatar || '');
     return { available: true, list, current };
   } catch {
     return { available: false, list: [], current: '' };
@@ -575,10 +605,10 @@ export async function readTavernPersonas() {
 }
 
 /**
- * 把改过的名字 / 设定写回酒馆。
+ * 把改过的名字 / 设定 / 人设世界书写回酒馆。
  * 只改内存里的 power_user，再让酒馆自己保存设置——不走私有接口，装进酒馆就能用。
  */
-export async function writeTavernPersona({ key, name, description }) {
+export async function writeTavernPersona({ key, name, description, lorebook }) {
   const script = await loadHostScript();
   const ctx = script?.getContext?.() || {};
   const pu = script?.power_user || ctx.powerUser || globalThis.power_user;
@@ -588,16 +618,22 @@ export async function writeTavernPersona({ key, name, description }) {
   const cleanName = String(name || '').trim();
   if (cleanName) pu.personas[key] = cleanName;
 
-  if (typeof description === 'string') {
+  if (typeof description === 'string' || typeof lorebook === 'string') {
     const descs = pu.persona_descriptions || (pu.persona_descriptions = {});
-    const prev = descs[key] || {};
-    descs[key] = { ...prev, description };
+    const next = { ...(descs[key] || {}) };
+    if (typeof description === 'string') next.description = description;
+    if (typeof lorebook === 'string') next.lorebook = String(lorebook || '').trim();
+    descs[key] = next;
   }
 
   if (String(script.user_avatar || ctx.user_avatar || '') === key) {
     if (cleanName) {
       script.name1 = cleanName;
       if (ctx.name1 !== undefined) ctx.name1 = cleanName;
+    }
+    if (typeof lorebook === 'string') {
+      pu.persona_description_lorebook = String(lorebook || '').trim();
+      if (ctx.powerUser) ctx.powerUser.persona_description_lorebook = pu.persona_description_lorebook;
     }
     const box = globalThis.document?.querySelector('#user_name');
     if (box && cleanName) box.value = cleanName;

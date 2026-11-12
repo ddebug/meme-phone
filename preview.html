@@ -8044,6 +8044,35 @@ async function imageFromResponse(res, label) {
 }
 
 /**
+ * 酒馆里可以绑给人的世界书名单。
+ * 人设的 lorebook 只存书名，真正的世界书还是酒馆自己那份。
+ */
+async function readWorldBookNames() {
+  const script = await loadHostScript();
+  if (!script) return { available: false, list: [], current: '' };
+  try {
+    const ctx = globalThis.SillyTavern?.getContext?.() || script.getContext?.() || {};
+    let names = script.world_names || ctx.world_names || [];
+    if (!Array.isArray(names) || !names.length) {
+      try {
+        const headers = ctx.getRequestHeaders?.() || script.getRequestHeaders?.() || {};
+        const response = await fetch('/api/settings/get', { method: 'POST', headers, body: '{}' });
+        if (response.ok) {
+          const saved = await response.json();
+          if (Array.isArray(saved.world_names)) names = saved.world_names;
+        }
+      } catch { /* 读不到名单就只显示已绑定的那本 */ }
+    }
+    const current = typeof script.world_info === 'string' ? script.world_info : '';
+    const list = [...new Set([...names, current].map(String).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'zh'));
+    return { available: true, list, current };
+  } catch {
+    return { available: false, list: [], current: '' };
+  }
+}
+
+/**
  * 酒馆的用户（persona）名单。
  * 名字与设定都住在酒馆设置里：power_user.personas 存「头像文件名 → 显示名」，
  * power_user.persona_descriptions 存每个头像对应的设定文本。读不到就返回 available:false。
@@ -8058,15 +8087,16 @@ async function readTavernPersonas() {
     if (!names) return { available: false, list: [], current: '' };
     const descs = pu.persona_descriptions && typeof pu.persona_descriptions === 'object' ? pu.persona_descriptions : {};
     const thumb = script.getThumbnailUrl;
+    const current = String(script.user_avatar || ctx.user_avatar || '');
     const list = Object.entries(names)
       .filter(([, name]) => Boolean(name))
       .map(([key, name]) => ({
         key,
         name: String(name || '').trim(),
         description: String(descs[key]?.description || ''),
+        lorebook: String(descs[key]?.lorebook || (key === current ? pu.persona_description_lorebook : '') || ''),
         avatarUrl: typeof thumb === 'function' ? thumb('persona', key) : '',
       }));
-    const current = String(script.user_avatar || ctx.user_avatar || '');
     return { available: true, list, current };
   } catch {
     return { available: false, list: [], current: '' };
@@ -8074,10 +8104,10 @@ async function readTavernPersonas() {
 }
 
 /**
- * 把改过的名字 / 设定写回酒馆。
+ * 把改过的名字 / 设定 / 人设世界书写回酒馆。
  * 只改内存里的 power_user，再让酒馆自己保存设置——不走私有接口，装进酒馆就能用。
  */
-async function writeTavernPersona({ key, name, description }) {
+async function writeTavernPersona({ key, name, description, lorebook }) {
   const script = await loadHostScript();
   const ctx = script?.getContext?.() || {};
   const pu = script?.power_user || ctx.powerUser || globalThis.power_user;
@@ -8087,16 +8117,22 @@ async function writeTavernPersona({ key, name, description }) {
   const cleanName = String(name || '').trim();
   if (cleanName) pu.personas[key] = cleanName;
 
-  if (typeof description === 'string') {
+  if (typeof description === 'string' || typeof lorebook === 'string') {
     const descs = pu.persona_descriptions || (pu.persona_descriptions = {});
-    const prev = descs[key] || {};
-    descs[key] = { ...prev, description };
+    const next = { ...(descs[key] || {}) };
+    if (typeof description === 'string') next.description = description;
+    if (typeof lorebook === 'string') next.lorebook = String(lorebook || '').trim();
+    descs[key] = next;
   }
 
   if (String(script.user_avatar || ctx.user_avatar || '') === key) {
     if (cleanName) {
       script.name1 = cleanName;
       if (ctx.name1 !== undefined) ctx.name1 = cleanName;
+    }
+    if (typeof lorebook === 'string') {
+      pu.persona_description_lorebook = String(lorebook || '').trim();
+      if (ctx.powerUser) ctx.powerUser.persona_description_lorebook = pu.persona_description_lorebook;
     }
     const box = globalThis.document?.querySelector('#user_name');
     if (box && cleanName) box.value = cleanName;
@@ -8296,6 +8332,7 @@ exports["readLatestTavernChat"] = readLatestTavernChat;
 exports["readUserAvatar"] = readUserAvatar;
 exports["generate"] = generate;
 exports["novelaiImage"] = novelaiImage;
+exports["readWorldBookNames"] = readWorldBookNames;
 exports["readTavernPersonas"] = readTavernPersonas;
 exports["writeTavernPersona"] = writeTavernPersona;
 exports["readTavernApi"] = readTavernApi;
@@ -13790,6 +13827,12 @@ const userEditApp = {
               <span class="mp-set-name">设定<small>${esc((user.description || '').slice(0, 26) || '还没有设定')}</small></span>
               ${icon('chevron')}
             </button>
+            <button class="mp-set-row" data-act="user-lore" data-key="${esc(user.key)}" type="button">
+              <span class="mp-set-ico">${icon('book')}</span>
+              <span class="mp-set-name">世界书<small>选中这个人设时一起加载</small></span>
+              <span class="mp-set-value">${esc(user.lorebook || '未绑定')}</span>
+              ${icon('chevron')}
+            </button>
             <div class="mp-set-row is-static">
               <span class="mp-set-ico">${icon('image')}</span>
               <span class="mp-set-name">头像<small>${user.avatarUrl ? '跟酒馆用同一张' : '酒馆里这一位还没设头像'}</small></span>
@@ -13843,11 +13886,46 @@ const userEditApp = {
       return true;
     }
 
+    if (act === 'user-lore') {
+      if (!user) return true;
+      const reader = ctx.host?.readWorldBooks;
+      if (typeof reader !== 'function') { ctx.toast('没接上酒馆，读不到世界书名单'); return true; }
+      Promise.resolve().then(() => reader()).then(result => {
+        if (!result?.available) { ctx.toast('没接上酒馆，读不到世界书名单'); return; }
+        const books = Array.isArray(result.list) ? result.list : [];
+        const items = [{ value: '', label: '不绑定', note: '只用人设描述，不额外加载世界书' }];
+        if (user.lorebook && !books.includes(user.lorebook)) {
+          items.push({ value: user.lorebook, label: user.lorebook, note: '酒馆里暂时没找到这本，先留在这里' });
+        }
+        books.forEach(name => {
+          items.push({
+            value: name,
+            label: name,
+            note: name === user.lorebook ? '正在用 · 选中这个人设时加载' : '选中这个人设时加载',
+          });
+        });
+        ctx.openSheet({
+          kind: 'pick',
+          title: `「${user.name || '这位'}」的世界书`,
+          note: '对应酒馆人设里的 Persona Lorebook；改完记得写回酒馆。',
+          items,
+          onPick: (name) => {
+            user.lorebook = String(name || '').trim();
+            user.dirty = true;
+            ctx.save();
+            ctx.toast(user.lorebook ? `绑成「${user.lorebook}」` : '世界书解绑了');
+            ctx.rerender();
+          },
+        });
+      }).catch(error => ctx.toast(error.message || '读不到世界书名单'));
+      return true;
+    }
+
     if (act === 'user-save') {
       if (!user) return true;
       const writer = ctx.host?.writeUser;
       if (typeof writer !== 'function') { ctx.toast('没接上酒馆，改不了酒馆那一边'); return true; }
-      writer({ key, name: user.name, description: user.description }).then(() => {
+      writer({ key, name: user.name, description: user.description, lorebook: user.lorebook || '' }).then(() => {
         user.dirty = false;
         ctx.save();
         ctx.rerender();
@@ -16484,7 +16562,7 @@ __mods["meme/index.js"] = function(module, exports, __req){
 const { createStore } = __req("meme/store.js");
 const { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, replyPresetFor, replyItemsFor, fillPromptTokens } = __req("meme/data.js");
 const { createShell, applyWall, applyLook } = __req("meme/shell.js");
-const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } = __req("meme/host.js");
+const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } = __req("meme/host.js");
 const { chatApp, threadApp, threadSettingsApp } = __req("meme/apps/chat.js");
 const { buildMemoryContext } = __req("meme/memory.js");
 const { replyContextItemBlock, transcript } = __req("meme/reply-context.js");
@@ -16779,7 +16857,7 @@ async function openMemePhone(options = {}) {
     state.users = result.list.map(item => {
       const local = previous.get(item.key);
       return local?.dirty
-        ? { ...item, name: local.name, description: local.description, dirty: true }
+        ? { ...item, name: local.name, description: local.description, lorebook: local.lorebook ?? item.lorebook, dirty: true }
         : item;
     });
     state.usersFromTavern = true;
@@ -16810,6 +16888,7 @@ async function openMemePhone(options = {}) {
     readCharacters: readTavernCharacters,
     readCards: readTavernCards,
     readBooks: readCharacterBooks,
+    readWorldBooks: readWorldBookNames,
     toggleBookEntry: setWorldEntryEnabled,
     readUserAvatar,
     syncUsers,

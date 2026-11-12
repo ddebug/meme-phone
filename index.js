@@ -77,7 +77,7 @@ function mountPanel() {
   panel.innerHTML = `
     <summary>meme-phone · 桌面式小手机</summary>
     <p class="meme-note">桌面 + App 图标的前端，数据单独存在 <code>/user/files/meme-phone.json</code>，不会写进酒馆的角色卡或聊天记录。</p>
-    <p class="meme-note">召唤：点扩展菜单，或者在快捷回复里放一条 <code>/meme</code>，点一下就打开手机。</p>
+    <p class="meme-note">召唤：点扩展菜单，或点聊天框上方快捷回复栏里的「召唤手机」；也可以在输入框敲 <code>/meme</code>。</p>
     <div class="meme-actions">
       <button type="button" data-role="open">打开手机</button>
       <button type="button" data-role="export">导出备份</button>
@@ -159,6 +159,117 @@ function registerSlashCommand() {
   }
 }
 
+/* ------------------------------------------------------------ QR 快速回复栏按钮 */
+
+/**
+ * 在聊天框上方的原生快速回复栏（#qr--bar）里挂一个「召唤手机」按钮，
+ * 外观直接复用 ST 原生 .qr--button 样式，不另写皮肤。
+ *
+ * 范式与相邻的 ST-BaiBai-Book / JS-Slash-Runner 一致：
+ *   #qr--bar（没有就自建一条同款）
+ *     └ .qr--buttons（没有就补一个）
+ *         └ .qr--button（我们的按钮）
+ * ST 切聊天 / 改 QR 设置时会重建 #qr--bar，把我们的按钮冲掉，
+ * 所以用 MutationObserver 盯住 #send_form，被冲掉就补回；聊天框懒加载时先轮询。
+ */
+
+const QR_BTN_ID = 'meme-phone-qr-button';
+const QR_BAR_CLASS = 'meme-phone-qr-bar';
+let qrPollTimer = null;
+let qrObserver = null;
+
+function ensureQrHolder(sendForm) {
+  let bar = Array.from(sendForm.querySelectorAll('div')).find(node => node.id === 'qr--bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'qr--bar';
+    bar.className = `${QR_BAR_CLASS} flex-container flexGap5`;
+    sendForm.prepend(bar);
+  }
+  let holder = bar.querySelector('.qr--buttons');
+  if (!holder) {
+    holder = document.createElement('div');
+    holder.className = 'qr--buttons';
+    bar.appendChild(holder);
+  }
+  return holder;
+}
+
+function buildQrButton() {
+  const btn = document.createElement('div');
+  btn.id = QR_BTN_ID;
+  btn.className = 'qr--button menu_button interactable';
+  btn.setAttribute('tabindex', '0');
+  btn.title = '打开 meme-phone 小手机';
+  btn.textContent = '召唤手机';
+  const activate = event => {
+    event.preventDefault();
+    event.stopPropagation();
+    void openPhone();
+  };
+  btn.addEventListener('click', activate);
+  btn.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') activate(event);
+  });
+  return btn;
+}
+
+/** 真正执行插入：成功或已存在返回 true，聊天框未就绪返回 false（由轮询重试）。 */
+function tryInjectQr() {
+  const sendForm = document.getElementById('send_form');
+  if (!sendForm) return false;
+  if (document.getElementById(QR_BTN_ID)) return true;
+  ensureQrHolder(sendForm).appendChild(buildQrButton());
+  return true;
+}
+
+function removeQrButton() {
+  document.getElementById(QR_BTN_ID)?.remove();
+  // 若是我们自建的空 #qr--bar，按钮撤了就一并回收，别留空条
+  const bar = document.querySelector(`#qr--bar.${QR_BAR_CLASS}`);
+  if (bar && !bar.querySelector('.qr--buttons')?.children.length) bar.remove();
+}
+
+/** 盯住 #send_form：ST 重建 #qr--bar 把按钮冲掉时补回（幂等，tryInjectQr 自带存在检查）。 */
+function startQrObserver() {
+  if (qrObserver) return;
+  const sendForm = document.getElementById('send_form');
+  if (!sendForm) return;
+  qrObserver = new MutationObserver(() => {
+    if (!document.getElementById(QR_BTN_ID)) tryInjectQr();
+  });
+  qrObserver.observe(sendForm, { childList: true, subtree: true });
+}
+
+/** 按开关同步 QR 按钮的有无；当前扩展没有开关，启动即常开，幂等。 */
+function syncQrButton(enabled) {
+  if (qrPollTimer) {
+    clearInterval(qrPollTimer);
+    qrPollTimer = null;
+  }
+  if (!enabled) {
+    qrObserver?.disconnect();
+    qrObserver = null;
+    removeQrButton();
+    return;
+  }
+  if (tryInjectQr()) {
+    startQrObserver();
+    return;
+  }
+  // 聊天框懒加载：轮询等它出现，封顶 ~20s（40 次）后放弃，绝不常驻空转。
+  let attempts = 0;
+  qrPollTimer = setInterval(() => {
+    if (tryInjectQr() || ++attempts > 40) {
+      if (qrPollTimer) {
+        clearInterval(qrPollTimer);
+        qrPollTimer = null;
+      }
+      if (document.getElementById(QR_BTN_ID)) startQrObserver();
+    }
+  }, 500);
+}
+
 /* ------------------------------------------------------------ 柏宝书只读桥 */
 
 /**
@@ -173,6 +284,7 @@ function registerSlashCommand() {
 export async function startMemePhone() {
   mountPanel();
   registerSlashCommand();
+  syncQrButton(true);
   try {
     await boot();
     setStatus(describeStatus({ ready: true }));
@@ -180,7 +292,10 @@ export async function startMemePhone() {
     setStatus(`载入失败：${error?.message || error}`, true);
   }
   registerMenuEntry();
-  setInterval(() => { if (!isOpen()) registerMenuEntry(); }, 5000);
+  setInterval(() => {
+    if (!isOpen()) registerMenuEntry();
+    if (!document.getElementById(QR_BTN_ID) && tryInjectQr()) startQrObserver();
+  }, 5000);
 }
 
 if (eventSource?.once && event_types?.APP_READY) eventSource.once(event_types.APP_READY, () => { void startMemePhone(); });

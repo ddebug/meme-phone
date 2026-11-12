@@ -42,7 +42,7 @@ preview.html#app-settings&night        末尾加 night 走夜间主题
 1. 把整个 `meme-phone` 文件夹放进 `data/<你的用户>/extensions/`。
 2. 如果需要柏宝书总结、楼层面板和生成前召回，请单独安装 `ST-BaiBai-Book`；手机不会重复打包第二份柏宝书。
 3. 刷新酒馆页面。扩展设置里多出「meme-phone · 桌面式小手机」，扩展菜单里多一项 `meme-phone`。
-4. 点菜单项就打开手机；也可以把 `quick-reply/summon-phone.json` 导进快捷回复，用 `/meme` 召唤。
+4. 点菜单项就打开手机；聊天框上方快捷回复栏会自动出现「召唤手机」按钮，点一下即开；也可以在输入框敲 `/meme`，或导入 `quick-reply/summon-phone.json` 备用。
 
 ## 界面与导航
 
@@ -137,7 +137,7 @@ meme-phone/
 │                        查角色、查 TA 的手机、小剧场/表情/计划/装扮/帮助
 ├── baibai-book/         柏宝书参考/ vendor 副本；扩展入口不再自动加载，避免与独立柏宝书抢占同一宿主
 ├── assets/              壁纸（day / night）
-├── quick-reply/         /meme 召唤用的快捷回复
+├── quick-reply/         备用可导入快捷回复（/meme 召唤）；QR 栏按钮由扩展自动注入
 ├── scripts/
 │   ├── build_preview.py 打包 preview.html
 │   └── check.mjs        语法 / 必备文件 / 预览产物自检

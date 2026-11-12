@@ -101,7 +101,7 @@ function avatarHtml(name, url, className = 'mp-avatar') {
     ? `background-image:url(&quot;${esc(url)}&quot;);background-size:cover;background-position:center`
     : tintStyle('contacts');
   const initial = String(name || '?').trim().slice(0, 1) || '?';
-  return `<span class="${className}" style="${style}">${url ? '' : esc(initial)}</span>`;
+  return `<span class="${className}${url ? '' : ' is-tint'}" style="${style}">${url ? '' : esc(initial)}</span>`;
 }
 
 /* 每个桌面图标都先看装扮里有没有换过：自定义图片 > 换过的图形 > App 默认图形 */

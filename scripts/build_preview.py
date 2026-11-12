@@ -30,6 +30,7 @@ MODULES = [
   "meme/apps/music.js",
   "meme/apps/memory.js",
   "meme/apps/presets.js",
+    "meme/reply-context.js",
     "meme/index.js",
 ]
 ENTRY = "meme/index.js"

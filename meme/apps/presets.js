@@ -6,13 +6,23 @@
 
 import { icon } from '../icons.js';
 import { esc } from '../shell.js';
-import { newId, replyPresetsOf, replyPresetFor } from '../data.js';
+import { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext } from '../data.js';
 
 let editingId = '';
 
 function clip(text, max = 42) {
   const value = String(text || '');
   return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
+function injectedCount(preset) {
+  const context = normalizeReplyContext(preset?.context);
+  return ['character', 'user', 'memory', 'history', 'time'].filter(key => context[key]).length;
+}
+
+function contextNote(preset) {
+  const count = injectedCount(preset);
+  return count ? `注入 ${count} 段上下文` : '不注入上下文';
 }
 
 function findPreset(state, id) {
@@ -30,7 +40,7 @@ export const presetsApp = {
       <button class="mp-row" data-act="reply-open" data-id="${esc(preset.id)}" type="button">
         <span class="mp-row-main">
           <span class="mp-row-name">${esc(preset.name || `预设 ${index + 1}`)}${preset.id === active?.id ? '<span class="mp-api-tag">手机</span>' : ''}</span>
-          <span class="mp-row-sub">${esc(clip(preset.text || '还没写指令'))}</span>
+          <span class="mp-row-sub">${esc(clip(preset.text || '还没写指令'))} · ${esc(contextNote(preset))}</span>
         </span>
         ${icon('chevron')}
       </button>`).join('');
@@ -41,7 +51,7 @@ export const presetsApp = {
           <div class="mp-title" style="flex:1">回复预设</div>
           <button class="mp-icon-btn" data-act="reply-new" type="button" aria-label="新建预设">${icon('plus')}</button>
         </div>
-        <div class="mp-subtitle">告诉模型该怎么回消息；聊天设置里还能给单个会话换一套</div>
+        <div class="mp-subtitle">告诉模型该怎么回消息，并决定要把哪些上下文一起塞进去；聊天设置里还能给单个会话换一套</div>
 
         <div class="mp-group-label" style="margin-top:14px">手机默认 · ${list.length} 套</div>
         <div class="mp-group-box">
@@ -49,7 +59,7 @@ export const presetsApp = {
         </div>
 
         <div class="mp-api-note" style="margin-top:14px">
-          预设只决定回复的语气、长短和格式，不存 API 地址、Key 或酒馆记忆。
+          预设只决定回复方式和注入的上下文，不存 API 地址、Key 或酒馆记忆本身；酒馆记忆仍按「记忆」里那套方案读取。
         </div>
       </div>`;
   },
@@ -63,7 +73,12 @@ export const presetsApp = {
         placeholder: '比如：短句、黏人、正经一点',
         onText: text => {
           const name = String(text || '').trim().slice(0, 20) || '新预设';
-          const preset = { id: newId('reply'), name, text: source?.text || '' };
+          const preset = {
+            id: newId('reply'),
+            name,
+            text: source?.text || '',
+            context: normalizeReplyContext(source?.context),
+          };
           ctx.state.settings.reply.presets.push(preset);
           ctx.state.settings.reply.activeId = preset.id;
           editingId = preset.id;
@@ -96,6 +111,24 @@ export const replyPresetApp = {
     const active = replyPresetFor(ctx.state, null);
     const isActive = active?.id === preset.id;
     const text = String(preset.text || '');
+    const context = normalizeReplyContext(preset.context);
+    const contextRows = [
+      ['character', '角色档案', '人设、性格、场景'],
+      ['user', '我的设定', '当前酒馆用户的名字和设定'],
+      ['memory', '酒馆记忆', '有总结先用总结，否则读最近几层原文'],
+      ['time', '当前时间', '日期、星期和时间'],
+      ['history', '手机聊天记录', `最近 ${context.historyLimit} 条本机会话`],
+    ].map(([key, label, note]) => {
+      const on = Boolean(context[key]);
+      return `
+        <button class="mp-row" data-act="reply-context" data-key="${key}" type="button">
+          <span class="mp-row-main">
+            <span class="mp-row-name">${esc(label)}</span>
+            <span class="mp-row-sub">${esc(on ? note : '已关闭，不注入')}</span>
+          </span>
+          <span class="mp-api-value${on ? '' : ' is-empty'}">${on ? '开' : '关'}</span>
+        </button>`;
+    }).join('');
 
     return `
       <div class="mp-nav">
@@ -122,6 +155,19 @@ export const replyPresetApp = {
           </button>
         </div>
 
+        <div class="mp-group-label" style="margin-top:16px">注入上下文</div>
+        <div class="mp-group">
+          ${contextRows}
+          ${context.history ? `
+          <button class="mp-row" data-act="reply-history-limit" type="button">
+            <span class="mp-row-main">
+              <span class="mp-row-name">聊天记录保留多少条</span>
+              <span class="mp-row-sub">太多会挤掉角色设定，太少会接不上话</span>
+            </span>
+            <span class="mp-api-value">${context.historyLimit} 条</span>
+          </button>` : ''}
+        </div>
+
         <div class="mp-group-label" style="margin-top:16px">用在</div>
         <div class="mp-api-use">
           <button class="mp-api-use-btn${isActive ? ' is-on' : ''}" data-act="reply-use" type="button">
@@ -130,7 +176,7 @@ export const replyPresetApp = {
         </div>
 
         <div class="mp-api-note" style="margin-top:14px">
-          点「回复指令」改这段文字，模型每次回消息前都会读到它。单个聊天可以在聊天设置里单独选一套。
+          点「回复指令」改这段文字，模型每次回消息前都会读到它；上面打开的上下文会拼在指令后面一起发给模型。单个聊天可以在聊天设置里单独选一套。
         </div>
       </div>`;
   },
@@ -166,6 +212,40 @@ export const replyPresetApp = {
         });
         return true;
       }
+    }
+
+    if (act === 'reply-context') {
+      const key = String(data.key || '');
+      if (!['character', 'user', 'memory', 'history', 'time'].includes(key)) return false;
+      const context = normalizeReplyContext(preset.context);
+      context[key] = !context[key];
+      preset.context = context;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`${key === 'history' ? '聊天记录' : key === 'memory' ? '酒馆记忆' : key === 'time' ? '当前时间' : key === 'user' ? '我的设定' : '角色档案'}已${context[key] ? '打开' : '关闭'}`);
+      return true;
+    }
+
+    if (act === 'reply-history-limit') {
+      ctx.openSheet({
+        kind: 'pick',
+        title: '聊天记录保留多少条',
+        note: '只影响这套预设注入的最近聊天，不会改手机里已有的聊天',
+        items: [5, 10, 15, 20, 30].map(value => ({
+          value: String(value),
+          label: `${value} 条`,
+          note: value === normalizeReplyContext(preset.context).historyLimit ? '现在用的' : '',
+        })),
+        onPick: value => {
+          const context = normalizeReplyContext(preset.context);
+          context.historyLimit = Number(value);
+          preset.context = context;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`聊天记录改成保留 ${context.historyLimit} 条`);
+        },
+      });
+      return true;
     }
 
     if (act === 'reply-use') {

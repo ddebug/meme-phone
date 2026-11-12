@@ -7,6 +7,30 @@
 
 export const SCHEMA_VERSION = 1;
 
+/* 回复预设除了「怎么说」，还要决定「给模型看哪些上下文」。
+ * 这一组开关沿用旧独立小手机的 QQ 预设：角色档案、用户设定、聊天记录、记忆、时间。 */
+export const DEFAULT_REPLY_CONTEXT = {
+  character: true,
+  user: true,
+  memory: true,
+  history: true,
+  historyLimit: 10,
+  time: true,
+};
+
+export function normalizeReplyContext(raw) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const limit = Number(source.historyLimit ?? DEFAULT_REPLY_CONTEXT.historyLimit);
+  return {
+    character: source.character !== false,
+    user: source.user !== false,
+    memory: source.memory !== false,
+    history: source.history !== false,
+    historyLimit: Number.isFinite(limit) ? Math.max(1, Math.min(50, Math.round(limit))) : DEFAULT_REPLY_CONTEXT.historyLimit,
+    time: source.time !== false,
+  };
+}
+
 export function emptyState() {
   return {
     version: SCHEMA_VERSION,
@@ -45,14 +69,17 @@ export function emptyState() {
           {
             id: 'reply_natural', name: '自然发消息',
             text: '像平时发微信一样回消息：口语、短句，一次只回一两句。不要写旁白、括号里的动作，也不要写成小说段落。',
+            context: { ...DEFAULT_REPLY_CONTEXT },
           },
           {
             id: 'reply_short', name: '再短一点',
             text: '回复尽量短，通常不超过 20 个字，像随手回一条消息。不要解释、不要总结、不要用括号写动作。',
+            context: { ...DEFAULT_REPLY_CONTEXT },
           },
           {
             id: 'reply_soft', name: '带点情绪',
             text: '像平时发微信一样回消息，口语、短句，可以带一点情绪和停顿，但不要写成小说，也不要用括号写旁白动作。',
+            context: { ...DEFAULT_REPLY_CONTEXT },
           },
         ],
       },
@@ -230,6 +257,12 @@ export function replyPresetFor(state, chat) {
 export function replyPromptFor(state, chat) {
   const preset = replyPresetFor(state, chat);
   return String(preset?.text || '').trim();
+}
+
+/** 这套回复预设要注入哪些上下文。 */
+export function replyContextFor(state, chat) {
+  const preset = replyPresetFor(state, chat);
+  return normalizeReplyContext(preset?.context);
 }
 
 /** 手机里保存的 LLM 整体方案：一套聊天 API + 一套酒馆记忆 + 一套回复预设。 */
@@ -645,6 +678,7 @@ export function normalize(raw) {
       id,
       name: String(item.name || '').trim().slice(0, 20) || `预设 ${index + 1}`,
       text: String(item.text || '').trim().slice(0, 3000),
+      context: normalizeReplyContext(item.context),
     });
   });
   merged.settings.reply = {

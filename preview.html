@@ -3649,6 +3649,30 @@ __mods["meme/data.js"] = function(module, exports, __req){
 
 const SCHEMA_VERSION = 1;
 
+/* 回复预设除了「怎么说」，还要决定「给模型看哪些上下文」。
+ * 这一组开关沿用旧独立小手机的 QQ 预设：角色档案、用户设定、聊天记录、记忆、时间。 */
+const DEFAULT_REPLY_CONTEXT = {
+  character: true,
+  user: true,
+  memory: true,
+  history: true,
+  historyLimit: 10,
+  time: true,
+};
+
+function normalizeReplyContext(raw) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const limit = Number(source.historyLimit ?? DEFAULT_REPLY_CONTEXT.historyLimit);
+  return {
+    character: source.character !== false,
+    user: source.user !== false,
+    memory: source.memory !== false,
+    history: source.history !== false,
+    historyLimit: Number.isFinite(limit) ? Math.max(1, Math.min(50, Math.round(limit))) : DEFAULT_REPLY_CONTEXT.historyLimit,
+    time: source.time !== false,
+  };
+}
+
 function emptyState() {
   return {
     version: SCHEMA_VERSION,
@@ -3687,14 +3711,17 @@ function emptyState() {
           {
             id: 'reply_natural', name: '自然发消息',
             text: '像平时发微信一样回消息：口语、短句，一次只回一两句。不要写旁白、括号里的动作，也不要写成小说段落。',
+            context: { ...DEFAULT_REPLY_CONTEXT },
           },
           {
             id: 'reply_short', name: '再短一点',
             text: '回复尽量短，通常不超过 20 个字，像随手回一条消息。不要解释、不要总结、不要用括号写动作。',
+            context: { ...DEFAULT_REPLY_CONTEXT },
           },
           {
             id: 'reply_soft', name: '带点情绪',
             text: '像平时发微信一样回消息，口语、短句，可以带一点情绪和停顿，但不要写成小说，也不要用括号写旁白动作。',
+            context: { ...DEFAULT_REPLY_CONTEXT },
           },
         ],
       },
@@ -3872,6 +3899,12 @@ function replyPresetFor(state, chat) {
 function replyPromptFor(state, chat) {
   const preset = replyPresetFor(state, chat);
   return String(preset?.text || '').trim();
+}
+
+/** 这套回复预设要注入哪些上下文。 */
+function replyContextFor(state, chat) {
+  const preset = replyPresetFor(state, chat);
+  return normalizeReplyContext(preset?.context);
 }
 
 /** 手机里保存的 LLM 整体方案：一套聊天 API + 一套酒馆记忆 + 一套回复预设。 */
@@ -4287,6 +4320,7 @@ function normalize(raw) {
       id,
       name: String(item.name || '').trim().slice(0, 20) || `预设 ${index + 1}`,
       text: String(item.text || '').trim().slice(0, 3000),
+      context: normalizeReplyContext(item.context),
     });
   });
   merged.settings.reply = {
@@ -4429,6 +4463,8 @@ function normalize(raw) {
 }
 
 exports["SCHEMA_VERSION"] = SCHEMA_VERSION;
+exports["DEFAULT_REPLY_CONTEXT"] = DEFAULT_REPLY_CONTEXT;
+exports["normalizeReplyContext"] = normalizeReplyContext;
 exports["emptyState"] = emptyState;
 exports["DEFAULT_DIARY_PROMPT"] = DEFAULT_DIARY_PROMPT;
 exports["newId"] = newId;
@@ -4446,6 +4482,7 @@ exports["memoryPresetFor"] = memoryPresetFor;
 exports["replyPresetsOf"] = replyPresetsOf;
 exports["replyPresetFor"] = replyPresetFor;
 exports["replyPromptFor"] = replyPromptFor;
+exports["replyContextFor"] = replyContextFor;
 exports["chatSchemesOf"] = chatSchemesOf;
 exports["activeChatScheme"] = activeChatScheme;
 exports["applyChatScheme"] = applyChatScheme;
@@ -6245,7 +6282,7 @@ const { icon } = __req("meme/icons.js");
 const {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
-  replyPresetsOf, replyPresetFor,
+  replyPresetsOf, replyPresetFor, normalizeReplyContext,
 } = __req("meme/data.js");
 const { memoryPresetSummary } = __req("meme/memory.js");
 const { avatarHtml, esc, shortText, timeText } = __req("meme/shell.js");
@@ -6347,9 +6384,10 @@ function settingsBody(ctx, chatId) {
   const replyPresets = replyPresetsOf(state);
   const ownReply = replyPresets.find(item => item.id === chat.replyPresetId) || null;
   const globalReply = replyPresetFor(state, null);
-  const replySub = ownReply
-    ? `只对这个会话 · ${ownReply.name || '未命名'}`
-    : `跟随手机 · ${globalReply?.name || '默认回复方式'}`;
+  const activeReply = ownReply || globalReply;
+  const replyContext = normalizeReplyContext(activeReply?.context);
+  const injectedCount = ['character', 'user', 'memory', 'history', 'time'].filter(key => replyContext[key]).length;
+  const replySub = `${ownReply ? `只对这个会话 · ${ownReply.name || '未命名'}` : `跟随手机 · ${globalReply?.name || '默认回复方式'}`} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
 
   return `
     <div class="mp-page-body">
@@ -12135,13 +12173,23 @@ __mods["meme/apps/presets.js"] = function(module, exports, __req){
 
 const { icon } = __req("meme/icons.js");
 const { esc } = __req("meme/shell.js");
-const { newId, replyPresetsOf, replyPresetFor } = __req("meme/data.js");
+const { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext } = __req("meme/data.js");
 
 let editingId = '';
 
 function clip(text, max = 42) {
   const value = String(text || '');
   return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
+function injectedCount(preset) {
+  const context = normalizeReplyContext(preset?.context);
+  return ['character', 'user', 'memory', 'history', 'time'].filter(key => context[key]).length;
+}
+
+function contextNote(preset) {
+  const count = injectedCount(preset);
+  return count ? `注入 ${count} 段上下文` : '不注入上下文';
 }
 
 function findPreset(state, id) {
@@ -12159,7 +12207,7 @@ const presetsApp = {
       <button class="mp-row" data-act="reply-open" data-id="${esc(preset.id)}" type="button">
         <span class="mp-row-main">
           <span class="mp-row-name">${esc(preset.name || `预设 ${index + 1}`)}${preset.id === active?.id ? '<span class="mp-api-tag">手机</span>' : ''}</span>
-          <span class="mp-row-sub">${esc(clip(preset.text || '还没写指令'))}</span>
+          <span class="mp-row-sub">${esc(clip(preset.text || '还没写指令'))} · ${esc(contextNote(preset))}</span>
         </span>
         ${icon('chevron')}
       </button>`).join('');
@@ -12170,7 +12218,7 @@ const presetsApp = {
           <div class="mp-title" style="flex:1">回复预设</div>
           <button class="mp-icon-btn" data-act="reply-new" type="button" aria-label="新建预设">${icon('plus')}</button>
         </div>
-        <div class="mp-subtitle">告诉模型该怎么回消息；聊天设置里还能给单个会话换一套</div>
+        <div class="mp-subtitle">告诉模型该怎么回消息，并决定要把哪些上下文一起塞进去；聊天设置里还能给单个会话换一套</div>
 
         <div class="mp-group-label" style="margin-top:14px">手机默认 · ${list.length} 套</div>
         <div class="mp-group-box">
@@ -12178,7 +12226,7 @@ const presetsApp = {
         </div>
 
         <div class="mp-api-note" style="margin-top:14px">
-          预设只决定回复的语气、长短和格式，不存 API 地址、Key 或酒馆记忆。
+          预设只决定回复方式和注入的上下文，不存 API 地址、Key 或酒馆记忆本身；酒馆记忆仍按「记忆」里那套方案读取。
         </div>
       </div>`;
   },
@@ -12192,7 +12240,12 @@ const presetsApp = {
         placeholder: '比如：短句、黏人、正经一点',
         onText: text => {
           const name = String(text || '').trim().slice(0, 20) || '新预设';
-          const preset = { id: newId('reply'), name, text: source?.text || '' };
+          const preset = {
+            id: newId('reply'),
+            name,
+            text: source?.text || '',
+            context: normalizeReplyContext(source?.context),
+          };
           ctx.state.settings.reply.presets.push(preset);
           ctx.state.settings.reply.activeId = preset.id;
           editingId = preset.id;
@@ -12225,6 +12278,24 @@ const replyPresetApp = {
     const active = replyPresetFor(ctx.state, null);
     const isActive = active?.id === preset.id;
     const text = String(preset.text || '');
+    const context = normalizeReplyContext(preset.context);
+    const contextRows = [
+      ['character', '角色档案', '人设、性格、场景'],
+      ['user', '我的设定', '当前酒馆用户的名字和设定'],
+      ['memory', '酒馆记忆', '有总结先用总结，否则读最近几层原文'],
+      ['time', '当前时间', '日期、星期和时间'],
+      ['history', '手机聊天记录', `最近 ${context.historyLimit} 条本机会话`],
+    ].map(([key, label, note]) => {
+      const on = Boolean(context[key]);
+      return `
+        <button class="mp-row" data-act="reply-context" data-key="${key}" type="button">
+          <span class="mp-row-main">
+            <span class="mp-row-name">${esc(label)}</span>
+            <span class="mp-row-sub">${esc(on ? note : '已关闭，不注入')}</span>
+          </span>
+          <span class="mp-api-value${on ? '' : ' is-empty'}">${on ? '开' : '关'}</span>
+        </button>`;
+    }).join('');
 
     return `
       <div class="mp-nav">
@@ -12251,6 +12322,19 @@ const replyPresetApp = {
           </button>
         </div>
 
+        <div class="mp-group-label" style="margin-top:16px">注入上下文</div>
+        <div class="mp-group">
+          ${contextRows}
+          ${context.history ? `
+          <button class="mp-row" data-act="reply-history-limit" type="button">
+            <span class="mp-row-main">
+              <span class="mp-row-name">聊天记录保留多少条</span>
+              <span class="mp-row-sub">太多会挤掉角色设定，太少会接不上话</span>
+            </span>
+            <span class="mp-api-value">${context.historyLimit} 条</span>
+          </button>` : ''}
+        </div>
+
         <div class="mp-group-label" style="margin-top:16px">用在</div>
         <div class="mp-api-use">
           <button class="mp-api-use-btn${isActive ? ' is-on' : ''}" data-act="reply-use" type="button">
@@ -12259,7 +12343,7 @@ const replyPresetApp = {
         </div>
 
         <div class="mp-api-note" style="margin-top:14px">
-          点「回复指令」改这段文字，模型每次回消息前都会读到它。单个聊天可以在聊天设置里单独选一套。
+          点「回复指令」改这段文字，模型每次回消息前都会读到它；上面打开的上下文会拼在指令后面一起发给模型。单个聊天可以在聊天设置里单独选一套。
         </div>
       </div>`;
   },
@@ -12297,6 +12381,40 @@ const replyPresetApp = {
       }
     }
 
+    if (act === 'reply-context') {
+      const key = String(data.key || '');
+      if (!['character', 'user', 'memory', 'history', 'time'].includes(key)) return false;
+      const context = normalizeReplyContext(preset.context);
+      context[key] = !context[key];
+      preset.context = context;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`${key === 'history' ? '聊天记录' : key === 'memory' ? '酒馆记忆' : key === 'time' ? '当前时间' : key === 'user' ? '我的设定' : '角色档案'}已${context[key] ? '打开' : '关闭'}`);
+      return true;
+    }
+
+    if (act === 'reply-history-limit') {
+      ctx.openSheet({
+        kind: 'pick',
+        title: '聊天记录保留多少条',
+        note: '只影响这套预设注入的最近聊天，不会改手机里已有的聊天',
+        items: [5, 10, 15, 20, 30].map(value => ({
+          value: String(value),
+          label: `${value} 条`,
+          note: value === normalizeReplyContext(preset.context).historyLimit ? '现在用的' : '',
+        })),
+        onPick: value => {
+          const context = normalizeReplyContext(preset.context);
+          context.historyLimit = Number(value);
+          preset.context = context;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`聊天记录改成保留 ${context.historyLimit} 条`);
+        },
+      });
+      return true;
+    }
+
     if (act === 'reply-use') {
       ctx.state.settings.reply.activeId = preset.id;
       editingId = preset.id;
@@ -12328,6 +12446,68 @@ const replyPresetApp = {
 exports["presetsApp"] = presetsApp;
 exports["replyPresetApp"] = replyPresetApp;
 };
+__mods["meme/reply-context.js"] = function(module, exports, __req){
+/**
+ * meme-phone · 回复预设的上下文拼装
+ * 旧独立小手机的 QQ 预设除了回复指令，还会按开关注入角色档案、用户设定、
+ * 酒馆记忆、当前时间和本机聊天记录；这里把这部分独立出来，聊天入口只负责取数据。
+ */
+
+function transcript(state, chat, limit = 10) {
+  const contact = state.contacts[chat.contactId];
+  return chat.messages.slice(-limit).map(message => {
+    const who = message.from === 'me'
+      ? state.settings.user.name
+      : (state.contacts[message.speaker]?.name || contact?.name || 'TA');
+    return `${who}：${message.text}`;
+  }).join('\n');
+}
+
+function characterBlock(state, contact) {
+  const card = (state.characters || []).find(item => item.name === contact?.name);
+  if (!card) return '';
+  return [
+    `【角色档案 · ${contact?.name || card.name || 'TA'}】`,
+    card.description ? String(card.description).slice(0, 400) : '',
+    card.personality ? `性格：${String(card.personality).slice(0, 160)}` : '',
+    card.scenario ? `场景：${String(card.scenario).slice(0, 160)}` : '',
+  ].filter(Boolean).join('\n');
+}
+
+function userBlock(state) {
+  const me = (state.users || []).find(item => item.key === state.settings.user?.key) || (state.users || [])[0];
+  if (!me) return '';
+  return [
+    '【我的设定】',
+    `名字：${me.name || state.settings.user?.name || '我'}`,
+    me.description ? String(me.description).slice(0, 300) : '',
+  ].filter(Boolean).join('\n');
+}
+
+function clockBlock(now = new Date()) {
+  const text = now.toLocaleString('zh-CN', {
+    month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  return `【当前时间】\n${text}`;
+}
+
+function replyContextBlock(state, chat, contact, context = {}, memoryText = '') {
+  const blocks = [
+    context.character ? characterBlock(state, contact) : '',
+    context.user ? userBlock(state) : '',
+    context.memory && memoryText ? `【酒馆记忆】\n${memoryText}` : '',
+    context.time ? clockBlock() : '',
+    context.history ? transcript(state, chat, Math.max(1, Number(context.historyLimit) || 10)) : '',
+  ];
+  return blocks.filter(Boolean).join('\n\n');
+}
+
+exports["transcript"] = transcript;
+exports["characterBlock"] = characterBlock;
+exports["userBlock"] = userBlock;
+exports["clockBlock"] = clockBlock;
+exports["replyContextBlock"] = replyContextBlock;
+};
 __mods["meme/index.js"] = function(module, exports, __req){
 /**
  * meme-phone · 模块入口
@@ -12335,11 +12515,12 @@ __mods["meme/index.js"] = function(module, exports, __req){
  */
 
 const { createStore } = __req("meme/store.js");
-const { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyPromptFor } = __req("meme/data.js");
+const { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyPromptFor, replyContextFor } = __req("meme/data.js");
 const { createShell, applyWall, applyLook } = __req("meme/shell.js");
 const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } = __req("meme/host.js");
 const { chatApp, threadApp, threadSettingsApp } = __req("meme/apps/chat.js");
 const { buildMemoryContext } = __req("meme/memory.js");
+const { replyContextBlock, transcript } = __req("meme/reply-context.js");
 const { diaryApp, threadDiaryApp } = __req("meme/apps/diary.js");
 const { contactsApp, contactApp } = __req("meme/apps/contacts.js");
 const { settingsApp, appearanceApp } = __req("meme/apps/settings.js");
@@ -12416,14 +12597,6 @@ let followTimer = 0;
 
 /* ------------------------------------------------------------ 模型调用 */
 
-function transcript(state, chat, limit = 10) {
-  const contact = state.contacts[chat.contactId];
-  return chat.messages.slice(-limit).map(message => {
-    const who = message.from === 'me' ? state.settings.user.name : (state.contacts[message.speaker]?.name || contact?.name || 'TA');
-    return `${who}：${message.text}`;
-  }).join('\n');
-}
-
 function makeAi(state) {
   /* 手机聊天 / 日记的背景走「酒馆记忆」：有酒馆总结先用总结，没有就读最近几层酒馆聊天 */
   function story(chat, limit = 1200) {
@@ -12432,13 +12605,14 @@ function makeAi(state) {
 
   return {
     async reply(context, chat, contact, demoReply) {
-      const storyBlock = await story(chat, 1200);
+      const ctxSettings = replyContextFor(state, chat);
+      const storyBlock = ctxSettings.memory ? await story(chat, 1200) : { text: '' };
       const replyPrompt = replyPromptFor(state, chat);
+      const contextText = replyContextBlock(state, chat, contact, ctxSettings, storyBlock.text);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`,
         replyPrompt ? '' : '要求：口语、短、不超过 40 字，不要旁白、不要括号动作。',
-        storyBlock.text ? `【酒馆记忆】\n${storyBlock.text}` : '',
-        transcript(state, chat),
+        contextText,
         `${state.settings.user.name}：${chat.messages[chat.messages.length - 1]?.text || ''}`,
         `${contact?.name || '对方'}：`,
       ].filter(Boolean).join('\n');
@@ -12447,14 +12621,15 @@ function makeAi(state) {
     },
 
     async proactive(context, chat, contact, demoReply) {
-      const storyBlock = await story(chat, 900);
+      const ctxSettings = replyContextFor(state, chat);
+      const storyBlock = ctxSettings.memory ? await story(chat, 900) : { text: '' };
       const replyPrompt = replyPromptFor(state, chat);
+      const contextText = replyContextBlock(state, chat, contact, ctxSettings, storyBlock.text);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。`,
         `距离上次说话已经过去 ${state.settings.proactive.idleMinutes} 分钟，你要主动发一条消息。`,
         replyPrompt ? '' : '要求：口语、短、不超过 30 字，像是忽然想起什么，不要提问过多。',
-        storyBlock.text ? `【酒馆记忆】\n${storyBlock.text}` : '',
-        transcript(state, chat, 6),
+        contextText,
         `${contact?.name || '对方'}：`,
       ].filter(Boolean).join('\n');
       const result = await generate({ prompt, system: replyPrompt, demoReply, preset: llmPresetFor(state, chat) });

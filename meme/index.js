@@ -4,11 +4,12 @@
  */
 
 import { createStore } from './store.js';
-import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyPromptFor } from './data.js';
+import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyPromptFor, replyContextFor } from './data.js';
 import { createShell, applyWall, applyLook } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { buildMemoryContext } from './memory.js';
+import { replyContextBlock, transcript } from './reply-context.js';
 import { diaryApp, threadDiaryApp } from './apps/diary.js';
 import { contactsApp, contactApp } from './apps/contacts.js';
 import { settingsApp, appearanceApp } from './apps/settings.js';
@@ -85,14 +86,6 @@ let followTimer = 0;
 
 /* ------------------------------------------------------------ 模型调用 */
 
-function transcript(state, chat, limit = 10) {
-  const contact = state.contacts[chat.contactId];
-  return chat.messages.slice(-limit).map(message => {
-    const who = message.from === 'me' ? state.settings.user.name : (state.contacts[message.speaker]?.name || contact?.name || 'TA');
-    return `${who}：${message.text}`;
-  }).join('\n');
-}
-
 function makeAi(state) {
   /* 手机聊天 / 日记的背景走「酒馆记忆」：有酒馆总结先用总结，没有就读最近几层酒馆聊天 */
   function story(chat, limit = 1200) {
@@ -101,13 +94,14 @@ function makeAi(state) {
 
   return {
     async reply(context, chat, contact, demoReply) {
-      const storyBlock = await story(chat, 1200);
+      const ctxSettings = replyContextFor(state, chat);
+      const storyBlock = ctxSettings.memory ? await story(chat, 1200) : { text: '' };
       const replyPrompt = replyPromptFor(state, chat);
+      const contextText = replyContextBlock(state, chat, contact, ctxSettings, storyBlock.text);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`,
         replyPrompt ? '' : '要求：口语、短、不超过 40 字，不要旁白、不要括号动作。',
-        storyBlock.text ? `【酒馆记忆】\n${storyBlock.text}` : '',
-        transcript(state, chat),
+        contextText,
         `${state.settings.user.name}：${chat.messages[chat.messages.length - 1]?.text || ''}`,
         `${contact?.name || '对方'}：`,
       ].filter(Boolean).join('\n');
@@ -116,14 +110,15 @@ function makeAi(state) {
     },
 
     async proactive(context, chat, contact, demoReply) {
-      const storyBlock = await story(chat, 900);
+      const ctxSettings = replyContextFor(state, chat);
+      const storyBlock = ctxSettings.memory ? await story(chat, 900) : { text: '' };
       const replyPrompt = replyPromptFor(state, chat);
+      const contextText = replyContextBlock(state, chat, contact, ctxSettings, storyBlock.text);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。`,
         `距离上次说话已经过去 ${state.settings.proactive.idleMinutes} 分钟，你要主动发一条消息。`,
         replyPrompt ? '' : '要求：口语、短、不超过 30 字，像是忽然想起什么，不要提问过多。',
-        storyBlock.text ? `【酒馆记忆】\n${storyBlock.text}` : '',
-        transcript(state, chat, 6),
+        contextText,
         `${contact?.name || '对方'}：`,
       ].filter(Boolean).join('\n');
       const result = await generate({ prompt, system: replyPrompt, demoReply, preset: llmPresetFor(state, chat) });

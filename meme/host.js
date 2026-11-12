@@ -218,9 +218,9 @@ function latestScore(item) {
  * 这个角色在酒馆里关联的最新聊天。
  * 先问酒馆的聊天文件列表，挑最近一条；列表读不到就退回角色卡上的当前聊天文件。
  */
-export async function readLatestTavernChat({ name = '', avatar = '', floors = 10 } = {}) {
+export async function readLatestTavernChat({ name = '', avatar = '', floors = 10, includeMemory = false } = {}) {
   const script = await loadHostScript();
-  const empty = { available: false, file: '', characterName: name, lines: [], total: 0 };
+  const empty = { available: false, file: '', characterName: name, lines: [], total: 0, metadata: null, messages: [] };
   if (!script || !Array.isArray(script.characters)) return empty;
   const character = script.characters.find(item => item && avatar && item.avatar === avatar)
     || script.characters.find(item => item && item.name === name);
@@ -253,6 +253,7 @@ export async function readLatestTavernChat({ name = '', avatar = '', floors = 10
   } catch { /* 列表接口不可用就继续用角色卡上的 chat */ }
 
   let raw = [];
+  let metadata = null;
   if (file) {
     try {
       const response = await fetch('/api/chats/get', {
@@ -268,15 +269,23 @@ export async function readLatestTavernChat({ name = '', avatar = '', floors = 10
       });
       if (response.ok) {
         const data = await response.json().catch(() => null);
-        raw = Array.isArray(data) ? data : (Array.isArray(data?.messages) ? data.messages : []);
+        if (Array.isArray(data)) raw = data;
+        else if (Array.isArray(data?.messages)) raw = data.messages;
+        else if (Array.isArray(data?.chat)) raw = data.chat;
+        metadata = data?.metadata || data?.chat_metadata || null;
       }
     } catch { raw = []; }
   }
 
   if (!raw.length && script.characters?.[script.this_chid]?.avatar === character.avatar && Array.isArray(script.chat)) {
     raw = script.chat;
-    file = file || String(character.chat || '当前聊天');
+    file = String(character.chat || '当前聊天');
+    metadata = script.chatMetadata || null;
   }
+
+  /* 聊天文件第一行是 metadata header（含 chat_metadata）；接口会原样返回它。 */
+  const header = raw.find(line => line && typeof line === 'object' && line.chat_metadata && typeof line.chat_metadata === 'object');
+  if (header?.chat_metadata) metadata = header.chat_metadata;
 
   const lines = raw
     .filter(line => line && !line.is_system && typeof line.mes === 'string' && line.mes.trim())
@@ -294,6 +303,8 @@ export async function readLatestTavernChat({ name = '', avatar = '', floors = 10
     lines,
     total: raw.length,
     meta: latestMeta,
+    metadata: includeMemory ? metadata : null,
+    messages: includeMemory ? raw : [],
   };
 }
 

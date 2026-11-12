@@ -2,14 +2,14 @@
  * meme-phone · 酒馆记忆
  *
  * 聊天 / 日记的上下文来源收成一套「记忆方案」：
- * - auto：这个角色当前酒馆聊天有酒馆总结，就注入总结；没有就取最近几层酒馆原文。
- * - summary：只用酒馆总结。
+ * - auto：这个角色最新聊天文件里有柏宝书记忆，就注入记忆；没有就取最近几层酒馆原文。
+ * - summary：只用柏宝书记忆。
  * - recent：只取最近几层酒馆原文。
  * 手机默认一套方案，某个会话可以单独换一套。
  */
 
 import { contactById, memoryPresetFor } from './data.js';
-import { summaryText } from './book.js';
+import { chatMemorySummary, summaryText } from './book.js';
 import { readLatestTavernChat, readTavernContext } from './host.js';
 
 export const MEMORY_MODES = [
@@ -80,28 +80,57 @@ export async function buildMemoryContext(state, chat, limit = 1200) {
   const floors = Math.max(1, Math.min(50, Number(preset?.floors) || 10));
   const summaryLimit = Math.max(300, Math.floor(limit * 0.75));
 
-  /* 先确认这个角色最新的酒馆聊天是哪一份；总结只读当前打开的那份，
-     如果最新聊天不是当前这份，就不能把当前总结当成最新聊天的记忆。 */
-  const latest = contact?.name && mode !== 'summary'
+  /* 先找到这个角色最新的一份酒馆聊天。柏宝书只按这份聊天文件读：
+     文件里有 chat_metadata[baibai_book] / 消息 extra.bbs_leaf 就直接用；
+     没有才回退到当前打开聊天的只读接口。 */
+  const latest = contact?.name
     ? await readLatestTavernChat({
       name: contact.name,
       avatar: contact.tavernAvatar || '',
       floors,
+      includeMemory: mode !== 'recent',
     })
     : null;
 
   let summary = null;
   if (mode !== 'recent') {
-    const data = summaryText({ skipFirstFloor: Boolean(preset?.skipFirstFloor) });
-    const current = await readTavernContext();
-    const currentNode = String(current?.characterName || '').trim();
-    const sameCharacter = !contact?.name || !currentNode || currentNode === contact.name;
-    const currentFile = chatKey(current?.chatFile);
-    const latestFile = chatKey(latest?.file);
-    const sameChat = !currentFile || !latestFile || currentFile === latestFile;
-    if (data.nodes.length && sameCharacter && sameChat) {
-      const text = clip(data.text, summaryLimit);
-      if (text) summary = { text, count: data.nodes.length, demo: data.demo };
+    const fileData = latest?.messages?.length
+      ? chatMemorySummary({
+        metadata: latest.metadata,
+        messages: latest.messages,
+        skipFirstFloor: Boolean(preset?.skipFirstFloor),
+      })
+      : null;
+    let data = fileData;
+    let demo = false;
+
+    /* 文件里没有真实柏宝书记忆时，只在“最新聊天 == 当前打开聊天”时读宿主接口，
+       避免把当前聊天的总结串到另一份聊天上。 */
+    if (!data?.nodes?.length) {
+      const current = await readTavernContext();
+      const currentNode = String(current?.characterName || '').trim();
+      const sameCharacter = !contact?.name || !currentNode || currentNode === contact.name;
+      const currentFile = chatKey(current?.chatFile);
+      const latestFile = chatKey(latest?.file);
+      const sameChat = !currentFile || !latestFile || currentFile === latestFile;
+      if (sameCharacter && sameChat) {
+        const legacy = summaryText({ skipFirstFloor: Boolean(preset?.skipFirstFloor) });
+        if (legacy.nodes.length) {
+          data = legacy;
+          demo = Boolean(legacy.demo);
+        }
+      }
+    }
+
+    if (data?.nodes?.length) {
+      const parts = [];
+      if (data.firstText) parts.push(`【首楼原文】\n${data.firstText}`);
+      data.nodes.forEach(node => {
+        const label = node.timeLabel || (node.floorStart != null ? `第 ${node.floorStart}–${node.floorEnd} 楼` : '');
+        parts.push(label ? `【${label}】\n${node.text}` : node.text);
+      });
+      const text = clip(parts.join('\n\n'), summaryLimit);
+      if (text) summary = { text, count: data.nodes.length, demo };
     }
   }
 

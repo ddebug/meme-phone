@@ -30,7 +30,7 @@ function renderPage(ctx) {
   return `
     <div class="mp-page-body">
       <div class="mp-title">酒馆记忆</div>
-      <div class="mp-subtitle">默认读这个角色最新的酒馆聊天；有酒馆总结时先用总结</div>
+      <div class="mp-subtitle">读角色最新聊天文件；有柏宝书记忆时先用记忆</div>
 
       <div class="mp-group" style="margin-top:16px">
         <div class="mp-group-label">手机默认方案</div>
@@ -52,7 +52,7 @@ function renderPage(ctx) {
       <div class="mp-group-label" style="margin-top:16px">怎么读</div>
       <div class="mp-card">
         <div class="mp-card-title">自动（默认）</div>
-        <div class="mp-card-sub">这个角色当前酒馆聊天有酒馆总结，就注入总结；没有总结，才读最近几层酒馆聊天原文。</div>
+        <div class="mp-card-sub">这个角色最新的聊天文件里有柏宝书记忆，就注入记忆；没有记忆，才读最近几层酒馆聊天原文。</div>
         <div class="mp-card-title" style="margin-top:12px">层数</div>
         <div class="mp-card-sub">一层就是酒馆里的一条消息。层数越多，模型记得越远，但占的上下文也越多。</div>
         <div class="mp-card-title" style="margin-top:12px">首楼</div>

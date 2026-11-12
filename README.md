@@ -4,7 +4,7 @@
 
 - **形态**：桌面资料卡 + 两个小组件 + 8 个桌面 App + 4 个 Dock App，点开一个就是完整一页，左上角返回，没有中间层和隐藏菜单。
 - **两种跑法**：装进酒馆当扩展；或者直接双击 `preview.html` 在浏览器里看（单文件、不用服务器、用虚构演示数据）。
-- **依赖**：只需要酒馆本体。酒馆记忆用的柏宝书已经整包放在 `baibai-book/`，不用另装。
+- **依赖**：只需要酒馆本体。柏宝书是可选的独立扩展；手机侧只通过公开接口只读接入，不再随手机重复挂载内置副本。
 
 ## 先看一眼
 
@@ -40,8 +40,9 @@ preview.html#app-settings&night        末尾加 night 走夜间主题
 ## 装进酒馆
 
 1. 把整个 `meme-phone` 文件夹放进 `data/<你的用户>/extensions/`。
-2. 刷新酒馆页面。扩展设置里多出「meme-phone · 桌面式小手机」，扩展菜单里多一项 `meme-phone`。
-3. 点菜单项就打开手机；也可以把 `quick-reply/summon-phone.json` 导进快捷回复，用 `/meme` 召唤。
+2. 如果需要柏宝书总结、楼层面板和生成前召回，请单独安装 `ST-BaiBai-Book`；手机不会重复打包第二份柏宝书。
+3. 刷新酒馆页面。扩展设置里多出「meme-phone · 桌面式小手机」，扩展菜单里多一项 `meme-phone`。
+4. 点菜单项就打开手机；也可以把 `quick-reply/summon-phone.json` 导进快捷回复，用 `/meme` 召唤。
 
 ## 界面与导航
 
@@ -98,7 +99,7 @@ preview.html#app-settings&night        末尾加 night 走夜间主题
 ## 和酒馆的对接
 
 - **数据**：`/user/files/meme-phone.json`（酒馆里）/ localStorage（预览页）。写入口只有 `store.flush()`，写完回读校验，失败保留 dirty 并报错，不静默丢数据。备份在「设置 → 数据 → 导出备份」或扩展设置面板。
-- **记忆**：默认读这个角色关联的**最新酒馆聊天**；有柏宝书总结就先扫总结，没有才保留最近几层原文。方案可新建、改名、改来源（自动 / 只用总结 / 只看原文）、改层数。`manifest.json` 里挂了 `generate_interceptor: bbs_generateInterceptor`，酒馆生成前能走到柏宝书的拦截与向量召回。
+- **记忆**：默认读这个角色关联的**最新酒馆聊天**；有柏宝书总结就先扫总结，没有才保留最近几层原文。方案可新建、改名、改来源（自动 / 只用总结 / 只看原文）、改层数。生成前的柏宝书拦截与向量召回由独立 `ST-BaiBai-Book` 扩展自己注册，`meme-phone` 不再重复声明同名拦截器。
 - **角色**：卡片字段原样读（`description` / `personality` / `scenario` / `first_mes` / `mes_example` / `creator_notes` / `tags` 等），详情页只读，不动酒馆里的角色；想聊就「存进通讯录」。
 - **用户**：从 `power_user.personas` / `persona_descriptions` 整份同步，改完「写回酒馆」只动内存再让酒馆自己 `saveSettingsDebounced()`。手机可以跟着酒馆切换 persona（4 秒内跟），也可以钉住一位。
 - **查 TA 的手机**：通讯录点进任何一个人（群聊没有）→ 聊天 / 通讯录 / 朋友圈三个 tab。默认按角色卡本地拼一份，不联网；右上角 ✦ 让模型按人设现编一份。只读，不会写进你自己的聊天。
@@ -134,7 +135,7 @@ meme-phone/
 │   ├── meme.css         界面样式
 │   └── apps/            聊天、通讯录、日记、设置、音乐、绘图、接口、预设、用户、
 │                        查角色、查 TA 的手机、小剧场/表情/计划/装扮/帮助
-├── baibai-book/         柏宝书整包（随扩展一起加载）
+├── baibai-book/         柏宝书参考/ vendor 副本；扩展入口不再自动加载，避免与独立柏宝书抢占同一宿主
 ├── assets/              壁纸（day / night）
 ├── quick-reply/         /meme 召唤用的快捷回复
 ├── scripts/

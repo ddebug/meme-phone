@@ -159,29 +159,20 @@ function registerSlashCommand() {
   }
 }
 
-/* ------------------------------------------------------------ 柏宝书 */
+/* ------------------------------------------------------------ 柏宝书只读桥 */
 
 /**
- * 柏宝书（ST-BaiBai-Book）整套代码已经放在 baibai-book/ 下，这里随手机一起加载它，
- * 装一个 meme-phone 就同时有记忆引擎。它自己会挂悬浮球 / 菜单 / 楼层面板，
- * 手机的「柏宝书」App 则通过它的公开接口 STBaiBaiBook 读记忆。
+ * meme-phone 只读取已安装柏宝书暴露的 `STBaiBaiBook`；
+ * 不再动态导入 `baibai-book/` 内置副本。
+ *
+ * 两份柏宝书会挂载到同一个 `#bbs-app-host`，后启动的副本会清空前一份的
+ * shadow root；扩展菜单又按固定 `#bbs-menu-item` 去重，容易出现菜单还在、
+ * 点开却是空白或无反应的情况。手机侧的记忆读取仍然走 `bookApi()` 只读桥。
  */
-async function loadBundledBook() {
-  if (globalThis.__MEME_BOOK_LOADED__) return;
-  globalThis.__MEME_BOOK_LOADED__ = true;
-  try {
-    await import('./baibai-book/dist/index.js');
-    console.log('[meme-phone] 柏宝书已随手机一起加载');
-  } catch (error) {
-    globalThis.__MEME_BOOK_LOADED__ = false;
-    console.warn('[meme-phone] 柏宝书加载失败（手机的柏宝书页会只剩演示数据）', error);
-  }
-}
 
 export async function startMemePhone() {
   mountPanel();
   registerSlashCommand();
-  void loadBundledBook();
   try {
     await boot();
     setStatus(describeStatus({ ready: true }));

@@ -66,14 +66,22 @@ function ensure(state) {
     history: [],
   };
   if (!state.draw || typeof state.draw !== 'object') state.draw = base;
-  state.draw.config = { ...base.config, ...(state.draw.config || {}) };
-  if (!Array.isArray(state.draw.presets) || !state.draw.presets.length) state.draw.presets = base.presets;
-  state.draw.presets = state.draw.presets.map((item, index) => ({
-    id: item.id || `dp_${index}`,
-    name: item.name || `预设 ${index + 1}`,
-    pos: item.pos || '',
-    neg: item.neg || '',
-  }));
+  /* 保留原对象引用：弹层渲染会重跑 ensure，换成新对象会让回调改到旧对象上 */
+  if (!state.draw.config || typeof state.draw.config !== 'object') state.draw.config = {};
+  Object.keys(base.config).forEach(key => {
+    if (state.draw.config[key] === undefined) state.draw.config[key] = base.config[key];
+  });
+  const drawPresets = Array.isArray(state.draw.presets)
+    ? state.draw.presets.filter(item => item && typeof item === 'object')
+    : [];
+  if (!drawPresets.length) drawPresets.push(...base.presets.map(item => ({ ...item })));
+  state.draw.presets = drawPresets;
+  drawPresets.forEach((item, index) => {
+    item.id = item.id || `dp_${index}`;
+    item.name = item.name || `预设 ${index + 1}`;
+    item.pos = item.pos || '';
+    item.neg = item.neg || '';
+  });
   if (typeof state.draw.presetIdx !== 'number' || state.draw.presetIdx >= state.draw.presets.length) state.draw.presetIdx = 0;
   if (!Array.isArray(state.draw.history)) state.draw.history = [];
 
@@ -86,10 +94,14 @@ function ensure(state) {
   image.custom = { url: '', key: '', model: '', path: '/v1/images/generations', ...(image.custom || {}) };
 
   /* 把原来那套单一接口配置收成第一套「绘图接口预设」，老存档不用手动迁移 */
-  if (!Array.isArray(image.presets) || !image.presets.length) {
+  const imagePresets = Array.isArray(image.presets)
+    ? image.presets.filter(item => item && typeof item === 'object')
+    : [];
+  image.presets = imagePresets;
+  if (!imagePresets.length) {
     const engine = image.engine;
     const legacy = engine === 'novelai' ? image.novelai : engine === 'doubao' ? image.doubao : image.custom;
-    image.presets = [{
+    imagePresets.push({
       id: 'image_default',
       name: engine === 'novelai' ? 'NovelAI 官方' : engine === 'doubao' ? '豆包 Seedream' : '自定义接口',
       engine,
@@ -97,27 +109,28 @@ function ensure(state) {
       path: legacy.path || '',
       key: legacy.key || '',
       model: legacy.model || '',
-    }];
+    });
   }
-  image.presets = image.presets.map((item, index) => ({
-    id: item.id || `image_${index}`,
-    name: item.name || `接口 ${index + 1}`,
-    engine: ['custom', 'doubao'].includes(item.engine) ? item.engine : 'novelai',
-    url: String(item.url || ''),
-    path: String(item.path || ''),
-    key: String(item.key || ''),
-    model: String(item.model || ''),
-  }));
-  if (!image.presets.some(item => item.id === image.activeId)) image.activeId = image.presets[0].id;
+  imagePresets.forEach((item, index) => {
+    item.id = item.id || `image_${index}`;
+    item.name = item.name || `接口 ${index + 1}`;
+    item.engine = ['custom', 'doubao'].includes(item.engine) ? item.engine : 'novelai';
+    item.url = String(item.url || '');
+    item.path = String(item.path || '');
+    item.key = String(item.key || '');
+    item.model = String(item.model || '');
+  });
+  if (!imagePresets.some(item => item.id === image.activeId)) image.activeId = imagePresets[0].id;
 
   /* 整体方案 = 一套接口预设 + 一套提示词预设 */
   if (!Array.isArray(state.draw.schemes)) state.draw.schemes = [];
-  state.draw.schemes = state.draw.schemes.map((item, index) => ({
-    id: item.id || `ds_${index}`,
-    name: item.name || `方案 ${index + 1}`,
-    apiId: item.apiId || image.activeId,
-    promptId: item.promptId || state.draw.presets[0].id,
-  }));
+  state.draw.schemes = state.draw.schemes.filter(item => item && typeof item === 'object');
+  state.draw.schemes.forEach((item, index) => {
+    item.id = item.id || `ds_${index}`;
+    item.name = item.name || `方案 ${index + 1}`;
+    item.apiId = item.apiId || image.activeId;
+    item.promptId = item.promptId || state.draw.presets[0].id;
+  });
   if (!state.draw.schemes.some(item => item.id === state.draw.schemeId)) {
     state.draw.schemeId = state.draw.schemes[0]?.id || '';
   }
@@ -147,7 +160,11 @@ function activePrompt(state) {
 function applyScheme(state, scheme) {
   const image = state.settings.image;
   const draw = state.draw;
-  if (scheme.apiId && image.presets.some(item => item.id === scheme.apiId)) image.activeId = scheme.apiId;
+  if (scheme.apiId && image.presets.some(item => item.id === scheme.apiId)) {
+    image.activeId = scheme.apiId;
+    const picked = image.presets.find(item => item.id === scheme.apiId);
+    if (picked) image.engine = picked.engine;
+  }
   const index = draw.presets.findIndex(item => item.id === scheme.promptId);
   if (index >= 0) draw.presetIdx = index;
   draw.schemeId = scheme.id;
@@ -206,6 +223,12 @@ function endpointReady(ep) {
   return Boolean(ep.url && ep.key);
 }
 
+/** 把当前绘图接口的地址 / Key / 模型同步回各引擎的默认配置，换引擎时不丢。 */
+function setEngineField(image, engine, key, value) {
+  const bucket = engine === 'novelai' ? image.novelai : engine === 'doubao' ? image.doubao : image.custom;
+  if (bucket && key in bucket) bucket[key] = value;
+}
+
 export const drawApp = {
   id: 'draw', name: '绘图', icon: 'image',
 
@@ -222,17 +245,17 @@ export const drawApp = {
 
     const promptChips = draw.presets.map((item, index) => `
       <button class="mp-chip-btn${index === draw.presetIdx ? ' is-on' : ''}" data-act="draw-preset" data-i="${index}" type="button">
-        <span style="font-size:12.5px">${esc(item.name || `预设 ${index + 1}`)}</span>
+        <span style="font-size: calc(12.5px * var(--font-scale))">${esc(item.name || `预设 ${index + 1}`)}</span>
       </button>`).join('');
 
     const apiChips = (ctx.state.settings.image.presets || []).map((item, index) => `
       <button class="mp-chip-btn${item.id === ctx.state.settings.image.activeId ? ' is-on' : ''}" data-act="draw-api" data-i="${index}" type="button">
-        <span style="font-size:12.5px">${esc(item.name || `接口 ${index + 1}`)}</span>
+        <span style="font-size: calc(12.5px * var(--font-scale))">${esc(item.name || `接口 ${index + 1}`)}</span>
       </button>`).join('');
 
     const schemeChips = draw.schemes.map((item, index) => `
       <button class="mp-chip-btn${item.id === draw.schemeId ? ' is-on' : ''}" data-act="draw-scheme" data-i="${index}" type="button">
-        <span style="font-size:12.5px">${esc(item.name || `方案 ${index + 1}`)}</span>
+        <span style="font-size: calc(12.5px * var(--font-scale))">${esc(item.name || `方案 ${index + 1}`)}</span>
       </button>`).join('');
 
     const rows = [
@@ -280,7 +303,7 @@ export const drawApp = {
         <div class="mp-group-label" style="margin-top:12px">整体方案</div>
         <div class="mp-draw-chips">
           ${schemeChips || '<div class="mp-empty" style="padding:4px 2px">还没有方案，新建一套就会把当前的接口和提示词绑在一起。</div>'}
-          <button class="mp-chip-btn" data-act="draw-scheme-new" type="button"><span style="font-size:12.5px">＋ 新建</span></button>
+          <button class="mp-chip-btn" data-act="draw-scheme-new" type="button"><span style="font-size: calc(12.5px * var(--font-scale))">＋ 新建</span></button>
         </div>
         <div class="mp-draw-hint">方案 = 一套接口预设 + 一套提示词预设，切换时两边一起换${schemeIndex >= 0 ? ` · 当前「${esc(draw.schemes[schemeIndex].name || '未命名')}」：${esc(apiPreset?.name || '接口')} / ${esc(preset.name || '提示词')}` : ''}</div>
 
@@ -288,7 +311,7 @@ export const drawApp = {
           <span class="mp-group-label">绘图接口预设</span>
           <button class="mp-draw-mini" data-act="draw-api-menu" type="button">管理</button>
         </div>
-        <div class="mp-draw-chips">${apiChips}<button class="mp-chip-btn" data-act="draw-api-new" type="button"><span style="font-size:12.5px">＋ 新建</span></button></div>
+        <div class="mp-draw-chips">${apiChips}<button class="mp-chip-btn" data-act="draw-api-new" type="button"><span style="font-size: calc(12.5px * var(--font-scale))">＋ 新建</span></button></div>
         <div class="mp-group">
           <button class="mp-row" data-act="draw-engine" type="button">
             <span class="mp-row-main">
@@ -320,7 +343,7 @@ export const drawApp = {
           <span class="mp-group-label">提示词预设</span>
           <button class="mp-draw-mini" data-act="draw-preset-menu" type="button">管理</button>
         </div>
-        <div class="mp-draw-chips">${promptChips}<button class="mp-chip-btn" data-act="draw-preset-new" type="button"><span style="font-size:12.5px">＋ 新建</span></button></div>
+        <div class="mp-draw-chips">${promptChips}<button class="mp-chip-btn" data-act="draw-preset-new" type="button"><span style="font-size: calc(12.5px * var(--font-scale))">＋ 新建</span></button></div>
 
         <div class="mp-group-label" style="margin-top:14px">画面</div>
         <button class="mp-draw-desc" data-act="draw-prompt" type="button">
@@ -440,8 +463,6 @@ export const drawApp = {
       if (!picked) return true;
       image.activeId = picked.id;
       image.engine = picked.engine;
-      /* 选接口就是给当前方案换搭配 */
-      if (scheme) scheme.apiId = picked.id;
       ctx.save();
       ctx.rerender();
       ctx.toast(`接口换成「${picked.name || '未命名'}」`);
@@ -452,7 +473,7 @@ export const drawApp = {
       const copy = { ...target, id: newId('image'), name: `${target.name || '接口'} 副本` };
       image.presets.push(copy);
       image.activeId = copy.id;
-      if (scheme) scheme.apiId = copy.id;
+      image.engine = copy.engine;
       ctx.save();
       ctx.rerender();
       ctx.toast('复制出一套新接口，改完就是模板');
@@ -472,7 +493,7 @@ export const drawApp = {
             const copy = { ...target, id: newId('image'), name: `${target.name || '接口'} 副本` };
             image.presets.push(copy);
             image.activeId = copy.id;
-            if (scheme) scheme.apiId = copy.id;
+            image.engine = copy.engine;
             ctx.save();
             ctx.rerender();
             ctx.toast('复制出一套新接口');
@@ -502,8 +523,14 @@ export const drawApp = {
         kind: 'pick', title: '绘图接口',
         items: ENGINES.map(item => ({ value: item.value, label: item.label, note: item.note })),
         onPick: value => {
+          const defaults = value === 'novelai' ? (image.novelai || {}) : value === 'doubao' ? (image.doubao || {}) : (image.custom || {});
           target.engine = value;
           image.engine = value;
+          target.name = value === 'novelai' ? 'NovelAI 官方' : value === 'doubao' ? '豆包 Seedream' : '自定义接口';
+          target.url = String(defaults.url || '');
+          target.path = value === 'custom' ? String(defaults.path || '/v1/images/generations') : '';
+          target.key = String(defaults.key || '');
+          target.model = String(defaults.model || '');
           ctx.save();
           ctx.rerender();
           const name = ENGINES.find(item => item.value === value)?.label || value;
@@ -523,6 +550,7 @@ export const drawApp = {
         value: String(target.url || ''),
         onText: value => {
           target.url = value.trim();
+          setEngineField(image, target.engine, 'url', target.url);
           ctx.save();
           ctx.rerender();
         },
@@ -538,6 +566,7 @@ export const drawApp = {
         value: String(target.key || ''),
         onText: value => {
           target.key = value.trim();
+          setEngineField(image, target.engine, 'key', target.key);
           ctx.save();
           ctx.rerender();
         },
@@ -551,14 +580,14 @@ export const drawApp = {
         ctx.openSheet({
           kind: 'pick', title: '模型',
           items: list.map(item => ({ value: item.value, label: item.label })),
-          onPick: value => { target.model = value; ctx.save(); ctx.rerender(); },
+          onPick: value => { target.model = value; setEngineField(image, target.engine, 'model', value); ctx.save(); ctx.rerender(); },
         });
       } else {
         ctx.openSheet({
           kind: 'text', title: '模型',
           placeholder: '接口要的模型名，比如 flux-dev',
           value: String(target.model || ''),
-          onText: value => { target.model = value.trim(); ctx.save(); ctx.rerender(); },
+          onText: value => { target.model = value.trim(); setEngineField(image, target.engine, 'model', target.model); ctx.save(); ctx.rerender(); },
         });
       }
       return true;
@@ -590,7 +619,6 @@ export const drawApp = {
     if (act === 'draw-preset') {
       const pickedIndex = Number(data.i) || 0;
       draw.presetIdx = pickedIndex;
-      if (scheme) scheme.promptId = draw.presets[pickedIndex]?.id || scheme.promptId;
       ctx.save();
       ctx.rerender();
       return true;
@@ -605,7 +633,6 @@ export const drawApp = {
       };
       draw.presets.push(copy);
       draw.presetIdx = draw.presets.length - 1;
-      if (scheme) scheme.promptId = copy.id;
       ctx.save();
       ctx.rerender();
       ctx.toast(`按「${preset.name || '预设'}」新建了一套`);
@@ -625,7 +652,6 @@ export const drawApp = {
             const copy = { id: newId('dp'), name: `${preset.name || '预设'} 副本`, pos: preset.pos || '', neg: preset.neg || '' };
             draw.presets.push(copy);
             draw.presetIdx = draw.presets.length - 1;
-            if (scheme) scheme.promptId = copy.id;
             ctx.save();
             ctx.rerender();
             ctx.toast('新建了一套，改名后就是你的模板');

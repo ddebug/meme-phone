@@ -2,8 +2,8 @@
  * meme-phone · 酒馆记忆
  *
  * 聊天 / 日记的上下文来源收成一套「记忆方案」：
- * - auto：这个角色当前酒馆聊天有柏宝书总结，就注入总结；没有就取最近几层酒馆原文。
- * - summary：只用柏宝书总结。
+ * - auto：这个角色当前酒馆聊天有酒馆总结，就注入总结；没有就取最近几层酒馆原文。
+ * - summary：只用酒馆总结。
  * - recent：只取最近几层酒馆原文。
  * 手机默认一套方案，某个会话可以单独换一套。
  */
@@ -14,7 +14,7 @@ import { readLatestTavernChat, readTavernContext } from './host.js';
 
 export const MEMORY_MODES = [
   { value: 'auto', label: '自动', hint: '有总结先用总结，没有就取最近几层原文' },
-  { value: 'summary', label: '只用总结', hint: '只注入柏宝书总结' },
+  { value: 'summary', label: '只用总结', hint: '只注入酒馆总结' },
   { value: 'recent', label: '只看原文', hint: '只注入最近几层酒馆聊天' },
 ];
 
@@ -26,9 +26,10 @@ export function memoryModeLabel(mode) {
 export function memoryPresetSummary(preset) {
   if (!preset) return '还没设记忆方案';
   const floors = Math.max(1, Math.min(50, Number(preset.floors) || 10));
-  if (preset.mode === 'summary') return `${memoryModeLabel(preset.mode)} · 只读总结`;
-  if (preset.mode === 'recent') return `${memoryModeLabel(preset.mode)} · 最近 ${floors} 层`;
-  return `${memoryModeLabel(preset.mode)} · 有总结先用，否则 ${floors} 层`;
+  const first = preset.skipFirstFloor ? ' · 首楼用原文' : '';
+  if (preset.mode === 'summary') return `${memoryModeLabel(preset.mode)} · 只读总结${first}`;
+  if (preset.mode === 'recent') return `${memoryModeLabel(preset.mode)} · 最近 ${floors} 层${first}`;
+  return `${memoryModeLabel(preset.mode)} · 有总结先用，否则 ${floors} 层${first}`;
 }
 
 export function activeMemoryPreset(state, chat) {
@@ -91,7 +92,7 @@ export async function buildMemoryContext(state, chat, limit = 1200) {
 
   let summary = null;
   if (mode !== 'recent') {
-    const data = summaryText({ skipFirstFloor: false });
+    const data = summaryText({ skipFirstFloor: Boolean(preset?.skipFirstFloor) });
     const current = await readTavernContext();
     const currentNode = String(current?.characterName || '').trim();
     const sameCharacter = !contact?.name || !currentNode || currentNode === contact.name;
@@ -106,7 +107,7 @@ export async function buildMemoryContext(state, chat, limit = 1200) {
 
   if (summary && mode !== 'recent') {
     return {
-      text: `【柏宝书总结】\n${summary.text}`,
+      text: `【酒馆总结】\n${summary.text}`,
       source: 'summary',
       preset,
       floors,
@@ -137,7 +138,7 @@ export async function buildMemoryContext(state, chat, limit = 1200) {
   });
   if (!taverner?.lines?.length) {
     return {
-      text: summary ? `【柏宝书总结】\n${summary.text}` : '',
+      text: summary ? `【酒馆总结】\n${summary.text}` : '',
       source: summary ? 'summary' : 'empty',
       preset,
       floors,

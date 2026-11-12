@@ -101,10 +101,10 @@ function renderPage(ctx, params = {}) {
   const list = recent.map(item => `
     <div class="mp-diary-card" data-act="diary-day" data-day="${item.key}">
       <div class="mp-diary-head">
-        <span style="font-size:12px;color:var(--text-3)">${Number(item.key.slice(5, 7))}月${Number(item.key.slice(8, 10))}日</span>
+        <span style="font-size: calc(12px * var(--font-scale));color:var(--text-3)">${Number(item.key.slice(5, 7))}月${Number(item.key.slice(8, 10))}日</span>
         ${(item.tags || []).slice(0, 2).map(tag => `<span class="mp-pill plain">${esc(tag)}</span>`).join('')}
       </div>
-      <div style="font-family:var(--font-serif);font-size:13px;line-height:1.72;color:var(--text-2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(item.text)}</div>
+      <div style="font-family:var(--font-serif);font-size: calc(13px * var(--font-scale));line-height: calc(1.72 * var(--line-scale));color:var(--text-2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(item.text)}</div>
     </div>`).join('');
 
   return `

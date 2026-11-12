@@ -7,6 +7,7 @@ import { icon } from '../icons.js';
 import {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
+  replyPresetsOf, replyPresetFor,
 } from '../data.js';
 import { memoryPresetSummary } from '../memory.js';
 import { avatarHtml, esc, shortText, timeText } from '../shell.js';
@@ -105,6 +106,12 @@ function settingsBody(ctx, chatId) {
   const memorySub = ownMemory
     ? `只对这个会话 · ${memoryPresetSummary(ownMemory)}`
     : `跟随手机 · ${memoryPresetSummary(globalMemory)}`;
+  const replyPresets = replyPresetsOf(state);
+  const ownReply = replyPresets.find(item => item.id === chat.replyPresetId) || null;
+  const globalReply = replyPresetFor(state, null);
+  const replySub = ownReply
+    ? `只对这个会话 · ${ownReply.name || '未命名'}`
+    : `跟随手机 · ${globalReply?.name || '默认回复方式'}`;
 
   return `
     <div class="mp-page-body">
@@ -135,6 +142,16 @@ function settingsBody(ctx, chatId) {
           ${chatSetRow(chat.id, {
             iconName: 'spark', title: '这个聊天的 LLM',
             sub: llmSub, act: 'ts-llm', value: ownPreset ? '单独' : '跟随',
+          })}
+        </div>
+      </div>
+
+      <div class="mp-group">
+        <div class="mp-group-label">回复</div>
+        <div class="mp-group-box">
+          ${chatSetRow(chat.id, {
+            iconName: 'reply', title: '回复预设',
+            sub: replySub, act: 'ts-reply', value: ownReply ? '单独' : '跟随',
           })}
         </div>
       </div>
@@ -510,6 +527,43 @@ export const threadSettingsApp = {
       return true;
     }
 
+    if (act === 'ts-reply') {
+      const presets = replyPresetsOf(ctx.state);
+      const globalPreset = replyPresetFor(ctx.state, null);
+      ctx.openSheet({
+        title: '这个会话怎么回消息',
+        items: [
+          { label: '跟随手机', value: 'follow', note: `现在用「${globalPreset?.name || '默认'}」` },
+          ...presets.map(item => ({
+            label: item.name || '未命名预设',
+            value: item.id,
+            note: String(item.text || '').slice(0, 38) || '空指令',
+          })),
+          { label: '管理回复预设', value: 'manage', note: '新建、改指令、设为手机默认' },
+        ],
+        onPick: (value) => {
+          if (value === 'follow') {
+            chat.replyPresetId = '';
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('这个会话已跟随手机的回复预设');
+            return;
+          }
+          if (value === 'manage') {
+            ctx.go('app-presets');
+            return;
+          }
+          const preset = presets.find(item => item.id === value);
+          if (!preset) return;
+          chat.replyPresetId = preset.id;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`这个会话改用「${preset.name || '未命名预设'}」`);
+        },
+      });
+      return true;
+    }
+
     if (act === 'ts-memory') {
       const presets = memoryPresetsOf(ctx.state);
       const globalPreset = memoryPresetFor(ctx.state, null);
@@ -550,11 +604,11 @@ export const threadSettingsApp = {
     if (act === 'ts-open-character') {
       const card = (ctx.state.characters || []).find(item => item.name === contact?.name);
       if (card) ctx.go('character-card', { name: card.name });
-      else ctx.go('app-characters');
+      else ctx.go('app-contacts', { tab: 'cards' });
       return true;
     }
 
-    if (act === 'ts-open-characters') { ctx.go('app-characters'); return true; }
+    if (act === 'ts-open-characters') { ctx.go('app-contacts', { tab: 'cards' }); return true; }
 
     if (act === 'ts-diary') { ctx.go('thread-diary', { chatId: chat.id }); return true; }
 

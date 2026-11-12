@@ -9,20 +9,22 @@ let hostScript = null;
 let hostScriptTried = false;
 
 export async function loadHostScript() {
-  if (hostScriptTried) return hostScript;
-  hostScriptTried = true;
-  /* 先拿酒馆自己的上下文（桌面版里 import('/script.js') 可能拿到 HTML 页面，
-     解析报 Unexpected token '<'）；上下文拿不到才退回 import */
+  if (hostScript) return hostScript;
+  /* 先拿酒馆自己的上下文；窗口晚就绪时下次还能再试 */
   try {
     const ctx = globalThis.SillyTavern?.getContext?.();
-    if (ctx && typeof ctx === 'object' && Object.keys(ctx).length) hostScript = ctx;
-  } catch { hostScript = null; }
-  if (!hostScript) {
-    try {
-      hostScript = await import('/script.js');
-    } catch {
-      hostScript = null;
+    if (ctx && typeof ctx === 'object' && Object.keys(ctx).length) {
+      hostScript = ctx;
+      return hostScript;
     }
+  } catch { hostScript = null; }
+  if (hostScriptTried) return hostScript;
+  hostScriptTried = true;
+  /* 上下文拿不到才退回 import（桌面版里 import('/script.js') 可能拿到 HTML） */
+  try {
+    hostScript = await import('/script.js');
+  } catch {
+    hostScript = null;
   }
   return hostScript;
 }
@@ -329,7 +331,10 @@ export async function generate({ prompt, system = '', demoReply = '', preset = n
     } catch { /* 这套接口没接通就退回酒馆自己的模型，别让聊天卡死 */ }
   }
   if (script && typeof script.generateQuietPrompt === 'function') {
-    const quiet = String(prompt || '');
+    const quiet = [
+      system ? `【回复要求】\n${String(system)}` : '',
+      String(prompt || ''),
+    ].filter(Boolean).join('\n\n');
     const text = await script.generateQuietPrompt({ quietPrompt: quiet, quietName: '' });
     if (typeof text === 'string' && text.trim()) return { text: text.trim(), demo: false };
     return { text: '', demo: false, error: '模型没有返回内容' };
@@ -343,9 +348,10 @@ async function presetCompletion(preset, { prompt, system }) {
   if (!script) return '';
   const base = String(preset.url || '').trim().replace(/\/+$/, '');
   const path = String(preset.path || '').trim() || '/v1/chat/completions';
-  const url = /^https?:/i.test(path)
-    ? path
+  const joined = path.startsWith('/v1') && /\/v1$/i.test(base)
+    ? `${base}${path.replace(/^\/v1/, '')}`
     : (/\/chat\/completions$/i.test(base) ? base : `${base}${path.startsWith('/') ? path : `/${path}`}`);
+  const url = /^https?:/i.test(path) ? path : joined;
   const ctx = globalThis.SillyTavern?.getContext?.() || script.getContext?.() || {};
   const getHeaders = ctx.getRequestHeaders || script.getRequestHeaders;
   const headers = typeof getHeaders === 'function' ? { ...getHeaders() } : {};
@@ -583,16 +589,38 @@ export async function writeTavernPersona({ key, name, description }) {
  */
 export async function readTavernApi() {
   const script = await loadHostScript();
-  if (!script) return { available: false, reason: '没接上酒馆' };
+  if (!script) return { available: false, reason: '没接上酒馆，先打开酒馆再试' };
   try {
-    const ctx = script.getContext?.() || {};
-    const settings = script.oai_settings
+    const ctx = globalThis.SillyTavern?.getContext?.() || script.getContext?.() || script;
+    const direct = script.oai_settings
+      || script.chatCompletionSettings
       || ctx.oai_settings
       || ctx.oaiSettings
+      || ctx.chatCompletionSettings
       || script.settings?.oai_settings
       || globalThis.oai_settings
       || null;
-    if (!settings) return { available: false, reason: '酒馆这版没暴露接口设置' };
+    let settings = direct;
+
+    /* getContext() 通常不暴露 oai_settings；用酒馆自己的设置接口兜底 */
+    if (!settings || typeof settings !== 'object' || !Object.keys(settings).length) {
+      try {
+        const headers = ctx.getRequestHeaders?.() || script.getRequestHeaders?.() || {};
+        const response = await fetch('/api/settings/get', {
+          method: 'POST',
+          headers,
+          body: '{}',
+        });
+        if (response.ok) {
+          const saved = await response.json();
+          settings = saved.oai_settings || saved.settings?.oai_settings || null;
+        }
+      } catch { /* 读不到就继续走下面的失败提示 */ }
+    }
+
+    if (!settings) {
+      return { available: false, reason: '酒馆没把这版接口设置暴露出来' };
+    }
 
     const source = String(settings.chat_completion_source || 'openai');
     const model = String(
@@ -604,11 +632,23 @@ export async function readTavernApi() {
       || settings.mistralai_model
       || settings.cohere_model
       || '',
-    );
+    ).trim();
     const proxy = String(settings.reverse_proxy || '').trim();
     const customUrl = String(settings.custom_url || '').trim();
-    const key = String(settings.custom_key || settings.proxy_password || '').trim();
-    const url = (proxy || customUrl).replace(/\/+$/, '');
+    const key = String(
+      settings.custom_key
+      || settings.proxy_password
+      || settings.openai_key
+      || settings.openrouter_key
+      || settings.claude_key
+      || settings.google_key
+      || settings.mistralai_key
+      || settings.cohere_key
+      || '',
+    ).trim();
+    let url = (proxy || customUrl).replace(/\/+$/, '');
+    if (!url && source === 'openai') url = 'https://api.openai.com';
+    if (!url && source === 'openrouter') url = 'https://openrouter.ai/api';
 
     return {
       available: true,
@@ -616,11 +656,11 @@ export async function readTavernApi() {
       url,
       key,
       model,
-      /* 没有反代 / 自定义地址时，酒馆是走自己内部的转发，小手机直连不了 */
-      direct: Boolean(url),
+      direct: Boolean(proxy || customUrl),
+      reason: url ? '' : '酒馆这套走内部转发，没有可直连的地址',
     };
-  } catch {
-    return { available: false, reason: '读酒馆设置时出错' };
+  } catch (error) {
+    return { available: false, reason: `读酒馆设置时出错：${error.message || error}` };
   }
 }
 
@@ -636,14 +676,23 @@ export async function listTavernModels(preset = {}) {
   try {
     const ctx = globalThis.SillyTavern?.getContext?.() || script.getContext?.() || {};
     const settings = script.oai_settings
+      || script.chatCompletionSettings
       || ctx.oai_settings
       || ctx.oaiSettings
+      || ctx.chatCompletionSettings
       || script.settings?.oai_settings
       || globalThis.oai_settings
       || {};
     const source = String(preset.tavernSource || settings.chat_completion_source || 'openai');
     const url = String(preset.url || settings.reverse_proxy || settings.custom_url || '').trim();
-    const key = String(preset.key || settings.proxy_password || '').trim();
+    const key = String(
+      preset.key
+      || settings.custom_key
+      || settings.proxy_password
+      || settings.openai_key
+      || settings.openrouter_key
+      || '',
+    ).trim();
     const getHeaders = ctx.getRequestHeaders || script.getRequestHeaders;
     const headers = typeof getHeaders === 'function' ? { ...getHeaders() } : {};
     if (!headers['X-CSRF-Token']) {

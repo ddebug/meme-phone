@@ -4,8 +4,8 @@
  */
 
 import { createStore } from './store.js';
-import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor } from './data.js';
-import { createShell, applyWall } from './shell.js';
+import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyPromptFor } from './data.js';
+import { createShell, applyWall, applyLook } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { buildMemoryContext } from './memory.js';
@@ -15,13 +15,14 @@ import { settingsApp, appearanceApp } from './apps/settings.js';
 import { drawApp } from './apps/draw.js';
 import { apiListApp, apiPresetApp } from './apps/api.js';
 import { userListApp, userEditApp } from './apps/user.js';
-import { charactersApp, characterApp } from './apps/characters.js';
+import { characterApp } from './apps/characters.js';
 import { charPhoneApp, charPhoneThreadApp, ensureLookup } from './apps/charphone.js';
 import { musicApp, musicPlaylistApp, stopMusic } from './apps/music.js';
 import { memoryPresetsApp } from './apps/memory.js';
+import { presetsApp, replyPresetApp } from './apps/presets.js';
 import {
   extrasApp, extraDetailApp, emojiApp,
-  plansApp, dressApp, helpApp,
+  plansApp, dressApp, iconPickerApp, helpApp,
 } from './apps/more.js';
 
 const APPS = {
@@ -35,17 +36,20 @@ const APPS = {
   'app-emoji': emojiApp,
   'app-plans': plansApp,
   'app-dress': dressApp,
+  'app-icon': iconPickerApp,
   'app-help': helpApp,
   'app-draw': drawApp,
   'app-api': apiListApp,
   'api-item': apiPresetApp,
+  'app-presets': presetsApp,
+  'reply-item': replyPresetApp,
   'app-user': userListApp,
   'user-item': userEditApp,
-  'app-characters': charactersApp,
   'character-card': characterApp,
   'p-charphone': charPhoneApp,
   'p-chatphone': charPhoneThreadApp,
   'memory-presets': memoryPresetsApp,
+  'app-memory-presets': memoryPresetsApp,
   'app-music': musicApp,
   'music-playlist': musicPlaylistApp,
   thread: threadApp,
@@ -61,8 +65,8 @@ const DESKTOP_APPS = [
   { id: 'plans', name: '计划', icon: 'plan' },
   { id: 'dress', name: '装扮', icon: 'brush' },
   { id: 'memory-presets', name: '记忆', icon: 'book' },
+  { id: 'presets', name: '预设', icon: 'reply' },
   { id: 'api', name: '接口', icon: 'code' },
-  { id: 'characters', name: '查角色', icon: 'contacts' },
 ];
 
 const DOCK_APPS = [
@@ -90,7 +94,7 @@ function transcript(state, chat, limit = 10) {
 }
 
 function makeAi(state) {
-  /* 手机聊天 / 日记的背景走「酒馆记忆」：有柏宝书总结先用总结，没有就读最近几层酒馆聊天 */
+  /* 手机聊天 / 日记的背景走「酒馆记忆」：有酒馆总结先用总结，没有就读最近几层酒馆聊天 */
   function story(chat, limit = 1200) {
     return buildMemoryContext(state, chat, limit);
   }
@@ -98,29 +102,31 @@ function makeAi(state) {
   return {
     async reply(context, chat, contact, demoReply) {
       const storyBlock = await story(chat, 1200);
+      const replyPrompt = replyPromptFor(state, chat);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`,
-        '要求：口语、短、不超过 40 字，不要旁白、不要括号动作。',
+        replyPrompt ? '' : '要求：口语、短、不超过 40 字，不要旁白、不要括号动作。',
         storyBlock.text ? `【酒馆记忆】\n${storyBlock.text}` : '',
         transcript(state, chat),
         `${state.settings.user.name}：${chat.messages[chat.messages.length - 1]?.text || ''}`,
         `${contact?.name || '对方'}：`,
       ].filter(Boolean).join('\n');
-      const result = await generate({ prompt, demoReply, preset: llmPresetFor(state, chat) });
+      const result = await generate({ prompt, system: replyPrompt, demoReply, preset: llmPresetFor(state, chat) });
       return result.text;
     },
 
     async proactive(context, chat, contact, demoReply) {
       const storyBlock = await story(chat, 900);
+      const replyPrompt = replyPromptFor(state, chat);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。`,
         `距离上次说话已经过去 ${state.settings.proactive.idleMinutes} 分钟，你要主动发一条消息。`,
-        '要求：口语、短、不超过 30 字，像是忽然想起什么，不要提问过多。',
+        replyPrompt ? '' : '要求：口语、短、不超过 30 字，像是忽然想起什么，不要提问过多。',
         storyBlock.text ? `【酒馆记忆】\n${storyBlock.text}` : '',
         transcript(state, chat, 6),
         `${contact?.name || '对方'}：`,
       ].filter(Boolean).join('\n');
-      const result = await generate({ prompt, demoReply, preset: llmPresetFor(state, chat) });
+      const result = await generate({ prompt, system: replyPrompt, demoReply, preset: llmPresetFor(state, chat) });
       return result.text;
     },
 
@@ -339,9 +345,6 @@ export async function openMemePhone(options = {}) {
       ctx.state = next;
       ctx.rerender?.();
     },
-    setWallpaper: (value) => {
-      rootEl.style.setProperty('--wallpaper', value);
-    },
     onDraft: (entry, value) => {
       if (entry.view !== 'thread') return;
       const chat = state.chats[entry.params?.chatId];
@@ -399,11 +402,50 @@ export async function openMemePhone(options = {}) {
     ctx.toast('自定义壁纸已换上');
   }
 
+  /* 自定义 App 图标：裁成正方形、缩到 192px，避免把存档撑大 */
+  async function useCustomIcon(file, appId) {
+    const looksImage = (file?.type && file.type.startsWith('image/')) || /\.(jpg|jpeg|png|webp|gif|bmp)$/i.test(file?.name || '');
+    if (!looksImage) { ctx.toast('请选一张图片'); return; }
+    const img = await new Promise((resolve, reject) => {
+      const image = new Image();
+      const url = URL.createObjectURL(file);
+      image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+      image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读不出来')); };
+      image.src = url;
+    });
+    const side = Math.min(img.width, img.height);
+    const sx = Math.max(0, (img.width - side) / 2);
+    const sy = Math.max(0, (img.height - side) / 2);
+    const canvas = document.createElement('canvas');
+    canvas.width = 192;
+    canvas.height = 192;
+    const painter = canvas.getContext('2d');
+    if (!painter) throw new Error('画布不可用');
+    painter.clearRect(0, 0, 192, 192);
+    painter.drawImage(img, sx, sy, side, side, 0, 0, 192, 192);
+    if (!state.settings.dress || typeof state.settings.dress !== 'object') state.settings.dress = {};
+    const dress = state.settings.dress;
+    if (!dress.icons || typeof dress.icons !== 'object') dress.icons = {};
+    const current = dress.icons[appId] && typeof dress.icons[appId] === 'object' ? dress.icons[appId] : {};
+    dress.icons[appId] = { ...current, image: canvas.toDataURL('image/webp', 0.86) };
+    ctx.save();
+    ctx.rerender();
+    ctx.toast('图标已换上');
+  }
+
   rootEl.addEventListener('change', event => {
-    if (event.target?.id !== 'mpWallFile') return;
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (file) useCustomWall(file).catch(error => ctx.toast(error.message || '换壁纸失败'));
+    const id = event.target?.id;
+    const file = event.target?.files?.[0];
+    if (id === 'mpWallFile') {
+      event.target.value = '';
+      if (file) useCustomWall(file).catch(error => ctx.toast(error.message || '换壁纸失败'));
+      return;
+    }
+    if (id === 'mpIconFile') {
+      const appId = event.target?.dataset?.app;
+      event.target.value = '';
+      if (file && appId) useCustomIcon(file, appId).catch(error => ctx.toast(error.message || '换图标失败'));
+    }
   });
 
   /* 用户头像（酒馆里有 persona 头像） */
@@ -470,7 +512,7 @@ export function applyTheme(state, root = rootEl) {
   root.dataset.mpTheme = theme;
   /* 背景：none 透明 / day 晨光 / night 夜色 / custom 自定义图 */
   applyWall(root, state.settings);
-  root.dataset.mpDress = state.settings.dress?.wallpaper || 'photo';
+  applyLook(root, state.settings);
 }
 
 export { chatFor };

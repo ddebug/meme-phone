@@ -5,6 +5,7 @@
 import { icon } from '../icons.js';
 import { contactsOf, contactById, chatFor, chatById, lastMessage, addContact, syncTavernContacts } from '../data.js';
 import { avatarHtml, esc, shortText } from '../shell.js';
+import { charactersPanel, charactersHandle } from './characters.js';
 
 function groupOf(contact) {
   if (contact.kind === 'group') return '群聊';
@@ -15,7 +16,9 @@ function groupOf(contact) {
 export const contactsApp = {
   id: 'contacts', name: '通讯录', icon: 'contacts',
 
-  render(ctx) {
+  render(ctx, params = {}) {
+    if (params.tab === 'cards' || params.tab === 'contacts') ctx.shell.contactsTab = params.tab;
+    const tab = ctx.shell.contactsTab === 'cards' ? 'cards' : 'contacts';
     const contacts = contactsOf(ctx.state);
     const groups = ['酒馆角色', '群聊', '自己加的'];
     const body = groups.map(group => {
@@ -38,18 +41,39 @@ export const contactsApp = {
       <div class="mp-page-body">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
           <div class="mp-title" style="flex:1">通讯录</div>
-          <button class="mp-icon-btn" data-act="contact-lookup" type="button" aria-label="查角色">${icon('search')}</button>
-          <button class="mp-icon-btn" data-act="contact-add" type="button" aria-label="添加">${icon('plus')}</button>
+          ${tab === 'cards'
+            ? `<button class="mp-icon-btn" data-act="char-search" type="button" aria-label="查角色">${icon('search')}</button>`
+            : `<button class="mp-icon-btn" data-act="contact-add" type="button" aria-label="添加">${icon('plus')}</button>`}
         </div>
-        <div class="mp-subtitle">${contacts.length} 位 · 只有在这里的人才会出现在聊天里</div>
-        ${body || '<div class="mp-empty">通讯录还是空的。<br>点右上角，把酒馆里的角色同步过来。</div>'}
+        <div class="mp-subtitle">${tab === 'cards' ? '酒馆里的角色卡，按卡片原样看' : `${contacts.length} 位 · 只有在这里的人才会出现在聊天里`}</div>
+
+        <div class="mp-seg" style="margin:2px 0 12px">
+          <button class="${tab === 'contacts' ? 'on' : ''}" data-act="contacts-tab" data-tab="contacts" type="button">通讯录</button>
+          <button class="${tab === 'cards' ? 'on' : ''}" data-act="contacts-tab" data-tab="cards" type="button">查角色</button>
+        </div>
+
+        ${tab === 'cards'
+          ? charactersPanel(ctx)
+          : (body || '<div class="mp-empty">通讯录还是空的。<br>点右上角，把酒馆里的角色同步过来。</div>')}
       </div>`;
   },
 
   handle(ctx, act, data) {
-    if (act === 'contact-lookup') {
-      ctx.go('app-characters');
+    if (act === 'contacts-tab') {
+      ctx.shell.contactsTab = data.tab === 'cards' ? 'cards' : 'contacts';
+      ctx.rerender();
       return true;
+    }
+
+    if (act === 'contact-lookup') {
+      ctx.shell.contactsTab = 'cards';
+      ctx.rerender();
+      return true;
+    }
+
+    /* 查角色的列表、搜索、同步都留在通讯录里，不再跳独立 App */
+    if (String(act).startsWith('char-')) {
+      return charactersHandle(ctx, act, data);
     }
 
     if (act === 'open-contact') {
@@ -122,6 +146,7 @@ export const contactApp = {
     const chats = Object.values(ctx.state.chats).filter(chat => chat.contactId === contact.id);
     const extras = ctx.state.extras[contact.id] || [];
     const last = chats[0] ? lastMessage(chats[0]) : null;
+    const card = (ctx.state.characters || []).find(item => item.name === contact.name) || null;
 
     const rows = chats.map(chat => `
       <button class="mp-row" data-act="open-thread" data-chat="${chat.id}" type="button">
@@ -140,8 +165,8 @@ export const contactApp = {
         <div style="display:flex;align-items:center;gap:14px;padding:4px 4px 18px">
           ${avatarHtml(contact.name, contact.avatar, 'mp-avatar lg')}
           <div style="flex:1;min-width:0">
-            <div style="font-size:20px;font-weight:600;letter-spacing:-.02em">${esc(contact.name)}</div>
-            <div style="font-size:12px;color:var(--text-3);margin-top:3px">${esc(contact.signature || '还没有签名')}</div>
+            <div style="font-size: calc(20px * var(--font-scale));font-weight:600;letter-spacing:-.02em">${esc(contact.name)}</div>
+            <div style="font-size: calc(12px * var(--font-scale));color:var(--text-3);margin-top:3px">${esc(contact.signature || '还没有签名')}</div>
             <div style="display:flex;gap:5px;margin-top:7px">
               <span class="mp-pill">${groupOf(contact)}</span>
               ${last ? `<span class="mp-pill plain">${shortText(last.at)}说过话</span>` : ''}
@@ -153,6 +178,7 @@ export const contactApp = {
           <button class="mp-btn" data-act="contact-extras" data-contact="${contact.id}" type="button" style="flex:1">${icon('theater')}小剧场 ${extras.length || ''}</button>
         </div>
         ${contact.kind === 'group' ? '' : `<button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button">${icon('search')}查 TA 的手机</button>`}
+        ${card ? `<button class="mp-btn mp-cp-entry" data-act="contact-card" data-name="${esc(card.name)}" type="button">${icon('contacts')}看 TA 的角色卡</button>` : ''}
         ${rows}
       </div>`;
   },
@@ -183,6 +209,12 @@ export const contactApp = {
     if (act === 'contact-phone') {
       if (!contact) return true;
       ctx.go('p-charphone', { contactId: contact.id });
+      return true;
+    }
+
+    if (act === 'contact-card') {
+      const name = String(data.name || '');
+      if (name) ctx.go('character-card', { name });
       return true;
     }
 

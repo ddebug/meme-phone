@@ -128,52 +128,38 @@ function match(card, query) {
     .some(text => String(text || '').toLowerCase().includes(needle));
 }
 
-function head(title, sub) {
-  return `<div class="mp-title" style="margin-top:2px">${esc(title)}</div><div class="mp-subtitle">${esc(sub)}</div>`;
+/** 查角色列表：通讯录的「查角色」页签直接复用，不再单独占一个桌面 App。 */
+export function charactersPanel(ctx) {
+  const state = ctx.state;
+  const cards = cardsOf(state);
+  const query = ctx.shell.charQuery || '';
+  const list = cards.filter(card => match(card, query));
+
+  const rows = list.map(card => `
+    <button class="mp-char-row" data-act="char-open" data-name="${esc(card.name)}" type="button">
+      ${avatarHtml(card.name, card.avatarUrl, 'mp-avatar')}
+      <span class="mp-user-main">
+        <span class="mp-char-name">${esc(card.name)}</span>
+        <span class="mp-char-sub">${esc((card.tags || []).slice(0, 3).join(' · ') || (card.description || '').slice(0, 26) || '没有标签')}</span>
+      </span>
+      ${icon('chevron')}
+    </button>`).join('');
+
+  return `
+    <div class="mp-draw-state${state.charactersFromTavern ? ' is-on' : ''}">
+      ${icon('contacts')}
+      <span>${state.charactersFromTavern ? `已接酒馆 · ${cards.length} 张卡` : (cards.length ? '预览环境 · 下面是演示卡' : '还没拉到角色卡')}</span>
+      <button class="mp-draw-state-btn" data-act="char-sync" type="button">同步</button>
+    </div>
+
+    ${query ? `<button class="mp-char-query" data-act="char-clear" type="button">搜：${esc(query)}<span>×</span></button>` : ''}
+
+    <div class="mp-card mp-char-list">
+      ${rows || `<div class="mp-empty">${query ? '没有匹配的角色。' : '还没有角色卡。接上酒馆后点「同步」。'}</div>`}
+    </div>`;
 }
 
-export const charactersApp = {
-  id: 'app-characters',
-
-  render(ctx) {
-    const state = ctx.state;
-    const cards = cardsOf(state);
-    const query = ctx.shell.charQuery || '';
-    const list = cards.filter(card => match(card, query));
-
-    const rows = list.map(card => `
-      <button class="mp-char-row" data-act="char-open" data-name="${esc(card.name)}" type="button">
-        ${avatarHtml(card.name, card.avatarUrl, 'mp-avatar')}
-        <span class="mp-user-main">
-          <span class="mp-char-name">${esc(card.name)}</span>
-          <span class="mp-char-sub">${esc((card.tags || []).slice(0, 3).join(' · ') || (card.description || '').slice(0, 26) || '没有标签')}</span>
-        </span>
-        ${icon('chevron')}
-      </button>`).join('');
-
-    return `
-      <div class="mp-page-body">
-        <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <div class="mp-title" style="flex:1">查角色</div>
-          <button class="mp-icon-btn" data-act="char-search" type="button" aria-label="搜索">${icon('search')}</button>
-        </div>
-        <div class="mp-subtitle">酒馆里的角色卡，按卡片原样看</div>
-
-        <div class="mp-draw-state${state.charactersFromTavern ? ' is-on' : ''}">
-          ${icon('contacts')}
-          <span>${state.charactersFromTavern ? `已接酒馆 · ${cards.length} 张卡` : (cards.length ? '预览环境 · 下面是演示卡' : '还没拉到角色卡')}</span>
-          <button class="mp-draw-state-btn" data-act="char-sync" type="button">同步</button>
-        </div>
-
-        ${query ? `<button class="mp-char-query" data-act="char-clear" type="button">搜：${esc(query)}<span>×</span></button>` : ''}
-
-        <div class="mp-card mp-char-list">
-          ${rows || `<div class="mp-empty">${query ? '没有匹配的角色。' : '还没有角色卡。接上酒馆后点「同步」。'}</div>`}
-        </div>
-      </div>`;
-  },
-
-  handle(ctx, act, data) {
+export function charactersHandle(ctx, act, data) {
     const state = ctx.state;
 
     if (act === 'char-sync') {
@@ -271,8 +257,7 @@ export const charactersApp = {
     }
 
     return false;
-  },
-};
+}
 
 export const characterApp = {
   id: 'character-card',

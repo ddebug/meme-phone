@@ -2,6 +2,9 @@
  * meme-phone · 音乐
  * 歌单导入：网易云读公开歌单；汽水走官方歌单接口，拿全曲目后按歌名匹配可播版本。
  * 播放用一个常驻 Audio，页面重绘不会把正在放的歌打断。
+ *
+ * 音源坏了会自动换源：先试歌单自带的地址，再按「歌名 + 歌手」在网易云 / QQ音乐 / 酷狗
+ * 逐个找可直接播放的链接，真的出声了才算换源成功，不会把不能播的地址写回歌单。
  */
 
 import { icon } from '../icons.js';
@@ -9,8 +12,20 @@ import { esc } from '../shell.js';
 import { newId } from '../data.js';
 
 const MUSIC_API = 'https://api.i-meto.com/meting/api';
+const GD_API = 'https://music-api.gdstudio.xyz/api.php';
 const READER_API = 'https://r.jina.ai/';
 const ALLOWED_LINKS = ['music.163.com', '163cn.tv', 'qishui.douyin.com', 'music.douyin.com', 'api.qishui.com'];
+
+/* 换源顺序：先歌单原来的地址，再按歌名到各家找。
+   gdstudio 给的是网易云直链，比 meting 的转发地址更容易出声，所以放前面 */
+const FALLBACK_SOURCES = [
+  { id: 'netease', kind: 'gdstudio' },
+  { id: 'netease', kind: 'meting' },
+  { id: 'tencent', kind: 'meting' },
+  { id: 'kugou', kind: 'meting' },
+];
+const SOURCE_LABEL = { netease: '网易云', tencent: 'QQ音乐', kugou: '酷狗', kuwo: '酷我', qishui: '汽水' };
+const PLAY_TIMEOUT = 9000;
 
 let audio = null;
 let playing = false;
@@ -20,6 +35,9 @@ let queueIndex = 0;
 let queuePlaylistId = '';
 let loadToken = 0;
 let lastCtx = null;
+let attemptDepth = 0;   // >0 表示正在试音源，此时 audio 的 error 不当作播放故障
+let recovering = false; // 播放中途断了正在换源
+let deadCandidates = []; // 这首已经断过的地址，同一轮里不再回头试，免得两个坏源来回跳
 
 function musicOf(state) {
   if (!state.music || typeof state.music !== 'object') state.music = {};
@@ -41,6 +59,147 @@ function fmtTime(seconds) {
   const min = Math.floor(total / 60);
   const sec = total % 60;
   return `${min}:${String(sec).padStart(2, '0')}`;
+}
+
+/* ------------------------------------------------------------ 换源 */
+
+function sourceLabel(id) {
+  return SOURCE_LABEL[id] || '在线音源';
+}
+
+function normText(value) {
+  return String(value == null ? '' : value)
+    .toLowerCase()
+    .replace(/[\s\-—_·・.,，。!！?？'"“”‘’()[\]【】]/g, '');
+}
+
+function searchKeyword(track) {
+  const artist = String(track.artist || '').split(/[,，、/]/)[0].trim();
+  return `${track.title || ''} ${artist}`.trim();
+}
+
+/** 按「歌名像 + 歌手像」排序，宁可少找几个源，也不把别的歌当成换源结果 */
+function rankHits(list, track, titleKey = 'title', artistKey = 'author') {
+  const wantTitle = normText(track.title);
+  const wantArtist = normText(String(track.artist || '').split(/[,，、/]/)[0]);
+  if (!wantTitle) return [];
+  const scored = list.map((item, index) => {
+    const title = normText(item && item[titleKey]);
+    const rawArtist = item ? item[artistKey] : '';
+    const artistText = normText(Array.isArray(rawArtist) ? rawArtist.join('') : rawArtist);
+    let score = 0;
+    if (title && title === wantTitle) score += 5;
+    else if (title && (title.indexOf(wantTitle) >= 0 || wantTitle.indexOf(title) >= 0)) score += 2;
+    if (wantArtist && artistText && artistText.indexOf(wantArtist) >= 0) score += 3;
+    return { item, score, index };
+  }).filter(entry => entry.item && entry.score >= 2);
+  scored.sort((a, b) => b.score - a.score || a.index - b.index);
+  return scored.map(entry => entry.item);
+}
+
+function songIdFromUrl(url) {
+  const match = String(url || '').match(/[?&]id=([^&]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+async function metingCandidates(spec, keyword, track) {
+  const list = await fetchJson(`${MUSIC_API}?server=${encodeURIComponent(spec.id)}&type=search&id=${encodeURIComponent(keyword)}`);
+  if (!Array.isArray(list)) return [];
+  return rankHits(list, track)
+    .slice(0, 2)
+    .filter(hit => hit && hit.url)
+    .map(hit => {
+      const url = secureUrl(hit.url);
+      return { url, via: spec.id, key: `${spec.id}:${songIdFromUrl(url) || url}` };
+    });
+}
+
+async function gdstudioCandidates(spec, keyword, track) {
+  const list = await fetchJson(`${GD_API}?types=search&count=6&source=${encodeURIComponent(spec.id)}&name=${encodeURIComponent(keyword)}`);
+  if (!Array.isArray(list)) return [];
+  const hits = rankHits(list, track, 'name', 'artist').slice(0, 2);
+  const found = [];
+  for (const hit of hits) {
+    const id = String(hit.url_id || hit.id || '');
+    if (!id) continue;
+    try {
+      const info = await fetchJson(`${GD_API}?types=url&id=${encodeURIComponent(id)}&source=${encodeURIComponent(spec.id)}`);
+      if (info && info.url) found.push({ url: secureUrl(info.url), via: spec.id, key: `${spec.id}:${id}` });
+    } catch { /* 这条拿不到播放地址，换下一条 */ }
+  }
+  return found;
+}
+
+/** 依次吐候选地址：歌单原有的 → 网易云直链 → 网易云 → QQ音乐 → 酷狗；同一首歌只试一次 */
+async function* sourceCandidates(track, skip = []) {
+  const seen = new Set();
+  (skip || []).forEach(item => { const url = secureUrl(item); if (url) seen.add(url); });
+  const cached = secureUrl(track.url);
+  if (cached && !seen.has(cached)) {
+    seen.add(cached);
+    yield { url: cached, via: track.playVia || track.via || '', cached: true };
+  }
+  const keyword = searchKeyword(track);
+  if (!keyword) return;
+  for (const spec of FALLBACK_SOURCES) {
+    let found = [];
+    try {
+      found = spec.kind === 'gdstudio'
+        ? await gdstudioCandidates(spec, keyword, track)
+        : await metingCandidates(spec, keyword, track);
+    } catch { continue; }
+    for (const item of found) {
+      const url = secureUrl(item.url);
+      if (!url) continue;
+      const key = item.key || url;
+      if (seen.has(url) || seen.has(key)) continue;
+      seen.add(url);
+      seen.add(key);
+      yield { url, via: item.via || spec.id, cached: false };
+    }
+  }
+}
+
+/** 真正开始出声才算这个音源可用；404 / 版权 / 格式不对都会在超时前失败 */
+function trySource(player, url, timeout = PLAY_TIMEOUT) {
+  return new Promise(resolve => {
+    let settled = false;
+    let timer = 0;
+    const finish = ok => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      player.removeEventListener('error', onError);
+      player.removeEventListener('playing', onPlaying);
+      resolve(ok);
+    };
+    const onError = () => finish(false);
+    const onPlaying = () => finish(true);
+    timer = setTimeout(() => finish(false), timeout);
+    player.addEventListener('error', onError);
+    player.addEventListener('playing', onPlaying);
+    try {
+      player.src = url;
+      const started = player.play();
+      if (started && typeof started.then === 'function') {
+        started.then(() => finish(true)).catch(error => {
+          /* 被浏览器自动播放策略拦住不是音源的问题，别把它当成换源失败 */
+          if (error && error.name === 'NotAllowedError') finish(true);
+        });
+      }
+    } catch {
+      finish(false);
+    }
+  });
+}
+
+function trackSourceTag(track) {
+  if (track.dead) return '暂无可播源';
+  const playing = track.playVia || track.via || '';
+  const label = SOURCE_LABEL[playing] || '';
+  if (!label) return '';
+  const swapped = Boolean(track.swapped) || Boolean(track.via && playing && track.via !== playing);
+  return swapped ? `${label}·换源` : label;
 }
 
 function trackFromState(state) {
@@ -95,13 +254,19 @@ function ensureAudio() {
   audio.addEventListener('error', () => {
     playing = false;
     paintPlayState();
+    if (!audio.src) return;            // 手动停止时清空了 src，不算故障
+    if (attemptDepth > 0) return;      // 正在试音源，由换源流程决定下一条
     if (current) current.dead = true;
-    if (typeof audio.__ctxToast === 'function') audio.__ctxToast('这首没有公开音源，换一首试试');
+    if (typeof audio.__ctxToast === 'function') audio.__ctxToast('音源断了，正在自动换源…');
+    recoverCurrent();
   });
   return audio;
 }
 
 export function stopMusic() {
+  loadToken += 1;   // 让还在跑的换源流程立刻作废
+  recovering = false;
+  deadCandidates = [];
   if (audio) {
     try { audio.pause(); } catch { /* 忽略 */ }
     try { audio.removeAttribute('src'); audio.load(); } catch { /* 忽略 */ }
@@ -388,54 +553,102 @@ async function importByText(ctx, raw) {
   }
 }
 
-async function resolveQishui(ctx, track) {
-  if (track.url) return true;
-  const artist = String(track.artist || '').split(/[,，、/]/)[0].trim();
-  const keyword = `${track.title} ${artist}`.trim();
-  const list = await fetchJson(`${MUSIC_API}?server=netease&type=search&id=${encodeURIComponent(keyword)}`);
-  if (!Array.isArray(list) || !list.length) return false;
-  const norm = value => String(value || '').toLowerCase().replace(/[\s\-—_（）()]/g, '');
-  const hit = list.find(item => norm(item.title) === norm(track.title) && norm(item.author).includes(norm(artist)))
-    || list.find(item => norm(item.title) === norm(track.title))
-    || list[0];
-  if (!hit?.url) return false;
-  track.url = secureUrl(hit.url);
-  track.pic = track.pic || secureUrl(hit.pic || '');
-  track.album = track.album || '';
-  track.via = 'qishui';
-  track.playVia = 'netease';
+/**
+ * 试遍候选音源，直到真的开始出声。成功才把地址写回歌单，失败不留下坏链接。
+ * gate 变了就说明用户已经切歌或停播，当前这轮直接作废。
+ */
+async function startTrack(ctx, playlist, track, gate, options = {}) {
+  attemptDepth += 1;
+  try {
+    for await (const candidate of sourceCandidates(track, options.skip || [])) {
+      if (gate !== loadToken) return false;
+      const player = ensureAudio();
+      player.__ctxToast = message => ctx.toast(message);
+      const ok = await trySource(player, candidate.url);
+      if (gate !== loadToken) return false;
+      if (!ok) continue;
+      track.url = candidate.url;
+      track.playVia = candidate.via;
+      track.dead = false;
+      track.swapped = !candidate.cached;
+      setCurrent(track, playlist);
+      playing = !player.paused;
+      freshSave(ctx, playlist.id, track.id);
+      if (!candidate.cached) ctx.toast(`已自动换源：${sourceLabel(candidate.via)}`);
+      paintPlayState();
+      ctx.rerender();
+      return true;
+    }
+    return false;
+  } finally {
+    attemptDepth -= 1;
+  }
+}
+
+async function playAt(ctx, playlist, index, options = {}) {
+  if (!playlist?.tracks?.length) return false;
+  const track = playlist.tracks[index];
+  if (!track) return false;
+  lastCtx = ctx;
+  const gate = ++loadToken;
+  queue = playlist.tracks;
+  queueIndex = index;
+  queuePlaylistId = playlist.id;
+  deadCandidates = [];
+  /* 换歌先把上一首停下，免得找音源的时候旧歌还在响、进度条却挂在新歌上 */
+  const player = ensureAudio();
+  player.__ctxToast = message => ctx.toast(message);
+  try { player.pause(); } catch { /* 忽略 */ }
+  try { player.removeAttribute('src'); player.load(); } catch { /* 忽略 */ }
+  playing = false;
+  setCurrent(track, playlist);
+  ctx.toast(track.url ? '正在打开音源…' : '正在找可播音源…');
+  const ok = await startTrack(ctx, playlist, track, gate, options);
+  if (gate !== loadToken) return false;
+  if (!ok) {
+    track.url = '';
+    track.playVia = '';
+    track.dead = true;
+    track.swapped = false;
+    playing = false;
+    paintPlayState();
+    ctx.toast('这首暂时没找到能播的音源，可以再点一次重试');
+    ctx.rerender();
+    return false;
+  }
   return true;
 }
 
-async function playAt(ctx, playlist, index) {
-  if (!playlist?.tracks?.length) return;
+/** 放到一半音源断了：换一条能播的接着放，实在没有才提示失败 */
+async function recoverCurrent() {
+  const ctx = lastCtx;
+  if (recovering) return;
+  if (!ctx || !current) return;
+  const playlist = ctx.state.music?.playlists?.find(item => item.id === current.playlistId);
+  if (!playlist) return;
+  const index = playlist.tracks.findIndex(item => item.id === current.trackId);
+  if (index < 0) return;
   const track = playlist.tracks[index];
-  if (!track) return;
-  lastCtx = ctx;
+  recovering = true;
   const gate = ++loadToken;
-  ctx.toast(track.via === 'qishui' && !track.url ? '正在找可播版本…' : '');
+  const skip = deadCandidates.slice();
+  if (current.url) skip.push(current.url);
+  deadCandidates = skip.filter(Boolean);
   try {
-    if (track.via === 'qishui' && !track.url) {
-      const ok = await resolveQishui(ctx, track);
-      if (!ok) throw new Error('这首没找到可播版本，换一首试试');
-    }
+    const ok = await startTrack(ctx, playlist, track, gate, { skip });
     if (gate !== loadToken) return;
-    const player = ensureAudio();
-    player.__ctxToast = message => ctx.toast(message);
-    queue = playlist.tracks;
-    queueIndex = index;
-    queuePlaylistId = playlist.id;
-    setCurrent(track, playlist);
-    player.src = track.url;
-    player.currentTime = 0;
-    const started = await player.play();
-    playing = true;
-    freshSave(ctx, playlist.id, track.id);
-    ctx.rerender();
-  } catch (error) {
-    playing = false;
-    ctx.toast(error?.message || '播放失败，可能是版权或网络问题');
-    ctx.rerender();
+    if (!ok) {
+      track.url = '';
+      track.playVia = '';
+      track.dead = true;
+      track.swapped = false;
+      playing = false;
+      paintPlayState();
+      ctx.toast('自动换源没成功，可以再点一次播放');
+      ctx.rerender();
+    }
+  } finally {
+    recovering = false;
   }
 }
 
@@ -465,19 +678,18 @@ async function playNextByQueue() {
 function togglePlay(ctx) {
   if (!current) return;
   const playlist = ctx.state.music?.playlists?.find(item => item.id === current.playlistId);
-  if (!current.url && current.via === 'qishui' && playlist) {
-    const index = playlist.tracks.findIndex(item => item.id === current.trackId);
-    playAt(ctx, playlist, Math.max(0, index));
-    return;
-  }
   const player = ensureAudio();
-  if (!player.src && current?.url) {
-    player.src = current.url;
-    player.play().then(() => { playing = true; paintPlayState(); }).catch(() => ctx.toast('播放失败'));
+  player.__ctxToast = message => ctx.toast(message);
+  const track = playlist ? playlist.tracks.find(item => item.id === current.trackId) : null;
+  if (!track?.url || !player.src) {
+    if (playlist) {
+      const index = playlist.tracks.findIndex(item => item.id === current.trackId);
+      playAt(ctx, playlist, Math.max(0, index));
+    }
     return;
   }
   if (player.paused) {
-    player.play().then(() => { playing = true; paintPlayState(); }).catch(() => ctx.toast('播放失败'));
+    player.play().then(() => { playing = true; paintPlayState(); }).catch(() => ctx.toast('播放失败，稍后再点一次'));
   } else {
     player.pause();
   }
@@ -524,7 +736,7 @@ function trackLine(ctx, track, playlist, index) {
         <b>${esc(track.title)}</b>
         <span>${esc(track.artist || '未知歌手')}${track.album ? ` · ${esc(track.album)}` : ''}</span>
       </span>
-      <span class="mp-music-track-side">${track.playVia === 'netease' && track.via === 'qishui' ? '网易云' : esc(track.via === 'qishui' ? '汽水' : '网易云')}</span>
+      <span class="mp-music-track-side">${esc(trackSourceTag(track))}</span>
     </button>`;
 }
 
@@ -593,7 +805,7 @@ export const musicApp = {
             <button class="mp-btn accent" data-act="music-import" type="button">${icon('plus')}导入歌单</button>
           </div>`}
         <div class="mp-music-note">
-          网易云公开歌单直接播放；汽水整张歌单都能导入，点歌时自动找网易云可播版本。
+          网易云公开歌单直接播放；汽水整张歌单都能导入。哪首放不出来，会自动按歌名换一个能放音源。
         </div>
       </div>`;
   },
@@ -646,7 +858,7 @@ export const musicPlaylistApp = {
           <div class="mp-music-detail-copy">
             <div class="mp-music-source">${playlist.source === 'qishui' ? '汽水音乐' : '网易云音乐'}</div>
             <div class="mp-music-detail-name">${esc(playlist.name)}</div>
-            <div class="mp-music-detail-sub">${tracks.length} 首 · ${playlist.tracks[0]?.via === 'qishui' ? '按歌名匹配可播版本' : '公开音源'}</div>
+            <div class="mp-music-detail-sub">${tracks.length} 首 · ${playlist.tracks[0]?.via === 'qishui' ? '按歌名匹配可播版本' : '公开音源 · 放不出来自动换源'}</div>
             <div style="display:flex;gap:8px;margin-top:10px">
               ${playAllButton(playlist)}
               <button class="mp-icon-btn" data-act="music-delete" data-id="${playlist.id}" type="button" aria-label="删除歌单">${icon('trash')}</button>
@@ -657,7 +869,7 @@ export const musicPlaylistApp = {
         <div class="mp-music-track-list">
           ${tracks.map((track, index) => trackLine(ctx, track, playlist, index)).join('')}
         </div>
-        <div class="mp-music-note">${playlist.source === 'qishui' ? '汽水歌单整张导入，点歌时再去找可播版本，VIP 或版权受限的可能会跳过。' : '播放走公开外链，个别 VIP 歌可能没有声音。'}</div>
+        <div class="mp-music-note">${playlist.source === 'qishui' ? '汽水歌单整张导入，点歌时先按歌名找可播版本；放不出来会自动换源，VIP 或版权受限的可能真的没有。' : '先播公开外链，链接失效或没有版权时会自动按歌名换源。'}</div>
       </div>`;
   },
 

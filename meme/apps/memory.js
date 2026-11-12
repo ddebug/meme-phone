@@ -5,7 +5,7 @@
  */
 
 import { icon } from '../icons.js';
-import { newId, memoryPresetsOf, syncActiveChatScheme } from '../data.js';
+import { newId, memoryPresetsOf } from '../data.js';
 import { esc } from '../shell.js';
 import { MEMORY_MODES, memoryModeLabel, memoryPresetSummary } from '../memory.js';
 
@@ -30,7 +30,7 @@ function renderPage(ctx) {
   return `
     <div class="mp-page-body">
       <div class="mp-title">酒馆记忆</div>
-      <div class="mp-subtitle">默认读这个角色最新的酒馆聊天；有柏宝书总结时先用总结</div>
+      <div class="mp-subtitle">默认读这个角色最新的酒馆聊天；有酒馆总结时先用总结</div>
 
       <div class="mp-group" style="margin-top:16px">
         <div class="mp-group-label">手机默认方案</div>
@@ -52,9 +52,11 @@ function renderPage(ctx) {
       <div class="mp-group-label" style="margin-top:16px">怎么读</div>
       <div class="mp-card">
         <div class="mp-card-title">自动（默认）</div>
-        <div class="mp-card-sub">这个角色当前酒馆聊天有柏宝书总结，就注入总结；没有总结，才读最近几层酒馆聊天原文。</div>
+        <div class="mp-card-sub">这个角色当前酒馆聊天有酒馆总结，就注入总结；没有总结，才读最近几层酒馆聊天原文。</div>
         <div class="mp-card-title" style="margin-top:12px">层数</div>
         <div class="mp-card-sub">一层就是酒馆里的一条消息。层数越多，模型记得越远，但占的上下文也越多。</div>
+        <div class="mp-card-title" style="margin-top:12px">首楼</div>
+        <div class="mp-card-sub">默认连首楼一起读总结；如果首楼总结丢了三件事或说话方式，可以在方案里改成「首楼用原文」。</div>
       </div>
     </div>`;
 }
@@ -68,6 +70,7 @@ function openEdit(ctx, preset) {
       { label: '改名', value: 'rename' },
       { label: '改记忆来源', value: 'mode', note: memoryModeLabel(preset.mode) },
       { label: '改保留层数', value: 'floors', note: `最近 ${preset.floors || 10} 层` },
+      { label: preset.skipFirstFloor ? '首楼：用原文' : '首楼：用总结', value: 'first', note: preset.skipFirstFloor ? '不注入首楼总结，改注入首楼原文' : '首楼也读酒馆总结' },
       { label: '复制一套', value: 'clone' },
       { label: '删除这套', value: 'delete', danger: true },
     ],
@@ -78,7 +81,6 @@ function openEdit(ctx, preset) {
 
       if (value === 'use') {
         store.activeId = live.id;
-        syncActiveChatScheme(ctx.state);
         ctx.save();
         ctx.rerender();
         ctx.toast(`手机默认记忆改成「${live.name}」`);
@@ -128,12 +130,21 @@ function openEdit(ctx, preset) {
         return;
       }
 
+      if (value === 'first') {
+        live.skipFirstFloor = !live.skipFirstFloor;
+        ctx.save();
+        ctx.rerender();
+        ctx.toast(live.skipFirstFloor ? '首楼改成注入原文' : '首楼恢复用总结');
+        return;
+      }
+
       if (value === 'clone') {
         const copy = {
           id: newId('mem'),
           name: `${live.name} 副本`.slice(0, 20),
           mode: live.mode,
           floors: live.floors,
+          skipFirstFloor: Boolean(live.skipFirstFloor),
         };
         store.presets.push(copy);
         ctx.save();
@@ -158,8 +169,11 @@ function openEdit(ctx, preset) {
             const index = store.presets.findIndex(item => item.id === live.id);
             if (index < 0) return;
             store.presets.splice(index, 1);
-            if (store.activeId === live.id) store.activeId = store.presets[0].id;
-            syncActiveChatScheme(ctx.state);
+            const fallback = store.presets[0].id;
+            if (store.activeId === live.id) store.activeId = fallback;
+            (ctx.state.settings.api.chatSchemes || []).forEach(item => {
+              if (item.memoryId === live.id) item.memoryId = fallback;
+            });
             ctx.save();
             ctx.rerender();
             ctx.toast('这套记忆方案删掉了');
@@ -183,6 +197,7 @@ function handle(ctx, act, data) {
       name: '新的记忆方案',
       mode: active?.mode || 'auto',
       floors: active?.floors || 10,
+      skipFirstFloor: Boolean(active?.skipFirstFloor),
     };
     ctx.state.settings.memory.presets.push(preset);
     ctx.save();

@@ -69,4 +69,37 @@ export const TINT = {
   api: ['#d3cdf0', '#aea3e6'],
   dress: ['#c3d6f2', '#8fb3e8'],
   music: ['#e4c9f4', '#bd9bea'],
+  reply: ['#d8d0fa', '#b7a7f1'],
 };
+
+/** 可换的图标图形：不把内部路径暴露给页面，只给名字列表。 */
+export const ICON_NAMES = Object.keys(P);
+
+export const ICON_LABELS = {
+  chat: '聊天气泡', contacts: '联系人', diary: '日记本', settings: '齿轮',
+  theater: '小剧场', bookmark: '书签', smile: '笑脸', plan: '清单',
+  brush: '画笔', help: '问号', back: '左箭头', home: '房子',
+  chevron: '下箭头', close: '关闭', plus: '加号', send: '纸飞机',
+  spark: '星光', search: '放大镜', more: '更多', copy: '复制',
+  reply: '回覆', refresh: '刷新', trash: '垃圾桶', heart: '心',
+  clock: '时钟', moon: '月亮', sun: '太阳', image: '图片',
+  pin: '定位', bell: '铃铛', code: '代码', book: '书本',
+  music: '音符', play: '播放', pause: '暂停', next: '下一首',
+};
+
+/** 桌面与 Dock 上所有可换图标的 App。 */
+export const APP_ICON_TARGETS = [
+  { id: 'chat', name: '聊天', icon: 'chat' },
+  { id: 'contacts', name: '通讯录', icon: 'contacts' },
+  { id: 'diary', name: '日记', icon: 'diary' },
+  { id: 'settings', name: '设置', icon: 'settings' },
+  { id: 'extras', name: '小剧场', icon: 'theater' },
+  { id: 'music', name: '音乐', icon: 'music' },
+  { id: 'draw', name: '绘图', icon: 'image' },
+  { id: 'plans', name: '计划', icon: 'plan' },
+  { id: 'dress', name: '装扮', icon: 'brush' },
+  { id: 'memory-presets', name: '记忆', icon: 'book' },
+  { id: 'presets', name: '预设', icon: 'reply' },
+  { id: 'api', name: '接口', icon: 'code' },
+];
+

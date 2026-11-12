@@ -32,6 +32,33 @@ export function applyWall(root, settings) {
   }
 }
 
+/* 装扮：字体、字号、行距、字重、灵动岛。所有值都用 CSS 变量，换页不会重排手机壳。 */
+const FONT_STACKS = {
+  system: ['-apple-system, "SF Pro Text", "PingFang SC", "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei", sans-serif',
+    '"Songti SC", "Noto Serif SC", "Source Han Serif SC", SimSun, serif'],
+  rounded: ['"YouYuan", "Yuanti SC", "Microsoft YaHei UI", "PingFang SC", "HarmonyOS Sans SC", sans-serif',
+    '"Songti SC", "Noto Serif SC", "Source Han Serif SC", SimSun, serif'],
+  serif: ['"Songti SC", "Noto Serif SC", "Source Han Serif SC", SimSun, serif',
+    '"Songti SC", "Noto Serif SC", "Source Han Serif SC", SimSun, serif'],
+  kai: ['"Kaiti SC", "STKaiti", KaiTi, "Noto Serif SC", serif',
+    '"Kaiti SC", "STKaiti", KaiTi, "Noto Serif SC", serif'],
+};
+
+export function applyLook(root, settings) {
+  if (!root) return;
+  const dress = settings?.dress || {};
+  const font = FONT_STACKS[dress.font] ? dress.font : 'system';
+  const scale = Math.max(0.85, Math.min(1.3, Number(dress.fontSize) || 1));
+  const line = Math.max(0.9, Math.min(1.3, Number(dress.lineHeight) || 1));
+  const weight = [400, 500, 600].includes(Number(dress.fontWeight)) ? Number(dress.fontWeight) : 400;
+  root.style.setProperty('--font-ui', FONT_STACKS[font][0]);
+  root.style.setProperty('--font-serif', FONT_STACKS[font][1]);
+  root.style.setProperty('--font-scale', String(scale));
+  root.style.setProperty('--line-scale', String(line));
+  root.style.setProperty('--font-weight', String(weight));
+  root.dataset.mpIsland = dress.island === 'hide' ? 'hide' : 'show';
+}
+
 export function dateText(date = new Date()) {
   return `${date.getMonth() + 1}月${date.getDate()}日<br>${WEEK[date.getDay()]}`;
 }
@@ -62,6 +89,17 @@ function avatarHtml(name, url, className = 'mp-avatar') {
   return `<span class="${className}" style="${style}">${url ? '' : esc(initial)}</span>`;
 }
 
+/* 每个桌面图标都先看装扮里有没有换过：自定义图片 > 换过的图形 > App 默认图形 */
+function appTileHtml(app, state, badge = 0) {
+  const custom = state?.settings?.dress?.icons?.[app.id];
+  const image = typeof custom?.image === 'string' && custom.image.startsWith('data:image/') ? custom.image : '';
+  const shape = typeof custom?.shape === 'string' ? custom.shape : app.icon;
+  const style = image
+    ? ` style="background-image:url(&quot;${esc(image)}&quot;);background-size:cover;background-position:center"`
+    : '';
+  return `<span class="mp-tile${image ? ' mp-tile-image' : ''}"${style}>${image ? '' : ico(shape)}${badge ? `<span class="mp-badge">${badge > 99 ? '99+' : badge}</span>` : ''}</span>`;
+}
+
 /* ================================================================== 外壳 */
 
 export function createShell(options) {
@@ -77,6 +115,7 @@ export function createShell(options) {
     root,
     stack: [],
     sheet: null,
+    sheetAnimated: false,
     toastTimer: 0,
     live: { inputValue: '', focus: false },
     scroller: null,
@@ -89,8 +128,8 @@ export function createShell(options) {
     home: () => { shell.stack.length = 0; shell.sheet = null; render(); },
     rerender: () => render(),
     toast: (message) => { shell.toastMessage = message; render(); scheduleToastClear(); },
-    openSheet: (sheet) => { shell.sheet = sheet; render(); },
-    closeSheet: () => { shell.sheet = null; render(); },
+    openSheet: (sheet) => { shell.sheetAnimated = false; shell.sheet = sheet; render(); },
+    closeSheet: () => { shell.sheet = null; shell.sheetAnimated = false; render(); },
     icon: ico,
     esc,
     TINT,
@@ -112,7 +151,7 @@ export function createShell(options) {
 
     const iconButtons = desktopApps.map(app => `
       <button class="mp-app" data-act="open-app" data-app="${app.id}" type="button" aria-label="${esc(app.name)}">
-        <span class="mp-tile">${ico(app.icon)}</span>
+        ${appTileHtml(app, state)}
         <span class="mp-app-label">${esc(app.name)}</span>
       </button>`).join('');
 
@@ -120,7 +159,7 @@ export function createShell(options) {
       const badge = app.id === 'chat' ? unreadTotal(state) : 0;
       return `
       <button class="mp-app" data-act="open-app" data-app="${app.id}" type="button" aria-label="${esc(app.name)}">
-        <span class="mp-tile">${ico(app.icon)}${badge ? `<span class="mp-badge">${badge > 99 ? '99+' : badge}</span>` : ''}</span>
+        ${appTileHtml(app, state, badge)}
         <span class="mp-app-label">${esc(app.name)}</span>
       </button>`;
     }).join('');
@@ -174,13 +213,14 @@ export function createShell(options) {
   function sheetHtml() {
     const sheet = shell.sheet;
     if (!sheet) return '';
+    const still = shell.sheetAnimated ? ' is-still' : '';
 
     if (sheet.kind === 'text') {
       return `
-        <div class="mp-mask" data-act="sheet-close"></div>
-        <div class="mp-sheet" role="dialog" aria-modal="true">
+        <div class="mp-mask${still}" data-act="sheet-close"></div>
+        <div class="mp-sheet${still}" role="dialog" aria-modal="true">
           ${sheet.title ? `<div class="mp-sheet-title">${esc(sheet.title)}</div>` : ''}
-          <textarea id="mpSheetText" style="width:100%;height:150px;box-sizing:border-box;border-radius:16px;padding:12px 13px;font:inherit;font-size:13.5px;line-height:1.72;color:var(--text);background:rgba(142,123,242,.05);border:1px solid rgba(142,123,242,.16);outline:none;resize:none;font-family:var(--font-serif)" placeholder="${esc(sheet.placeholder || '')}">${esc(sheet.value || '')}</textarea>
+          <textarea id="mpSheetText" class="mp-sheet-textarea" placeholder="${esc(sheet.placeholder || '')}">${esc(sheet.value || '')}</textarea>
           <div style="display:flex;gap:8px;margin-top:9px">
             <button class="mp-sheet-cancel" data-act="sheet-close" type="button" style="margin-top:0;flex:1">取消</button>
             <button class="mp-sheet-cancel" data-act="sheet-text-ok" type="button" style="margin-top:0;flex:1.4;background:linear-gradient(150deg,#9583f2,#7f6ce9);color:#fff;box-shadow:0 8px 18px rgba(140,116,224,.26)">${esc(sheet.confirm || '存下来')}</button>
@@ -193,8 +233,8 @@ export function createShell(options) {
         ${item.icon ? ico(item.icon) : ''}<span>${esc(item.label)}</span>
       </button>`).join('');
     return `
-      <div class="mp-mask" data-act="sheet-close"></div>
-      <div class="mp-sheet" role="dialog" aria-modal="true">
+      <div class="mp-mask${still}" data-act="sheet-close"></div>
+      <div class="mp-sheet${still}" role="dialog" aria-modal="true">
         ${sheet.title ? `<div class="mp-sheet-title">${esc(sheet.title)}</div>` : ''}
         ${items}
         <button class="mp-sheet-cancel" data-act="sheet-close" type="button">取消</button>
@@ -208,11 +248,12 @@ export function createShell(options) {
     root.className = 'mp-root';
     root.dataset.mpTheme = status;
     applyWall(root, state.settings);
+    applyLook(root, state.settings);
     root.innerHTML = `
       <div class="mp-overlay">
         <div class="mp-device">
           <div class="mp-screen">
-            <div class="mp-island"></div>
+            ${state.settings.dress?.island === 'hide' ? '' : '<div class="mp-island"></div>'}
             <div class="mp-wallpaper"></div>
             <div class="mp-scrim"></div>
             <div class="mp-status">
@@ -229,6 +270,7 @@ export function createShell(options) {
 
     restoreLive();
     shell.improveSendState();
+    if (shell.sheet) shell.sheetAnimated = true;
   }
 
   function restoreLive() {
@@ -280,16 +322,21 @@ export function createShell(options) {
       const sheet = shell.sheet;
       const handler = sheet?.onPick;
       const value = data.value;
-      ctx.closeSheet();
+      /* 先回调，再渲染：重渲染会重建对象，先关弹层会让回调改到旧对象上 */
+      shell.sheet = null;
+      shell.sheetAnimated = false;
       if (typeof handler === 'function') handler(value);
+      if (!shell.sheet) render();
     },
     'sheet-text-ok': () => {
       const sheet = shell.sheet;
       const node = root.querySelector('#mpSheetText');
       const value = node ? node.value : '';
       const handler = sheet?.onText;
-      ctx.closeSheet();
+      shell.sheet = null;
+      shell.sheetAnimated = false;
       if (typeof handler === 'function') handler(value);
+      if (!shell.sheet) render();
     },
     'toast': (data) => ctx.toast(data.message || ''),
     'phone-close': () => { if (typeof ctx.onClose === 'function') ctx.onClose(); },

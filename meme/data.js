@@ -15,18 +15,45 @@ export function emptyState() {
       theme: 'day',              // day | night
       wallpaper: 'day',          // day | night | none | custom（默认铺壁纸，不透出酒馆背景）
       customWall: '',            // 自定义壁纸的 data URL
+      /* 装扮：字体、字号、行距、灵动岛、每个 App 的自定义图标 */
+      dress: {
+        font: 'system',          // system | rounded | serif | kai
+        fontSize: 1,             // 0.85–1.3，只影响文字，不放大手机壳
+        lineHeight: 1,           // 0.9–1.3
+        fontWeight: 400,         // 400 | 500 | 600
+        island: 'show',          // show | hide
+        icons: {},               // appId -> { shape?: iconName, image?: dataURL }
+      },
       user: { name: '我', avatar: '', key: '' },
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
       chat: { showTime: true, enterToSend: false, remind: true, wake: true },
-      /* 酒馆记忆方案：默认有柏宝书总结就用总结，没有就取最近 10 层酒馆聊天 */
+      /* 酒馆记忆方案：默认有酒馆总结就用总结，没有就取最近 10 层酒馆聊天 */
       memory: {
         activeId: 'mem_auto',
         presets: [
-          { id: 'mem_auto', name: '默认', mode: 'auto', floors: 10 },
-          { id: 'mem_summary', name: '只看总结', mode: 'summary', floors: 10 },
-          { id: 'mem_recent', name: '最近原文', mode: 'recent', floors: 20 },
+          { id: 'mem_auto', name: '默认', mode: 'auto', floors: 10, skipFirstFloor: false },
+          { id: 'mem_summary', name: '只看总结', mode: 'summary', floors: 10, skipFirstFloor: false },
+          { id: 'mem_recent', name: '最近原文', mode: 'recent', floors: 20, skipFirstFloor: false },
+        ],
+      },
+      /* 回复预设：真正告诉模型「这通聊天该怎么说话」的一段指令 */
+      reply: {
+        activeId: 'reply_natural',
+        presets: [
+          {
+            id: 'reply_natural', name: '自然发消息',
+            text: '像平时发微信一样回消息：口语、短句，一次只回一两句。不要写旁白、括号里的动作，也不要写成小说段落。',
+          },
+          {
+            id: 'reply_short', name: '再短一点',
+            text: '回复尽量短，通常不超过 20 个字，像随手回一条消息。不要解释、不要总结、不要用括号写动作。',
+          },
+          {
+            id: 'reply_soft', name: '带点情绪',
+            text: '像平时发微信一样回消息，口语、短句，可以带一点情绪和停顿，但不要写成小说，也不要用括号写旁白动作。',
+          },
         ],
       },
       api: {
@@ -35,7 +62,7 @@ export function emptyState() {
         ],
         /* LLM 整体方案 = 一套聊天 API + 一套酒馆记忆 */
         chatSchemes: [
-          { id: 'lsch_default', name: '默认', apiId: 'api_default', memoryId: 'mem_auto' },
+          { id: 'lsch_default', name: '默认', apiId: 'api_default', memoryId: 'mem_auto', replyId: 'reply_natural' },
         ],
         chatSchemeId: 'lsch_default',
       },
@@ -185,7 +212,27 @@ export function memoryPresetFor(state, chat) {
   return list.find(preset => preset.id === state?.settings?.memory?.activeId) || list[0] || null;
 }
 
-/** 手机里保存的 LLM 整体方案：一套聊天 API + 一套酒馆记忆绑在一起。 */
+/** 手机里保存的回复预设：每一套就是一段告诉模型「怎么回消息」的指令。 */
+export function replyPresetsOf(state) {
+  const store = state?.settings?.reply;
+  return Array.isArray(store?.presets) ? store.presets : [];
+}
+
+/** 这个会话实际用哪套回复预设：自己选了就用自己那套，没选就跟随手机。 */
+export function replyPresetFor(state, chat) {
+  const list = replyPresetsOf(state);
+  const own = list.find(preset => preset.id === chat?.replyPresetId);
+  if (own) return own;
+  return list.find(preset => preset.id === state?.settings?.reply?.activeId) || list[0] || null;
+}
+
+/** 注入模型的回复要求；预设没写内容时返回空，不额外加约束。 */
+export function replyPromptFor(state, chat) {
+  const preset = replyPresetFor(state, chat);
+  return String(preset?.text || '').trim();
+}
+
+/** 手机里保存的 LLM 整体方案：一套聊天 API + 一套酒馆记忆 + 一套回复预设。 */
 export function chatSchemesOf(state) {
   const store = state?.settings?.api;
   return Array.isArray(store?.chatSchemes) ? store.chatSchemes : [];
@@ -197,26 +244,15 @@ export function activeChatScheme(state) {
   return list.find(item => item.id === store?.chatSchemeId) || list[0] || null;
 }
 
-/** 切一套整体方案：API 和记忆一起换。 */
+/** 切一套整体方案：API、记忆和回复预设一起换。 */
 export function applyChatScheme(state, scheme) {
   if (!scheme) return false;
   const store = state.settings.api;
   if (apiPresetsOf(state).some(item => item.id === scheme.apiId)) store.activeChat = scheme.apiId;
   if (memoryPresetsOf(state).some(item => item.id === scheme.memoryId)) state.settings.memory.activeId = scheme.memoryId;
+  if (replyPresetsOf(state).some(item => item.id === scheme.replyId)) state.settings.reply.activeId = scheme.replyId;
   store.chatSchemeId = scheme.id;
   return true;
-}
-
-/** 单独换了 API 或记忆后，把当前整体方案的两个绑定同步过去。 */
-export function syncActiveChatScheme(state) {
-  const scheme = activeChatScheme(state);
-  if (!scheme) return;
-  if (apiPresetsOf(state).some(item => item.id === state.settings.api.activeChat)) {
-    scheme.apiId = state.settings.api.activeChat;
-  }
-  if (memoryPresetsOf(state).some(item => item.id === state.settings.memory.activeId)) {
-    scheme.memoryId = state.settings.memory.activeId;
-  }
 }
 
 export function lastMessage(chat) {
@@ -586,6 +622,7 @@ export function normalize(raw) {
       name: String(item.name).trim().slice(0, 20),
       mode: ['auto', 'summary', 'recent'].includes(item.mode) ? item.mode : 'auto',
       floors: Math.max(1, Math.min(50, Number(item.floors) || 10)),
+      skipFirstFloor: Boolean(item.skipFirstFloor),
     }));
   merged.settings.memory = {
     ...base.settings.memory,
@@ -595,7 +632,55 @@ export function normalize(raw) {
   if (!merged.settings.memory.presets.some(item => item.id === merged.settings.memory.activeId)) {
     merged.settings.memory.activeId = merged.settings.memory.presets[0].id;
   }
+  const replyRaw = raw.settings?.reply;
+  const replyList = Array.isArray(replyRaw?.presets) ? replyRaw.presets : [];
+  const replyPresets = [];
+  const seenReplyIds = new Set();
+  replyList.forEach((item, index) => {
+    if (!item || typeof item !== 'object') return;
+    let id = String(item.id || `reply_${index + 1}`).trim().slice(0, 40);
+    if (!id || seenReplyIds.has(id)) id = `reply_${index + 1}_${seenReplyIds.size}`;
+    seenReplyIds.add(id);
+    replyPresets.push({
+      id,
+      name: String(item.name || '').trim().slice(0, 20) || `预设 ${index + 1}`,
+      text: String(item.text || '').trim().slice(0, 3000),
+    });
+  });
+  merged.settings.reply = {
+    ...base.settings.reply,
+    ...(replyRaw && typeof replyRaw === 'object' ? replyRaw : {}),
+    presets: replyPresets.length ? replyPresets : base.settings.reply.presets,
+  };
+  if (!merged.settings.reply.presets.some(item => item.id === merged.settings.reply.activeId)) {
+    merged.settings.reply.activeId = merged.settings.reply.presets[0].id;
+  }
   merged.settings.customWall = typeof raw.settings?.customWall === 'string' ? raw.settings.customWall : '';
+  const dressRaw = raw.settings?.dress && typeof raw.settings.dress === 'object' && !Array.isArray(raw.settings.dress)
+    ? raw.settings.dress
+    : {};
+  const iconsRaw = dressRaw.icons && typeof dressRaw.icons === 'object' && !Array.isArray(dressRaw.icons)
+    ? dressRaw.icons
+    : {};
+  const icons = {};
+  for (const [appId, value] of Object.entries(iconsRaw)) {
+    if (!appId || !value || typeof value !== 'object') continue;
+    const shape = typeof value.shape === 'string' ? value.shape.trim().slice(0, 40) : '';
+    const image = typeof value.image === 'string' && value.image.startsWith('data:image/') && value.image.length < 400000
+      ? value.image
+      : '';
+    if (shape || image) icons[String(appId).slice(0, 40)] = { ...(shape ? { shape } : {}), ...(image ? { image } : {}) };
+  }
+  merged.settings.dress = {
+    ...base.settings.dress,
+    ...dressRaw,
+    font: ['system', 'rounded', 'serif', 'kai'].includes(dressRaw.font) ? dressRaw.font : base.settings.dress.font,
+    fontSize: Math.max(0.85, Math.min(1.3, Number(dressRaw.fontSize) || 1)),
+    lineHeight: Math.max(0.9, Math.min(1.3, Number(dressRaw.lineHeight) || 1)),
+    fontWeight: [400, 500, 600].includes(Number(dressRaw.fontWeight)) ? Number(dressRaw.fontWeight) : 400,
+    island: dressRaw.island === 'hide' ? 'hide' : 'show',
+    icons,
+  };
   if (merged.settings.wallpaper === 'custom' && !merged.settings.customWall) merged.settings.wallpaper = 'day';
   merged.settings.image = {
     ...base.settings.image,
@@ -640,6 +725,7 @@ export function normalize(raw) {
   /* LLM 整体方案：旧存档没有就按当前 API + 当前记忆补一套默认方案 */
   const apiIds = new Set(merged.settings.api.presets.map(item => item.id));
   const memoryIds = new Set(merged.settings.memory.presets.map(item => item.id));
+  const replyIds = new Set(merged.settings.reply.presets.map(item => item.id));
   const fallbackApiId = apiIds.has(merged.settings.api.activeChat)
     ? merged.settings.api.activeChat
     : merged.settings.api.presets[0].id;
@@ -659,19 +745,22 @@ export function normalize(raw) {
       name: String(item.name || `方案 ${index + 1}`).trim().slice(0, 20) || `方案 ${index + 1}`,
       apiId: apiIds.has(item.apiId) ? item.apiId : fallbackApiId,
       memoryId: memoryIds.has(item.memoryId) ? item.memoryId : fallbackMemoryId,
+      replyId: replyIds.has(item.replyId) ? item.replyId : merged.settings.reply.activeId,
     });
   });
   if (!chatSchemes.length) {
     chatSchemes.push({
       id: 'lsch_default', name: '默认', apiId: fallbackApiId, memoryId: fallbackMemoryId,
+      replyId: merged.settings.reply.activeId,
     });
   }
   const wantedScheme = String(merged.settings.api.chatSchemeId || '');
   const chatScheme = chatSchemes.find(item => item.id === wantedScheme) || chatSchemes[0];
   merged.settings.api.chatSchemes = chatSchemes;
   merged.settings.api.chatSchemeId = chatScheme.id;
-  merged.settings.api.activeChat = chatScheme.apiId;
-  merged.settings.memory.activeId = chatScheme.memoryId;
+  if (!apiIds.has(merged.settings.api.activeChat)) merged.settings.api.activeChat = chatScheme.apiId;
+  if (!memoryIds.has(merged.settings.memory.activeId)) merged.settings.memory.activeId = chatScheme.memoryId;
+  if (!replyIds.has(merged.settings.reply.activeId)) merged.settings.reply.activeId = chatScheme.replyId;
   merged.version = SCHEMA_VERSION;
   merged.contacts = merged.contacts || {};
   merged.chats = merged.chats || {};

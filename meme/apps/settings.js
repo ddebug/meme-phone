@@ -45,7 +45,7 @@ export const settingsApp = {
           <div class="mp-group-label">账号</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'contacts', title: '用户', sub: `${state.settings.userMode === 'pin' ? '固定' : '跟随酒馆'} · ${state.settings.user.name}`, act: 'set-open', app: 'user' })}
-            ${row(ctx, { iconName: 'brush', title: '外观与主题', sub: `${wallLabel} · ${state.settings.theme === 'night' ? '夜间' : '日间'}`, act: 'set-open-appearance' })}
+            ${row(ctx, { iconName: 'brush', title: '装扮与主题', sub: `${wallLabel} · ${state.settings.theme === 'night' ? '夜间' : '日间'} · 字体与图标`, act: 'set-open-dress' })}
           </div>
         </div>
 
@@ -54,6 +54,7 @@ export const settingsApp = {
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'bell', title: '消息提醒', sub: '有新消息时在图标上显示红点', act: 'set-toggle-remind', toggle: state.settings.chat.remind !== false })}
             ${row(ctx, { iconName: 'chat', title: '空着发送 = 让 TA 主动开口', sub: '不写空消息，只触发一句主动的话', act: 'set-toggle-wake', toggle: state.settings.chat.wake !== false })}
+            ${row(ctx, { iconName: 'reply', title: '回复预设', sub: '告诉模型该怎么回消息，可多套切换', act: 'set-open', app: 'presets' })}
           </div>
         </div>
 
@@ -78,7 +79,7 @@ export const settingsApp = {
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'image', title: '绘图', sub: imageReady ? `${imageLabel} · ${image.model || '模型没填'}` : `${imageLabel} · 还没填${image.engine === 'custom' ? '地址' : ' Key'}`, act: 'set-open', app: 'draw' })}
             ${row(ctx, { iconName: 'code', title: '聊天接口与预设', sub: '每套 = 地址 + Key + 模型，只影响聊天', act: 'set-open', app: 'api' })}
-            ${row(ctx, { iconName: 'search', title: '查角色', sub: (state.charactersFromTavern ? `酒馆里 ${state.characters.length} 张角色卡` : '看酒馆里每张角色卡的设定'), act: 'set-open', app: 'characters' })}
+            ${row(ctx, { iconName: 'search', title: '查角色', sub: (state.charactersFromTavern ? `酒馆里 ${state.characters.length} 张角色卡` : '看酒馆里每张角色卡的设定'), act: 'set-open-cards' })}
             ${row(ctx, { iconName: 'smile', title: '表情包', sub: '表情面板里那些贴纸', act: 'set-open', app: 'emoji' })}
             ${row(ctx, { iconName: 'help', title: '帮助', sub: '怎么用、快捷键、常见问题', act: 'set-open', app: 'help' })}
           </div>
@@ -104,7 +105,9 @@ export const settingsApp = {
   handle(ctx, act, data) {
     const state = ctx.state;
 
+    if (act === 'set-open-dress') { ctx.go('app-dress'); return true; }
     if (act === 'set-open-appearance') { ctx.go('app-appearance'); return true; }
+    if (act === 'set-open-cards') { ctx.go('app-contacts', { tab: 'cards' }); return true; }
 
     if (act === 'set-open') {
       if (data?.app) ctx.go(`app-${data.app}`);
@@ -252,8 +255,8 @@ export const appearanceApp = {
     return `
       <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button><span style="flex:1"></span></div>
       <div class="mp-page-body">
-        <div class="mp-title" style="margin-top:0">外观</div>
-        <div class="mp-subtitle">背景、主题与图标</div>
+        <div class="mp-title" style="margin-top:0">壁纸与主题</div>
+        <div class="mp-subtitle">背景和明暗；字体、灵动岛与图标在「装扮」里</div>
 
         <div class="mp-group-label" style="margin-top:10px">背景</div>
         ${walls.map(item => row(item, 'pick-wall', 'wall')).join('')}
@@ -264,7 +267,7 @@ export const appearanceApp = {
           ${customWall ? `<button class="mp-btn" data-act="remove-custom-wall" type="button" style="flex:0 0 auto;padding:0 16px">删除</button>` : ''}
         </div>
         <input id="mpWallFile" type="file" accept="image/*" style="display:none">
-        <div class="mp-subtitle" style="margin-top:6px;font-size:11.5px">图片会存进小手机存档，导出备份时一起带走；只铺在屏幕里。</div>
+        <div class="mp-subtitle" style="margin-top:6px;font-size: calc(11.5px * var(--font-scale))">图片会存进小手机存档，导出备份时一起带走；只铺在屏幕里。</div>
 
         <div class="mp-group-label" style="margin-top:14px">主题</div>
         <div style="display:flex;gap:8px">
@@ -272,22 +275,18 @@ export const appearanceApp = {
             <button class="mp-chip-btn${theme === item.key ? ' is-on' : ''}" data-act="pick-theme" data-theme="${item.key}" type="button" style="flex:1">
               <span style="width:22px;height:22px;border-radius:7px;background:${item.swatch};box-shadow:inset 0 0 0 1px rgba(120,110,170,.16)"></span>
               <span style="display:flex;flex-direction:column;gap:2px;text-align:left">
-                <span style="font-size:12.5px">${esc(item.title)}</span>
-                <span style="font-size:10.5px;color:var(--text-3)">${esc(item.sub)}</span>
+                <span style="font-size: calc(12.5px * var(--font-scale))">${esc(item.title)}</span>
+                <span style="font-size: calc(10.5px * var(--font-scale));color:var(--text-3)">${esc(item.sub)}</span>
               </span>
             </button>`).join('')}
         </div>
 
-        <div class="mp-group-label" style="margin-top:14px">图标</div>
-        <div class="mp-group-box" style="padding:14px">
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;justify-items:center">
-            ${Object.keys(TINT).slice(0, 8).map(key => `<span style="width:44px;height:44px;border-radius:13px;display:grid;place-items:center;${tintStyle(key)};box-shadow:var(--shadow-s)">${icon(key)}</span>`).join('')}
-          </div>
-        </div>
+        <button class="mp-dress-link" data-act="set-open-dress" type="button">${icon('brush')}字体、灵动岛和 App 图标去「装扮」换</button>
       </div>`;
   },
 
   handle(ctx, act, data) {
+    if (act === 'set-open-dress') { ctx.go('app-dress'); return true; }
     if (act === 'pick-theme') {
       const next = data.theme === 'night' ? 'night' : 'day';
       ctx.state.settings.theme = next;

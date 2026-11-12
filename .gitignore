@@ -11,6 +11,9 @@ desktop.ini
 # 预览打包的中间产物
 scripts/__pycache__/
 
+# 本地 QA 脚本、截图和浏览器测试配置
+_qa/
+
 # 只用来看/对照的克隆仓库（真正的代码已拷进 baibai-book/）
 ref/
 

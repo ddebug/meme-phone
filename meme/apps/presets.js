@@ -6,7 +6,7 @@
 
 import { icon } from '../icons.js';
 import { esc } from '../shell.js';
-import { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext, normalizeReplyItems, defaultReplyItems } from '../data.js';
+import { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext, normalizeReplyItems, defaultReplyItems, REPLY_CONTEXT_SPECS } from '../data.js';
 
 let editingId = '';
 
@@ -16,8 +16,7 @@ function clip(text, max = 42) {
 }
 
 function injectedCount(preset) {
-  const context = normalizeReplyContext(preset?.context);
-  return ['character', 'user', 'memory', 'history', 'time'].filter(key => context[key]).length;
+  return promptItems(preset).filter(item => item.kind === 'context' && item.enabled).length;
 }
 
 function contextNote(preset) {
@@ -26,23 +25,42 @@ function contextNote(preset) {
 }
 
 function promptItems(preset) {
-  return normalizeReplyItems(preset?.items);
+  return normalizeReplyItems(preset?.items, preset?.context);
 }
 
 function itemNote(preset) {
   const items = promptItems(preset);
-  const chat = items.filter(item => item.kind !== 'app').length;
+  const chat = items.filter(item => item.kind === 'chat').length;
+  const context = items.filter(item => item.kind === 'context').length;
   const app = items.filter(item => item.kind === 'app').length;
   if (!items.length) return '没有附加提示';
-  return app ? `聊天 ${chat} 条 · 其他软件 ${app} 条` : `附加 ${chat} 条提示`;
+  return [
+    chat ? `聊天 ${chat} 条` : '',
+    context ? `上下文 ${context} 条` : '',
+    app ? `其他软件 ${app} 条` : '',
+  ].filter(Boolean).join(' · ');
 }
 
 function itemKindLabel(item) {
-  return item.kind === 'app' ? `其他软件${item.app ? ` · ${item.app}` : ''}` : '聊天';
+  if (item.kind === 'context') return '上下文注入';
+  if (item.kind === 'app') return `其他软件${item.app ? ` · ${item.app}` : ''}`;
+  return '聊天行为';
 }
 
 function roleLabel(role) {
   return role === 'user' ? '用户' : role === 'assistant' ? '角色示例' : '系统';
+}
+
+function contextItemNote(item, context) {
+  const spec = REPLY_CONTEXT_SPECS[item.auto];
+  if (item.auto === 'history') return `最近 ${context.historyLimit} 条会话`;
+  return spec?.note || '手机读取当前数据';
+}
+
+function setContextEnabled(preset, key, enabled) {
+  const context = normalizeReplyContext(preset.context);
+  context[key] = Boolean(enabled);
+  preset.context = context;
 }
 
 function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
@@ -141,7 +159,7 @@ function importPresets(ctx) {
           name: String(item.name || '').trim().slice(0, 20) || `导入预设 ${index + 1}`,
           text: String(item.text || '').trim().slice(0, 3000),
           context: normalizeReplyContext(item.context),
-          items: normalizeReplyItems(item.items),
+          items: normalizeReplyItems(item.items, item.context),
         };
       });
       ctx.openSheet({
@@ -192,7 +210,7 @@ export const presetsApp = {
           <button class="mp-icon-btn" data-act="reply-more" type="button" aria-label="导入导出">${icon('more')}</button>
           <button class="mp-icon-btn" data-act="reply-new" type="button" aria-label="新建预设">${icon('plus')}</button>
         </div>
-        <div class="mp-subtitle">一套预设由回复指令、聊天行为条目、其他软件条目和注入的上下文组成；聊天设置里还能给单个会话换一套</div>
+        <div class="mp-subtitle">一套预设就是一条条提示词：回复指令、聊天行为、其他软件、上下文注入都在同一个列表里，能开关能排序</div>
 
         <div class="mp-group-label" style="margin-top:14px">手机默认 · ${list.length} 套</div>
         <div class="mp-group-box">
@@ -272,43 +290,29 @@ export const replyPresetApp = {
     const text = String(preset.text || '');
     const context = normalizeReplyContext(preset.context);
     const items = promptItems(preset);
-    const chatItems = items.filter(item => item.kind !== 'app');
-    const appItems = items.filter(item => item.kind === 'app');
+    const contextCount = items.filter(item => item.kind === 'context').length;
     const itemRow = (item) => {
       const index = items.indexOf(item);
+      const isContext = item.kind === 'context';
+      const openAct = isContext ? 'reply-context-open' : 'reply-item-open';
+      const sub = isContext
+        ? `${roleLabel(item.role)} · ${item.enabled ? '已启用' : '已关闭'} · ${contextItemNote(item, context)}`
+        : `${roleLabel(item.role)} · ${item.enabled ? '已启用' : '已关闭'} · ${item.content.length} 字`;
       return `
-      <div class="mp-preset-item">
-        <button class="mp-preset-item-main" data-act="reply-item-open" data-id="${esc(item.id)}" type="button">
-          <span class="mp-preset-item-label">${esc(item.label)}</span>
-          <span class="mp-preset-item-sub">${esc(itemKindLabel(item))} · ${esc(roleLabel(item.role))} · ${item.enabled ? '已启用' : '已关闭'} · ${item.content.length} 字</span>
+      <div class="mp-preset-item${isContext ? ' is-context' : ''}">
+        <button class="mp-preset-item-main" data-act="${openAct}" data-id="${esc(item.id)}" type="button">
+          <span class="mp-preset-item-label"><span class="mp-preset-name">${esc(item.label)}</span><span class="mp-preset-tag${isContext ? ' is-context' : item.kind === 'app' ? ' is-app' : ''}">${esc(itemKindLabel(item))}</span></span>
+          <span class="mp-preset-item-sub">${esc(sub)}</span>
         </button>
         <div class="mp-preset-item-actions">
           <button class="mp-item-switch" data-act="reply-item-toggle" data-id="${esc(item.id)}" type="button" title="${item.enabled ? '关闭' : '启用'}" role="switch" aria-checked="${item.enabled ? 'true' : 'false'}"><span class="mp-switch${item.enabled ? ' on' : ''}"></span></button>
           <button class="mp-item-mini is-up" data-act="reply-item-up" data-id="${esc(item.id)}" type="button" title="上移"${index === 0 ? ' disabled' : ''}>${icon('chevron')}</button>
           <button class="mp-item-mini" data-act="reply-item-down" data-id="${esc(item.id)}" type="button" title="下移"${index === items.length - 1 ? ' disabled' : ''}>${icon('chevron')}</button>
-          <button class="mp-item-mini" data-act="reply-item-del" data-id="${esc(item.id)}" type="button" title="删除">${icon('trash')}</button>
+          ${item.deletable ? `<button class="mp-item-mini" data-act="reply-item-del" data-id="${esc(item.id)}" type="button" title="删除">${icon('trash')}</button>` : ''}
         </div>
       </div>`;
     };
-    const chatRows = chatItems.map(itemRow).join('');
-    const appRows = appItems.map(itemRow).join('');
-    const contextRows = [
-      ['character', '角色档案', '人设、性格、场景'],
-      ['user', '我的设定', '当前酒馆用户的名字和设定'],
-      ['memory', '酒馆记忆', '有总结先用总结，否则读最近几层原文'],
-      ['time', '当前时间', '日期、星期和时间'],
-      ['history', '手机聊天记录', `最近 ${context.historyLimit} 条本机会话`],
-    ].map(([key, label, note]) => {
-      const on = Boolean(context[key]);
-      return `
-        <button class="mp-row" data-act="reply-context" data-key="${key}" type="button">
-          <span class="mp-row-main">
-            <span class="mp-row-name">${esc(label)}</span>
-            <span class="mp-row-sub">${esc(on ? note : '已关闭，不注入')}</span>
-          </span>
-          <span class="mp-switch${on ? ' on' : ''}"></span>
-        </button>`;
-    }).join('');
+    const itemRows = items.map(itemRow).join('');
 
     return `
       <div class="mp-nav">
@@ -319,7 +323,7 @@ export const replyPresetApp = {
       </div>
       <div class="mp-page-body">
         <div class="mp-title" style="margin-top:0">${esc(preset.name || '未命名预设')}</div>
-        <div class="mp-subtitle">${isActive ? '手机现在默认用这套' : '只在聊天设置里选中它时生效'}</div>
+        <div class="mp-subtitle">${isActive ? '手机现在默认用这套' : '只在聊天设置里选中它时生效'} · 条目按顺序拼进模型消息</div>
 
         <div class="mp-group" style="margin-top:14px">
           <button class="mp-row" data-act="reply-field" data-key="name" type="button">
@@ -337,32 +341,14 @@ export const replyPresetApp = {
         </div>
 
         <div class="mp-group-head" style="margin-top:16px">
-          <div class="mp-group-label">聊天行为条目 · ${chatItems.length} 条</div>
-          <button class="mp-icon-btn" data-act="reply-item-add" data-scope="chat" type="button" aria-label="添加聊天条目">${icon('plus')}</button>
+          <div class="mp-group-label">提示词条目 · ${items.length} 条${contextCount ? `（上下文 ${contextCount}）` : ''}</div>
+          <button class="mp-icon-btn" data-act="reply-item-add" type="button" aria-label="添加提示词条目">${icon('plus')}</button>
         </div>
-        <div class="mp-group">
-          ${chatRows || '<div class="mp-empty" style="padding:16px 14px">还没有聊天行为条目，点上面的加号加一条。</div>'}
+        <div class="mp-group mp-preset-list">
+          ${itemRows || '<div class="mp-empty" style="padding:16px 14px">还没有条目，点上面的加号加一条。</div>'}
         </div>
-
-        <div class="mp-group-head" style="margin-top:16px">
-          <div class="mp-group-label">其他软件条目 · ${appItems.length} 条</div>
-          <button class="mp-icon-btn" data-act="reply-item-add" data-scope="app" type="button" aria-label="添加其他软件条目">${icon('plus')}</button>
-        </div>
-        <div class="mp-group">
-          ${appRows || '<div class="mp-empty" style="padding:16px 14px">日历、外卖、音乐之类的提示写在里，不会混进聊天回复。</div>'}
-        </div>
-
-        <div class="mp-group-label" style="margin-top:16px">注入上下文</div>
-        <div class="mp-group">
-          ${contextRows}
-          ${context.history ? `
-          <button class="mp-row" data-act="reply-history-limit" type="button">
-            <span class="mp-row-main">
-              <span class="mp-row-name">聊天记录保留多少条</span>
-              <span class="mp-row-sub">太多会挤掉角色设定，太少会接不上话</span>
-            </span>
-            <span class="mp-api-value">${context.historyLimit} 条</span>
-          </button>` : ''}
+        <div class="mp-api-note" style="margin-top:8px">
+          带「上下文注入」的是手机按当前会话自动读取的条目，和手写条目在同一个列表里，可以开关、排序；点开还能改聊天记录条数。
         </div>
 
         <div class="mp-group-label" style="margin-top:16px">用在</div>
@@ -373,13 +359,14 @@ export const replyPresetApp = {
         </div>
 
         <div class="mp-api-note" style="margin-top:14px">
-          点「回复指令」改主指令；聊天行为条目会按角色接在它后面，其他软件条目单独存着，不会混进聊天回复。下面的上下文开关只作用于聊天。单个聊天可以在聊天设置里单独选一套。
+          点「回复指令」改主指令；聊天行为条目会按角色接在它后面，其他软件条目单独存着，不会混进聊天回复。单个聊天可以在聊天设置里单独选一套。
         </div>
       </div>`;
   },
 
   handle(ctx, act, data) {
-    const preset = findPreset(ctx.state, String(data?.id || editingId));
+    /* 条目动作里的 data.id 是条目 id，不是预设 id；详情页始终以 editingId 定位当前这套预设 */
+    const preset = findPreset(ctx.state, editingId);
     if (!preset) return false;
 
     if (act === 'reply-field') {
@@ -415,11 +402,12 @@ export const replyPresetApp = {
       ctx.openSheet({
         kind: 'pick',
         title: '恢复默认条目',
-        note: '会替换这套预设当前的提示词条目，主回复指令和上下文开关不动',
+        note: '会恢复整套默认条目，包括 5 条上下文注入；主回复指令不动',
         items: [{ label: '恢复默认条目', value: 'reset', icon: 'refresh', danger: true }],
         onPick: value => {
           if (value !== 'reset') return;
           preset.items = defaultReplyItems();
+          preset.context = normalizeReplyContext({});
           ctx.save();
           ctx.rerender();
           ctx.toast('提示词条目已恢复默认');
@@ -429,12 +417,89 @@ export const replyPresetApp = {
     }
 
     if (act === 'reply-item-add') {
-      openItemForm(ctx, preset, '', data.scope === 'app' ? 'app' : 'chat');
+      if (data.scope === 'chat' || data.scope === 'app') {
+        openItemForm(ctx, preset, '', data.scope);
+        return true;
+      }
+      ctx.openSheet({
+        kind: 'pick',
+        title: '加一类条目',
+        note: '聊天行为只影响聊天回复；其他软件只给日历、外卖、音乐这类页面用',
+        items: [
+          { label: '聊天行为条目', value: 'chat', icon: 'chat', note: '聊天软件里的说法和习惯' },
+          { label: '其他软件条目', value: 'app', icon: 'plan', note: '日历、外卖、音乐之类的提示' },
+        ],
+        onPick: value => {
+          if (value !== 'chat' && value !== 'app') return;
+          setTimeout(() => openItemForm(ctx, preset, '', value), 0);
+        },
+      });
       return true;
     }
 
     if (act === 'reply-item-open') {
+      const item = promptItems(preset).find(candidate => candidate.id === data.id);
+      if (item?.kind === 'context') {
+        ctx.toast('这条是自动注入条目，点开关或条目本身可以调整');
+        return true;
+      }
       openItemForm(ctx, preset, String(data.id || ''));
+      return true;
+    }
+
+    if (act === 'reply-context-open') {
+      const item = promptItems(preset).find(candidate => candidate.id === data.id);
+      if (!item || item.kind !== 'context') return false;
+      const spec = REPLY_CONTEXT_SPECS[item.auto];
+      if (item.auto === 'history') {
+        const context = normalizeReplyContext(preset.context);
+        ctx.openSheet({
+          kind: 'pick',
+          title: '手机聊天记录',
+          note: `这条会按当前会话自动取最近几条消息；现在是 ${context.historyLimit} 条。`,
+          items: [
+            { label: item.enabled ? '关闭这条注入' : '开启这条注入', value: 'toggle', icon: item.enabled ? 'close' : 'plus' },
+            ...[5, 10, 15, 20, 30].map(value => ({
+              value: String(value),
+              label: `保留最近 ${value} 条`,
+              note: value === context.historyLimit ? '现在用的' : '',
+            })),
+          ],
+          onPick: value => {
+            if (value === 'toggle') {
+              const next = !item.enabled;
+              const items = promptItems(preset).map(candidate => candidate.id === item.id ? { ...candidate, enabled: next } : candidate);
+              preset.items = items;
+              setContextEnabled(preset, item.auto, next);
+              ctx.toast(`手机聊天记录已${next ? '启用' : '关闭'}`);
+            } else {
+              const nextContext = normalizeReplyContext(preset.context);
+              nextContext.historyLimit = Number(value);
+              preset.context = nextContext;
+              ctx.toast(`聊天记录改成保留 ${nextContext.historyLimit} 条`);
+            }
+            ctx.save();
+            ctx.rerender();
+          },
+        });
+        return true;
+      }
+      ctx.openSheet({
+        kind: 'pick',
+        title: item.label,
+        note: `${spec?.note || '手机读取当前数据'}。这条不用手写，内容跟着当前会话变。`,
+        items: [{ label: item.enabled ? '关闭这条注入' : '开启这条注入', value: 'toggle', icon: item.enabled ? 'close' : 'plus' }],
+        onPick: value => {
+          if (value !== 'toggle') return;
+          const next = !item.enabled;
+          const items = promptItems(preset).map(candidate => candidate.id === item.id ? { ...candidate, enabled: next } : candidate);
+          preset.items = items;
+          setContextEnabled(preset, item.auto, next);
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`${item.label}已${next ? '启用' : '关闭'}`);
+        },
+      });
       return true;
     }
 
@@ -442,11 +507,13 @@ export const replyPresetApp = {
       const items = promptItems(preset);
       const index = items.findIndex(item => item.id === data.id);
       if (index < 0) return false;
-      items[index] = { ...items[index], enabled: !items[index].enabled };
+      const next = { ...items[index], enabled: !items[index].enabled };
+      items[index] = next;
       preset.items = items;
+      if (next.kind === 'context' && next.auto) setContextEnabled(preset, next.auto, next.enabled);
       ctx.save();
       ctx.rerender();
-      ctx.toast(`${items[index].label}已${items[index].enabled ? '启用' : '关闭'}`);
+      ctx.toast(`${next.label}已${next.enabled ? '启用' : '关闭'}`);
       return true;
     }
 

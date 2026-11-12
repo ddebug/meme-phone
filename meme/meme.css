@@ -2397,13 +2397,42 @@
   cursor: pointer;
 }
 .mp-root .mp-preset-item-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   font-size: calc(13px * var(--font-scale));
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
+}
+.mp-root .mp-preset-name {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-root .mp-preset-tag {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(142, 123, 242, .12);
+  color: var(--lav-deep);
+  font-size: calc(10px * var(--font-scale));
+  font-weight: 500;
+  line-height: 1.5;
+}
+.mp-root .mp-preset-tag.is-context {
+  background: rgba(52, 199, 89, .12);
+  color: #248a3d;
+}
+.mp-root .mp-preset-tag.is-app {
+  background: rgba(120, 120, 128, .12);
+  color: var(--text-2);
+}
+.mp-root .mp-preset-item.is-context {
+  background: rgba(52, 199, 89, .035);
 }
 .mp-root .mp-preset-item-sub {
   display: block;

@@ -52,3 +52,20 @@ export function replyContextBlock(state, chat, contact, context = {}, memoryText
   ];
   return blocks.filter(Boolean).join('\n\n');
 }
+
+/**
+ * 单个上下文注入条目的内容。旧 QQ 的预设把「用户设定 / 角色档案 / 聊天记录 / 时间」
+ * 当作列表里的独立条目，每条按自己的 role 进 messages；这里保持同样的粒度。
+ */
+export function replyContextItemBlock(key, state, chat, contact, context = {}, memoryText = '') {
+  const limit = Math.max(1, Number(context.historyLimit) || 10);
+  if (key === 'character') return characterBlock(state, contact);
+  if (key === 'user') return userBlock(state);
+  if (key === 'memory') return memoryText ? `【酒馆记忆】\n${memoryText}` : '';
+  if (key === 'time') return clockBlock();
+  if (key === 'history') {
+    const text = transcript(state, chat, limit);
+    return text ? `【手机聊天记录 · 最近 ${Math.min(limit, chat.messages.length)} 条】\n${text}` : '';
+  }
+  return '';
+}

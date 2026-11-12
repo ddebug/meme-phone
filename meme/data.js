@@ -31,6 +31,72 @@ export function normalizeReplyContext(raw) {
   };
 }
 
+/* 旧 QQ 预设把上下文注入也做成列表里的条目，而不是列表下面的一组开关：
+ * 用户设定、角色档案、聊天记录、时间信息各自有 role 和顺序，能单独开关、能排序。
+ * 这里沿用同一套做法，新增 kind:'context' + auto 字段；内容是运行时从手机/酒馆读取的。 */
+export const REPLY_CONTEXT_KEYS = ['user', 'character', 'memory', 'history', 'time'];
+
+export const REPLY_CONTEXT_SPECS = {
+  user: {
+    id: 'reply_context_user',
+    label: '用户角色设定',
+    role: 'system',
+    content: '__AUTO_USER_PERSONA__',
+    note: '我的名字和设定',
+    hintOrder: 1.51,
+  },
+  character: {
+    id: 'reply_context_character',
+    label: '角色档案',
+    role: 'system',
+    content: '__AUTO_CHARACTERS__',
+    note: '人设、性格和场景',
+    hintOrder: 1.52,
+  },
+  memory: {
+    id: 'reply_context_memory',
+    label: '酒馆记忆',
+    role: 'system',
+    content: '__AUTO_MEMORY__',
+    note: '酒馆总结或最近几层',
+    hintOrder: 1.53,
+  },
+  history: {
+    id: 'reply_context_history',
+    label: '手机聊天记录',
+    role: 'system',
+    content: '__AUTO_CHAT_HISTORY__',
+    note: '本机会话最近几条',
+    hintOrder: 1.54,
+  },
+  time: {
+    id: 'reply_context_time',
+    label: '时间信息',
+    role: 'system',
+    content: '__AUTO_TIME__',
+    note: '日期、星期和时间',
+    hintOrder: 1.55,
+  },
+};
+
+function contextItem(key, overrides = {}) {
+  const spec = REPLY_CONTEXT_SPECS[key];
+  return {
+    id: spec.id,
+    label: spec.label,
+    role: spec.role,
+    kind: 'context',
+    auto: key,
+    app: '',
+    content: spec.content,
+    enabled: true,
+    editable: false,
+    deletable: false,
+    order: spec.hintOrder,
+    ...overrides,
+  };
+}
+
 /** 旧 QQ 预设里的固定提示词条目；这些是「怎么说」的补充，不替代聊天气泡本身。 */
 export function defaultReplyItems() {
   return [
@@ -48,34 +114,68 @@ export function defaultReplyItems() {
       content: '[聊天行为要求]\n在符合角色性格的前提下，回复后可以自然延伸一点：追问一句、分享一件小事，或者停一下等对方。\n不要每次都追问，也不要在不合适的时候强行主动。\n[/聊天行为要求]',
       enabled: true, editable: true, deletable: true, order: 1,
     },
+    contextItem('user', { order: 2 }),
+    contextItem('character', { order: 3 }),
+    contextItem('memory', { order: 4 }),
+    contextItem('history', { order: 5 }),
+    contextItem('time', { order: 6 }),
     {
       id: 'reply_item_detail',
       label: '关注消息细节',
       role: 'system',
       content: '[关注消息细节]\n留意对方消息里的停顿、标点和长短变化，判断对方的状态。\n不要直接点破，用语气和关心程度自然回应。\n[/关注消息细节]',
-      enabled: true, editable: true, deletable: true, order: 2,
+      enabled: true, editable: true, deletable: true, order: 7,
     },
     {
       id: 'reply_item_chinese',
       label: '中文回复',
       role: 'system',
       content: '角色必须用中文回复。',
-      enabled: true, editable: true, deletable: true, order: 3,
+      enabled: true, editable: true, deletable: true, order: 8,
+    },
+    {
+      id: 'reply_item_format',
+      label: '回复格式要求',
+      role: 'system',
+      content: '[回复格式要求]\n只输出角色要发的那一条消息。不要加角色名、时间、序号、冒号，也不要写旁白、括号动作或场景描写。\n[/回复格式要求]',
+      enabled: true, editable: true, deletable: false, order: 9,
+    },
+    {
+      id: 'reply_item_footer',
+      label: '尾部',
+      role: 'user',
+      content: '请保持手机上的聊天语气，只输出一条回复。',
+      enabled: true, editable: true, deletable: false, order: 10,
     },
   ];
 }
 
-export function normalizeReplyItems(raw) {
+export function normalizeReplyItems(raw, rawContext) {
+  const context = normalizeReplyContext(rawContext);
   const source = Array.isArray(raw) ? raw : defaultReplyItems();
-  return source.slice(0, 24).map((item, index) => {
+  const seenAuto = new Set();
+  const items = source.slice(0, 32).map((item, index) => {
+    const order = Number(item?.order);
+    const auto = REPLY_CONTEXT_KEYS.includes(item?.auto) ? item.auto : '';
+    if (auto) {
+      if (seenAuto.has(auto)) return null;
+      seenAuto.add(auto);
+      const spec = REPLY_CONTEXT_SPECS[auto];
+      return {
+        ...contextItem(auto),
+        id: spec.id,
+        enabled: item?.enabled !== undefined ? item.enabled !== false : context[auto] !== false,
+        order: Number.isFinite(order) ? order : spec.hintOrder,
+      };
+    }
     const role = ['system', 'user', 'assistant'].includes(item?.role) ? item.role : 'system';
     const kind = item?.kind === 'app' ? 'app' : 'chat';
-    const order = Number(item?.order);
     return {
       id: String(item?.id || newId('item')),
       label: String(item?.label || '').trim().slice(0, 30) || `条目 ${index + 1}`,
       role,
       kind,
+      auto: '',
       app: kind === 'app' ? String(item?.app || '').trim().slice(0, 20) : '',
       content: String(item?.content || '').trim().slice(0, 4000),
       enabled: item?.enabled !== false,
@@ -83,7 +183,20 @@ export function normalizeReplyItems(raw) {
       deletable: item?.deletable !== false,
       order: Number.isFinite(order) ? order : index,
     };
-  }).sort((a, b) => a.order - b.order).map((item, index) => ({ ...item, order: index }));
+  }).filter(Boolean);
+  /* 老预设里没有上下文条目时补进列表；用 hintOrder 插到聊天条目之间，保持旧 QQ 的同一列表形态。 */
+  REPLY_CONTEXT_KEYS.forEach(key => {
+    if (seenAuto.has(key)) return;
+    items.push(contextItem(key, { enabled: context[key] !== false }));
+  });
+  /* 旧版本创建的预设没有「回复格式要求 / 尾部」，补上这两条固定条目；
+   * 其他聊天条目可能被用户删过，不强行加回来。 */
+  ['reply_item_format', 'reply_item_footer'].forEach(id => {
+    if (items.some(item => item.id === id)) return;
+    const fixed = defaultReplyItems().find(item => item.id === id);
+    if (fixed) items.push({ ...fixed });
+  });
+  return items.sort((a, b) => a.order - b.order).map((item, index) => ({ ...item, order: index }));
 }
 
 export function emptyState() {
@@ -318,16 +431,20 @@ export function replyPromptFor(state, chat) {
   return String(preset?.text || '').trim();
 }
 
-/** 这套回复预设要注入哪些上下文。 */
+/** 这套回复预设要注入哪些上下文：以列表里的固定上下文条目为准，historyLimit 仍存在 context。 */
 export function replyContextFor(state, chat) {
   const preset = replyPresetFor(state, chat);
-  return normalizeReplyContext(preset?.context);
+  const context = normalizeReplyContext(preset?.context);
+  normalizeReplyItems(preset?.items, context).forEach(item => {
+    if (item.kind === 'context' && item.auto) context[item.auto] = item.enabled !== false;
+  });
+  return context;
 }
 
 /** 这套预设的全部提示词条目（包含关闭的，给设置页用）。 */
 export function replyItemsFor(state, chat) {
   const preset = replyPresetFor(state, chat);
-  return normalizeReplyItems(preset?.items);
+  return normalizeReplyItems(preset?.items, normalizeReplyContext(preset?.context));
 }
 
 /** 把条目里的旧版变量换成当前数据；不认识的占位符保留，方便用户自己排查。 */
@@ -346,15 +463,15 @@ export function fillPromptTokens(text, state, chat) {
 /** 真正发给模型的 system 文本：主回复指令 + 开启的聊天 system 条目。 */
 export function replySystemFor(state, chat) {
   const preset = replyPresetFor(state, chat);
-  const items = normalizeReplyItems(preset?.items)
-    .filter(item => item.kind !== 'app' && item.enabled && item.role === 'system' && item.content)
+  const items = normalizeReplyItems(preset?.items, normalizeReplyContext(preset?.context))
+    .filter(item => item.kind === 'chat' && item.enabled && item.role === 'system' && item.content)
     .map(item => fillPromptTokens(item.content, state, chat));
   return [fillPromptTokens(preset?.text, state, chat), ...items].filter(Boolean).join('\n\n');
 }
 
 /** 聊天软件用的条目：过滤掉「其他软件」条目。 */
 export function replyChatItemsFor(state, chat) {
-  return replyItemsFor(state, chat).filter(item => item.kind !== 'app');
+  return replyItemsFor(state, chat).filter(item => item.kind === 'chat');
 }
 
 /** 某个其他软件用的条目；不传软件名时返回全部其他软件条目。 */
@@ -787,7 +904,7 @@ export function normalize(raw) {
       name: String(item.name || '').trim().slice(0, 20) || `预设 ${index + 1}`,
       text: String(item.text || '').trim().slice(0, 3000),
       context: normalizeReplyContext(item.context),
-      items: normalizeReplyItems(item.items),
+      items: normalizeReplyItems(item.items, item.context),
     });
   });
   merged.settings.reply = {

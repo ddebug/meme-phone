@@ -322,18 +322,24 @@ export async function readUserAvatar() {
  * 传了具体接口预设时先走那套地址 / Key / 模型；没传、是酒馆 API，或那套没填地址时走宿主。
  * 真机上走宿主 generateQuietPrompt；预览环境返回演示文案并标记 demo=true。
  */
-export async function generate({ prompt, system = '', demoReply = '', preset = null }) {
+export async function generate({ prompt, system = '', messages = null, demoReply = '', preset = null }) {
   const script = await loadHostScript();
   if (script && preset && preset.engine !== 'tavern' && String(preset.url || '').trim()) {
     try {
-      const text = await presetCompletion(preset, { prompt, system });
+      const text = await presetCompletion(preset, { prompt, system, messages });
       if (text) return { text, demo: false };
     } catch { /* 这套接口没接通就退回酒馆自己的模型，别让聊天卡死 */ }
   }
   if (script && typeof script.generateQuietPrompt === 'function') {
+    const messageText = Array.isArray(messages) && messages.length
+      ? messages.map(message => {
+        const role = message.role === 'assistant' ? '[角色示例]' : '';
+        return [role, String(message.content || '')].filter(Boolean).join('\n');
+      }).filter(Boolean).join('\n\n')
+      : '';
     const quiet = [
       system ? `【回复要求】\n${String(system)}` : '',
-      String(prompt || ''),
+      messageText || String(prompt || ''),
     ].filter(Boolean).join('\n\n');
     const text = await script.generateQuietPrompt({ quietPrompt: quiet, quietName: '' });
     if (typeof text === 'string' && text.trim()) return { text: text.trim(), demo: false };
@@ -343,7 +349,7 @@ export async function generate({ prompt, system = '', demoReply = '', preset = n
 }
 
 /** 借酒馆后端请求一套自定义 OpenAI 兼容接口，避开浏览器 CORS。 */
-async function presetCompletion(preset, { prompt, system }) {
+async function presetCompletion(preset, { prompt, system, messages }) {
   const script = await loadHostScript();
   if (!script) return '';
   const base = String(preset.url || '').trim().replace(/\/+$/, '');
@@ -361,9 +367,19 @@ async function presetCompletion(preset, { prompt, system }) {
   }
   headers['Content-Type'] = 'application/json';
 
-  const messages = [];
-  if (system) messages.push({ role: 'system', content: String(system) });
-  messages.push({ role: 'user', content: String(prompt || '') });
+  const outgoing = Array.isArray(messages) && messages.length
+    ? messages
+      .filter(message => message && String(message.content || '').trim())
+      .slice(-40)
+      .map(message => ({
+        role: ['system', 'user', 'assistant'].includes(message.role) ? message.role : 'system',
+        content: String(message.content).trim(),
+      }))
+    : [];
+  if (!outgoing.length) {
+    if (system) outgoing.push({ role: 'system', content: String(system) });
+    outgoing.push({ role: 'user', content: String(prompt || '') });
+  }
   const body = {
     chat_completion_source: 'custom',
     custom_url: url,
@@ -371,7 +387,7 @@ async function presetCompletion(preset, { prompt, system }) {
     reverse_proxy: base,
     proxy_password: String(preset.key || ''),
     model: String(preset.model || ''),
-    messages,
+    messages: outgoing,
     temperature: typeof preset.temp === 'number' ? preset.temp : 0.8,
     stream: false,
   };

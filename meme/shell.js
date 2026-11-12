@@ -119,6 +119,7 @@ export function createShell(options) {
     toastTimer: 0,
     live: { inputValue: '', focus: false },
     scroller: null,
+    deviceOffset: { x: 0, y: 0 },
   };
 
   Object.assign(ctx, {
@@ -279,16 +280,19 @@ export function createShell(options) {
     root.dataset.mpTheme = status;
     applyWall(root, state.settings);
     applyLook(root, state.settings);
+    const offsetX = Math.round(shell.deviceOffset?.x || 0);
+    const offsetY = Math.round(shell.deviceOffset?.y || 0);
     root.innerHTML = `
       <div class="mp-overlay">
-        <div class="mp-device">
+        <div class="mp-device" style="transform: translate(${offsetX}px, ${offsetY}px)">
           <div class="mp-screen">
             ${state.settings.dress?.island === 'hide' ? '' : '<div class="mp-island"></div>'}
+            <div class="mp-drag-handle" data-drag="phone" title="按住顶部拖动手机"></div>
             <div class="mp-wallpaper"></div>
             <div class="mp-scrim"></div>
             <div class="mp-status">
-              <span>${clockText()}</span>
-              <span class="mp-status-right">${ico('bell')}</span>
+              <span class="mp-status-left">${shell.stack.length ? `<button class="mp-status-back" data-act="back" type="button" aria-label="返回">${ico('back')}</button>` : ''}</span>
+              <span class="mp-status-right">${clockText()}</span>
             </div>
             ${shell.stack.length ? pageHtml() : desktopHtml()}
             ${sheetHtml()}
@@ -346,7 +350,7 @@ export function createShell(options) {
   const acts = {
     'open-app': (data) => { shell.live = { inputValue: '', focus: false }; ctx.go('app-' + data.app, {}); },
     'home': () => { shell.live = { inputValue: '', focus: false }; ctx.home(); },
-    'back': () => ctx.back(),
+    'back': () => { if (shell.sheet) ctx.closeSheet(); else ctx.back(); },
     'sheet-close': () => ctx.closeSheet(),
     'sheet-pick': (data) => {
       const sheet = shell.sheet;
@@ -407,6 +411,58 @@ export function createShell(options) {
     if (app && typeof app.handle === 'function' && app.handle(ctx, act, data, event)) return;
     if (acts[act]) { acts[act](data, event); return; }
     if (typeof ctx.onGlobalAct === 'function' && ctx.onGlobalAct(act, data, event)) return;
+  });
+
+  /* 顶部中间拖动手机壳：只在最上面一条区域响应，不影响页面里的滑动 */
+  let phoneDrag = null;
+  function clampDeviceOffset(x, y) {
+    const maxX = Math.max(0, (window.innerWidth + 390) / 2 - 90);
+    const maxY = Math.max(0, (window.innerHeight + 844) / 2 - 120);
+    return {
+      x: Math.max(-maxX, Math.min(maxX, x)),
+      y: Math.max(-maxY, Math.min(maxY, y)),
+    };
+  }
+  root.addEventListener('pointerdown', event => {
+    const handle = event.target.closest('[data-drag="phone"]');
+    if (!handle) return;
+    const device = root.querySelector('.mp-device');
+    if (!device) return;
+    event.preventDefault();
+    event.stopPropagation();
+    phoneDrag = {
+      id: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      baseX: shell.deviceOffset?.x || 0,
+      baseY: shell.deviceOffset?.y || 0,
+    };
+    device.classList.add('is-dragging');
+    handle.setPointerCapture?.(event.pointerId);
+  });
+  window.addEventListener('pointermove', event => {
+    if (!phoneDrag || event.pointerId !== phoneDrag.id) return;
+    const device = root.querySelector('.mp-device');
+    if (!device) return;
+    const next = clampDeviceOffset(
+      phoneDrag.baseX + event.clientX - phoneDrag.startX,
+      phoneDrag.baseY + event.clientY - phoneDrag.startY
+    );
+    shell.deviceOffset = next;
+    device.style.transform = `translate(${Math.round(next.x)}px, ${Math.round(next.y)}px)`;
+    event.preventDefault();
+  }, { passive: false });
+  const endPhoneDrag = event => {
+    if (!phoneDrag || event.pointerId !== phoneDrag.id) return;
+    phoneDrag = null;
+    root.querySelector('.mp-device')?.classList.remove('is-dragging');
+  };
+  window.addEventListener('pointerup', endPhoneDrag);
+  window.addEventListener('pointercancel', endPhoneDrag);
+  window.addEventListener('resize', () => {
+    shell.deviceOffset = clampDeviceOffset(shell.deviceOffset?.x || 0, shell.deviceOffset?.y || 0);
+    const device = root.querySelector('.mp-device');
+    if (device) device.style.transform = `translate(${Math.round(shell.deviceOffset.x)}px, ${Math.round(shell.deviceOffset.y)}px)`;
   });
 
   /* 上滑：页面里快速上滑一段就回桌面 */

@@ -31,6 +31,58 @@ export function normalizeReplyContext(raw) {
   };
 }
 
+/** 旧 QQ 预设里的固定提示词条目；这些是「怎么说」的补充，不替代聊天气泡本身。 */
+export function defaultReplyItems() {
+  return [
+    {
+      id: 'reply_item_phone_task',
+      label: '手机聊天任务',
+      role: 'system',
+      content: '[手机聊天任务]\n这是手机上的即时聊天，不是小说。消息要短，像随手打出来的，可以分成几条。\n不要描写动作、场景和心理活动，也不要用括号、旁白或角色名前缀。\n[/手机聊天任务]',
+      enabled: true, editable: true, deletable: true, order: 0,
+    },
+    {
+      id: 'reply_item_behavior',
+      label: '聊天行为要求',
+      role: 'system',
+      content: '[聊天行为要求]\n在符合角色性格的前提下，回复后可以自然延伸一点：追问一句、分享一件小事，或者停一下等对方。\n不要每次都追问，也不要在不合适的时候强行主动。\n[/聊天行为要求]',
+      enabled: true, editable: true, deletable: true, order: 1,
+    },
+    {
+      id: 'reply_item_detail',
+      label: '关注消息细节',
+      role: 'system',
+      content: '[关注消息细节]\n留意对方消息里的停顿、标点和长短变化，判断对方的状态。\n不要直接点破，用语气和关心程度自然回应。\n[/关注消息细节]',
+      enabled: true, editable: true, deletable: true, order: 2,
+    },
+    {
+      id: 'reply_item_chinese',
+      label: '中文回复',
+      role: 'system',
+      content: '角色必须用中文回复。',
+      enabled: true, editable: true, deletable: true, order: 3,
+    },
+  ];
+}
+
+export function normalizeReplyItems(raw) {
+  const source = Array.isArray(raw) ? raw : defaultReplyItems();
+  return source.slice(0, 24).map((item, index) => {
+    const role = ['system', 'user', 'assistant'].includes(item?.role) ? item.role : 'system';
+    const order = Number(item?.order);
+    return {
+      id: String(item?.id || newId('item')),
+      label: String(item?.label || '').trim().slice(0, 30) || `条目 ${index + 1}`,
+      role,
+      content: String(item?.content || '').trim().slice(0, 4000),
+      enabled: item?.enabled !== false,
+      editable: item?.editable !== false,
+      deletable: item?.deletable !== false,
+      order: Number.isFinite(order) ? order : index,
+    };
+  }).sort((a, b) => a.order - b.order).map((item, index) => ({ ...item, order: index }));
+}
+
 export function emptyState() {
   return {
     version: SCHEMA_VERSION,
@@ -70,16 +122,19 @@ export function emptyState() {
             id: 'reply_natural', name: '自然发消息',
             text: '像平时发微信一样回消息：口语、短句，一次只回一两句。不要写旁白、括号里的动作，也不要写成小说段落。',
             context: { ...DEFAULT_REPLY_CONTEXT },
+            items: defaultReplyItems(),
           },
           {
             id: 'reply_short', name: '再短一点',
             text: '回复尽量短，通常不超过 20 个字，像随手回一条消息。不要解释、不要总结、不要用括号写动作。',
             context: { ...DEFAULT_REPLY_CONTEXT },
+            items: defaultReplyItems(),
           },
           {
             id: 'reply_soft', name: '带点情绪',
             text: '像平时发微信一样回消息，口语、短句，可以带一点情绪和停顿，但不要写成小说，也不要用括号写旁白动作。',
             context: { ...DEFAULT_REPLY_CONTEXT },
+            items: defaultReplyItems(),
           },
         ],
       },
@@ -239,7 +294,7 @@ export function memoryPresetFor(state, chat) {
   return list.find(preset => preset.id === state?.settings?.memory?.activeId) || list[0] || null;
 }
 
-/** 手机里保存的回复预设：每一套就是一段告诉模型「怎么回消息」的指令。 */
+/** 手机里保存的回复预设：每套由主回复指令、提示词条目和上下文配置组成。 */
 export function replyPresetsOf(state) {
   const store = state?.settings?.reply;
   return Array.isArray(store?.presets) ? store.presets : [];
@@ -263,6 +318,34 @@ export function replyPromptFor(state, chat) {
 export function replyContextFor(state, chat) {
   const preset = replyPresetFor(state, chat);
   return normalizeReplyContext(preset?.context);
+}
+
+/** 这套预设的全部提示词条目（包含关闭的，给设置页用）。 */
+export function replyItemsFor(state, chat) {
+  const preset = replyPresetFor(state, chat);
+  return normalizeReplyItems(preset?.items);
+}
+
+/** 把条目里的旧版变量换成当前数据；不认识的占位符保留，方便用户自己排查。 */
+export function fillPromptTokens(text, state, chat) {
+  const contact = chat ? state?.contacts?.[chat.contactId] : null;
+  const user = state?.settings?.user?.name || '我';
+  const now = new Date().toLocaleString('zh-CN', {
+    month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  return String(text || '')
+    .replace(/\{\{user\}\}/g, user)
+    .replace(/\{\{char\}\}/g, contact?.name || '对方')
+    .replace(/\{\{当前时间\}\}/g, now);
+}
+
+/** 真正发给模型的 system 文本：主回复指令 + 开启的 system 条目。 */
+export function replySystemFor(state, chat) {
+  const preset = replyPresetFor(state, chat);
+  const items = normalizeReplyItems(preset?.items)
+    .filter(item => item.enabled && item.role === 'system' && item.content)
+    .map(item => fillPromptTokens(item.content, state, chat));
+  return [fillPromptTokens(preset?.text, state, chat), ...items].filter(Boolean).join('\n\n');
 }
 
 /** 手机里保存的 LLM 整体方案：一套聊天 API + 一套酒馆记忆 + 一套回复预设。 */
@@ -679,6 +762,7 @@ export function normalize(raw) {
       name: String(item.name || '').trim().slice(0, 20) || `预设 ${index + 1}`,
       text: String(item.text || '').trim().slice(0, 3000),
       context: normalizeReplyContext(item.context),
+      items: normalizeReplyItems(item.items),
     });
   });
   merged.settings.reply = {

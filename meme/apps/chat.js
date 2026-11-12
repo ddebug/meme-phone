@@ -7,7 +7,7 @@ import { icon } from '../icons.js';
 import {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
-  replyPresetsOf, replyPresetFor, normalizeReplyContext,
+  replyPresetsOf, replyPresetFor, normalizeReplyContext, normalizeReplyItems,
 } from '../data.js';
 import { memoryPresetSummary } from '../memory.js';
 import { avatarHtml, esc, shortText, timeText } from '../shell.js';
@@ -112,7 +112,8 @@ function settingsBody(ctx, chatId) {
   const activeReply = ownReply || globalReply;
   const replyContext = normalizeReplyContext(activeReply?.context);
   const injectedCount = ['character', 'user', 'memory', 'history', 'time'].filter(key => replyContext[key]).length;
-  const replySub = `${ownReply ? `只对这个会话 · ${ownReply.name || '未命名'}` : `跟随手机 · ${globalReply?.name || '默认回复方式'}`} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
+  const replyItemCount = normalizeReplyItems(activeReply?.items).length;
+  const replySub = `${ownReply ? `只对这个会话 · ${ownReply.name || '未命名'}` : `跟随手机 · ${globalReply?.name || '默认回复方式'}`} · ${replyItemCount} 条提示 · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
 
   return `
     <div class="mp-page-body">

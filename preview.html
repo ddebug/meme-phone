@@ -1301,6 +1301,25 @@ body {
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
+.mp-sheet-form { display: grid; gap: 10px; }
+.mp-sheet-field { display: grid; gap: 5px; }
+.mp-sheet-field-label { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); padding-left: 3px; }
+.mp-sheet-field-hint { font-size: calc(10.5px * var(--font-scale)); color: var(--text-4); padding-left: 3px; }
+.mp-sheet-input {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 14px;
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: calc(14px * var(--font-scale));
+  padding: 11px 12px;
+  outline: none;
+}
+.mp-sheet-select { padding: 11px 12px; }
+.mp-sheet-form-textarea { height: 116px; }
+
 .mp-toast {
   position: absolute;
   left: 50%;
@@ -1941,6 +1960,69 @@ body {
   overflow: hidden;
   line-height: calc(1.55 * var(--line-scale));
 }
+.mp-root .mp-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 7px 6px;
+}
+.mp-root .mp-group-head .mp-group-label { padding: 0; flex: 1; }
+.mp-root .mp-preset-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 48px;
+  padding: 5px 6px 5px 12px;
+}
+.mp-root .mp-preset-item:not(:last-child) { border-bottom: 1px solid var(--line); }
+.mp-root .mp-preset-item-main {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  padding: 5px 4px;
+  cursor: pointer;
+}
+.mp-root .mp-preset-item-label {
+  display: block;
+  font-size: calc(13px * var(--font-scale));
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mp-root .mp-preset-item-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: calc(10.5px * var(--font-scale));
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mp-root .mp-preset-item-actions { display: flex; align-items: center; gap: 2px; }
+.mp-root .mp-item-mini {
+  width: 27px;
+  height: 27px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: calc(11px * var(--font-scale));
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.mp-root .mp-item-mini .mp-i { width: 14px; height: 14px; }
+.mp-root .mp-item-mini.is-on { color: var(--accent); }
+.mp-root .mp-item-mini.is-muted { color: var(--text-4); }
+.mp-root .mp-item-mini.is-up .mp-i { transform: rotate(180deg); }
+.mp-root .mp-item-mini:active { background: rgba(142, 123, 242, .08); }
 .mp-root .mp-api-use {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -3673,6 +3755,58 @@ function normalizeReplyContext(raw) {
   };
 }
 
+/** 旧 QQ 预设里的固定提示词条目；这些是「怎么说」的补充，不替代聊天气泡本身。 */
+function defaultReplyItems() {
+  return [
+    {
+      id: 'reply_item_phone_task',
+      label: '手机聊天任务',
+      role: 'system',
+      content: '[手机聊天任务]\n这是手机上的即时聊天，不是小说。消息要短，像随手打出来的，可以分成几条。\n不要描写动作、场景和心理活动，也不要用括号、旁白或角色名前缀。\n[/手机聊天任务]',
+      enabled: true, editable: true, deletable: true, order: 0,
+    },
+    {
+      id: 'reply_item_behavior',
+      label: '聊天行为要求',
+      role: 'system',
+      content: '[聊天行为要求]\n在符合角色性格的前提下，回复后可以自然延伸一点：追问一句、分享一件小事，或者停一下等对方。\n不要每次都追问，也不要在不合适的时候强行主动。\n[/聊天行为要求]',
+      enabled: true, editable: true, deletable: true, order: 1,
+    },
+    {
+      id: 'reply_item_detail',
+      label: '关注消息细节',
+      role: 'system',
+      content: '[关注消息细节]\n留意对方消息里的停顿、标点和长短变化，判断对方的状态。\n不要直接点破，用语气和关心程度自然回应。\n[/关注消息细节]',
+      enabled: true, editable: true, deletable: true, order: 2,
+    },
+    {
+      id: 'reply_item_chinese',
+      label: '中文回复',
+      role: 'system',
+      content: '角色必须用中文回复。',
+      enabled: true, editable: true, deletable: true, order: 3,
+    },
+  ];
+}
+
+function normalizeReplyItems(raw) {
+  const source = Array.isArray(raw) ? raw : defaultReplyItems();
+  return source.slice(0, 24).map((item, index) => {
+    const role = ['system', 'user', 'assistant'].includes(item?.role) ? item.role : 'system';
+    const order = Number(item?.order);
+    return {
+      id: String(item?.id || newId('item')),
+      label: String(item?.label || '').trim().slice(0, 30) || `条目 ${index + 1}`,
+      role,
+      content: String(item?.content || '').trim().slice(0, 4000),
+      enabled: item?.enabled !== false,
+      editable: item?.editable !== false,
+      deletable: item?.deletable !== false,
+      order: Number.isFinite(order) ? order : index,
+    };
+  }).sort((a, b) => a.order - b.order).map((item, index) => ({ ...item, order: index }));
+}
+
 function emptyState() {
   return {
     version: SCHEMA_VERSION,
@@ -3712,16 +3846,19 @@ function emptyState() {
             id: 'reply_natural', name: '自然发消息',
             text: '像平时发微信一样回消息：口语、短句，一次只回一两句。不要写旁白、括号里的动作，也不要写成小说段落。',
             context: { ...DEFAULT_REPLY_CONTEXT },
+            items: defaultReplyItems(),
           },
           {
             id: 'reply_short', name: '再短一点',
             text: '回复尽量短，通常不超过 20 个字，像随手回一条消息。不要解释、不要总结、不要用括号写动作。',
             context: { ...DEFAULT_REPLY_CONTEXT },
+            items: defaultReplyItems(),
           },
           {
             id: 'reply_soft', name: '带点情绪',
             text: '像平时发微信一样回消息，口语、短句，可以带一点情绪和停顿，但不要写成小说，也不要用括号写旁白动作。',
             context: { ...DEFAULT_REPLY_CONTEXT },
+            items: defaultReplyItems(),
           },
         ],
       },
@@ -3881,7 +4018,7 @@ function memoryPresetFor(state, chat) {
   return list.find(preset => preset.id === state?.settings?.memory?.activeId) || list[0] || null;
 }
 
-/** 手机里保存的回复预设：每一套就是一段告诉模型「怎么回消息」的指令。 */
+/** 手机里保存的回复预设：每套由主回复指令、提示词条目和上下文配置组成。 */
 function replyPresetsOf(state) {
   const store = state?.settings?.reply;
   return Array.isArray(store?.presets) ? store.presets : [];
@@ -3905,6 +4042,34 @@ function replyPromptFor(state, chat) {
 function replyContextFor(state, chat) {
   const preset = replyPresetFor(state, chat);
   return normalizeReplyContext(preset?.context);
+}
+
+/** 这套预设的全部提示词条目（包含关闭的，给设置页用）。 */
+function replyItemsFor(state, chat) {
+  const preset = replyPresetFor(state, chat);
+  return normalizeReplyItems(preset?.items);
+}
+
+/** 把条目里的旧版变量换成当前数据；不认识的占位符保留，方便用户自己排查。 */
+function fillPromptTokens(text, state, chat) {
+  const contact = chat ? state?.contacts?.[chat.contactId] : null;
+  const user = state?.settings?.user?.name || '我';
+  const now = new Date().toLocaleString('zh-CN', {
+    month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  return String(text || '')
+    .replace(/\{\{user\}\}/g, user)
+    .replace(/\{\{char\}\}/g, contact?.name || '对方')
+    .replace(/\{\{当前时间\}\}/g, now);
+}
+
+/** 真正发给模型的 system 文本：主回复指令 + 开启的 system 条目。 */
+function replySystemFor(state, chat) {
+  const preset = replyPresetFor(state, chat);
+  const items = normalizeReplyItems(preset?.items)
+    .filter(item => item.enabled && item.role === 'system' && item.content)
+    .map(item => fillPromptTokens(item.content, state, chat));
+  return [fillPromptTokens(preset?.text, state, chat), ...items].filter(Boolean).join('\n\n');
 }
 
 /** 手机里保存的 LLM 整体方案：一套聊天 API + 一套酒馆记忆 + 一套回复预设。 */
@@ -4321,6 +4486,7 @@ function normalize(raw) {
       name: String(item.name || '').trim().slice(0, 20) || `预设 ${index + 1}`,
       text: String(item.text || '').trim().slice(0, 3000),
       context: normalizeReplyContext(item.context),
+      items: normalizeReplyItems(item.items),
     });
   });
   merged.settings.reply = {
@@ -4465,6 +4631,8 @@ function normalize(raw) {
 exports["SCHEMA_VERSION"] = SCHEMA_VERSION;
 exports["DEFAULT_REPLY_CONTEXT"] = DEFAULT_REPLY_CONTEXT;
 exports["normalizeReplyContext"] = normalizeReplyContext;
+exports["defaultReplyItems"] = defaultReplyItems;
+exports["normalizeReplyItems"] = normalizeReplyItems;
 exports["emptyState"] = emptyState;
 exports["DEFAULT_DIARY_PROMPT"] = DEFAULT_DIARY_PROMPT;
 exports["newId"] = newId;
@@ -4483,6 +4651,9 @@ exports["replyPresetsOf"] = replyPresetsOf;
 exports["replyPresetFor"] = replyPresetFor;
 exports["replyPromptFor"] = replyPromptFor;
 exports["replyContextFor"] = replyContextFor;
+exports["replyItemsFor"] = replyItemsFor;
+exports["fillPromptTokens"] = fillPromptTokens;
+exports["replySystemFor"] = replySystemFor;
 exports["chatSchemesOf"] = chatSchemesOf;
 exports["activeChatScheme"] = activeChatScheme;
 exports["applyChatScheme"] = applyChatScheme;
@@ -5753,6 +5924,36 @@ function createShell(options) {
         </div>`;
     }
 
+    if (sheet.kind === 'form') {
+      const fields = (sheet.fields || []).map((field, index) => {
+        const id = `mpField${index}`;
+        let control = '';
+        if (field.type === 'textarea') {
+          control = `<textarea id="${id}" class="mp-sheet-textarea mp-sheet-form-textarea" maxlength="${field.maxLength || 4000}" placeholder="${esc(field.placeholder || '')}">${esc(field.value || '')}</textarea>`;
+        } else if (field.type === 'select') {
+          const options = (field.options || []).map(option => `<option value="${esc(option.value)}"${String(option.value) === String(field.value) ? ' selected' : ''}>${esc(option.label)}</option>`).join('');
+          control = `<select id="${id}" class="mp-sheet-input mp-sheet-select">${options}</select>`;
+        } else {
+          control = `<input id="${id}" class="mp-sheet-input" type="text" maxlength="${field.maxLength || 30}" value="${esc(field.value || '')}" placeholder="${esc(field.placeholder || '')}">`;
+        }
+        return `<label class="mp-sheet-field">
+          <span class="mp-sheet-field-label">${esc(field.label || '')}</span>
+          ${control}
+          ${field.hint ? `<span class="mp-sheet-field-hint">${esc(field.hint)}</span>` : ''}
+        </label>`;
+      }).join('');
+      return `
+        <div class="mp-mask${still}" data-act="sheet-close"></div>
+        <div class="mp-sheet${still}" role="dialog" aria-modal="true">
+          ${sheet.title ? `<div class="mp-sheet-title">${esc(sheet.title)}</div>` : ''}
+          <div class="mp-sheet-form">${fields}</div>
+          <div style="display:flex;gap:8px;margin-top:9px">
+            <button class="mp-sheet-cancel" data-act="sheet-close" type="button" style="margin-top:0;flex:1">取消</button>
+            <button class="mp-sheet-cancel" data-act="sheet-form-ok" type="button" style="margin-top:0;flex:1.4;background:linear-gradient(150deg,#9583f2,#7f6ce9);color:#fff;box-shadow:0 8px 18px rgba(140,116,224,.26)">${esc(sheet.confirm || '保存')}</button>
+          </div>
+        </div>`;
+    }
+
     const items = (sheet.items || []).map(item => `
       <button class="mp-sheet-item${item.danger ? ' danger' : ''}" data-act="sheet-pick" data-value="${esc(item.value)}" type="button">
         ${item.icon ? ico(item.icon) : ''}<span>${esc(item.label)}</span>
@@ -5861,6 +6062,20 @@ function createShell(options) {
       shell.sheet = null;
       shell.sheetAnimated = false;
       if (typeof handler === 'function') handler(value);
+      if (!shell.sheet) render();
+    },
+    'sheet-form-ok': () => {
+      const sheet = shell.sheet;
+      const fields = sheet?.fields || [];
+      const values = {};
+      fields.forEach((field, index) => {
+        const node = root.querySelector(`#mpField${index}`);
+        values[field.name] = node ? node.value : '';
+      });
+      const handler = sheet?.onForm;
+      shell.sheet = null;
+      shell.sheetAnimated = false;
+      if (typeof handler === 'function') handler(values);
       if (!shell.sheet) render();
     },
     'toast': (data) => ctx.toast(data.message || ''),
@@ -6282,7 +6497,7 @@ const { icon } = __req("meme/icons.js");
 const {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
-  replyPresetsOf, replyPresetFor, normalizeReplyContext,
+  replyPresetsOf, replyPresetFor, normalizeReplyContext, normalizeReplyItems,
 } = __req("meme/data.js");
 const { memoryPresetSummary } = __req("meme/memory.js");
 const { avatarHtml, esc, shortText, timeText } = __req("meme/shell.js");
@@ -6387,7 +6602,8 @@ function settingsBody(ctx, chatId) {
   const activeReply = ownReply || globalReply;
   const replyContext = normalizeReplyContext(activeReply?.context);
   const injectedCount = ['character', 'user', 'memory', 'history', 'time'].filter(key => replyContext[key]).length;
-  const replySub = `${ownReply ? `只对这个会话 · ${ownReply.name || '未命名'}` : `跟随手机 · ${globalReply?.name || '默认回复方式'}`} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
+  const replyItemCount = normalizeReplyItems(activeReply?.items).length;
+  const replySub = `${ownReply ? `只对这个会话 · ${ownReply.name || '未命名'}` : `跟随手机 · ${globalReply?.name || '默认回复方式'}`} · ${replyItemCount} 条提示 · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
 
   return `
     <div class="mp-page-body">
@@ -12167,13 +12383,13 @@ exports["memoryPresetsApp"] = memoryPresetsApp;
 __mods["meme/apps/presets.js"] = function(module, exports, __req){
 /**
  * meme-phone · 回复预设
- * 每一套预设就是一段告诉模型「该怎么回消息」的指令；
+ * 一套预设 = 主回复指令 + 可排序的提示词条目 + 注入的上下文；
  * 手机默认一套，单个聊天也可以自己换一套。
  */
 
 const { icon } = __req("meme/icons.js");
 const { esc } = __req("meme/shell.js");
-const { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext } = __req("meme/data.js");
+const { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext, normalizeReplyItems, defaultReplyItems } = __req("meme/data.js");
 
 let editingId = '';
 
@@ -12192,6 +12408,131 @@ function contextNote(preset) {
   return count ? `注入 ${count} 段上下文` : '不注入上下文';
 }
 
+function promptItems(preset) {
+  return normalizeReplyItems(preset?.items);
+}
+
+function itemNote(preset) {
+  const count = promptItems(preset).length;
+  return count ? `附加 ${count} 条提示` : '没有附加提示';
+}
+
+function roleLabel(role) {
+  return role === 'user' ? '用户' : role === 'assistant' ? '角色示例' : '系统';
+}
+
+function openItemForm(ctx, preset, itemId = '') {
+  const items = promptItems(preset);
+  const index = itemId ? items.findIndex(item => item.id === itemId) : -1;
+  const item = index >= 0 ? items[index] : null;
+  if (item && item.editable === false) {
+    ctx.toast('这条是固定条目，不能改内容');
+    return;
+  }
+  ctx.openSheet({
+    kind: 'form',
+    title: item ? '编辑提示词条目' : '添加提示词条目',
+    confirm: item ? '保存' : '添加',
+    fields: [
+      { name: 'label', type: 'text', label: '名称', value: item?.label || '', placeholder: '比如：聊天任务、行为要求', maxLength: 30 },
+      { name: 'role', type: 'select', label: '角色', value: item?.role || 'system', options: [
+        { value: 'system', label: '系统（system）' },
+        { value: 'user', label: '用户（user）' },
+        { value: 'assistant', label: '角色示例（assistant）' },
+      ] },
+      { name: 'content', type: 'textarea', label: '内容', value: item?.content || '', placeholder: '这段文字会按顺序拼进发给模型的提示词', maxLength: 4000, hint: '可以用 {{user}}、{{char}}、{{当前时间}} 这三个变量' },
+    ],
+    onForm: values => {
+      const next = promptItems(preset);
+      const nextItem = {
+        id: item?.id || newId('item'),
+        label: String(values.label || '').trim().slice(0, 30) || '自定义条目',
+        role: ['system', 'user', 'assistant'].includes(values.role) ? values.role : 'system',
+        content: String(values.content || '').trim().slice(0, 4000),
+        enabled: item?.enabled !== false,
+        editable: true,
+        deletable: true,
+        order: item?.order ?? next.length,
+      };
+      if (index >= 0) next[index] = { ...next[index], ...nextItem, id: next[index].id };
+      else next.push(nextItem);
+      preset.items = next;
+      ctx.save();
+      ctx.toast(item ? '条目已更新' : '条目已添加');
+    },
+  });
+}
+
+function exportPresets(ctx) {
+  const payload = {
+    version: 1,
+    kind: 'meme-phone-reply-presets',
+    activeId: ctx.state.settings.reply?.activeId || '',
+    presets: replyPresetsOf(ctx.state).map(preset => ({
+      id: preset.id,
+      name: preset.name,
+      text: preset.text,
+      context: normalizeReplyContext(preset.context),
+      items: promptItems(preset),
+    })),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `meme-phone-presets-${Date.now()}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  ctx.toast('预设已导出');
+}
+
+function importPresets(ctx) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      const raw = JSON.parse(await file.text());
+      const list = Array.isArray(raw) ? raw : (raw?.presets || raw?.reply?.presets || []);
+      if (!Array.isArray(list) || !list.length) throw new Error('没有找到预设列表');
+      const seen = new Set();
+      const next = list.slice(0, 20).map((item, index) => {
+        let id = String(item.id || newId('reply'));
+        if (seen.has(id)) id = `${id}_${index}`;
+        seen.add(id);
+        return {
+          id,
+          name: String(item.name || '').trim().slice(0, 20) || `导入预设 ${index + 1}`,
+          text: String(item.text || '').trim().slice(0, 3000),
+          context: normalizeReplyContext(item.context),
+          items: normalizeReplyItems(item.items),
+        };
+      });
+      ctx.openSheet({
+        kind: 'pick',
+        title: '导入回复预设',
+        note: `导入 ${next.length} 套会覆盖手机现有的 ${replyPresetsOf(ctx.state).length} 套`,
+        items: [{ label: '覆盖导入', value: 'import', icon: 'refresh', danger: true }],
+        onPick: value => {
+          if (value !== 'import') return;
+          ctx.state.settings.reply.presets = next;
+          ctx.state.settings.reply.activeId = next[0].id;
+          ctx.save();
+          ctx.go('app-presets');
+          ctx.toast(`已导入 ${next.length} 套预设`);
+        },
+      });
+    } catch (error) {
+      ctx.toast(`导入失败：${error?.message || '文件格式不对'}`);
+    }
+  };
+  input.click();
+}
+
 function findPreset(state, id) {
   const list = replyPresetsOf(state);
   return list.find(item => item.id === id) || list[0] || null;
@@ -12207,7 +12548,7 @@ const presetsApp = {
       <button class="mp-row" data-act="reply-open" data-id="${esc(preset.id)}" type="button">
         <span class="mp-row-main">
           <span class="mp-row-name">${esc(preset.name || `预设 ${index + 1}`)}${preset.id === active?.id ? '<span class="mp-api-tag">手机</span>' : ''}</span>
-          <span class="mp-row-sub">${esc(clip(preset.text || '还没写指令'))} · ${esc(contextNote(preset))}</span>
+          <span class="mp-row-sub">${esc(clip(preset.text || '还没写指令'))} · ${esc(itemNote(preset))} · ${esc(contextNote(preset))}</span>
         </span>
         ${icon('chevron')}
       </button>`).join('');
@@ -12216,9 +12557,10 @@ const presetsApp = {
       <div class="mp-page-body">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
           <div class="mp-title" style="flex:1">回复预设</div>
+          <button class="mp-icon-btn" data-act="reply-more" type="button" aria-label="导入导出">${icon('more')}</button>
           <button class="mp-icon-btn" data-act="reply-new" type="button" aria-label="新建预设">${icon('plus')}</button>
         </div>
-        <div class="mp-subtitle">告诉模型该怎么回消息，并决定要把哪些上下文一起塞进去；聊天设置里还能给单个会话换一套</div>
+        <div class="mp-subtitle">一套预设由回复指令、提示词条目和注入的上下文组成；可以加条目、改角色、调顺序，聊天设置里还能给单个会话换一套</div>
 
         <div class="mp-group-label" style="margin-top:14px">手机默认 · ${list.length} 套</div>
         <div class="mp-group-box">
@@ -12232,6 +12574,23 @@ const presetsApp = {
   },
 
   handle(ctx, act, data) {
+    if (act === 'reply-more') {
+      ctx.openSheet({
+        kind: 'pick',
+        title: '预设管理',
+        note: '导入导出的是整套预设，包含回复指令、条目和上下文开关',
+        items: [
+          { label: '导出预设', value: 'export', icon: 'book' },
+          { label: '导入预设', value: 'import', icon: 'refresh' },
+        ],
+        onPick: value => {
+          if (value === 'export') exportPresets(ctx);
+          if (value === 'import') importPresets(ctx);
+        },
+      });
+      return true;
+    }
+
     if (act === 'reply-new') {
       const source = replyPresetFor(ctx.state, null);
       ctx.openSheet({
@@ -12245,6 +12604,7 @@ const presetsApp = {
             name,
             text: source?.text || '',
             context: normalizeReplyContext(source?.context),
+            items: promptItems(source).map(item => ({ ...item })),
           };
           ctx.state.settings.reply.presets.push(preset);
           ctx.state.settings.reply.activeId = preset.id;
@@ -12279,6 +12639,20 @@ const replyPresetApp = {
     const isActive = active?.id === preset.id;
     const text = String(preset.text || '');
     const context = normalizeReplyContext(preset.context);
+    const items = promptItems(preset);
+    const itemRows = items.map((item, index) => `
+      <div class="mp-preset-item">
+        <button class="mp-preset-item-main" data-act="reply-item-open" data-id="${esc(item.id)}" type="button">
+          <span class="mp-preset-item-label">${esc(item.label)}</span>
+          <span class="mp-preset-item-sub">${esc(roleLabel(item.role))} · ${item.enabled ? '已启用' : '已关闭'} · ${item.content.length} 字</span>
+        </button>
+        <div class="mp-preset-item-actions">
+          <button class="mp-item-mini${item.enabled ? ' is-on' : ' is-muted'}" data-act="reply-item-toggle" data-id="${esc(item.id)}" type="button" title="${item.enabled ? '关闭' : '启用'}">${item.enabled ? '开' : '关'}</button>
+          <button class="mp-item-mini is-up" data-act="reply-item-up" data-id="${esc(item.id)}" type="button" title="上移"${index === 0 ? ' disabled' : ''}>${icon('chevron')}</button>
+          <button class="mp-item-mini" data-act="reply-item-down" data-id="${esc(item.id)}" type="button" title="下移"${index === items.length - 1 ? ' disabled' : ''}>${icon('chevron')}</button>
+          <button class="mp-item-mini" data-act="reply-item-del" data-id="${esc(item.id)}" type="button" title="删除">${icon('trash')}</button>
+        </div>
+      </div>`).join('');
     const contextRows = [
       ['character', '角色档案', '人设、性格、场景'],
       ['user', '我的设定', '当前酒馆用户的名字和设定'],
@@ -12301,6 +12675,7 @@ const replyPresetApp = {
       <div class="mp-nav">
         <button class="mp-back" data-act="back" type="button">${icon('back')}</button>
         <span style="flex:1"></span>
+        <button class="mp-back" data-act="reply-item-reset" type="button" title="恢复默认条目">${icon('refresh')}</button>
         <button class="mp-back" data-act="reply-del" type="button" title="删除">${icon('trash')}</button>
       </div>
       <div class="mp-page-body">
@@ -12320,6 +12695,14 @@ const replyPresetApp = {
             </span>
             ${icon('chevron')}
           </button>
+        </div>
+
+        <div class="mp-group-head" style="margin-top:16px">
+          <div class="mp-group-label">提示词条目 · ${items.length} 条</div>
+          <button class="mp-icon-btn" data-act="reply-item-add" type="button" aria-label="添加条目">${icon('plus')}</button>
+        </div>
+        <div class="mp-group">
+          ${itemRows || '<div class="mp-empty" style="padding:16px 14px">还没有附加条目，点上面的加号加一条。</div>'}
         </div>
 
         <div class="mp-group-label" style="margin-top:16px">注入上下文</div>
@@ -12343,7 +12726,7 @@ const replyPresetApp = {
         </div>
 
         <div class="mp-api-note" style="margin-top:14px">
-          点「回复指令」改这段文字，模型每次回消息前都会读到它；上面打开的上下文会拼在指令后面一起发给模型。单个聊天可以在聊天设置里单独选一套。
+          点「回复指令」改主指令；提示词条目会按顺序接在它后面，可以把 system / user / assistant 分开写；下面打开的上下文会再拼到后面。单个聊天可以在聊天设置里单独选一套。
         </div>
       </div>`;
   },
@@ -12379,6 +12762,83 @@ const replyPresetApp = {
         });
         return true;
       }
+    }
+
+    if (act === 'reply-item-reset') {
+      ctx.openSheet({
+        kind: 'pick',
+        title: '恢复默认条目',
+        note: '会替换这套预设当前的提示词条目，主回复指令和上下文开关不动',
+        items: [{ label: '恢复默认条目', value: 'reset', icon: 'refresh', danger: true }],
+        onPick: value => {
+          if (value !== 'reset') return;
+          preset.items = defaultReplyItems();
+          ctx.save();
+          ctx.rerender();
+          ctx.toast('提示词条目已恢复默认');
+        },
+      });
+      return true;
+    }
+
+    if (act === 'reply-item-add') {
+      openItemForm(ctx, preset);
+      return true;
+    }
+
+    if (act === 'reply-item-open') {
+      openItemForm(ctx, preset, String(data.id || ''));
+      return true;
+    }
+
+    if (act === 'reply-item-toggle') {
+      const items = promptItems(preset);
+      const index = items.findIndex(item => item.id === data.id);
+      if (index < 0) return false;
+      items[index] = { ...items[index], enabled: !items[index].enabled };
+      preset.items = items;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`${items[index].label}已${items[index].enabled ? '启用' : '关闭'}`);
+      return true;
+    }
+
+    if (act === 'reply-item-up' || act === 'reply-item-down') {
+      const items = promptItems(preset);
+      const index = items.findIndex(item => item.id === data.id);
+      const target = act === 'reply-item-up' ? index - 1 : index + 1;
+      if (index < 0 || target < 0 || target >= items.length) return true;
+      [items[index], items[target]] = [items[target], items[index]];
+      items.forEach((item, order) => { item.order = order; });
+      preset.items = items;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast('条目顺序已调整');
+      return true;
+    }
+
+    if (act === 'reply-item-del') {
+      const items = promptItems(preset);
+      const item = items.find(candidate => candidate.id === data.id);
+      if (!item) return false;
+      if (item.deletable === false) {
+        ctx.toast('这条是固定条目，不能删');
+        return true;
+      }
+      ctx.openSheet({
+        kind: 'pick',
+        title: '删除提示词条目',
+        note: `「${item.label}」不再拼进发给模型的提示词`,
+        items: [{ label: '删除这条', value: 'delete', icon: 'trash', danger: true }],
+        onPick: value => {
+          if (value !== 'delete') return;
+          preset.items = items.filter(candidate => candidate.id !== item.id);
+          ctx.save();
+          ctx.rerender();
+          ctx.toast('条目已删除');
+        },
+      });
+      return true;
     }
 
     if (act === 'reply-context') {
@@ -12515,7 +12975,7 @@ __mods["meme/index.js"] = function(module, exports, __req){
  */
 
 const { createStore } = __req("meme/store.js");
-const { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyPromptFor, replyContextFor } = __req("meme/data.js");
+const { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, replySystemFor, replyItemsFor, fillPromptTokens } = __req("meme/data.js");
 const { createShell, applyWall, applyLook } = __req("meme/shell.js");
 const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } = __req("meme/host.js");
 const { chatApp, threadApp, threadSettingsApp } = __req("meme/apps/chat.js");
@@ -12597,6 +13057,13 @@ let followTimer = 0;
 
 /* ------------------------------------------------------------ 模型调用 */
 
+function roleNote(items, role, title, state, chat) {
+  const lines = items
+    .filter(item => item.enabled && item.role === role && item.content)
+    .map(item => fillPromptTokens(item.content, state, chat));
+  return lines.length ? `【${title}】\n${lines.join('\n')}` : '';
+}
+
 function makeAi(state) {
   /* 手机聊天 / 日记的背景走「酒馆记忆」：有酒馆总结先用总结，没有就读最近几层酒馆聊天 */
   function story(chat, limit = 1200) {
@@ -12607,32 +13074,38 @@ function makeAi(state) {
     async reply(context, chat, contact, demoReply) {
       const ctxSettings = replyContextFor(state, chat);
       const storyBlock = ctxSettings.memory ? await story(chat, 1200) : { text: '' };
-      const replyPrompt = replyPromptFor(state, chat);
+      const replySystem = replySystemFor(state, chat);
+      const items = replyItemsFor(state, chat);
       const contextText = replyContextBlock(state, chat, contact, ctxSettings, storyBlock.text);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`,
-        replyPrompt ? '' : '要求：口语、短、不超过 40 字，不要旁白、不要括号动作。',
+        replySystem ? '' : '要求：口语、短、不超过 40 字，不要旁白、不要括号动作。',
+        roleNote(items, 'user', '用户补充', state, chat),
+        roleNote(items, 'assistant', '角色示例', state, chat),
         contextText,
         `${state.settings.user.name}：${chat.messages[chat.messages.length - 1]?.text || ''}`,
         `${contact?.name || '对方'}：`,
       ].filter(Boolean).join('\n');
-      const result = await generate({ prompt, system: replyPrompt, demoReply, preset: llmPresetFor(state, chat) });
+      const result = await generate({ prompt, system: replySystem, demoReply, preset: llmPresetFor(state, chat) });
       return result.text;
     },
 
     async proactive(context, chat, contact, demoReply) {
       const ctxSettings = replyContextFor(state, chat);
       const storyBlock = ctxSettings.memory ? await story(chat, 900) : { text: '' };
-      const replyPrompt = replyPromptFor(state, chat);
+      const replySystem = replySystemFor(state, chat);
+      const items = replyItemsFor(state, chat);
       const contextText = replyContextBlock(state, chat, contact, ctxSettings, storyBlock.text);
       const prompt = [
         `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。`,
         `距离上次说话已经过去 ${state.settings.proactive.idleMinutes} 分钟，你要主动发一条消息。`,
-        replyPrompt ? '' : '要求：口语、短、不超过 30 字，像是忽然想起什么，不要提问过多。',
+        replySystem ? '' : '要求：口语、短、不超过 30 字，像是忽然想起什么，不要提问过多。',
+        roleNote(items, 'user', '用户补充', state, chat),
+        roleNote(items, 'assistant', '角色示例', state, chat),
         contextText,
         `${contact?.name || '对方'}：`,
       ].filter(Boolean).join('\n');
-      const result = await generate({ prompt, system: replyPrompt, demoReply, preset: llmPresetFor(state, chat) });
+      const result = await generate({ prompt, system: replySystem, demoReply, preset: llmPresetFor(state, chat) });
       return result.text;
     },
 

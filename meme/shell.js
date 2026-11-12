@@ -228,6 +228,36 @@ export function createShell(options) {
         </div>`;
     }
 
+    if (sheet.kind === 'form') {
+      const fields = (sheet.fields || []).map((field, index) => {
+        const id = `mpField${index}`;
+        let control = '';
+        if (field.type === 'textarea') {
+          control = `<textarea id="${id}" class="mp-sheet-textarea mp-sheet-form-textarea" maxlength="${field.maxLength || 4000}" placeholder="${esc(field.placeholder || '')}">${esc(field.value || '')}</textarea>`;
+        } else if (field.type === 'select') {
+          const options = (field.options || []).map(option => `<option value="${esc(option.value)}"${String(option.value) === String(field.value) ? ' selected' : ''}>${esc(option.label)}</option>`).join('');
+          control = `<select id="${id}" class="mp-sheet-input mp-sheet-select">${options}</select>`;
+        } else {
+          control = `<input id="${id}" class="mp-sheet-input" type="text" maxlength="${field.maxLength || 30}" value="${esc(field.value || '')}" placeholder="${esc(field.placeholder || '')}">`;
+        }
+        return `<label class="mp-sheet-field">
+          <span class="mp-sheet-field-label">${esc(field.label || '')}</span>
+          ${control}
+          ${field.hint ? `<span class="mp-sheet-field-hint">${esc(field.hint)}</span>` : ''}
+        </label>`;
+      }).join('');
+      return `
+        <div class="mp-mask${still}" data-act="sheet-close"></div>
+        <div class="mp-sheet${still}" role="dialog" aria-modal="true">
+          ${sheet.title ? `<div class="mp-sheet-title">${esc(sheet.title)}</div>` : ''}
+          <div class="mp-sheet-form">${fields}</div>
+          <div style="display:flex;gap:8px;margin-top:9px">
+            <button class="mp-sheet-cancel" data-act="sheet-close" type="button" style="margin-top:0;flex:1">取消</button>
+            <button class="mp-sheet-cancel" data-act="sheet-form-ok" type="button" style="margin-top:0;flex:1.4;background:linear-gradient(150deg,#9583f2,#7f6ce9);color:#fff;box-shadow:0 8px 18px rgba(140,116,224,.26)">${esc(sheet.confirm || '保存')}</button>
+          </div>
+        </div>`;
+    }
+
     const items = (sheet.items || []).map(item => `
       <button class="mp-sheet-item${item.danger ? ' danger' : ''}" data-act="sheet-pick" data-value="${esc(item.value)}" type="button">
         ${item.icon ? ico(item.icon) : ''}<span>${esc(item.label)}</span>
@@ -336,6 +366,20 @@ export function createShell(options) {
       shell.sheet = null;
       shell.sheetAnimated = false;
       if (typeof handler === 'function') handler(value);
+      if (!shell.sheet) render();
+    },
+    'sheet-form-ok': () => {
+      const sheet = shell.sheet;
+      const fields = sheet?.fields || [];
+      const values = {};
+      fields.forEach((field, index) => {
+        const node = root.querySelector(`#mpField${index}`);
+        values[field.name] = node ? node.value : '';
+      });
+      const handler = sheet?.onForm;
+      shell.sheet = null;
+      shell.sheetAnimated = false;
+      if (typeof handler === 'function') handler(values);
       if (!shell.sheet) render();
     },
     'toast': (data) => ctx.toast(data.message || ''),

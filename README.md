@@ -141,3 +141,11 @@ python scripts/build_preview.py
 
 - 扩展菜单里点 `meme-phone` 打开。
 - 也可以在快捷回复（QR）里放一条 `/meme`，点一下召唤手机；仓库里的 `quick-reply/summon-phone.json` 直接导入酒馆的快捷回复即可。
+
+## 开发约定
+
+- **改完就提交，不留一堆未提交的改动**。一次提交只装一件事，提交信息照「模块：一句话」，例如 `音乐：放不出来的歌自动换源`。
+- 只 `git add` 这一次动过的文件；工作树里有别的会话没写完的东西时，不顺手打包进去。
+- 改了 `meme/` 下的源码要跟着重跑 `python scripts/build_preview.py`，`preview.html` 和源码放在同一个提交里，不然别人拉下来看到的是旧界面。
+- 不 `--amend`、不 `--force`、不 `--no-verify`；提交前 `git status` 看一眼有没有混进不该进的文件（`_qa/`、`ref/`、`node_modules/` 已在 `.gitignore` 里）。
+- 需求文档 `docs/需求文档.md` 的「当前状态 / 提交证据」两列要跟着这次提交一起更新，commit 号写完补进去。

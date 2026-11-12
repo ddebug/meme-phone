@@ -1608,6 +1608,31 @@ body {
 }
 .mp-sheet-select { padding: 11px 36px 11px 12px; }
 .mp-sheet-form-textarea { height: 116px; }
+.mp-sheet-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 0;
+}
+.mp-sheet-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 9px;
+  border-radius: 11px;
+  border: 1px solid var(--field-border);
+  background: var(--field-solid);
+  color: var(--text);
+  font-size: calc(12px * var(--font-scale));
+  cursor: pointer;
+}
+.mp-sheet-check input {
+  width: 13px;
+  height: 13px;
+  accent-color: var(--accent);
+  margin: 0;
+}
+.mp-sheet-check span { max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .mp-toast {
   position: absolute;
@@ -2440,6 +2465,74 @@ body {
   color: var(--text-3);
 }
 
+/* --------------------------------------------------- 接口：当前生效 / 方案保存 / 草稿 */
+.mp-root .mp-api-state {
+  display: grid;
+  gap: 4px;
+  margin: 10px 2px 2px;
+  font-size: calc(11.5px * var(--font-scale));
+  color: var(--text-3);
+}
+.mp-root .mp-api-state div {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+.mp-root .mp-api-state span {
+  flex: none;
+  min-width: 4.5em;
+  color: var(--text-4);
+}
+.mp-root .mp-api-state strong {
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-root .mp-api-dirty {
+  margin: 8px 2px 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(226, 170, 82, .12);
+  color: #8a6224;
+  font-size: calc(11px * var(--font-scale));
+  line-height: calc(1.55 * var(--line-scale));
+}
+.mp-root .mp-api-dirty.is-clear {
+  background: rgba(79, 138, 99, .1);
+  color: #4f8a63;
+}
+.mp-root .mp-api-tag.is-draft {
+  background: rgba(226, 170, 82, .16);
+  color: #8a6224;
+}
+.mp-root .mp-api-draft-note {
+  margin: 2px 2px 6px;
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text-4);
+}
+.mp-root .mp-api-draft-note.is-on { color: #8a6224; }
+.mp-root .mp-api-delete {
+  margin: 12px 0 0;
+  padding: 12px 12px 10px;
+  border-radius: 16px;
+  background: rgba(214, 96, 96, .09);
+  box-shadow: var(--shadow-s);
+}
+.mp-root .mp-api-delete-title {
+  font-size: calc(13px * var(--font-scale));
+  font-weight: 600;
+  color: var(--text);
+}
+.mp-root .mp-api-delete-sub {
+  margin-top: 5px;
+  font-size: calc(11.5px * var(--font-scale));
+  line-height: calc(1.65 * var(--line-scale));
+  color: var(--text-3);
+}
+
 /* --------------------------------------------------- 接口：列表内展开详情 */
 .mp-root .mp-api-stack + .mp-api-stack { margin-top: 8px; }
 .mp-root .mp-api-row.is-open {
@@ -2467,6 +2560,10 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 9px;
+}
+.mp-root .mp-mem-edit {
+  margin: 4px 0 10px;
+  padding: 12px;
 }
 .mp-root .mp-api-field {
   display: grid;
@@ -6110,8 +6207,17 @@ function pushMessage(state, chatId, message) {
 }
 
 function unreadTotal(state) {
+  if (state.settings?.chat?.remind === false) return 0;
   return Object.values(state.chats).reduce((sum, chat) => sum + (chat.muted ? 0 : (chat.unread || 0)), 0);
 }
+
+/* 空发送能不能真的发出去：全局总开关 + 手机默认 + 这个会话的单独设置 */
+function wakeAllowed(state, chat) {
+  if (state.settings?.proactive?.enabled === false) return false;
+  if (chat && chat.wake === false) return false;
+  return state.settings?.chat?.wake !== false;
+}
+
 
 /* ----------------------------------------------------------------- 日记 */
 
@@ -6661,6 +6767,7 @@ exports["applyChatScheme"] = applyChatScheme;
 exports["lastMessage"] = lastMessage;
 exports["pushMessage"] = pushMessage;
 exports["unreadTotal"] = unreadTotal;
+exports["wakeAllowed"] = wakeAllowed;
 exports["dayKey"] = dayKey;
 exports["diaryEntry"] = diaryEntry;
 exports["writeDiary"] = writeDiary;
@@ -8113,6 +8220,14 @@ function createShell(options) {
         let control = '';
         if (field.type === 'textarea') {
           control = `<textarea id="${id}" class="mp-sheet-textarea mp-sheet-form-textarea" maxlength="${field.maxLength || 4000}" placeholder="${esc(field.placeholder || '')}">${esc(field.value || '')}</textarea>`;
+        } else if (field.type === 'checks') {
+          const picked = new Set(Array.isArray(field.value) ? field.value.map(String) : []);
+          const options = (field.options || []).map(option => `
+            <label class="mp-sheet-check">
+              <input type="checkbox" data-check-field="${esc(field.name)}" value="${esc(option.value)}"${picked.has(String(option.value)) ? ' checked' : ''}>
+              <span>${esc(option.label)}</span>
+            </label>`).join('');
+          control = `<div class="mp-sheet-checks">${options}</div>`;
         } else if (field.type === 'select') {
           const options = (field.options || []).map(option => `<option value="${esc(option.value)}"${String(option.value) === String(field.value) ? ' selected' : ''}>${esc(option.label)}</option>`).join('');
           control = `<div class="mp-select-wrap"><select id="${id}" class="mp-sheet-input mp-sheet-select">${options}</select>${ico('chevron')}</div>`;
@@ -8169,7 +8284,7 @@ function createShell(options) {
             <div class="mp-wallpaper"></div>
             <div class="mp-scrim"></div>
             <div class="mp-status">
-              <span class="mp-status-left">${shell.stack.length ? `<button class="mp-status-back" data-act="back" type="button" aria-label="返回">${ico('back')}</button>` : ''}</span>
+              <span class="mp-status-left"></span>
               <span class="mp-status-right">${clockText()}</span>
             </div>
             ${shell.stack.length ? pageHtml() : desktopHtml()}
@@ -8255,6 +8370,10 @@ function createShell(options) {
       const fields = sheet?.fields || [];
       const values = {};
       fields.forEach((field, index) => {
+        if (field.type === 'checks') {
+          values[field.name] = [...root.querySelectorAll(`[data-check-field="${field.name}"]`)].filter(node => node.checked).map(node => node.value);
+          return;
+        }
         const node = root.querySelector(`#mpField${index}`);
         values[field.name] = node ? node.value : '';
       });
@@ -8277,6 +8396,9 @@ function createShell(options) {
   };
 
   root.addEventListener('click', event => {
+    /* 原生 <select> 的选项变化只走下面的 change 事件；click 阶段没有选中值，
+       不能按按钮动作执行，否则打开下拉时会被默认值保存并整页重渲染。 */
+    if (event.target.closest('select[data-act]')) return;
     const target = event.target.closest('[data-act]');
     if (!target || !root.contains(target)) return;
     const act = target.dataset.act;
@@ -8414,11 +8536,13 @@ function createShell(options) {
 
   /* 输入：不整页重绘，只切发送键状态并同步草稿 */
   root.addEventListener('input', event => {
+    const entry = shell.stack[shell.stack.length - 1];
+    const app = entry ? apps[entry.view] : null;
+    if (app && typeof app.onInput === 'function' && app.onInput(ctx, event)) return;
     const input = event.target.closest('.mp-compose-box input');
     if (!input) return;
     shell.live.inputValue = input.value;
     shell.improveSendState();
-    const entry = shell.stack[shell.stack.length - 1];
     if (entry && ctx.onDraft) ctx.onDraft(entry, input.value);
   });
 
@@ -8763,7 +8887,7 @@ function chatMemorySummary({ metadata = null, messages = [], skipFirstFloor = fa
  * 读取当前聊天全部总结。
  * skipFirstFloor=true 时：首楼的总结不参与，改成给首楼原文。
  */
-function readSummaries({ skipFirstFloor = false } = {}) {
+function readSummaries({ skipFirstFloor = false, name = '' } = {}) {
   const api = bookApi();
   let nodes = [];
   let coverage = { complete: true, missingAiFloors: [] };
@@ -8781,7 +8905,7 @@ function readSummaries({ skipFirstFloor = false } = {}) {
     } catch (error) {
       nodes = [];
     }
-  } else if (globalThis.__MEME_DEMO__) {
+  } else if (globalThis.__MEME_DEMO__ && (!name || String(name) === '沈砚')) {
     /* 只有预览环境才用演示数据；真机没接上柏宝书时宁可没有记忆，也不注入假总结 */
     demo = true;
     nodes = DEMO_NODES.map(node => ({ ...node }));
@@ -8933,7 +9057,7 @@ async function buildMemoryContext(state, chat, limit = 1200) {
       const latestFile = chatKey(latest?.file);
       const sameChat = !currentFile || !latestFile || currentFile === latestFile;
       if (sameCharacter && sameChat) {
-        const legacy = summaryText({ skipFirstFloor: Boolean(preset?.skipFirstFloor) });
+        const legacy = summaryText({ skipFirstFloor: Boolean(preset?.skipFirstFloor), name: contact?.name });
         if (legacy.nodes.length) {
           data = legacy;
           demo = Boolean(legacy.demo);
@@ -9023,6 +9147,7 @@ __mods["meme/apps/chat.js"] = function(module, exports, __req){
 const { icon } = __req("meme/icons.js");
 const {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
+  wakeAllowed,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, normalizeReplyItems,
 } = __req("meme/data.js");
@@ -9132,11 +9257,14 @@ function settingsBody(ctx, chatId) {
   const replyAppCount = replyItems.filter(item => item.kind === 'app').length;
   const injectedCount = replyItems.filter(item => item.kind === 'context' && item.enabled).length;
   const replySub = `${ownReply ? `只对这个会话 · ${ownReply.name || '未命名'}` : `跟随手机 · ${globalReply?.name || '默认回复方式'}`} · ${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
+  const wakeSub = chat.wake === undefined
+    ? `跟随手机设置 · ${state.settings.chat?.wake === false ? '关' : '开'}`
+    : (chat.wake ? '这个会话单独开着' : '这个会话单独关掉');
 
   return `
     <div class="mp-page-body">
       <div class="mp-title" style="margin-top:0">聊天设置</div>
-      <div class="mp-subtitle">只影响这个会话，不动角色卡和酒馆</div>
+      <div class="mp-subtitle">只改这个会话的开关和引用；角色卡、世界书是全局的，改会写到酒馆</div>
 
       <div class="mp-chat-set-head">
         ${avatarHtml(contact?.name || '?', contact?.avatar)}
@@ -9152,7 +9280,11 @@ function settingsBody(ctx, chatId) {
         <div class="mp-group-box">
           ${chatSetRow(chat.id, { iconName: 'pin', title: '置顶聊天', sub: chat.pinned ? '已固定在会话列表最上面' : '让这个会话排在前面', act: 'ts-toggle-pin', toggle: chat.pinned })}
           ${chatSetRow(chat.id, { iconName: 'bell', title: '消息免打扰', sub: chat.muted ? '新消息不显示未读角标' : '这个会话的新消息照常计数', act: 'ts-toggle-mute', toggle: chat.muted })}
-          ${chatSetRow(chat.id, { iconName: 'chat', title: '空着发送 = 让 TA 主动开口', sub: chat.wake === false ? '已经关掉，空消息不会发出去' : '不写内容也能让 TA 先开口', act: 'ts-toggle-wake', toggle: chat.wake !== false })}
+          ${chatSetRow(chat.id, {
+            iconName: 'chat', title: '空着发送 = 让 TA 主动开口',
+            sub: wakeSub, act: 'ts-toggle-wake',
+            value: chat.wake === undefined ? '跟随' : (chat.wake ? '开' : '关'),
+          })}
         </div>
       </div>
 
@@ -9190,7 +9322,7 @@ function settingsBody(ctx, chatId) {
         <div class="mp-group-label">这个角色</div>
         <div class="mp-group-box">
           ${card
-            ? chatSetRow(chat.id, { iconName: 'contacts', title: '角色设定与世界书', sub: '看这张卡，也可以开关关联世界书', act: 'ts-open-character' })
+            ? chatSetRow(chat.id, { iconName: 'contacts', title: '角色设定与世界书', sub: '角色卡正文只读；世界书开关会写回酒馆，影响所有会话', act: 'ts-open-character' })
             : chatSetRow(chat.id, { iconName: 'search', title: '去查角色', sub: '还没同步这张角色卡', act: 'ts-open-characters' })}
           ${chatSetRow(chat.id, { iconName: 'diary', title: 'TA 的日记', sub: '按天记录这个角色和你的聊天', act: 'ts-diary' })}
           ${chatSetRow(chat.id, { iconName: 'theater', title: '看 TA 的小剧场', sub: '这个角色存下来的片段', act: 'ts-extras' })}
@@ -9308,7 +9440,7 @@ function threadBody(ctx, chatId) {
       </div>
       <div class="mp-messages" id="mpMessages">${blocks.join('')}</div>
       <div class="mp-composer">
-        <div class="mp-composer-tip">空着发出去，TA 会主动开口</div>
+        <div class="mp-composer-tip">${wakeAllowed(ctx.state, chat) ? '空着发出去，TA 会主动开口' : '空发送已关掉，去聊天设置里打开'}</div>
         ${quote ? `
         <div class="mp-quote-chip">
           <span style="color:var(--accent-deep)">${icon('reply')}</span>
@@ -9346,7 +9478,12 @@ function doSend(ctx, chatId) {
   const contact = contactById(ctx.state, chat.contactId);
 
   if (!text) {
-    if (chat.wake === false) { ctx.toast('这个会话的空发送已经关掉了'); return; }
+    if (!wakeAllowed(ctx.state, chat)) {
+      ctx.toast(ctx.state.settings?.proactive?.enabled === false
+        ? '设置里关掉了主动开口'
+        : (ctx.state.settings?.chat?.wake === false ? '设置里关掉了空发送' : '这个会话的空发送已经关掉了'));
+      return;
+    }
     wake(ctx, chat, contact);
     return;
   }
@@ -9461,8 +9598,18 @@ const chatApp = {
           if (value === 'pin') chat.pinned = !chat.pinned;
           if (value === 'mute') chat.muted = !chat.muted;
           if (value === 'delete') {
-            delete ctx.state.chats[chat.id];
-            ctx.toast('会话已删除');
+            ctx.openSheet({
+              title: `删除和「${contact?.name || 'TA'}」的会话？`,
+              items: [{ label: '确认删除会话', value: 'delete', icon: 'trash', danger: true, note: '会删掉这段聊天记录和会话设置；联系人、角色卡和酒馆数据都不动。' }],
+              onPick: (pick) => {
+                if (pick !== 'delete') return;
+                delete ctx.state.chats[chat.id];
+                ctx.save();
+                ctx.rerender();
+                ctx.toast('会话已删除');
+              },
+            });
+            return;
           }
           ctx.save();
           ctx.rerender();
@@ -9508,10 +9655,12 @@ const threadSettingsApp = {
     }
 
     if (act === 'ts-toggle-wake') {
-      chat.wake = chat.wake === false;
+      chat.wake = chat.wake === undefined ? true : (chat.wake ? false : undefined);
       ctx.save();
       ctx.rerender();
-      ctx.toast(chat.wake ? '空发送会触发主动开口' : '空发送已关掉');
+      ctx.toast(chat.wake === undefined
+        ? '这个会话恢复跟随手机设置'
+        : (chat.wake ? '这个会话空发送可以触发主动开口' : '这个会话空发送已关掉'));
       return true;
     }
 
@@ -9756,11 +9905,18 @@ const threadApp = {
         onPick: (value) => {
           if (value === 'extras') ctx.go('app-extras', { contactId: chat.contactId });
           if (value === 'clear') {
-            chat.messages = [];
-            chat.unread = 0;
-            ctx.save();
-            ctx.toast('已清空');
-            ctx.rerender();
+            ctx.openSheet({
+              title: `清空「${contact?.name || 'TA'}」的聊天记录？`,
+              items: [{ label: '确认清空消息', value: 'clear', icon: 'trash', danger: true, note: '聊天记录会全部删掉，会话设置和联系人保留，不能恢复。' }],
+              onPick: (pick) => {
+                if (pick !== 'clear') return;
+                chat.messages = [];
+                chat.unread = 0;
+                ctx.save();
+                ctx.rerender();
+                ctx.toast('已清空');
+              },
+            });
           }
         },
       });
@@ -9802,10 +9958,17 @@ const threadApp = {
             reply(ctx, chat, contact);
           }
           if (value === 'delete') {
-            chat.messages = chat.messages.filter(item => item.id !== message.id);
-            ctx.save();
-            ctx.rerender();
-            ctx.toast('已删除');
+            ctx.openSheet({
+              title: '删除这一条消息？',
+              items: [{ label: '确认删除这条', value: 'delete', icon: 'trash', danger: true, note: '只删这一条，不影响其他聊天记录；不能恢复。' }],
+              onPick: (pick) => {
+                if (pick !== 'delete') return;
+                chat.messages = chat.messages.filter(item => item.id !== message.id);
+                ctx.save();
+                ctx.rerender();
+                ctx.toast('已删除');
+              },
+            });
           }
         },
       });
@@ -10285,13 +10448,30 @@ const contactApp = {
             });
           }
           if (value === 'delete') {
-            delete ctx.state.contacts[contact.id];
-            for (const chat of Object.values(ctx.state.chats)) {
-              if (chat.contactId === contact.id) delete ctx.state.chats[chat.id];
-            }
-            ctx.save();
-            ctx.toast('已删掉');
-            ctx.home();
+            const relatedChats = Object.values(ctx.state.chats || {}).filter(chat => chat.contactId === contact.id);
+            ctx.openSheet({
+              title: `删除「${contact.name}」？`,
+              items: [{
+                label: '确认删除联系人',
+                value: 'delete',
+                icon: 'trash',
+                danger: true,
+                note: `${relatedChats.length ? `会一起删掉 ${relatedChats.length} 个会话、` : ''}TA 的小剧场、日记和查角色缓存。酒馆里的角色卡不会删。`,
+              }],
+              onPick: async (pick) => {
+                if (pick !== 'delete') return;
+                delete ctx.state.contacts[contact.id];
+                delete ctx.state.extras?.[contact.id];
+                if (ctx.state.diary?.contacts) delete ctx.state.diary.contacts[contact.id];
+                if (ctx.state.lookups) delete ctx.state.lookups[contact.id];
+                for (const chat of Object.values(ctx.state.chats)) {
+                  if (chat.contactId === contact.id) delete ctx.state.chats[chat.id];
+                }
+                await ctx.save();
+                ctx.toast('联系人和关联数据已删掉');
+                ctx.home();
+              },
+            });
           }
         },
       });
@@ -10367,17 +10547,17 @@ const settingsApp = {
         </div>
 
         <div class="mp-group">
-          <div class="mp-group-label">主动消息</div>
+          <div class="mp-group-label">主动开口</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'spark', title: '让角色主动来找你', sub: state.settings.proactive.enabled ? `沉默 ${state.settings.proactive.idleMinutes} 分钟后，每天最多 ${state.settings.proactive.dailyCount} 次` : '已关闭', act: 'set-toggle-proactive', toggle: state.settings.proactive.enabled })}
-            ${row(ctx, { iconName: 'clock', title: '沉默多久算久', sub: '到了就允许 TA 先说一句', act: 'set-idle', value: `${state.settings.proactive.idleMinutes} 分钟` })}
+            ${row(ctx, { iconName: 'spark', title: '允许主动开口', sub: state.settings.proactive.enabled ? '开着：空发送可以触发；没有定时任务' : '已关闭：空发送不会触发', act: 'set-toggle-proactive', toggle: state.settings.proactive.enabled })}
+            ${row(ctx, { iconName: 'clock', title: '空发送时参考沉默多久', sub: '写进主动开口的提示，不会自己定时发消息', act: 'set-idle', value: `${state.settings.proactive.idleMinutes} 分钟` })}
           </div>
         </div>
 
         <div class="mp-group">
           <div class="mp-group-label">模型</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'code', title: '模型来源', sub: apiReady ? '酒馆模型已接入' : '未接入（预览环境）', act: 'set-api', value: apiReady ? '已连接' : '未连接' })}
+            ${row(ctx, { iconName: 'code', title: '酒馆连接', sub: apiReady ? '酒馆模型可用；聊天接口在「聊天接口与预设」里改' : '未接入（预览环境）；聊天接口在「聊天接口与预设」里改', act: 'set-host-status', value: apiReady ? '已连接' : '未连接' })}
             ${row(ctx, { iconName: 'reply', title: '日记提示词', sub: '决定它怎么替你写日记', act: 'set-prompt' })}
           </div>
         </div>
@@ -10426,6 +10606,7 @@ const settingsApp = {
       state.settings.chat.remind = state.settings.chat.remind === false;
       ctx.save();
       ctx.rerender();
+      ctx.toast(state.settings.chat.remind ? '有新消息会显示未读角标' : '全局不显示未读角标，会话免打扰仍然有效');
       return true;
     }
 
@@ -10433,6 +10614,7 @@ const settingsApp = {
       state.settings.chat.wake = state.settings.chat.wake === false;
       ctx.save();
       ctx.rerender();
+      ctx.toast(state.settings.chat.wake ? '空发送可以触发主动开口' : '空发送不再触发');
       return true;
     }
 
@@ -10440,6 +10622,7 @@ const settingsApp = {
       state.settings.proactive.enabled = !state.settings.proactive.enabled;
       ctx.save();
       ctx.rerender();
+      ctx.toast(state.settings.proactive.enabled ? '允许主动开口了' : '主动开口关掉了');
       return true;
     }
 
@@ -10456,27 +10639,12 @@ const settingsApp = {
       return true;
     }
 
-    if (act === 'set-api') {
-      ctx.openSheet({
-        title: '模型来源',
-        items: [
-          { label: '用酒馆当前的模型', value: 'host' },
-          { label: '查看连接状态', value: 'status' },
-        ],
-        onPick: async (value) => {
-          if (value === 'host') {
-            const host = await ctx.host.probe();
-            state.settings.api.source = host.hasGenerate ? 'host' : 'default';
-            ctx.save();
-            ctx.toast(host.hasGenerate ? '用的是酒馆的模型' : '预览环境没有模型，先看界面');
-            ctx.rerender();
-          }
-          if (value === 'status') {
-            const host = await ctx.host.probe();
-            ctx.toast(host.inTavern ? `已接入酒馆 · 角色 ${host.hasCharacters ? '可读' : '不可读'} · 模型 ${host.hasGenerate ? '可用' : '不可用'}` : '预览环境：没有接酒馆，回复是演示文案');
-          }
-        },
-      });
+    if (act === 'set-host-status') {
+      ctx.host.probe().then(host => {
+        ctx.toast(host.inTavern
+          ? `已接入酒馆 · 角色 ${host.hasCharacters ? '可读' : '不可读'} · 模型 ${host.hasGenerate ? '可用' : '不可用'}`
+          : '预览环境：没有接酒馆，回复是演示文案');
+      }).catch(() => ctx.toast('读不到酒馆连接状态'));
       return true;
     }
 
@@ -10885,14 +11053,7 @@ const dressApp = {
   render(ctx) {
     const settings = ctx.state.settings;
     const dress = dressOf(ctx.state);
-    const wall = settings.wallpaper || 'day';
     const theme = ['default', 'frost', 'pixel'].includes(dress.theme) ? dress.theme : 'default';
-    const walls = [
-      { key: 'day', title: '晨光', preview: 'linear-gradient(150deg,#ffe3ef,#e4f7f0)' },
-      { key: 'night', title: '夜色', preview: 'linear-gradient(150deg,#1a1f2b,#2b2350 60%,#0a0c11)' },
-      { key: 'none', title: '素色', preview: 'linear-gradient(150deg,#fbf9fe,#f1edf9)' },
-      { key: 'custom', title: '自定义', preview: settings.customWall ? `url("${esc(settings.customWall)}") center / cover` : 'linear-gradient(150deg,#e7e1f7,#f7e8ef 55%,#e8f5f2)' },
-    ];
     const themes = [
       { key: 'default', title: '默认', sub: '晨光紫气泡', preview: 'background:linear-gradient(150deg,#ffe3ef,#e4f7f0)' },
       { key: 'frost', title: '白色磨砂', sub: '二改无光', preview: 'background:linear-gradient(145deg,rgba(230,230,230,.92),rgba(250,250,250,.76))' },
@@ -10938,11 +11099,10 @@ const dressApp = {
 
         <div class="mp-group-label" style="margin-top:14px">壁纸</div>
         <div class="mp-dress-wall-row">
-          ${walls.map(item => `
-            <button class="mp-dress-wall" data-act="dress-wall" data-key="${item.key}" type="button">
-              <span class="mp-dress-wall-swatch${wall === item.key ? ' is-on' : ''}" style="background:${item.preview}"></span>
-              <span>${esc(item.title)}</span>
-            </button>`).join('')}
+          <button class="mp-dress-wall" data-act="dress-open-appearance" type="button">
+            <span class="mp-dress-wall-swatch" style="background:${settings.customWall ? `url("${esc(settings.customWall)}") center / cover` : 'linear-gradient(150deg,#ffe3ef,#e4f7f0 55%,#efe6ff)'}"></span>
+            <span>${settings.customWall ? '自定义' : '换背景'}</span>
+          </button>
         </div>
         <button class="mp-dress-link" data-act="dress-open-appearance" type="button">${icon('image')}更多壁纸与自定义图片</button>
 
@@ -10986,17 +11146,6 @@ const dressApp = {
       dress.fontWeight = [400, 500, 600].includes(Number(data.value)) ? Number(data.value) : 400;
     } else if (act === 'dress-island') {
       dress.island = dress.island === 'hide' ? 'show' : 'hide';
-    } else if (act === 'dress-wall') {
-      const wall = ['day', 'night', 'none', 'custom'].includes(data.key) ? data.key : 'day';
-      dress.theme = 'default';
-      if (wall === 'custom' && !settings.customWall) {
-        ctx.go('app-appearance');
-        ctx.toast('先去外观里选一张自定义壁纸');
-        return true;
-      }
-      settings.wallpaper = wall;
-      if (wall === 'day') settings.theme = 'day';
-      if (wall === 'night') settings.theme = 'night';
     } else if (act === 'dress-open-appearance') {
       ctx.go('app-appearance');
       return true;
@@ -12115,6 +12264,8 @@ const SOURCE_LABELS = {
 
 let expandedId = '';
 let schemeEdit = null;   // { mode: 'new' | 'rename', value: '' }，放在方案按钮下面直接改
+let apiDelete = null;    // { type: 'scheme' | 'api', id }：页面内删除确认，不直接执行
+const drafts = new Map(); // preset.id -> 尚未保存的字段草稿，收起/切行都不丢
 
 function engineLabel(value) {
   return (ENGINES.find(item => item.value === value) || ENGINES[0]).label;
@@ -12130,6 +12281,70 @@ function mask(key) {
 function defaultPath(engine) {
   if (engine === 'openai') return '/v1/chat/completions';
   return '';
+}
+
+/* 接口字段的草稿：展开面板里改的字先落在这里，点「保存修改」才写进预设。
+ * 这样收起、切行、翻页都不会把没保存的字静默丢掉。 */
+function draftFor(preset) {
+  if (!preset) return null;
+  if (!drafts.has(preset.id)) {
+    drafts.set(preset.id, {
+      name: preset.name || '',
+      engine: preset.engine || 'openai',
+      temp: typeof preset.temp === 'number' ? preset.temp : 0.8,
+      url: preset.url || '',
+      path: preset.path || '',
+      model: preset.model || '',
+      key: preset.key || '',
+    });
+  }
+  return drafts.get(preset.id);
+}
+
+function draftValue(preset, key) {
+  const draft = draftFor(preset);
+  return draft ? draft[key] : preset?.[key];
+}
+
+function draftChanged(preset) {
+  const draft = draftFor(preset);
+  if (!preset || !draft) return false;
+  return ['name', 'engine', 'temp', 'url', 'path', 'model', 'key']
+    .some(key => String(draft[key] ?? '') !== String(preset[key] ?? ''));
+}
+
+function draftNote(preset) {
+  const changed = draftChanged(preset);
+  return `<div class="mp-api-draft-note${changed ? ' is-on' : ''}" data-draft-note>${changed ? '有未保存修改 · 点「保存修改」才写入' : '改动先留在草稿里，点「保存修改」才写入'}</div>`;
+}
+
+function readDraft(scope, draft) {
+  if (!scope || !draft) return draft;
+  scope.querySelectorAll('[data-api-field]').forEach(input => {
+    const key = input.dataset.apiField;
+    if (!key) return;
+    const value = String(input.value || '');
+    if (key === 'temp') {
+      const num = Number(value);
+      draft.temp = Number.isFinite(num) ? Math.min(2, Math.max(0, num)) : 0.8;
+    } else {
+      draft[key] = value.trim();
+    }
+  });
+  return draft;
+}
+
+function markDraftNote(input) {
+  const note = input?.closest('.mp-api-detail')?.querySelector('[data-draft-note]');
+  if (note) {
+    note.classList.add('is-on');
+    note.textContent = '有未保存修改 · 点「保存修改」才写入';
+  }
+}
+
+function replyNameFor(state, id) {
+  const item = replyPresetsOf(state).find(preset => preset.id === id);
+  return item ? (item.name || '未命名') : '没选';
 }
 
 /* 复制一套做模板：地址 / Key / 模型 / 引擎整套带走，只换名字和 id */
@@ -12302,11 +12517,11 @@ async function fetchModels(ctx, preset) {
   throw new Error(last || hostReason || '拉不到模型列表，可以手动填模型名');
 }
 
-async function refreshModels(ctx, preset) {
+async function refreshModels(ctx, preset, values = preset) {
   preset.status = { ok: false, text: '正在连接…', at: Date.now() };
   ctx.rerender();
   try {
-    const { url, list } = await fetchModels(ctx, preset);
+    const { url, list } = await fetchModels(ctx, values);
     preset.models = [...new Set(list)].sort();
     preset.status = { ok: true, text: `连接正常 · ${preset.models.length} 个模型 · ${url}`, at: Date.now() };
     ctx.save();
@@ -12385,46 +12600,32 @@ async function importTavernPreset(ctx, store) {
     : `导入了「${preset.name}」，酒馆没填反代地址，补上地址再连接`);
 }
 
-/* 把展开面板里手填的值读回 preset；点任何操作前先读，避免一刷新就把刚改的字弄丢 */
-function readDraft(scope, preset) {
-  if (!scope || !preset) return;
-  scope.querySelectorAll('[data-api-field]').forEach(input => {
-    const key = input.dataset.apiField;
-    if (!key) return;
-    const value = String(input.value || '');
-    if (key === 'temp') {
-      const num = Number(value);
-      preset.temp = Number.isFinite(num) ? Math.min(2, Math.max(0, num)) : 0.8;
-    } else {
-      preset[key] = value.trim();
-    }
-  });
-}
+/* 把展开面板里手填的值读回草稿；点任何操作前先读，避免一刷新就把刚改的字弄丢 */
 
 function presetDetail(ctx, store, preset) {
-  const tavern = preset.engine === 'tavern';
-  const asChat = preset.id === store.activeChat;
+  const draft = draftFor(preset);
+  const tavern = draft.engine === 'tavern';
   const status = preset.status || null;
   const models = Array.isArray(preset.models) ? preset.models : [];
-  const hasUrl = Boolean(apiRoot(preset));
+  const hasUrl = Boolean(apiRoot(draft));
   const engineOptions = ENGINES.filter(item => item.value !== 'tavern').map(item => `
-    <option value="${item.value}"${item.value === preset.engine ? ' selected' : ''}>${esc(item.label)}</option>`).join('');
+    <option value="${item.value}"${item.value === draft.engine ? ' selected' : ''}>${esc(item.label)}</option>`).join('');
   const modelOptions = models.map(name => `
-    <option value="${esc(name)}"${name === preset.model ? ' selected' : ''}>${esc(name)}</option>`).join('');
+    <option value="${esc(name)}"${name === draft.model ? ' selected' : ''}>${esc(name)}</option>`).join('');
   const modelPicker = models.length ? `
     <div class="mp-api-model">
       <div class="mp-select-wrap mp-api-mini-select"><select data-act="api-model-select" data-id="${preset.id}">
         ${modelOptions}
       </select>${icon('chevron')}</div>
-      <input class="mp-api-input" data-api-field="model" type="text" value="${esc(preset.model || '')}" placeholder="也可以手填模型名">
-    </div>` : `<input class="mp-api-input" data-api-field="model" type="text" value="${esc(preset.model || '')}" placeholder="gpt-4o-mini">`;
+      <input class="mp-api-input" data-api-field="model" type="text" value="${esc(draft.model || '')}" placeholder="也可以手填模型名">
+    </div>` : `<input class="mp-api-input" data-api-field="model" type="text" value="${esc(draft.model || '')}" placeholder="gpt-4o-mini">`;
 
   return `
     <div class="mp-api-detail" data-id="${preset.id}">
       <div class="mp-api-edit">
         <label class="mp-api-field" style="grid-column:1/-1">
           <span>名称</span>
-          <input class="mp-api-input" data-api-field="name" type="text" value="${esc(preset.name || '')}" placeholder="比如 我的 GPT">
+          <input class="mp-api-input" data-api-field="name" type="text" value="${esc(draft.name || '')}" placeholder="比如 我的 GPT">
         </label>
         <label class="mp-api-field">
           <span>引擎</span>
@@ -12434,16 +12635,16 @@ function presetDetail(ctx, store, preset) {
         </label>
         <label class="mp-api-field">
           <span>温度</span>
-          <input class="mp-api-input" data-api-field="temp" type="text" value="${esc(String(preset.temp ?? 0.8))}" placeholder="0.8">
+          <input class="mp-api-input" data-api-field="temp" type="text" value="${esc(String(draft.temp ?? 0.8))}" placeholder="0.8">
         </label>
         ${tavern ? '' : `
         <label class="mp-api-field" style="grid-column:1/-1">
           <span>地址</span>
-          <input class="mp-api-input" data-api-field="url" type="text" value="${esc(preset.url || '')}" placeholder="https://你的接口">
+          <input class="mp-api-input" data-api-field="url" type="text" value="${esc(draft.url || '')}" placeholder="https://你的接口">
         </label>
         <label class="mp-api-field" style="grid-column:1/-1">
           <span>路径</span>
-          <input class="mp-api-input" data-api-field="path" type="text" value="${esc(preset.path || '')}" placeholder="/v1/chat/completions">
+          <input class="mp-api-input" data-api-field="path" type="text" value="${esc(draft.path || '')}" placeholder="/v1/chat/completions">
         </label>
         <div class="mp-api-field" style="grid-column:1/-1">
           <span>模型</span>
@@ -12451,23 +12652,59 @@ function presetDetail(ctx, store, preset) {
         </div>
         <label class="mp-api-field" style="grid-column:1/-1">
           <span>Key</span>
-          <input class="mp-api-input" data-api-field="key" type="text" value="${esc(preset.key || '')}" placeholder="sk-...">
+          <input class="mp-api-input" data-api-field="key" type="text" value="${esc(draft.key || '')}" placeholder="sk-...">
         </label>`}
       </div>
 
       <div class="mp-api-status-inline${status?.ok ? ' is-ok' : ''}">
         ${esc(status ? status.text : (tavern ? '借酒馆自己的模型，不用填地址' : (hasUrl ? '还没测试，改完点保存修改' : '还没填地址')))}
       </div>
+      ${draftNote(preset)}
 
       <div class="mp-draw-actions">
         <button class="mp-draw-action is-primary" data-act="api-inline-save" data-id="${preset.id}" type="button">保存修改</button>
-        ${tavern ? '' : `<button class="mp-draw-action" data-act="api-test" data-id="${preset.id}" type="button">测试连接</button>
-        <button class="mp-draw-action" data-act="api-models" data-id="${preset.id}" type="button">拉模型</button>`}
-        <button class="mp-draw-action" data-act="api-use-chat" data-id="${preset.id}" type="button">${asChat ? '正在用' : '设为聊天'}</button>
+        <button class="mp-draw-action" data-act="api-draft-reset" data-id="${preset.id}" type="button">取消修改</button>
+        ${tavern ? '' : `<button class="mp-draw-action" data-act="api-test" data-id="${preset.id}" type="button">连接并拉取模型</button>`}
       </div>
       <div class="mp-draw-actions">
         ${tavern ? '' : `<button class="mp-draw-action" data-act="api-clone" data-id="${preset.id}" type="button">复制一套</button>
-        <button class="mp-draw-action is-danger" data-act="api-del" data-id="${preset.id}" type="button">删除这套</button>`}
+        <button class="mp-draw-action is-danger" data-act="api-del" data-id="${preset.id}" type="button">删除接口</button>`}
+      </div>
+    </div>`;
+}
+
+function deleteConfirm(state, store) {
+  if (!apiDelete) return '';
+  if (apiDelete.type === 'scheme') {
+    const scheme = chatSchemesOf(state).find(item => item.id === apiDelete.id);
+    if (!scheme) return '';
+    return `
+      <div class="mp-api-delete">
+        <div class="mp-api-delete-title">删除整体方案「${esc(scheme.name || '未命名')}」？</div>
+        <div class="mp-api-delete-sub">只会删掉这套「接口 + 回复预设」的组合，不删接口，也不删回复预设。至少会留一套方案。</div>
+        <div class="mp-draw-actions">
+          <button class="mp-draw-action is-danger" data-act="api-scheme-del-confirm" type="button">确认删除方案</button>
+          <button class="mp-draw-action" data-act="api-delete-cancel" type="button">取消</button>
+        </div>
+      </div>`;
+  }
+
+  const preset = store.presets.find(item => item.id === apiDelete.id);
+  if (!preset) return '';
+  const linked = chatSchemesOf(state).filter(item => item.apiId === preset.id);
+  const chats = Object.values(state.chats || {}).filter(chat => chat.llmPresetId === preset.id);
+  const fallback = store.presets.find(item => item.id !== preset.id) || null;
+  return `
+    <div class="mp-api-delete">
+      <div class="mp-api-delete-title">删除接口「${esc(preset.name || '未命名')}」？</div>
+      <div class="mp-api-delete-sub">
+        删除后不能恢复。${linked.length ? `${linked.length} 套整体方案会改指「${esc(fallback?.name || '酒馆 API')}」。` : '没有整体方案引用它，但可能正被当前聊天临时使用。'}
+        ${store.activeChat === preset.id ? '当前聊天正在用它，删除后会改指兜底。' : ''}
+        ${chats.length ? `${chats.length} 个单独引用它的会话会恢复跟随手机。` : ''}
+      </div>
+      <div class="mp-draw-actions">
+        <button class="mp-draw-action is-danger" data-act="api-del-confirm" type="button">确认删除接口</button>
+        <button class="mp-draw-action" data-act="api-delete-cancel" type="button">取消</button>
       </div>
     </div>`;
 }
@@ -12481,26 +12718,31 @@ const apiListApp = {
     const scheme = activeChatScheme(ctx.state);
     const currentReply = replyPresetFor(ctx.state, null);
     const schemeDirty = Boolean(scheme && (scheme.apiId !== store.activeChat || scheme.replyId !== currentReply?.id));
-    const schemeSummary = `${presetName(store, store.activeChat)} · ${currentReply?.name || '回复预设'}`;
+    const currentSummary = `${presetName(store, store.activeChat)} · ${currentReply?.name || '回复预设'}`;
+    const savedSummary = scheme
+      ? `${presetName(store, scheme.apiId)} · ${replyNameFor(ctx.state, scheme.replyId)}`
+      : '还没有整体方案';
     const schemeOptions = schemes.length
       ? schemes.map(item => ({ value: item.id, label: item.name || '未命名' }))
       : [{ value: '', label: '未选方案' }];
     const apiOptions = store.presets.map(preset => ({ value: preset.id, label: preset.name || '未命名' }));
     const replyOptions = replyPresetsOf(ctx.state).map(item => ({ value: item.id, label: item.name || '未命名' }));
     const rows = store.presets.map(preset => {
+      const draft = draftFor(preset);
       const active = preset.id === store.activeChat ? '聊天' : '';
-      const inTavern = Boolean(preset.tavernSource) && preset.engine !== 'tavern' && !preset.key;
-      const keyNote = inTavern ? 'Key 留在酒馆里' : `Key ${mask(preset.key)}`;
-      const sub = preset.engine === 'tavern' && !preset.model
+      const changed = draftChanged(preset);
+      const inTavern = Boolean(preset.tavernSource) && draft.engine !== 'tavern' && !draft.key;
+      const keyNote = inTavern ? 'Key 留在酒馆里' : `Key ${mask(draft.key)}`;
+      const sub = draft.engine === 'tavern' && !draft.model
         ? '借酒馆自己的模型，不用填地址'
-        : `${engineLabel(preset.engine)}${preset.model ? ` · ${preset.model}` : ''} · ${keyNote}`;
+        : `${engineLabel(draft.engine)}${draft.model ? ` · ${draft.model}` : ''} · ${keyNote}`;
       const open = preset.id === expandedId;
       return `
         <div class="mp-api-stack">
           <button class="mp-row mp-api-row${open ? ' is-open' : ''}" data-act="api-toggle" data-id="${preset.id}" type="button" aria-expanded="${open}">
             ${ctx.icon ? ctx.icon('code') : icon('code')}
             <span class="mp-row-main">
-              <span class="mp-row-name">${esc(preset.name || '未命名')}${active ? `<span class="mp-api-tag">${esc(active)}</span>` : ''}</span>
+              <span class="mp-row-name">${esc(draft.name || '未命名')}${active ? `<span class="mp-api-tag">${esc(active)}</span>` : ''}${changed ? '<span class="mp-api-tag is-draft">未保存</span>' : ''}</span>
               <span class="mp-row-sub">${esc(sub)}</span>
             </span>
             <span class="mp-api-caret">${icon('chevron')}</span>
@@ -12516,31 +12758,40 @@ const apiListApp = {
       </div>
       <div class="mp-page-body">
         <div class="mp-title" style="margin-top:0">聊天接口</div>
-        <div class="mp-subtitle">一套接口预设 = 地址 + Key + 模型；LLM 整体方案只记聊天 API 和回复预设，不关联酒馆记忆</div>
+        <div class="mp-subtitle">一套接口 = 地址 + Key + 模型；整体方案只记「聊天 API + 回复预设」，不关联酒馆记忆</div>
 
         <div class="mp-ios-card">
-          <div class="mp-ios-card-label">LLM 整体方案</div>
+          <div class="mp-ios-card-label">当前聊天方案</div>
           ${iosSelect('api-scheme-select', schemeOptions, scheme?.id || '')}
-          <div class="mp-ios-card-sub">${esc(schemeSummary)}${schemeDirty ? ' · 当前选择还没保存' : ''}</div>
+          <div class="mp-api-state">
+            <div><span>当前生效</span><strong>${esc(currentSummary)}</strong></div>
+            <div><span>方案保存</span><strong>${esc(savedSummary)}</strong></div>
+          </div>
+          ${schemeDirty
+            ? `<div class="mp-api-dirty">当前选择还没保存：改 API 或回复预设会先影响新聊天，点「保存当前组合」才写进这套方案。</div>`
+            : '<div class="mp-api-dirty is-clear">当前选择和方案保存一致。</div>'}
           <div class="mp-ios-two">
             <label class="mp-ios-field">
-              <span class="mp-ios-field-label">切换 API</span>
+              <span class="mp-ios-field-label">当前聊天 API</span>
               ${iosSelect('api-chat-select', apiOptions, store.activeChat)}
             </label>
             <label class="mp-ios-field">
-              <span class="mp-ios-field-label">切换预设</span>
+              <span class="mp-ios-field-label">当前回复预设</span>
               ${iosSelect('api-reply-select', replyOptions, currentReply?.id || '')}
             </label>
           </div>
 
           <div class="mp-draw-actions">
-            <button class="mp-draw-action is-primary" data-act="api-scheme-save" type="button">保存</button>
-            <button class="mp-draw-action" data-act="api-scheme-new" type="button">新建</button>
-            <button class="mp-draw-action" data-act="api-scheme-rename" type="button">改名</button>
-            <button class="mp-draw-action is-danger" data-act="api-scheme-del" type="button">删除</button>
+            <button class="mp-draw-action is-primary" data-act="api-scheme-save" type="button">保存当前组合</button>
+            ${schemeDirty ? '<button class="mp-draw-action" data-act="api-scheme-revert" type="button">恢复为方案值</button>' : ''}
           </div>
           <div class="mp-draw-actions">
+            <button class="mp-draw-action" data-act="api-scheme-new" type="button">新建方案</button>
+            <button class="mp-draw-action" data-act="api-scheme-rename" type="button">改名</button>
             <button class="mp-draw-action" data-act="api-scheme-copy" type="button">复制方案</button>
+            <button class="mp-draw-action is-danger" data-act="api-scheme-del" type="button">删除方案</button>
+          </div>
+          <div class="mp-draw-actions">
             <button class="mp-draw-action" data-act="api-new" type="button">＋ 新建接口</button>
             <button class="mp-draw-action" data-act="api-import-tavern" type="button">导入酒馆接口</button>
           </div>
@@ -12555,6 +12806,8 @@ const apiListApp = {
           <button class="mp-ios-edit-reply" data-act="api-open-presets" type="button">编辑回复预设${icon('chevron')}</button>
         </div>
 
+        ${deleteConfirm(ctx.state, store)}
+
         <div class="mp-group-label" style="margin-top:16px">聊天 API 预设</div>
         <div class="mp-group">${rows}</div>
 
@@ -12564,14 +12817,35 @@ const apiListApp = {
       </div>`;
   },
 
+  onInput(ctx, event) {
+    const input = event.target?.closest?.('[data-api-field]');
+    if (!input) return false;
+    const preset = api(ctx.state).presets.find(item => item.id === input.closest('.mp-api-detail')?.dataset.id);
+    if (!preset) return false;
+    const draft = draftFor(preset);
+    const key = input.dataset.apiField;
+    if (key === 'temp') {
+      const num = Number(String(input.value || ''));
+      draft.temp = Number.isFinite(num) ? Math.min(2, Math.max(0, num)) : 0.8;
+    } else if (key) {
+      draft[key] = String(input.value || '').trim();
+    }
+    markDraftNote(input);
+    return true;
+  },
+
   handle(ctx, act, data, event) {
     const store = api(ctx.state);
     const scheme = activeChatScheme(ctx.state);
 
     if (act === 'api-toggle') {
       const id = String(data.id || '');
+      const previous = store.presets.find(preset => preset.id === expandedId);
+      const detail = ctx.shell.root?.querySelector(`.mp-api-detail[data-id="${expandedId}"]`);
+      if (previous && detail) readDraft(detail, draftFor(previous));
       expandedId = expandedId === id ? '' : id;
       schemeEdit = null;
+      apiDelete = null;
       ctx.rerender();
       return true;
     }
@@ -12581,6 +12855,7 @@ const apiListApp = {
       if (!picked) return true;
       applyChatScheme(ctx.state, picked);
       schemeEdit = null;
+      apiDelete = null;
       ctx.save();
       ctx.rerender();
       ctx.toast(`整体方案换成「${picked.name || '未命名'}」`);
@@ -12591,9 +12866,10 @@ const apiListApp = {
       const target = store.presets.find(preset => preset.id === String(data.value || ''));
       if (!target) return true;
       store.activeChat = target.id;
+      apiDelete = null;
       ctx.save();
       ctx.rerender();
-      ctx.toast(`聊天 API 换成「${target.name || '未命名'}」，点保存写入方案`);
+      ctx.toast(`当前聊天 API 换成「${target.name || '未命名'}」；保存后写进方案`);
       return true;
     }
 
@@ -12601,9 +12877,22 @@ const apiListApp = {
       const target = replyPresetsOf(ctx.state).find(item => item.id === String(data.value || ''));
       if (!target) return true;
       ctx.state.settings.reply.activeId = target.id;
+      apiDelete = null;
       ctx.save();
       ctx.rerender();
-      ctx.toast(`回复预设换成「${target.name || '未命名'}」，点保存写入方案`);
+      ctx.toast(`当前回复预设换成「${target.name || '未命名'}」；保存后写进方案`);
+      return true;
+    }
+
+    if (act === 'api-scheme-revert') {
+      if (!scheme) { ctx.toast('先选一套整体方案'); return true; }
+      const savedApi = store.presets.find(preset => preset.id === scheme.apiId);
+      const savedReply = replyPresetsOf(ctx.state).find(item => item.id === scheme.replyId);
+      if (savedApi) store.activeChat = savedApi.id;
+      if (savedReply) ctx.state.settings.reply.activeId = savedReply.id;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast('已恢复成这套方案保存的值');
       return true;
     }
 
@@ -12685,36 +12974,59 @@ const apiListApp = {
     if (act === 'api-scheme-del') {
       if (!scheme) { ctx.toast('先选一套整体方案'); return true; }
       if (chatSchemesOf(ctx.state).length <= 1) { ctx.toast('至少留一套整体方案'); return true; }
-      store.chatSchemes = chatSchemesOf(ctx.state).filter(item => item.id !== scheme.id);
+      apiDelete = { type: 'scheme', id: scheme.id };
+      schemeEdit = null;
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'api-scheme-del-confirm') {
+      const pending = apiDelete?.type === 'scheme'
+        ? chatSchemesOf(ctx.state).find(item => item.id === apiDelete.id)
+        : null;
+      if (!pending) { apiDelete = null; ctx.rerender(); return true; }
+      if (chatSchemesOf(ctx.state).length <= 1) {
+        apiDelete = null;
+        ctx.rerender();
+        ctx.toast('至少留一套整体方案');
+        return true;
+      }
+      store.chatSchemes = chatSchemesOf(ctx.state).filter(item => item.id !== pending.id);
       const next = store.chatSchemes[0];
       if (next) applyChatScheme(ctx.state, next);
+      apiDelete = null;
       schemeEdit = null;
       ctx.save();
       ctx.rerender();
-      ctx.toast('这套整体方案删掉了');
+      ctx.toast(`整体方案「${pending.name || '未命名'}」删掉了`);
+      return true;
+    }
+
+    if (act === 'api-delete-cancel') {
+      apiDelete = null;
+      ctx.rerender();
       return true;
     }
 
     if (act === 'api-engine') {
       const preset = store.presets.find(item => item.id === String(data.id || ''));
       if (!preset) return true;
-      readDraft(event?.target?.closest('.mp-api-detail'), preset);
-      preset.engine = String(data.value || 'openai');
-      preset.path = defaultPath(preset.engine);
-      if (preset.engine === 'tavern') {
-        preset.url = '';
-        preset.key = '';
-        preset.model = '';
-      } else if (preset.engine === 'openai') {
-        if (!preset.url || preset.url === 'https://api.openai.com') preset.url = 'https://api.openai.com';
-        if (!preset.model) preset.model = 'gpt-4o-mini';
-        if (!preset.path) preset.path = '/v1/chat/completions';
-      } else if (preset.url === 'https://api.openai.com') {
-        preset.url = '';
+      const draft = readDraft(event?.target?.closest('.mp-api-detail'), draftFor(preset));
+      draft.engine = String(data.value || 'openai');
+      draft.path = defaultPath(draft.engine);
+      if (draft.engine === 'tavern') {
+        draft.url = '';
+        draft.key = '';
+        draft.model = '';
+      } else if (draft.engine === 'openai') {
+        if (!draft.url || draft.url === 'https://api.openai.com') draft.url = 'https://api.openai.com';
+        if (!draft.model) draft.model = 'gpt-4o-mini';
+        if (!draft.path) draft.path = '/v1/chat/completions';
+      } else if (draft.url === 'https://api.openai.com') {
+        draft.url = '';
       }
       preset.status = null;
       preset.models = [];
-      ctx.save();
       ctx.rerender();
       return true;
     }
@@ -12722,21 +13034,21 @@ const apiListApp = {
     if (act === 'api-model-select') {
       const preset = store.presets.find(item => item.id === String(data.id || ''));
       if (!preset) return true;
-      readDraft(event?.target?.closest('.mp-api-detail'), preset);
-      preset.model = String(data.value || '').trim();
-      ctx.save();
+      const draft = readDraft(event?.target?.closest('.mp-api-detail'), draftFor(preset));
+      draft.model = String(data.value || '').trim();
       ctx.rerender();
-      ctx.toast(`模型换成「${preset.model || '没填'}」`);
       return true;
     }
 
     if (act === 'api-inline-save') {
       const preset = store.presets.find(item => item.id === String(data.id || ''));
       if (!preset) return true;
-      const before = { url: preset.url, path: preset.path, key: preset.key };
-      readDraft(event?.target?.closest('.mp-api-detail'), preset);
+      const draft = readDraft(event?.target?.closest('.mp-api-detail'), draftFor(preset));
+      const before = { url: preset.url, path: preset.path, key: preset.key, engine: preset.engine };
+      Object.assign(preset, draft);
+      drafts.delete(preset.id);
       if (!preset.name) preset.name = '未命名接口';
-      if (before.url !== preset.url || before.path !== preset.path || before.key !== preset.key) {
+      if (before.url !== preset.url || before.path !== preset.path || before.key !== preset.key || before.engine !== preset.engine) {
         preset.status = null;
         preset.models = [];
       }
@@ -12746,19 +13058,27 @@ const apiListApp = {
       return true;
     }
 
+    if (act === 'api-draft-reset') {
+      const preset = store.presets.find(item => item.id === String(data.id || ''));
+      if (!preset) return true;
+      drafts.delete(preset.id);
+      ctx.rerender();
+      ctx.toast('这次修改已经取消');
+      return true;
+    }
+
     if (act === 'api-test' || act === 'api-models') {
       const preset = store.presets.find(item => item.id === String(data.id || ''));
       if (!preset) return true;
-      readDraft(event?.target?.closest('.mp-api-detail'), preset);
-      if (!apiRoot(preset) && typeof ctx.host?.listModels !== 'function') {
-        ctx.toast(act === 'api-test' ? '先填接口地址，再测试连接' : '先填接口地址，再拉模型');
+      const draft = readDraft(event?.target?.closest('.mp-api-detail'), draftFor(preset));
+      const probe = { ...preset, ...draft };
+      if (!apiRoot(probe) && typeof ctx.host?.listModels !== 'function') {
+        ctx.toast('先填接口地址，再连接');
         return true;
       }
-      refreshModels(ctx, preset).then(list => {
+      refreshModels(ctx, preset, probe).then(list => {
         if (!list) return;
-        ctx.toast(act === 'api-test'
-          ? `连接正常，拉到 ${list.length} 个模型`
-          : `拉到 ${list.length} 个模型，已放进下拉框`);
+        ctx.toast(`连接正常，拉到 ${list.length} 个模型`);
       });
       return true;
     }
@@ -12766,11 +13086,13 @@ const apiListApp = {
     if (act === 'api-use-chat') {
       const preset = store.presets.find(item => item.id === String(data.id || ''));
       if (!preset) return true;
-      readDraft(event?.target?.closest('.mp-api-detail'), preset);
+      const draft = readDraft(event?.target?.closest('.mp-api-detail'), draftFor(preset));
+      Object.assign(preset, draft);
+      drafts.delete(preset.id);
       store.activeChat = preset.id;
       ctx.save();
       ctx.rerender();
-      ctx.toast(`聊天换成「${preset.name || '未命名'}」，点保存写入方案`);
+      ctx.toast(`聊天换成「${preset.name || '未命名'}」；保存后写进方案`);
       return true;
     }
 
@@ -12791,19 +13113,40 @@ const apiListApp = {
       const preset = store.presets.find(item => item.id === String(data.id || ''));
       if (!preset) return true;
       if (preset.engine === 'tavern') { ctx.toast('酒馆 API 留着兜底，删不掉'); return true; }
-      if (store.presets.length <= 1) { ctx.toast('至少留一套'); return true; }
-      store.presets = store.presets.filter(item => item.id !== preset.id);
+      if (store.presets.length <= 1) { ctx.toast('至少留一套接口'); return true; }
+      apiDelete = { type: 'api', id: preset.id };
+      schemeEdit = null;
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'api-del-confirm') {
+      const pending = apiDelete?.type === 'api'
+        ? store.presets.find(item => item.id === apiDelete.id)
+        : null;
+      if (!pending) { apiDelete = null; ctx.rerender(); return true; }
+      if (pending.engine === 'tavern' || store.presets.length <= 1) {
+        apiDelete = null;
+        ctx.rerender();
+        ctx.toast('至少留一套接口');
+        return true;
+      }
+      const linkedCount = chatSchemesOf(ctx.state).filter(item => item.apiId === pending.id).length;
+      const chatCount = Object.values(ctx.state.chats || {}).filter(chat => chat.llmPresetId === pending.id).length;
+      store.presets = store.presets.filter(item => item.id !== pending.id);
       const fallback = store.presets[0];
-      if (store.activeChat === preset.id) store.activeChat = fallback.id;
-      store.chatSchemes.forEach(item => { if (item.apiId === preset.id) item.apiId = fallback.id; });
+      if (store.activeChat === pending.id) store.activeChat = fallback.id;
+      store.chatSchemes.forEach(item => { if (item.apiId === pending.id) item.apiId = fallback.id; });
       /* 单个聊天如果引用过这套接口，清掉引用，别留下空 id */
       Object.values(ctx.state.chats || {}).forEach(chat => {
-        if (chat && chat.llmPresetId === preset.id) chat.llmPresetId = '';
+        if (chat && chat.llmPresetId === pending.id) chat.llmPresetId = '';
       });
-      if (expandedId === preset.id) expandedId = '';
+      if (expandedId === pending.id) expandedId = '';
+      drafts.delete(pending.id);
+      apiDelete = null;
       ctx.save();
       ctx.rerender();
-      ctx.toast('这套接口删掉了');
+      ctx.toast(`接口「${pending.name || '未命名'}」删掉了${linkedCount ? `，${linkedCount} 套方案已改指兜底` : ''}${chatCount ? `，${chatCount} 个会话恢复跟随手机` : ''}`);
       return true;
     }
 
@@ -13478,7 +13821,7 @@ const characterApp = {
             ${icon(inContacts ? 'contacts' : 'plus')}<span>${inContacts ? '已在通讯录' : '存进通讯录'}</span>
           </button>
         </div>
-        <div class="mp-foot-note">只读卡片，不会改动酒馆里的角色。</div>
+        <div class="mp-foot-note">角色卡正文只读；上方世界书开关会写回酒馆，影响所有会话。</div>
       </div>`;
   },
 
@@ -14865,6 +15208,9 @@ const { MEMORY_MODES, memoryModeLabel, memoryPresetSummary, buildMemoryContext }
 let memoryChosen = '';
 let memoryView = { contactId: '', loading: false, error: '', text: '', source: '', file: '', demo: false, summaryCount: 0 };
 let memoryAutoKey = '';
+let memEdit = '';
+let memRename = false;
+let memDelete = '';
 
 function singleContacts(state) {
   return Object.values(state.contacts || {}).filter(contact => contact && contact.kind !== 'group');
@@ -14923,6 +15269,55 @@ function row(state, preset) {
     </button>`;
 }
 
+/* 方案管理不再走弹窗：在当前列表里展开，改完点保存 */
+function presetPanel(ctx, preset) {
+  const state = ctx.state;
+  const active = state.settings.memory?.activeId === preset.id;
+  return `
+    <div class="mp-card mp-api-edit mp-mem-edit">
+      <div class="mp-card-title">${esc(preset.name)}${active ? '<span class="mp-api-tag">使用中</span>' : ''}</div>
+      <label class="mp-api-field">
+        <span>记忆来源</span>
+        <div class="mp-select-wrap mp-api-mini-select">
+          <select data-act="mem-mode-select" data-id="${esc(preset.id)}">
+            ${MEMORY_MODES.map(item => `<option value="${item.value}"${item.value === preset.mode ? ' selected' : ''}>${esc(item.label)}</option>`).join('')}
+          </select>${icon('chevron')}
+        </div>
+      </label>
+      <label class="mp-api-field">
+        <span>保留层数</span>
+        <input id="mem-floors-input" class="mp-api-input" type="text" value="${esc(String(preset.floors || 10))}" placeholder="1 到 50">
+      </label>
+      <div class="mp-api-draft-note" style="grid-column:1/-1">${esc(memoryModeLabel(preset.mode))} · 最近 ${preset.floors || 10} 层 · ${preset.skipFirstFloor ? '首楼用原文' : '首楼用总结'}</div>
+      <div class="mp-draw-actions">
+        <button class="mp-draw-action" data-act="mem-floors-save" data-id="${esc(preset.id)}" type="button">保存层数</button>
+        <button class="mp-draw-action" data-act="mem-first" data-id="${esc(preset.id)}" type="button">${preset.skipFirstFloor ? '首楼改回总结' : '首楼改用原文'}</button>
+      </div>
+      <div class="mp-draw-actions">
+        ${active ? '' : `<button class="mp-draw-action is-primary" data-act="mem-use" data-id="${esc(preset.id)}" type="button">设为手机默认</button>`}
+        <button class="mp-draw-action" data-act="mem-rename-open" data-id="${esc(preset.id)}" type="button">改名</button>
+        <button class="mp-draw-action" data-act="mem-clone" data-id="${esc(preset.id)}" type="button">复制一套</button>
+        <button class="mp-draw-action is-danger" data-act="mem-del" data-id="${esc(preset.id)}" type="button">删除这套</button>
+      </div>
+      ${memRename ? `
+      <div class="mp-api-name-edit">
+        <input id="mem-rename-input" class="mp-api-input" type="text" maxlength="20" value="${esc(preset.name)}" placeholder="方案名字">
+        <button class="mp-draw-side is-primary" data-act="mem-rename-save" data-id="${esc(preset.id)}" type="button">确定</button>
+        <button class="mp-draw-side" data-act="mem-rename-cancel" type="button">取消</button>
+      </div>` : ''}
+      ${memDelete === preset.id ? `
+      <div class="mp-api-delete">
+        <div class="mp-api-delete-title">删除「${esc(preset.name)}」？</div>
+        <div class="mp-api-delete-sub">只删这套记忆方案；正在用它时，手机会改用剩下第一套。至少留一套。</div>
+        <div class="mp-draw-actions">
+          <button class="mp-draw-action is-danger" data-act="mem-del-confirm" data-id="${esc(preset.id)}" type="button">确认删除</button>
+          <button class="mp-draw-action" data-act="mem-del-cancel" type="button">取消</button>
+        </div>
+      </div>` : ''}
+      <button class="mp-ios-edit-reply" data-act="mem-edit-close" type="button">收起${icon('chevron')}</button>
+    </div>`;
+}
+
 function renderPage(ctx) {
   const presets = memoryPresetsOf(ctx.state);
   const active = presetById(ctx.state, ctx.state.settings.memory?.activeId) || presets[0] || null;
@@ -14971,7 +15366,7 @@ function renderPage(ctx) {
       <div class="mp-group" style="margin-top:16px">
         <div class="mp-group-label">手机默认方案</div>
         <div class="mp-group-box">
-          ${presets.map(item => row(ctx.state, item)).join('') || '<div class="mp-empty">还没有方案。</div>'}
+          ${presets.map(item => `${row(ctx.state, item)}${memEdit === item.id ? presetPanel(ctx, item) : ''}`).join('') || '<div class="mp-empty">还没有方案。</div>'}
         </div>
       </div>
 
@@ -14997,126 +15392,6 @@ function renderPage(ctx) {
     </div>`;
 }
 
-function openEdit(ctx, preset) {
-  if (!preset) return;
-  ctx.openSheet({
-    title: preset.name,
-    items: [
-      { label: '设为手机默认', value: 'use', note: '所有跟随手机的会话都用这套' },
-      { label: '改名', value: 'rename' },
-      { label: '改记忆来源', value: 'mode', note: memoryModeLabel(preset.mode) },
-      { label: '改保留层数', value: 'floors', note: `最近 ${preset.floors || 10} 层` },
-      { label: preset.skipFirstFloor ? '首楼：用原文' : '首楼：用总结', value: 'first', note: preset.skipFirstFloor ? '不注入首楼总结，改注入首楼原文' : '首楼也读酒馆总结' },
-      { label: '复制一套', value: 'clone' },
-      { label: '删除这套', value: 'delete', danger: true },
-    ],
-    onPick: (value) => {
-      const store = ctx.state.settings.memory;
-      const live = presetById(ctx.state, preset.id);
-      if (!live) return;
-
-      if (value === 'use') {
-        store.activeId = live.id;
-        ctx.save();
-        ctx.rerender();
-        ctx.toast(`手机默认记忆改成「${live.name}」`);
-        return;
-      }
-
-      if (value === 'rename') {
-        ctx.openSheet({
-          kind: 'text', title: '改个名字', value: live.name, placeholder: '比如：最近原文、长记忆',
-          onText: (text) => {
-            const name = String(text || '').trim().slice(0, 20);
-            if (!name) return;
-            live.name = name;
-            ctx.save();
-            ctx.rerender();
-          },
-        });
-        return;
-      }
-
-      if (value === 'mode') {
-        ctx.openSheet({
-          title: '记忆来源',
-          items: MEMORY_MODES.map(item => ({ label: item.label, value: item.value, note: item.hint })),
-          onPick: (mode) => {
-            if (!['auto', 'summary', 'recent'].includes(mode)) return;
-            live.mode = mode;
-            ctx.save();
-            ctx.rerender();
-          },
-        });
-        return;
-      }
-
-      if (value === 'floors') {
-        ctx.openSheet({
-          kind: 'text', title: '保留多少层', value: String(live.floors || 10),
-          placeholder: '1 到 50，默认 10',
-          onText: (text) => {
-            const floors = Math.max(1, Math.min(50, Number(String(text).replace(/[^\d]/g, '')) || 10));
-            live.floors = floors;
-            ctx.save();
-            ctx.rerender();
-            ctx.toast(`最近 ${floors} 层`);
-          },
-        });
-        return;
-      }
-
-      if (value === 'first') {
-        live.skipFirstFloor = !live.skipFirstFloor;
-        ctx.save();
-        ctx.rerender();
-        ctx.toast(live.skipFirstFloor ? '首楼改成注入原文' : '首楼恢复用总结');
-        return;
-      }
-
-      if (value === 'clone') {
-        const copy = {
-          id: newId('mem'),
-          name: `${live.name} 副本`.slice(0, 20),
-          mode: live.mode,
-          floors: live.floors,
-          skipFirstFloor: Boolean(live.skipFirstFloor),
-        };
-        store.presets.push(copy);
-        ctx.save();
-        ctx.rerender();
-        openEdit(ctx, copy);
-        return;
-      }
-
-      if (value === 'delete') {
-        if (store.presets.length <= 1) {
-          ctx.toast('至少留一套记忆方案');
-          return;
-        }
-        ctx.openSheet({
-          title: `删除「${live.name}」？`,
-          items: [
-            { label: '确认删除', value: 'delete', danger: true },
-            { label: '先留着', value: 'keep' },
-          ],
-          onPick: (pick) => {
-            if (pick !== 'delete') return;
-            const index = store.presets.findIndex(item => item.id === live.id);
-            if (index < 0) return;
-            store.presets.splice(index, 1);
-            const fallback = store.presets[0].id;
-            if (store.activeId === live.id) store.activeId = fallback;
-            ctx.save();
-            ctx.rerender();
-            ctx.toast('这套记忆方案删掉了');
-          },
-        });
-      }
-    },
-  });
-}
-
 function handle(ctx, act, data) {
   if (act === 'mem-character') {
     const contactId = String(data?.value || data?.id || '');
@@ -15137,7 +15412,19 @@ function handle(ctx, act, data) {
   }
 
   if (act === 'mem-edit') {
-    openEdit(ctx, presetById(ctx.state, data.id));
+    const id = String(data.id || '');
+    memEdit = memEdit === id ? '' : id;
+    memRename = false;
+    memDelete = '';
+    ctx.rerender();
+    return true;
+  }
+
+  if (act === 'mem-edit-close') {
+    memEdit = '';
+    memRename = false;
+    memDelete = '';
+    ctx.rerender();
     return true;
   }
 
@@ -15151,9 +15438,134 @@ function handle(ctx, act, data) {
       skipFirstFloor: Boolean(active?.skipFirstFloor),
     };
     ctx.state.settings.memory.presets.push(preset);
+    memEdit = preset.id;
+    memRename = false;
+    memDelete = '';
     ctx.save();
     ctx.rerender();
-    openEdit(ctx, preset);
+    return true;
+  }
+
+  if (act === 'mem-mode-select') {
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live || !['auto', 'summary', 'recent'].includes(String(data.value || ''))) return true;
+    live.mode = String(data.value);
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(`记忆来源改成「${memoryModeLabel(live.mode)}」`);
+    return true;
+  }
+
+  if (act === 'mem-floors-save') {
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live) return true;
+    const input = ctx.shell.root?.querySelector('#mem-floors-input');
+    const floors = Math.max(1, Math.min(50, Number(String(input?.value || '').replace(/[^\d]/g, '')) || 10));
+    live.floors = floors;
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(`最近 ${floors} 层`);
+    return true;
+  }
+
+  if (act === 'mem-first') {
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live) return true;
+    live.skipFirstFloor = !live.skipFirstFloor;
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(live.skipFirstFloor ? '首楼改成注入原文' : '首楼恢复用总结');
+    return true;
+  }
+
+  if (act === 'mem-use') {
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live) return true;
+    ctx.state.settings.memory.activeId = live.id;
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(`手机默认记忆改成「${live.name}」`);
+    return true;
+  }
+
+  if (act === 'mem-rename-open') {
+    memRename = true;
+    memDelete = '';
+    ctx.rerender();
+    return true;
+  }
+
+  if (act === 'mem-rename-save') {
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live) return true;
+    const input = ctx.shell.root?.querySelector('#mem-rename-input');
+    const name = String(input?.value || '').trim().slice(0, 20);
+    if (!name) { ctx.toast('名字不能空着'); return true; }
+    live.name = name;
+    memRename = false;
+    ctx.save();
+    ctx.rerender();
+    ctx.toast('名字改好了');
+    return true;
+  }
+
+  if (act === 'mem-rename-cancel') {
+    memRename = false;
+    ctx.rerender();
+    return true;
+  }
+
+  if (act === 'mem-clone') {
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live) return true;
+    const copy = {
+      id: newId('mem'),
+      name: `${live.name} 副本`.slice(0, 20),
+      mode: live.mode,
+      floors: live.floors,
+      skipFirstFloor: Boolean(live.skipFirstFloor),
+    };
+    ctx.state.settings.memory.presets.push(copy);
+    memEdit = copy.id;
+    memRename = false;
+    memDelete = '';
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(`复制成「${copy.name}」`);
+    return true;
+  }
+
+  if (act === 'mem-del') {
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live) return true;
+    if (memoryPresetsOf(ctx.state).length <= 1) { ctx.toast('至少留一套记忆方案'); return true; }
+    memDelete = live.id;
+    memRename = false;
+    ctx.rerender();
+    return true;
+  }
+
+  if (act === 'mem-del-cancel') {
+    memDelete = '';
+    ctx.rerender();
+    return true;
+  }
+
+  if (act === 'mem-del-confirm') {
+    const store = ctx.state.settings.memory;
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live) return true;
+    if (memoryPresetsOf(ctx.state).length <= 1) { ctx.toast('至少留一套记忆方案'); return true; }
+    const index = store.presets.findIndex(item => item.id === live.id);
+    if (index < 0) return true;
+    store.presets.splice(index, 1);
+    if (store.activeId === live.id) store.activeId = store.presets[0].id;
+    memDelete = '';
+    memEdit = '';
+    memRename = false;
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(`记忆方案「${live.name}」删掉了`);
     return true;
   }
 
@@ -15185,10 +15597,10 @@ let editingId = '';
 let creating = false;
 let renaming = false;
 let deleting = false;
-let preview = { presetId: '', tab: 'messages', loading: false, error: '', data: null, flat: '' };
+let preview = { presetId: '', tab: 'messages', chatId: '', loading: false, error: '', data: null, flat: '' };
 
 function resetPreview() {
-  preview = { presetId: '', tab: preview.tab || 'messages', loading: false, error: '', data: null, flat: '' };
+  preview = { presetId: '', tab: preview.tab || 'messages', chatId: preview.chatId || '', loading: false, error: '', data: null, flat: '' };
 }
 
 function clip(text, max = 42) {
@@ -15261,7 +15673,7 @@ const PREVIEW_STATUS = {
 
 function previewHtml(preset) {
   if (!preview.presetId || preview.presetId !== preset.id) {
-    return '<div class="mp-api-note">点「跑一遍」会按当前开关、顺序和最近一个会话，走和真实聊天完全相同的那套组装逻辑。</div>';
+    return '<div class="mp-api-note">点「跑一遍」会按当前开关、顺序和上面选中的会话，走和真实聊天完全相同的那套组装逻辑。</div>';
   }
   if (preview.loading) return '<div class="mp-api-note">正在组装…</div>';
   if (preview.error) return `<div class="mp-api-note is-warn">${esc(preview.error)}</div>`;
@@ -15291,33 +15703,49 @@ function previewHtml(preset) {
     </div>`;
 }
 
+function characterOptions(ctx) {
+  const names = [...new Set((ctx.state.characters || []).map(card => String(card?.name || '')).filter(Boolean))];
+  return names.map(name => ({ value: name, label: name }));
+}
+
 function openCharactersForm(ctx, preset, item) {
+  const options = characterOptions(ctx);
   ctx.openSheet({
     kind: 'form',
     title: `「${item.label}」对谁生效`,
     confirm: '保存',
     fields: [
-      {
+      options.length ? {
+        name: 'characters',
+        type: 'checks',
+        label: '角色卡',
+        value: normalizeCharacters(item.characters),
+        options,
+        hint: '勾选 = 只在这些角色的一对一聊天里生效；一个都不勾 = 全部角色。群聊只注入没勾角色的公共条目。',
+      } : {
         name: 'characters',
         type: 'text',
         label: '角色卡名字',
         value: normalizeCharacters(item.characters).join('、'),
         placeholder: '留空 = 全部角色',
         maxLength: 200,
-        hint: '按角色卡匹配，名字或头像文件名都行，用「、」或逗号分隔；填了只在这些角色的一对一聊天里生效，群聊只注入留空的那条',
+        hint: '还没读到角色卡；先按名字填，用「、」或逗号分隔。',
       },
     ],
     onForm: values => {
       const items = promptItems(preset);
       const index = items.findIndex(candidate => candidate.id === item.id);
       if (index < 0) return;
-      const next = normalizeCharacters(String(values.characters || '').split(/[、,，/]/).map(part => part.trim()));
+      const raw = Array.isArray(values.characters)
+        ? values.characters
+        : String(values.characters || '').split(/[、,，/]/).map(part => part.trim());
+      const next = normalizeCharacters(raw);
       items[index] = { ...items[index], characters: next };
       preset.items = items;
       resetPreview();
       ctx.save();
       ctx.rerender();
-      ctx.toast(next.length ? `只对 ${next.join('、')} 生效` : '改回全部角色');
+      ctx.toast(next.length ? `只对 ${next.join('、')} 生效` : '改成全部角色');
     },
   });
 }
@@ -15331,6 +15759,7 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
     return;
   }
   const defaultKind = item?.kind || (scope === 'app' ? 'app' : 'chat');
+  const charOptions = characterOptions(ctx);
   ctx.openSheet({
     kind: 'form',
     title: item ? '编辑提示词条目' : '添加提示词条目',
@@ -15342,7 +15771,14 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
         { value: 'app', label: '其他软件' },
       ] },
       { name: 'app', type: 'text', label: '软件名', value: item?.app || '', placeholder: '日历 / 外卖 / 音乐 / 购物', maxLength: 20, hint: '类型选“其他软件”时才填，聊天条目留空' },
-      { name: 'characters', type: 'text', label: '适用角色', value: normalizeCharacters(item?.characters).join('、'), placeholder: '留空 = 全部角色', maxLength: 200, hint: '填角色卡名字，用「、」或逗号分隔；填了只在这些角色的一对一聊天里生效，群聊只注入留空的公共条目' },
+      charOptions.length ? {
+        name: 'characters', type: 'checks', label: '适用角色',
+        value: normalizeCharacters(item?.characters), options: charOptions,
+        hint: '勾选 = 只在这些角色的一对一聊天里生效；一个都不勾 = 全部角色。群聊只注入没勾角色的公共条目。',
+      } : {
+        name: 'characters', type: 'text', label: '适用角色', value: normalizeCharacters(item?.characters).join('、'), placeholder: '留空 = 全部角色', maxLength: 200,
+        hint: '还没读到角色卡；先按名字填，用「、」或逗号分隔。',
+      },
       { name: 'role', type: 'select', label: '角色', value: item?.role || 'system', options: [
         { value: 'system', label: '系统（system）' },
         { value: 'user', label: '用户（user）' },
@@ -15357,7 +15793,9 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
         label: String(values.label || '').trim().slice(0, 30) || '自定义条目',
         kind: values.kind === 'app' ? 'app' : 'chat',
         app: values.kind === 'app' ? String(values.app || '').trim().slice(0, 20) : '',
-        characters: normalizeCharacters(String(values.characters || '').split(/[、,，/]/).map(part => part.trim())),
+        characters: normalizeCharacters(Array.isArray(values.characters)
+          ? values.characters
+          : String(values.characters || '').split(/[、,，/]/).map(part => part.trim())),
         role: ['system', 'user', 'assistant'].includes(values.role) ? values.role : 'system',
         content: String(values.content || '').trim().slice(0, 4000),
         enabled: item?.enabled !== false,
@@ -15571,6 +16009,8 @@ const replyPresetApp = {
       deleting = false;
     }
     editingId = preset.id;
+    const chats = chatsOf(ctx.state);
+    const previewChat = chats.find(chat => chat.id === preview.chatId) || chats[0] || null;
     const active = replyPresetFor(ctx.state, null);
     const isActive = active?.id === preset.id;
     const text = String(preset.text || '');
@@ -15666,6 +16106,15 @@ const replyPresetApp = {
           <div class="mp-group-label">实际注入预览</div>
           <button class="mp-draw-side is-primary" data-act="reply-preview-run" type="button"${preview.loading ? ' disabled' : ''}>${preview.loading ? '组装中…' : '跑一遍'}</button>
         </div>
+        ${chats.length ? `
+        <div class="mp-select-wrap" style="margin:0 0 8px">
+          <select data-act="reply-preview-chat">
+            ${chats.map(chat => {
+              const contact = ctx.state.contacts?.[chat.contactId];
+              return `<option value="${esc(chat.id)}"${previewChat?.id === chat.id ? ' selected' : ''}>${esc(contact?.name || '未命名会话')} · ${esc(clip(chat.messages?.slice(-1)[0]?.text || '还没有消息', 18))}</option>`;
+            }).join('')}
+          </select>${icon('chevron')}
+        </div>` : '<div class="mp-api-note">还没有会话，先回聊天发一条，再来预览。</div>'}
         ${previewHtml(preset)}
 
         <div class="mp-group-label" style="margin-top:16px">用在</div>
@@ -15910,15 +16359,25 @@ const replyPresetApp = {
       return true;
     }
 
+    if (act === 'reply-preview-chat') {
+      const chatId = String(data.value || '');
+      if (!chatsOf(ctx.state).some(chat => chat.id === chatId)) return true;
+      preview = { presetId: '', tab: preview.tab || 'messages', chatId, loading: false, error: '', data: null, flat: '' };
+      ctx.rerender();
+      return true;
+    }
+
     if (act === 'reply-preview-run') {
-      const chat = chatsOf(ctx.state)[0] || null;
+      const chats = chatsOf(ctx.state);
+      const chat = chats.find(item => item.id === preview.chatId) || chats[0] || null;
       const contact = chat ? ctx.state.contacts?.[chat.contactId] || null : null;
-      preview = { presetId: preset.id, tab: preview.tab || 'messages', loading: true, error: '', data: null, flat: '' };
+      preview = { presetId: preset.id, tab: preview.tab || 'messages', chatId: chat?.id || '', loading: true, error: '', data: null, flat: '' };
       ctx.rerender();
       buildReplyMessages(ctx.state, chat, contact).then(result => {
         preview = {
           presetId: preset.id,
           tab: preview.tab || 'messages',
+          chatId: chat?.id || '',
           loading: false,
           error: '',
           data: result,
@@ -15926,7 +16385,7 @@ const replyPresetApp = {
         };
         ctx.rerender();
       }).catch(error => {
-        preview = { presetId: preset.id, tab: preview.tab || 'messages', loading: false, error: error?.message || '组装失败', data: null, flat: '' };
+        preview = { presetId: preset.id, tab: preview.tab || 'messages', chatId: chat?.id || '', loading: false, error: error?.message || '组装失败', data: null, flat: '' };
         ctx.rerender();
       });
       return true;

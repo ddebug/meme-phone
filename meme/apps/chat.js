@@ -6,6 +6,7 @@
 import { icon } from '../icons.js';
 import {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
+  wakeAllowed,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, normalizeReplyItems,
 } from '../data.js';
@@ -115,11 +116,14 @@ function settingsBody(ctx, chatId) {
   const replyAppCount = replyItems.filter(item => item.kind === 'app').length;
   const injectedCount = replyItems.filter(item => item.kind === 'context' && item.enabled).length;
   const replySub = `${ownReply ? `只对这个会话 · ${ownReply.name || '未命名'}` : `跟随手机 · ${globalReply?.name || '默认回复方式'}`} · ${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
+  const wakeSub = chat.wake === undefined
+    ? `跟随手机设置 · ${state.settings.chat?.wake === false ? '关' : '开'}`
+    : (chat.wake ? '这个会话单独开着' : '这个会话单独关掉');
 
   return `
     <div class="mp-page-body">
       <div class="mp-title" style="margin-top:0">聊天设置</div>
-      <div class="mp-subtitle">只影响这个会话，不动角色卡和酒馆</div>
+      <div class="mp-subtitle">只改这个会话的开关和引用；角色卡、世界书是全局的，改会写到酒馆</div>
 
       <div class="mp-chat-set-head">
         ${avatarHtml(contact?.name || '?', contact?.avatar)}
@@ -135,7 +139,11 @@ function settingsBody(ctx, chatId) {
         <div class="mp-group-box">
           ${chatSetRow(chat.id, { iconName: 'pin', title: '置顶聊天', sub: chat.pinned ? '已固定在会话列表最上面' : '让这个会话排在前面', act: 'ts-toggle-pin', toggle: chat.pinned })}
           ${chatSetRow(chat.id, { iconName: 'bell', title: '消息免打扰', sub: chat.muted ? '新消息不显示未读角标' : '这个会话的新消息照常计数', act: 'ts-toggle-mute', toggle: chat.muted })}
-          ${chatSetRow(chat.id, { iconName: 'chat', title: '空着发送 = 让 TA 主动开口', sub: chat.wake === false ? '已经关掉，空消息不会发出去' : '不写内容也能让 TA 先开口', act: 'ts-toggle-wake', toggle: chat.wake !== false })}
+          ${chatSetRow(chat.id, {
+            iconName: 'chat', title: '空着发送 = 让 TA 主动开口',
+            sub: wakeSub, act: 'ts-toggle-wake',
+            value: chat.wake === undefined ? '跟随' : (chat.wake ? '开' : '关'),
+          })}
         </div>
       </div>
 
@@ -173,7 +181,7 @@ function settingsBody(ctx, chatId) {
         <div class="mp-group-label">这个角色</div>
         <div class="mp-group-box">
           ${card
-            ? chatSetRow(chat.id, { iconName: 'contacts', title: '角色设定与世界书', sub: '看这张卡，也可以开关关联世界书', act: 'ts-open-character' })
+            ? chatSetRow(chat.id, { iconName: 'contacts', title: '角色设定与世界书', sub: '角色卡正文只读；世界书开关会写回酒馆，影响所有会话', act: 'ts-open-character' })
             : chatSetRow(chat.id, { iconName: 'search', title: '去查角色', sub: '还没同步这张角色卡', act: 'ts-open-characters' })}
           ${chatSetRow(chat.id, { iconName: 'diary', title: 'TA 的日记', sub: '按天记录这个角色和你的聊天', act: 'ts-diary' })}
           ${chatSetRow(chat.id, { iconName: 'theater', title: '看 TA 的小剧场', sub: '这个角色存下来的片段', act: 'ts-extras' })}
@@ -291,7 +299,7 @@ function threadBody(ctx, chatId) {
       </div>
       <div class="mp-messages" id="mpMessages">${blocks.join('')}</div>
       <div class="mp-composer">
-        <div class="mp-composer-tip">空着发出去，TA 会主动开口</div>
+        <div class="mp-composer-tip">${wakeAllowed(ctx.state, chat) ? '空着发出去，TA 会主动开口' : '空发送已关掉，去聊天设置里打开'}</div>
         ${quote ? `
         <div class="mp-quote-chip">
           <span style="color:var(--accent-deep)">${icon('reply')}</span>
@@ -329,7 +337,12 @@ function doSend(ctx, chatId) {
   const contact = contactById(ctx.state, chat.contactId);
 
   if (!text) {
-    if (chat.wake === false) { ctx.toast('这个会话的空发送已经关掉了'); return; }
+    if (!wakeAllowed(ctx.state, chat)) {
+      ctx.toast(ctx.state.settings?.proactive?.enabled === false
+        ? '设置里关掉了主动开口'
+        : (ctx.state.settings?.chat?.wake === false ? '设置里关掉了空发送' : '这个会话的空发送已经关掉了'));
+      return;
+    }
     wake(ctx, chat, contact);
     return;
   }
@@ -444,8 +457,18 @@ export const chatApp = {
           if (value === 'pin') chat.pinned = !chat.pinned;
           if (value === 'mute') chat.muted = !chat.muted;
           if (value === 'delete') {
-            delete ctx.state.chats[chat.id];
-            ctx.toast('会话已删除');
+            ctx.openSheet({
+              title: `删除和「${contact?.name || 'TA'}」的会话？`,
+              items: [{ label: '确认删除会话', value: 'delete', icon: 'trash', danger: true, note: '会删掉这段聊天记录和会话设置；联系人、角色卡和酒馆数据都不动。' }],
+              onPick: (pick) => {
+                if (pick !== 'delete') return;
+                delete ctx.state.chats[chat.id];
+                ctx.save();
+                ctx.rerender();
+                ctx.toast('会话已删除');
+              },
+            });
+            return;
           }
           ctx.save();
           ctx.rerender();
@@ -491,10 +514,12 @@ export const threadSettingsApp = {
     }
 
     if (act === 'ts-toggle-wake') {
-      chat.wake = chat.wake === false;
+      chat.wake = chat.wake === undefined ? true : (chat.wake ? false : undefined);
       ctx.save();
       ctx.rerender();
-      ctx.toast(chat.wake ? '空发送会触发主动开口' : '空发送已关掉');
+      ctx.toast(chat.wake === undefined
+        ? '这个会话恢复跟随手机设置'
+        : (chat.wake ? '这个会话空发送可以触发主动开口' : '这个会话空发送已关掉'));
       return true;
     }
 
@@ -739,11 +764,18 @@ export const threadApp = {
         onPick: (value) => {
           if (value === 'extras') ctx.go('app-extras', { contactId: chat.contactId });
           if (value === 'clear') {
-            chat.messages = [];
-            chat.unread = 0;
-            ctx.save();
-            ctx.toast('已清空');
-            ctx.rerender();
+            ctx.openSheet({
+              title: `清空「${contact?.name || 'TA'}」的聊天记录？`,
+              items: [{ label: '确认清空消息', value: 'clear', icon: 'trash', danger: true, note: '聊天记录会全部删掉，会话设置和联系人保留，不能恢复。' }],
+              onPick: (pick) => {
+                if (pick !== 'clear') return;
+                chat.messages = [];
+                chat.unread = 0;
+                ctx.save();
+                ctx.rerender();
+                ctx.toast('已清空');
+              },
+            });
           }
         },
       });
@@ -785,10 +817,17 @@ export const threadApp = {
             reply(ctx, chat, contact);
           }
           if (value === 'delete') {
-            chat.messages = chat.messages.filter(item => item.id !== message.id);
-            ctx.save();
-            ctx.rerender();
-            ctx.toast('已删除');
+            ctx.openSheet({
+              title: '删除这一条消息？',
+              items: [{ label: '确认删除这条', value: 'delete', icon: 'trash', danger: true, note: '只删这一条，不影响其他聊天记录；不能恢复。' }],
+              onPick: (pick) => {
+                if (pick !== 'delete') return;
+                chat.messages = chat.messages.filter(item => item.id !== message.id);
+                ctx.save();
+                ctx.rerender();
+                ctx.toast('已删除');
+              },
+            });
           }
         },
       });

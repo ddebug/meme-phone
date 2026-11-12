@@ -12,6 +12,9 @@ import { MEMORY_MODES, memoryModeLabel, memoryPresetSummary, buildMemoryContext 
 let memoryChosen = '';
 let memoryView = { contactId: '', loading: false, error: '', text: '', source: '', file: '', demo: false, summaryCount: 0 };
 let memoryAutoKey = '';
+let memEdit = '';
+let memRename = false;
+let memDelete = '';
 
 function singleContacts(state) {
   return Object.values(state.contacts || {}).filter(contact => contact && contact.kind !== 'group');
@@ -70,6 +73,55 @@ function row(state, preset) {
     </button>`;
 }
 
+/* 方案管理不再走弹窗：在当前列表里展开，改完点保存 */
+function presetPanel(ctx, preset) {
+  const state = ctx.state;
+  const active = state.settings.memory?.activeId === preset.id;
+  return `
+    <div class="mp-card mp-api-edit mp-mem-edit">
+      <div class="mp-card-title">${esc(preset.name)}${active ? '<span class="mp-api-tag">使用中</span>' : ''}</div>
+      <label class="mp-api-field">
+        <span>记忆来源</span>
+        <div class="mp-select-wrap mp-api-mini-select">
+          <select data-act="mem-mode-select" data-id="${esc(preset.id)}">
+            ${MEMORY_MODES.map(item => `<option value="${item.value}"${item.value === preset.mode ? ' selected' : ''}>${esc(item.label)}</option>`).join('')}
+          </select>${icon('chevron')}
+        </div>
+      </label>
+      <label class="mp-api-field">
+        <span>保留层数</span>
+        <input id="mem-floors-input" class="mp-api-input" type="text" value="${esc(String(preset.floors || 10))}" placeholder="1 到 50">
+      </label>
+      <div class="mp-api-draft-note" style="grid-column:1/-1">${esc(memoryModeLabel(preset.mode))} · 最近 ${preset.floors || 10} 层 · ${preset.skipFirstFloor ? '首楼用原文' : '首楼用总结'}</div>
+      <div class="mp-draw-actions">
+        <button class="mp-draw-action" data-act="mem-floors-save" data-id="${esc(preset.id)}" type="button">保存层数</button>
+        <button class="mp-draw-action" data-act="mem-first" data-id="${esc(preset.id)}" type="button">${preset.skipFirstFloor ? '首楼改回总结' : '首楼改用原文'}</button>
+      </div>
+      <div class="mp-draw-actions">
+        ${active ? '' : `<button class="mp-draw-action is-primary" data-act="mem-use" data-id="${esc(preset.id)}" type="button">设为手机默认</button>`}
+        <button class="mp-draw-action" data-act="mem-rename-open" data-id="${esc(preset.id)}" type="button">改名</button>
+        <button class="mp-draw-action" data-act="mem-clone" data-id="${esc(preset.id)}" type="button">复制一套</button>
+        <button class="mp-draw-action is-danger" data-act="mem-del" data-id="${esc(preset.id)}" type="button">删除这套</button>
+      </div>
+      ${memRename ? `
+      <div class="mp-api-name-edit">
+        <input id="mem-rename-input" class="mp-api-input" type="text" maxlength="20" value="${esc(preset.name)}" placeholder="方案名字">
+        <button class="mp-draw-side is-primary" data-act="mem-rename-save" data-id="${esc(preset.id)}" type="button">确定</button>
+        <button class="mp-draw-side" data-act="mem-rename-cancel" type="button">取消</button>
+      </div>` : ''}
+      ${memDelete === preset.id ? `
+      <div class="mp-api-delete">
+        <div class="mp-api-delete-title">删除「${esc(preset.name)}」？</div>
+        <div class="mp-api-delete-sub">只删这套记忆方案；正在用它时，手机会改用剩下第一套。至少留一套。</div>
+        <div class="mp-draw-actions">
+          <button class="mp-draw-action is-danger" data-act="mem-del-confirm" data-id="${esc(preset.id)}" type="button">确认删除</button>
+          <button class="mp-draw-action" data-act="mem-del-cancel" type="button">取消</button>
+        </div>
+      </div>` : ''}
+      <button class="mp-ios-edit-reply" data-act="mem-edit-close" type="button">收起${icon('chevron')}</button>
+    </div>`;
+}
+
 function renderPage(ctx) {
   const presets = memoryPresetsOf(ctx.state);
   const active = presetById(ctx.state, ctx.state.settings.memory?.activeId) || presets[0] || null;
@@ -118,7 +170,7 @@ function renderPage(ctx) {
       <div class="mp-group" style="margin-top:16px">
         <div class="mp-group-label">手机默认方案</div>
         <div class="mp-group-box">
-          ${presets.map(item => row(ctx.state, item)).join('') || '<div class="mp-empty">还没有方案。</div>'}
+          ${presets.map(item => `${row(ctx.state, item)}${memEdit === item.id ? presetPanel(ctx, item) : ''}`).join('') || '<div class="mp-empty">还没有方案。</div>'}
         </div>
       </div>
 
@@ -144,126 +196,6 @@ function renderPage(ctx) {
     </div>`;
 }
 
-function openEdit(ctx, preset) {
-  if (!preset) return;
-  ctx.openSheet({
-    title: preset.name,
-    items: [
-      { label: '设为手机默认', value: 'use', note: '所有跟随手机的会话都用这套' },
-      { label: '改名', value: 'rename' },
-      { label: '改记忆来源', value: 'mode', note: memoryModeLabel(preset.mode) },
-      { label: '改保留层数', value: 'floors', note: `最近 ${preset.floors || 10} 层` },
-      { label: preset.skipFirstFloor ? '首楼：用原文' : '首楼：用总结', value: 'first', note: preset.skipFirstFloor ? '不注入首楼总结，改注入首楼原文' : '首楼也读酒馆总结' },
-      { label: '复制一套', value: 'clone' },
-      { label: '删除这套', value: 'delete', danger: true },
-    ],
-    onPick: (value) => {
-      const store = ctx.state.settings.memory;
-      const live = presetById(ctx.state, preset.id);
-      if (!live) return;
-
-      if (value === 'use') {
-        store.activeId = live.id;
-        ctx.save();
-        ctx.rerender();
-        ctx.toast(`手机默认记忆改成「${live.name}」`);
-        return;
-      }
-
-      if (value === 'rename') {
-        ctx.openSheet({
-          kind: 'text', title: '改个名字', value: live.name, placeholder: '比如：最近原文、长记忆',
-          onText: (text) => {
-            const name = String(text || '').trim().slice(0, 20);
-            if (!name) return;
-            live.name = name;
-            ctx.save();
-            ctx.rerender();
-          },
-        });
-        return;
-      }
-
-      if (value === 'mode') {
-        ctx.openSheet({
-          title: '记忆来源',
-          items: MEMORY_MODES.map(item => ({ label: item.label, value: item.value, note: item.hint })),
-          onPick: (mode) => {
-            if (!['auto', 'summary', 'recent'].includes(mode)) return;
-            live.mode = mode;
-            ctx.save();
-            ctx.rerender();
-          },
-        });
-        return;
-      }
-
-      if (value === 'floors') {
-        ctx.openSheet({
-          kind: 'text', title: '保留多少层', value: String(live.floors || 10),
-          placeholder: '1 到 50，默认 10',
-          onText: (text) => {
-            const floors = Math.max(1, Math.min(50, Number(String(text).replace(/[^\d]/g, '')) || 10));
-            live.floors = floors;
-            ctx.save();
-            ctx.rerender();
-            ctx.toast(`最近 ${floors} 层`);
-          },
-        });
-        return;
-      }
-
-      if (value === 'first') {
-        live.skipFirstFloor = !live.skipFirstFloor;
-        ctx.save();
-        ctx.rerender();
-        ctx.toast(live.skipFirstFloor ? '首楼改成注入原文' : '首楼恢复用总结');
-        return;
-      }
-
-      if (value === 'clone') {
-        const copy = {
-          id: newId('mem'),
-          name: `${live.name} 副本`.slice(0, 20),
-          mode: live.mode,
-          floors: live.floors,
-          skipFirstFloor: Boolean(live.skipFirstFloor),
-        };
-        store.presets.push(copy);
-        ctx.save();
-        ctx.rerender();
-        openEdit(ctx, copy);
-        return;
-      }
-
-      if (value === 'delete') {
-        if (store.presets.length <= 1) {
-          ctx.toast('至少留一套记忆方案');
-          return;
-        }
-        ctx.openSheet({
-          title: `删除「${live.name}」？`,
-          items: [
-            { label: '确认删除', value: 'delete', danger: true },
-            { label: '先留着', value: 'keep' },
-          ],
-          onPick: (pick) => {
-            if (pick !== 'delete') return;
-            const index = store.presets.findIndex(item => item.id === live.id);
-            if (index < 0) return;
-            store.presets.splice(index, 1);
-            const fallback = store.presets[0].id;
-            if (store.activeId === live.id) store.activeId = fallback;
-            ctx.save();
-            ctx.rerender();
-            ctx.toast('这套记忆方案删掉了');
-          },
-        });
-      }
-    },
-  });
-}
-
 function handle(ctx, act, data) {
   if (act === 'mem-character') {
     const contactId = String(data?.value || data?.id || '');
@@ -284,7 +216,19 @@ function handle(ctx, act, data) {
   }
 
   if (act === 'mem-edit') {
-    openEdit(ctx, presetById(ctx.state, data.id));
+    const id = String(data.id || '');
+    memEdit = memEdit === id ? '' : id;
+    memRename = false;
+    memDelete = '';
+    ctx.rerender();
+    return true;
+  }
+
+  if (act === 'mem-edit-close') {
+    memEdit = '';
+    memRename = false;
+    memDelete = '';
+    ctx.rerender();
     return true;
   }
 
@@ -298,9 +242,134 @@ function handle(ctx, act, data) {
       skipFirstFloor: Boolean(active?.skipFirstFloor),
     };
     ctx.state.settings.memory.presets.push(preset);
+    memEdit = preset.id;
+    memRename = false;
+    memDelete = '';
     ctx.save();
     ctx.rerender();
-    openEdit(ctx, preset);
+    return true;
+  }
+
+  if (act === 'mem-mode-select') {
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live || !['auto', 'summary', 'recent'].includes(String(data.value || ''))) return true;
+    live.mode = String(data.value);
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(`记忆来源改成「${memoryModeLabel(live.mode)}」`);
+    return true;
+  }
+
+  if (act === 'mem-floors-save') {
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live) return true;
+    const input = ctx.shell.root?.querySelector('#mem-floors-input');
+    const floors = Math.max(1, Math.min(50, Number(String(input?.value || '').replace(/[^\d]/g, '')) || 10));
+    live.floors = floors;
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(`最近 ${floors} 层`);
+    return true;
+  }
+
+  if (act === 'mem-first') {
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live) return true;
+    live.skipFirstFloor = !live.skipFirstFloor;
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(live.skipFirstFloor ? '首楼改成注入原文' : '首楼恢复用总结');
+    return true;
+  }
+
+  if (act === 'mem-use') {
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live) return true;
+    ctx.state.settings.memory.activeId = live.id;
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(`手机默认记忆改成「${live.name}」`);
+    return true;
+  }
+
+  if (act === 'mem-rename-open') {
+    memRename = true;
+    memDelete = '';
+    ctx.rerender();
+    return true;
+  }
+
+  if (act === 'mem-rename-save') {
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live) return true;
+    const input = ctx.shell.root?.querySelector('#mem-rename-input');
+    const name = String(input?.value || '').trim().slice(0, 20);
+    if (!name) { ctx.toast('名字不能空着'); return true; }
+    live.name = name;
+    memRename = false;
+    ctx.save();
+    ctx.rerender();
+    ctx.toast('名字改好了');
+    return true;
+  }
+
+  if (act === 'mem-rename-cancel') {
+    memRename = false;
+    ctx.rerender();
+    return true;
+  }
+
+  if (act === 'mem-clone') {
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live) return true;
+    const copy = {
+      id: newId('mem'),
+      name: `${live.name} 副本`.slice(0, 20),
+      mode: live.mode,
+      floors: live.floors,
+      skipFirstFloor: Boolean(live.skipFirstFloor),
+    };
+    ctx.state.settings.memory.presets.push(copy);
+    memEdit = copy.id;
+    memRename = false;
+    memDelete = '';
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(`复制成「${copy.name}」`);
+    return true;
+  }
+
+  if (act === 'mem-del') {
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live) return true;
+    if (memoryPresetsOf(ctx.state).length <= 1) { ctx.toast('至少留一套记忆方案'); return true; }
+    memDelete = live.id;
+    memRename = false;
+    ctx.rerender();
+    return true;
+  }
+
+  if (act === 'mem-del-cancel') {
+    memDelete = '';
+    ctx.rerender();
+    return true;
+  }
+
+  if (act === 'mem-del-confirm') {
+    const store = ctx.state.settings.memory;
+    const live = presetById(ctx.state, String(data.id || ''));
+    if (!live) return true;
+    if (memoryPresetsOf(ctx.state).length <= 1) { ctx.toast('至少留一套记忆方案'); return true; }
+    const index = store.presets.findIndex(item => item.id === live.id);
+    if (index < 0) return true;
+    store.presets.splice(index, 1);
+    if (store.activeId === live.id) store.activeId = store.presets[0].id;
+    memDelete = '';
+    memEdit = '';
+    memRename = false;
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(`记忆方案「${live.name}」删掉了`);
     return true;
   }
 

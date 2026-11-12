@@ -271,7 +271,7 @@ export function chatMemorySummary({ metadata = null, messages = [], skipFirstFlo
  * 读取当前聊天全部总结。
  * skipFirstFloor=true 时：首楼的总结不参与，改成给首楼原文。
  */
-export function readSummaries({ skipFirstFloor = false } = {}) {
+export function readSummaries({ skipFirstFloor = false, name = '' } = {}) {
   const api = bookApi();
   let nodes = [];
   let coverage = { complete: true, missingAiFloors: [] };
@@ -289,7 +289,7 @@ export function readSummaries({ skipFirstFloor = false } = {}) {
     } catch (error) {
       nodes = [];
     }
-  } else if (globalThis.__MEME_DEMO__) {
+  } else if (globalThis.__MEME_DEMO__ && (!name || String(name) === '沈砚')) {
     /* 只有预览环境才用演示数据；真机没接上柏宝书时宁可没有记忆，也不注入假总结 */
     demo = true;
     nodes = DEMO_NODES.map(node => ({ ...node }));

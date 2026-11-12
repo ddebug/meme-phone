@@ -14,10 +14,10 @@ let editingId = '';
 let creating = false;
 let renaming = false;
 let deleting = false;
-let preview = { presetId: '', tab: 'messages', loading: false, error: '', data: null, flat: '' };
+let preview = { presetId: '', tab: 'messages', chatId: '', loading: false, error: '', data: null, flat: '' };
 
 function resetPreview() {
-  preview = { presetId: '', tab: preview.tab || 'messages', loading: false, error: '', data: null, flat: '' };
+  preview = { presetId: '', tab: preview.tab || 'messages', chatId: preview.chatId || '', loading: false, error: '', data: null, flat: '' };
 }
 
 function clip(text, max = 42) {
@@ -90,7 +90,7 @@ const PREVIEW_STATUS = {
 
 function previewHtml(preset) {
   if (!preview.presetId || preview.presetId !== preset.id) {
-    return '<div class="mp-api-note">点「跑一遍」会按当前开关、顺序和最近一个会话，走和真实聊天完全相同的那套组装逻辑。</div>';
+    return '<div class="mp-api-note">点「跑一遍」会按当前开关、顺序和上面选中的会话，走和真实聊天完全相同的那套组装逻辑。</div>';
   }
   if (preview.loading) return '<div class="mp-api-note">正在组装…</div>';
   if (preview.error) return `<div class="mp-api-note is-warn">${esc(preview.error)}</div>`;
@@ -120,33 +120,49 @@ function previewHtml(preset) {
     </div>`;
 }
 
+function characterOptions(ctx) {
+  const names = [...new Set((ctx.state.characters || []).map(card => String(card?.name || '')).filter(Boolean))];
+  return names.map(name => ({ value: name, label: name }));
+}
+
 function openCharactersForm(ctx, preset, item) {
+  const options = characterOptions(ctx);
   ctx.openSheet({
     kind: 'form',
     title: `「${item.label}」对谁生效`,
     confirm: '保存',
     fields: [
-      {
+      options.length ? {
+        name: 'characters',
+        type: 'checks',
+        label: '角色卡',
+        value: normalizeCharacters(item.characters),
+        options,
+        hint: '勾选 = 只在这些角色的一对一聊天里生效；一个都不勾 = 全部角色。群聊只注入没勾角色的公共条目。',
+      } : {
         name: 'characters',
         type: 'text',
         label: '角色卡名字',
         value: normalizeCharacters(item.characters).join('、'),
         placeholder: '留空 = 全部角色',
         maxLength: 200,
-        hint: '按角色卡匹配，名字或头像文件名都行，用「、」或逗号分隔；填了只在这些角色的一对一聊天里生效，群聊只注入留空的那条',
+        hint: '还没读到角色卡；先按名字填，用「、」或逗号分隔。',
       },
     ],
     onForm: values => {
       const items = promptItems(preset);
       const index = items.findIndex(candidate => candidate.id === item.id);
       if (index < 0) return;
-      const next = normalizeCharacters(String(values.characters || '').split(/[、,，/]/).map(part => part.trim()));
+      const raw = Array.isArray(values.characters)
+        ? values.characters
+        : String(values.characters || '').split(/[、,，/]/).map(part => part.trim());
+      const next = normalizeCharacters(raw);
       items[index] = { ...items[index], characters: next };
       preset.items = items;
       resetPreview();
       ctx.save();
       ctx.rerender();
-      ctx.toast(next.length ? `只对 ${next.join('、')} 生效` : '改回全部角色');
+      ctx.toast(next.length ? `只对 ${next.join('、')} 生效` : '改成全部角色');
     },
   });
 }
@@ -160,6 +176,7 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
     return;
   }
   const defaultKind = item?.kind || (scope === 'app' ? 'app' : 'chat');
+  const charOptions = characterOptions(ctx);
   ctx.openSheet({
     kind: 'form',
     title: item ? '编辑提示词条目' : '添加提示词条目',
@@ -171,7 +188,14 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
         { value: 'app', label: '其他软件' },
       ] },
       { name: 'app', type: 'text', label: '软件名', value: item?.app || '', placeholder: '日历 / 外卖 / 音乐 / 购物', maxLength: 20, hint: '类型选“其他软件”时才填，聊天条目留空' },
-      { name: 'characters', type: 'text', label: '适用角色', value: normalizeCharacters(item?.characters).join('、'), placeholder: '留空 = 全部角色', maxLength: 200, hint: '填角色卡名字，用「、」或逗号分隔；填了只在这些角色的一对一聊天里生效，群聊只注入留空的公共条目' },
+      charOptions.length ? {
+        name: 'characters', type: 'checks', label: '适用角色',
+        value: normalizeCharacters(item?.characters), options: charOptions,
+        hint: '勾选 = 只在这些角色的一对一聊天里生效；一个都不勾 = 全部角色。群聊只注入没勾角色的公共条目。',
+      } : {
+        name: 'characters', type: 'text', label: '适用角色', value: normalizeCharacters(item?.characters).join('、'), placeholder: '留空 = 全部角色', maxLength: 200,
+        hint: '还没读到角色卡；先按名字填，用「、」或逗号分隔。',
+      },
       { name: 'role', type: 'select', label: '角色', value: item?.role || 'system', options: [
         { value: 'system', label: '系统（system）' },
         { value: 'user', label: '用户（user）' },
@@ -186,7 +210,9 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
         label: String(values.label || '').trim().slice(0, 30) || '自定义条目',
         kind: values.kind === 'app' ? 'app' : 'chat',
         app: values.kind === 'app' ? String(values.app || '').trim().slice(0, 20) : '',
-        characters: normalizeCharacters(String(values.characters || '').split(/[、,，/]/).map(part => part.trim())),
+        characters: normalizeCharacters(Array.isArray(values.characters)
+          ? values.characters
+          : String(values.characters || '').split(/[、,，/]/).map(part => part.trim())),
         role: ['system', 'user', 'assistant'].includes(values.role) ? values.role : 'system',
         content: String(values.content || '').trim().slice(0, 4000),
         enabled: item?.enabled !== false,
@@ -400,6 +426,8 @@ export const replyPresetApp = {
       deleting = false;
     }
     editingId = preset.id;
+    const chats = chatsOf(ctx.state);
+    const previewChat = chats.find(chat => chat.id === preview.chatId) || chats[0] || null;
     const active = replyPresetFor(ctx.state, null);
     const isActive = active?.id === preset.id;
     const text = String(preset.text || '');
@@ -495,6 +523,15 @@ export const replyPresetApp = {
           <div class="mp-group-label">实际注入预览</div>
           <button class="mp-draw-side is-primary" data-act="reply-preview-run" type="button"${preview.loading ? ' disabled' : ''}>${preview.loading ? '组装中…' : '跑一遍'}</button>
         </div>
+        ${chats.length ? `
+        <div class="mp-select-wrap" style="margin:0 0 8px">
+          <select data-act="reply-preview-chat">
+            ${chats.map(chat => {
+              const contact = ctx.state.contacts?.[chat.contactId];
+              return `<option value="${esc(chat.id)}"${previewChat?.id === chat.id ? ' selected' : ''}>${esc(contact?.name || '未命名会话')} · ${esc(clip(chat.messages?.slice(-1)[0]?.text || '还没有消息', 18))}</option>`;
+            }).join('')}
+          </select>${icon('chevron')}
+        </div>` : '<div class="mp-api-note">还没有会话，先回聊天发一条，再来预览。</div>'}
         ${previewHtml(preset)}
 
         <div class="mp-group-label" style="margin-top:16px">用在</div>
@@ -739,15 +776,25 @@ export const replyPresetApp = {
       return true;
     }
 
+    if (act === 'reply-preview-chat') {
+      const chatId = String(data.value || '');
+      if (!chatsOf(ctx.state).some(chat => chat.id === chatId)) return true;
+      preview = { presetId: '', tab: preview.tab || 'messages', chatId, loading: false, error: '', data: null, flat: '' };
+      ctx.rerender();
+      return true;
+    }
+
     if (act === 'reply-preview-run') {
-      const chat = chatsOf(ctx.state)[0] || null;
+      const chats = chatsOf(ctx.state);
+      const chat = chats.find(item => item.id === preview.chatId) || chats[0] || null;
       const contact = chat ? ctx.state.contacts?.[chat.contactId] || null : null;
-      preview = { presetId: preset.id, tab: preview.tab || 'messages', loading: true, error: '', data: null, flat: '' };
+      preview = { presetId: preset.id, tab: preview.tab || 'messages', chatId: chat?.id || '', loading: true, error: '', data: null, flat: '' };
       ctx.rerender();
       buildReplyMessages(ctx.state, chat, contact).then(result => {
         preview = {
           presetId: preset.id,
           tab: preview.tab || 'messages',
+          chatId: chat?.id || '',
           loading: false,
           error: '',
           data: result,
@@ -755,7 +802,7 @@ export const replyPresetApp = {
         };
         ctx.rerender();
       }).catch(error => {
-        preview = { presetId: preset.id, tab: preview.tab || 'messages', loading: false, error: error?.message || '组装失败', data: null, flat: '' };
+        preview = { presetId: preset.id, tab: preview.tab || 'messages', chatId: chat?.id || '', loading: false, error: error?.message || '组装失败', data: null, flat: '' };
         ctx.rerender();
       });
       return true;

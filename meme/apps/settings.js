@@ -59,17 +59,17 @@ export const settingsApp = {
         </div>
 
         <div class="mp-group">
-          <div class="mp-group-label">主动消息</div>
+          <div class="mp-group-label">主动开口</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'spark', title: '让角色主动来找你', sub: state.settings.proactive.enabled ? `沉默 ${state.settings.proactive.idleMinutes} 分钟后，每天最多 ${state.settings.proactive.dailyCount} 次` : '已关闭', act: 'set-toggle-proactive', toggle: state.settings.proactive.enabled })}
-            ${row(ctx, { iconName: 'clock', title: '沉默多久算久', sub: '到了就允许 TA 先说一句', act: 'set-idle', value: `${state.settings.proactive.idleMinutes} 分钟` })}
+            ${row(ctx, { iconName: 'spark', title: '允许主动开口', sub: state.settings.proactive.enabled ? '开着：空发送可以触发；没有定时任务' : '已关闭：空发送不会触发', act: 'set-toggle-proactive', toggle: state.settings.proactive.enabled })}
+            ${row(ctx, { iconName: 'clock', title: '空发送时参考沉默多久', sub: '写进主动开口的提示，不会自己定时发消息', act: 'set-idle', value: `${state.settings.proactive.idleMinutes} 分钟` })}
           </div>
         </div>
 
         <div class="mp-group">
           <div class="mp-group-label">模型</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'code', title: '模型来源', sub: apiReady ? '酒馆模型已接入' : '未接入（预览环境）', act: 'set-api', value: apiReady ? '已连接' : '未连接' })}
+            ${row(ctx, { iconName: 'code', title: '酒馆连接', sub: apiReady ? '酒馆模型可用；聊天接口在「聊天接口与预设」里改' : '未接入（预览环境）；聊天接口在「聊天接口与预设」里改', act: 'set-host-status', value: apiReady ? '已连接' : '未连接' })}
             ${row(ctx, { iconName: 'reply', title: '日记提示词', sub: '决定它怎么替你写日记', act: 'set-prompt' })}
           </div>
         </div>
@@ -118,6 +118,7 @@ export const settingsApp = {
       state.settings.chat.remind = state.settings.chat.remind === false;
       ctx.save();
       ctx.rerender();
+      ctx.toast(state.settings.chat.remind ? '有新消息会显示未读角标' : '全局不显示未读角标，会话免打扰仍然有效');
       return true;
     }
 
@@ -125,6 +126,7 @@ export const settingsApp = {
       state.settings.chat.wake = state.settings.chat.wake === false;
       ctx.save();
       ctx.rerender();
+      ctx.toast(state.settings.chat.wake ? '空发送可以触发主动开口' : '空发送不再触发');
       return true;
     }
 
@@ -132,6 +134,7 @@ export const settingsApp = {
       state.settings.proactive.enabled = !state.settings.proactive.enabled;
       ctx.save();
       ctx.rerender();
+      ctx.toast(state.settings.proactive.enabled ? '允许主动开口了' : '主动开口关掉了');
       return true;
     }
 
@@ -148,27 +151,12 @@ export const settingsApp = {
       return true;
     }
 
-    if (act === 'set-api') {
-      ctx.openSheet({
-        title: '模型来源',
-        items: [
-          { label: '用酒馆当前的模型', value: 'host' },
-          { label: '查看连接状态', value: 'status' },
-        ],
-        onPick: async (value) => {
-          if (value === 'host') {
-            const host = await ctx.host.probe();
-            state.settings.api.source = host.hasGenerate ? 'host' : 'default';
-            ctx.save();
-            ctx.toast(host.hasGenerate ? '用的是酒馆的模型' : '预览环境没有模型，先看界面');
-            ctx.rerender();
-          }
-          if (value === 'status') {
-            const host = await ctx.host.probe();
-            ctx.toast(host.inTavern ? `已接入酒馆 · 角色 ${host.hasCharacters ? '可读' : '不可读'} · 模型 ${host.hasGenerate ? '可用' : '不可用'}` : '预览环境：没有接酒馆，回复是演示文案');
-          }
-        },
-      });
+    if (act === 'set-host-status') {
+      ctx.host.probe().then(host => {
+        ctx.toast(host.inTavern
+          ? `已接入酒馆 · 角色 ${host.hasCharacters ? '可读' : '不可读'} · 模型 ${host.hasGenerate ? '可用' : '不可用'}`
+          : '预览环境：没有接酒馆，回复是演示文案');
+      }).catch(() => ctx.toast('读不到酒馆连接状态'));
       return true;
     }
 

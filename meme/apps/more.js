@@ -251,14 +251,7 @@ export const dressApp = {
   render(ctx) {
     const settings = ctx.state.settings;
     const dress = dressOf(ctx.state);
-    const wall = settings.wallpaper || 'day';
     const theme = ['default', 'frost', 'pixel'].includes(dress.theme) ? dress.theme : 'default';
-    const walls = [
-      { key: 'day', title: '晨光', preview: 'linear-gradient(150deg,#ffe3ef,#e4f7f0)' },
-      { key: 'night', title: '夜色', preview: 'linear-gradient(150deg,#1a1f2b,#2b2350 60%,#0a0c11)' },
-      { key: 'none', title: '素色', preview: 'linear-gradient(150deg,#fbf9fe,#f1edf9)' },
-      { key: 'custom', title: '自定义', preview: settings.customWall ? `url("${esc(settings.customWall)}") center / cover` : 'linear-gradient(150deg,#e7e1f7,#f7e8ef 55%,#e8f5f2)' },
-    ];
     const themes = [
       { key: 'default', title: '默认', sub: '晨光紫气泡', preview: 'background:linear-gradient(150deg,#ffe3ef,#e4f7f0)' },
       { key: 'frost', title: '白色磨砂', sub: '二改无光', preview: 'background:linear-gradient(145deg,rgba(230,230,230,.92),rgba(250,250,250,.76))' },
@@ -304,11 +297,10 @@ export const dressApp = {
 
         <div class="mp-group-label" style="margin-top:14px">壁纸</div>
         <div class="mp-dress-wall-row">
-          ${walls.map(item => `
-            <button class="mp-dress-wall" data-act="dress-wall" data-key="${item.key}" type="button">
-              <span class="mp-dress-wall-swatch${wall === item.key ? ' is-on' : ''}" style="background:${item.preview}"></span>
-              <span>${esc(item.title)}</span>
-            </button>`).join('')}
+          <button class="mp-dress-wall" data-act="dress-open-appearance" type="button">
+            <span class="mp-dress-wall-swatch" style="background:${settings.customWall ? `url("${esc(settings.customWall)}") center / cover` : 'linear-gradient(150deg,#ffe3ef,#e4f7f0 55%,#efe6ff)'}"></span>
+            <span>${settings.customWall ? '自定义' : '换背景'}</span>
+          </button>
         </div>
         <button class="mp-dress-link" data-act="dress-open-appearance" type="button">${icon('image')}更多壁纸与自定义图片</button>
 
@@ -352,17 +344,6 @@ export const dressApp = {
       dress.fontWeight = [400, 500, 600].includes(Number(data.value)) ? Number(data.value) : 400;
     } else if (act === 'dress-island') {
       dress.island = dress.island === 'hide' ? 'show' : 'hide';
-    } else if (act === 'dress-wall') {
-      const wall = ['day', 'night', 'none', 'custom'].includes(data.key) ? data.key : 'day';
-      dress.theme = 'default';
-      if (wall === 'custom' && !settings.customWall) {
-        ctx.go('app-appearance');
-        ctx.toast('先去外观里选一张自定义壁纸');
-        return true;
-      }
-      settings.wallpaper = wall;
-      if (wall === 'day') settings.theme = 'day';
-      if (wall === 'night') settings.theme = 'night';
     } else if (act === 'dress-open-appearance') {
       ctx.go('app-appearance');
       return true;

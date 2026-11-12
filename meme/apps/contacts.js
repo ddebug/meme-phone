@@ -249,13 +249,30 @@ export const contactApp = {
             });
           }
           if (value === 'delete') {
-            delete ctx.state.contacts[contact.id];
-            for (const chat of Object.values(ctx.state.chats)) {
-              if (chat.contactId === contact.id) delete ctx.state.chats[chat.id];
-            }
-            ctx.save();
-            ctx.toast('已删掉');
-            ctx.home();
+            const relatedChats = Object.values(ctx.state.chats || {}).filter(chat => chat.contactId === contact.id);
+            ctx.openSheet({
+              title: `删除「${contact.name}」？`,
+              items: [{
+                label: '确认删除联系人',
+                value: 'delete',
+                icon: 'trash',
+                danger: true,
+                note: `${relatedChats.length ? `会一起删掉 ${relatedChats.length} 个会话、` : ''}TA 的小剧场、日记和查角色缓存。酒馆里的角色卡不会删。`,
+              }],
+              onPick: async (pick) => {
+                if (pick !== 'delete') return;
+                delete ctx.state.contacts[contact.id];
+                delete ctx.state.extras?.[contact.id];
+                if (ctx.state.diary?.contacts) delete ctx.state.diary.contacts[contact.id];
+                if (ctx.state.lookups) delete ctx.state.lookups[contact.id];
+                for (const chat of Object.values(ctx.state.chats)) {
+                  if (chat.contactId === contact.id) delete ctx.state.chats[chat.id];
+                }
+                await ctx.save();
+                ctx.toast('联系人和关联数据已删掉');
+                ctx.home();
+              },
+            });
           }
         },
       });

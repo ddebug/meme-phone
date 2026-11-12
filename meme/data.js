@@ -592,8 +592,17 @@ export function pushMessage(state, chatId, message) {
 }
 
 export function unreadTotal(state) {
+  if (state.settings?.chat?.remind === false) return 0;
   return Object.values(state.chats).reduce((sum, chat) => sum + (chat.muted ? 0 : (chat.unread || 0)), 0);
 }
+
+/* 空发送能不能真的发出去：全局总开关 + 手机默认 + 这个会话的单独设置 */
+export function wakeAllowed(state, chat) {
+  if (state.settings?.proactive?.enabled === false) return false;
+  if (chat && chat.wake === false) return false;
+  return state.settings?.chat?.wake !== false;
+}
+
 
 /* ----------------------------------------------------------------- 日记 */
 

@@ -31,6 +31,8 @@ const SOURCE_LABELS = {
 
 let expandedId = '';
 let schemeEdit = null;   // { mode: 'new' | 'rename', value: '' }，放在方案按钮下面直接改
+let apiDelete = null;    // { type: 'scheme' | 'api', id }：页面内删除确认，不直接执行
+const drafts = new Map(); // preset.id -> 尚未保存的字段草稿，收起/切行都不丢
 
 function engineLabel(value) {
   return (ENGINES.find(item => item.value === value) || ENGINES[0]).label;
@@ -46,6 +48,70 @@ function mask(key) {
 function defaultPath(engine) {
   if (engine === 'openai') return '/v1/chat/completions';
   return '';
+}
+
+/* 接口字段的草稿：展开面板里改的字先落在这里，点「保存修改」才写进预设。
+ * 这样收起、切行、翻页都不会把没保存的字静默丢掉。 */
+function draftFor(preset) {
+  if (!preset) return null;
+  if (!drafts.has(preset.id)) {
+    drafts.set(preset.id, {
+      name: preset.name || '',
+      engine: preset.engine || 'openai',
+      temp: typeof preset.temp === 'number' ? preset.temp : 0.8,
+      url: preset.url || '',
+      path: preset.path || '',
+      model: preset.model || '',
+      key: preset.key || '',
+    });
+  }
+  return drafts.get(preset.id);
+}
+
+function draftValue(preset, key) {
+  const draft = draftFor(preset);
+  return draft ? draft[key] : preset?.[key];
+}
+
+function draftChanged(preset) {
+  const draft = draftFor(preset);
+  if (!preset || !draft) return false;
+  return ['name', 'engine', 'temp', 'url', 'path', 'model', 'key']
+    .some(key => String(draft[key] ?? '') !== String(preset[key] ?? ''));
+}
+
+function draftNote(preset) {
+  const changed = draftChanged(preset);
+  return `<div class="mp-api-draft-note${changed ? ' is-on' : ''}" data-draft-note>${changed ? '有未保存修改 · 点「保存修改」才写入' : '改动先留在草稿里，点「保存修改」才写入'}</div>`;
+}
+
+function readDraft(scope, draft) {
+  if (!scope || !draft) return draft;
+  scope.querySelectorAll('[data-api-field]').forEach(input => {
+    const key = input.dataset.apiField;
+    if (!key) return;
+    const value = String(input.value || '');
+    if (key === 'temp') {
+      const num = Number(value);
+      draft.temp = Number.isFinite(num) ? Math.min(2, Math.max(0, num)) : 0.8;
+    } else {
+      draft[key] = value.trim();
+    }
+  });
+  return draft;
+}
+
+function markDraftNote(input) {
+  const note = input?.closest('.mp-api-detail')?.querySelector('[data-draft-note]');
+  if (note) {
+    note.classList.add('is-on');
+    note.textContent = '有未保存修改 · 点「保存修改」才写入';
+  }
+}
+
+function replyNameFor(state, id) {
+  const item = replyPresetsOf(state).find(preset => preset.id === id);
+  return item ? (item.name || '未命名') : '没选';
 }
 
 /* 复制一套做模板：地址 / Key / 模型 / 引擎整套带走，只换名字和 id */
@@ -218,11 +284,11 @@ async function fetchModels(ctx, preset) {
   throw new Error(last || hostReason || '拉不到模型列表，可以手动填模型名');
 }
 
-async function refreshModels(ctx, preset) {
+async function refreshModels(ctx, preset, values = preset) {
   preset.status = { ok: false, text: '正在连接…', at: Date.now() };
   ctx.rerender();
   try {
-    const { url, list } = await fetchModels(ctx, preset);
+    const { url, list } = await fetchModels(ctx, values);
     preset.models = [...new Set(list)].sort();
     preset.status = { ok: true, text: `连接正常 · ${preset.models.length} 个模型 · ${url}`, at: Date.now() };
     ctx.save();
@@ -301,46 +367,32 @@ async function importTavernPreset(ctx, store) {
     : `导入了「${preset.name}」，酒馆没填反代地址，补上地址再连接`);
 }
 
-/* 把展开面板里手填的值读回 preset；点任何操作前先读，避免一刷新就把刚改的字弄丢 */
-function readDraft(scope, preset) {
-  if (!scope || !preset) return;
-  scope.querySelectorAll('[data-api-field]').forEach(input => {
-    const key = input.dataset.apiField;
-    if (!key) return;
-    const value = String(input.value || '');
-    if (key === 'temp') {
-      const num = Number(value);
-      preset.temp = Number.isFinite(num) ? Math.min(2, Math.max(0, num)) : 0.8;
-    } else {
-      preset[key] = value.trim();
-    }
-  });
-}
+/* 把展开面板里手填的值读回草稿；点任何操作前先读，避免一刷新就把刚改的字弄丢 */
 
 function presetDetail(ctx, store, preset) {
-  const tavern = preset.engine === 'tavern';
-  const asChat = preset.id === store.activeChat;
+  const draft = draftFor(preset);
+  const tavern = draft.engine === 'tavern';
   const status = preset.status || null;
   const models = Array.isArray(preset.models) ? preset.models : [];
-  const hasUrl = Boolean(apiRoot(preset));
+  const hasUrl = Boolean(apiRoot(draft));
   const engineOptions = ENGINES.filter(item => item.value !== 'tavern').map(item => `
-    <option value="${item.value}"${item.value === preset.engine ? ' selected' : ''}>${esc(item.label)}</option>`).join('');
+    <option value="${item.value}"${item.value === draft.engine ? ' selected' : ''}>${esc(item.label)}</option>`).join('');
   const modelOptions = models.map(name => `
-    <option value="${esc(name)}"${name === preset.model ? ' selected' : ''}>${esc(name)}</option>`).join('');
+    <option value="${esc(name)}"${name === draft.model ? ' selected' : ''}>${esc(name)}</option>`).join('');
   const modelPicker = models.length ? `
     <div class="mp-api-model">
       <div class="mp-select-wrap mp-api-mini-select"><select data-act="api-model-select" data-id="${preset.id}">
         ${modelOptions}
       </select>${icon('chevron')}</div>
-      <input class="mp-api-input" data-api-field="model" type="text" value="${esc(preset.model || '')}" placeholder="也可以手填模型名">
-    </div>` : `<input class="mp-api-input" data-api-field="model" type="text" value="${esc(preset.model || '')}" placeholder="gpt-4o-mini">`;
+      <input class="mp-api-input" data-api-field="model" type="text" value="${esc(draft.model || '')}" placeholder="也可以手填模型名">
+    </div>` : `<input class="mp-api-input" data-api-field="model" type="text" value="${esc(draft.model || '')}" placeholder="gpt-4o-mini">`;
 
   return `
     <div class="mp-api-detail" data-id="${preset.id}">
       <div class="mp-api-edit">
         <label class="mp-api-field" style="grid-column:1/-1">
           <span>名称</span>
-          <input class="mp-api-input" data-api-field="name" type="text" value="${esc(preset.name || '')}" placeholder="比如 我的 GPT">
+          <input class="mp-api-input" data-api-field="name" type="text" value="${esc(draft.name || '')}" placeholder="比如 我的 GPT">
         </label>
         <label class="mp-api-field">
           <span>引擎</span>
@@ -350,16 +402,16 @@ function presetDetail(ctx, store, preset) {
         </label>
         <label class="mp-api-field">
           <span>温度</span>
-          <input class="mp-api-input" data-api-field="temp" type="text" value="${esc(String(preset.temp ?? 0.8))}" placeholder="0.8">
+          <input class="mp-api-input" data-api-field="temp" type="text" value="${esc(String(draft.temp ?? 0.8))}" placeholder="0.8">
         </label>
         ${tavern ? '' : `
         <label class="mp-api-field" style="grid-column:1/-1">
           <span>地址</span>
-          <input class="mp-api-input" data-api-field="url" type="text" value="${esc(preset.url || '')}" placeholder="https://你的接口">
+          <input class="mp-api-input" data-api-field="url" type="text" value="${esc(draft.url || '')}" placeholder="https://你的接口">
         </label>
         <label class="mp-api-field" style="grid-column:1/-1">
           <span>路径</span>
-          <input class="mp-api-input" data-api-field="path" type="text" value="${esc(preset.path || '')}" placeholder="/v1/chat/completions">
+          <input class="mp-api-input" data-api-field="path" type="text" value="${esc(draft.path || '')}" placeholder="/v1/chat/completions">
         </label>
         <div class="mp-api-field" style="grid-column:1/-1">
           <span>模型</span>
@@ -367,23 +419,59 @@ function presetDetail(ctx, store, preset) {
         </div>
         <label class="mp-api-field" style="grid-column:1/-1">
           <span>Key</span>
-          <input class="mp-api-input" data-api-field="key" type="text" value="${esc(preset.key || '')}" placeholder="sk-...">
+          <input class="mp-api-input" data-api-field="key" type="text" value="${esc(draft.key || '')}" placeholder="sk-...">
         </label>`}
       </div>
 
       <div class="mp-api-status-inline${status?.ok ? ' is-ok' : ''}">
         ${esc(status ? status.text : (tavern ? '借酒馆自己的模型，不用填地址' : (hasUrl ? '还没测试，改完点保存修改' : '还没填地址')))}
       </div>
+      ${draftNote(preset)}
 
       <div class="mp-draw-actions">
         <button class="mp-draw-action is-primary" data-act="api-inline-save" data-id="${preset.id}" type="button">保存修改</button>
-        ${tavern ? '' : `<button class="mp-draw-action" data-act="api-test" data-id="${preset.id}" type="button">测试连接</button>
-        <button class="mp-draw-action" data-act="api-models" data-id="${preset.id}" type="button">拉模型</button>`}
-        <button class="mp-draw-action" data-act="api-use-chat" data-id="${preset.id}" type="button">${asChat ? '正在用' : '设为聊天'}</button>
+        <button class="mp-draw-action" data-act="api-draft-reset" data-id="${preset.id}" type="button">取消修改</button>
+        ${tavern ? '' : `<button class="mp-draw-action" data-act="api-test" data-id="${preset.id}" type="button">连接并拉取模型</button>`}
       </div>
       <div class="mp-draw-actions">
         ${tavern ? '' : `<button class="mp-draw-action" data-act="api-clone" data-id="${preset.id}" type="button">复制一套</button>
-        <button class="mp-draw-action is-danger" data-act="api-del" data-id="${preset.id}" type="button">删除这套</button>`}
+        <button class="mp-draw-action is-danger" data-act="api-del" data-id="${preset.id}" type="button">删除接口</button>`}
+      </div>
+    </div>`;
+}
+
+function deleteConfirm(state, store) {
+  if (!apiDelete) return '';
+  if (apiDelete.type === 'scheme') {
+    const scheme = chatSchemesOf(state).find(item => item.id === apiDelete.id);
+    if (!scheme) return '';
+    return `
+      <div class="mp-api-delete">
+        <div class="mp-api-delete-title">删除整体方案「${esc(scheme.name || '未命名')}」？</div>
+        <div class="mp-api-delete-sub">只会删掉这套「接口 + 回复预设」的组合，不删接口，也不删回复预设。至少会留一套方案。</div>
+        <div class="mp-draw-actions">
+          <button class="mp-draw-action is-danger" data-act="api-scheme-del-confirm" type="button">确认删除方案</button>
+          <button class="mp-draw-action" data-act="api-delete-cancel" type="button">取消</button>
+        </div>
+      </div>`;
+  }
+
+  const preset = store.presets.find(item => item.id === apiDelete.id);
+  if (!preset) return '';
+  const linked = chatSchemesOf(state).filter(item => item.apiId === preset.id);
+  const chats = Object.values(state.chats || {}).filter(chat => chat.llmPresetId === preset.id);
+  const fallback = store.presets.find(item => item.id !== preset.id) || null;
+  return `
+    <div class="mp-api-delete">
+      <div class="mp-api-delete-title">删除接口「${esc(preset.name || '未命名')}」？</div>
+      <div class="mp-api-delete-sub">
+        删除后不能恢复。${linked.length ? `${linked.length} 套整体方案会改指「${esc(fallback?.name || '酒馆 API')}」。` : '没有整体方案引用它，但可能正被当前聊天临时使用。'}
+        ${store.activeChat === preset.id ? '当前聊天正在用它，删除后会改指兜底。' : ''}
+        ${chats.length ? `${chats.length} 个单独引用它的会话会恢复跟随手机。` : ''}
+      </div>
+      <div class="mp-draw-actions">
+        <button class="mp-draw-action is-danger" data-act="api-del-confirm" type="button">确认删除接口</button>
+        <button class="mp-draw-action" data-act="api-delete-cancel" type="button">取消</button>
       </div>
     </div>`;
 }
@@ -397,26 +485,31 @@ export const apiListApp = {
     const scheme = activeChatScheme(ctx.state);
     const currentReply = replyPresetFor(ctx.state, null);
     const schemeDirty = Boolean(scheme && (scheme.apiId !== store.activeChat || scheme.replyId !== currentReply?.id));
-    const schemeSummary = `${presetName(store, store.activeChat)} · ${currentReply?.name || '回复预设'}`;
+    const currentSummary = `${presetName(store, store.activeChat)} · ${currentReply?.name || '回复预设'}`;
+    const savedSummary = scheme
+      ? `${presetName(store, scheme.apiId)} · ${replyNameFor(ctx.state, scheme.replyId)}`
+      : '还没有整体方案';
     const schemeOptions = schemes.length
       ? schemes.map(item => ({ value: item.id, label: item.name || '未命名' }))
       : [{ value: '', label: '未选方案' }];
     const apiOptions = store.presets.map(preset => ({ value: preset.id, label: preset.name || '未命名' }));
     const replyOptions = replyPresetsOf(ctx.state).map(item => ({ value: item.id, label: item.name || '未命名' }));
     const rows = store.presets.map(preset => {
+      const draft = draftFor(preset);
       const active = preset.id === store.activeChat ? '聊天' : '';
-      const inTavern = Boolean(preset.tavernSource) && preset.engine !== 'tavern' && !preset.key;
-      const keyNote = inTavern ? 'Key 留在酒馆里' : `Key ${mask(preset.key)}`;
-      const sub = preset.engine === 'tavern' && !preset.model
+      const changed = draftChanged(preset);
+      const inTavern = Boolean(preset.tavernSource) && draft.engine !== 'tavern' && !draft.key;
+      const keyNote = inTavern ? 'Key 留在酒馆里' : `Key ${mask(draft.key)}`;
+      const sub = draft.engine === 'tavern' && !draft.model
         ? '借酒馆自己的模型，不用填地址'
-        : `${engineLabel(preset.engine)}${preset.model ? ` · ${preset.model}` : ''} · ${keyNote}`;
+        : `${engineLabel(draft.engine)}${draft.model ? ` · ${draft.model}` : ''} · ${keyNote}`;
       const open = preset.id === expandedId;
       return `
         <div class="mp-api-stack">
           <button class="mp-row mp-api-row${open ? ' is-open' : ''}" data-act="api-toggle" data-id="${preset.id}" type="button" aria-expanded="${open}">
             ${ctx.icon ? ctx.icon('code') : icon('code')}
             <span class="mp-row-main">
-              <span class="mp-row-name">${esc(preset.name || '未命名')}${active ? `<span class="mp-api-tag">${esc(active)}</span>` : ''}</span>
+              <span class="mp-row-name">${esc(draft.name || '未命名')}${active ? `<span class="mp-api-tag">${esc(active)}</span>` : ''}${changed ? '<span class="mp-api-tag is-draft">未保存</span>' : ''}</span>
               <span class="mp-row-sub">${esc(sub)}</span>
             </span>
             <span class="mp-api-caret">${icon('chevron')}</span>
@@ -432,31 +525,40 @@ export const apiListApp = {
       </div>
       <div class="mp-page-body">
         <div class="mp-title" style="margin-top:0">聊天接口</div>
-        <div class="mp-subtitle">一套接口预设 = 地址 + Key + 模型；LLM 整体方案只记聊天 API 和回复预设，不关联酒馆记忆</div>
+        <div class="mp-subtitle">一套接口 = 地址 + Key + 模型；整体方案只记「聊天 API + 回复预设」，不关联酒馆记忆</div>
 
         <div class="mp-ios-card">
-          <div class="mp-ios-card-label">LLM 整体方案</div>
+          <div class="mp-ios-card-label">当前聊天方案</div>
           ${iosSelect('api-scheme-select', schemeOptions, scheme?.id || '')}
-          <div class="mp-ios-card-sub">${esc(schemeSummary)}${schemeDirty ? ' · 当前选择还没保存' : ''}</div>
+          <div class="mp-api-state">
+            <div><span>当前生效</span><strong>${esc(currentSummary)}</strong></div>
+            <div><span>方案保存</span><strong>${esc(savedSummary)}</strong></div>
+          </div>
+          ${schemeDirty
+            ? `<div class="mp-api-dirty">当前选择还没保存：改 API 或回复预设会先影响新聊天，点「保存当前组合」才写进这套方案。</div>`
+            : '<div class="mp-api-dirty is-clear">当前选择和方案保存一致。</div>'}
           <div class="mp-ios-two">
             <label class="mp-ios-field">
-              <span class="mp-ios-field-label">切换 API</span>
+              <span class="mp-ios-field-label">当前聊天 API</span>
               ${iosSelect('api-chat-select', apiOptions, store.activeChat)}
             </label>
             <label class="mp-ios-field">
-              <span class="mp-ios-field-label">切换预设</span>
+              <span class="mp-ios-field-label">当前回复预设</span>
               ${iosSelect('api-reply-select', replyOptions, currentReply?.id || '')}
             </label>
           </div>
 
           <div class="mp-draw-actions">
-            <button class="mp-draw-action is-primary" data-act="api-scheme-save" type="button">保存</button>
-            <button class="mp-draw-action" data-act="api-scheme-new" type="button">新建</button>
-            <button class="mp-draw-action" data-act="api-scheme-rename" type="button">改名</button>
-            <button class="mp-draw-action is-danger" data-act="api-scheme-del" type="button">删除</button>
+            <button class="mp-draw-action is-primary" data-act="api-scheme-save" type="button">保存当前组合</button>
+            ${schemeDirty ? '<button class="mp-draw-action" data-act="api-scheme-revert" type="button">恢复为方案值</button>' : ''}
           </div>
           <div class="mp-draw-actions">
+            <button class="mp-draw-action" data-act="api-scheme-new" type="button">新建方案</button>
+            <button class="mp-draw-action" data-act="api-scheme-rename" type="button">改名</button>
             <button class="mp-draw-action" data-act="api-scheme-copy" type="button">复制方案</button>
+            <button class="mp-draw-action is-danger" data-act="api-scheme-del" type="button">删除方案</button>
+          </div>
+          <div class="mp-draw-actions">
             <button class="mp-draw-action" data-act="api-new" type="button">＋ 新建接口</button>
             <button class="mp-draw-action" data-act="api-import-tavern" type="button">导入酒馆接口</button>
           </div>
@@ -471,6 +573,8 @@ export const apiListApp = {
           <button class="mp-ios-edit-reply" data-act="api-open-presets" type="button">编辑回复预设${icon('chevron')}</button>
         </div>
 
+        ${deleteConfirm(ctx.state, store)}
+
         <div class="mp-group-label" style="margin-top:16px">聊天 API 预设</div>
         <div class="mp-group">${rows}</div>
 
@@ -480,14 +584,35 @@ export const apiListApp = {
       </div>`;
   },
 
+  onInput(ctx, event) {
+    const input = event.target?.closest?.('[data-api-field]');
+    if (!input) return false;
+    const preset = api(ctx.state).presets.find(item => item.id === input.closest('.mp-api-detail')?.dataset.id);
+    if (!preset) return false;
+    const draft = draftFor(preset);
+    const key = input.dataset.apiField;
+    if (key === 'temp') {
+      const num = Number(String(input.value || ''));
+      draft.temp = Number.isFinite(num) ? Math.min(2, Math.max(0, num)) : 0.8;
+    } else if (key) {
+      draft[key] = String(input.value || '').trim();
+    }
+    markDraftNote(input);
+    return true;
+  },
+
   handle(ctx, act, data, event) {
     const store = api(ctx.state);
     const scheme = activeChatScheme(ctx.state);
 
     if (act === 'api-toggle') {
       const id = String(data.id || '');
+      const previous = store.presets.find(preset => preset.id === expandedId);
+      const detail = ctx.shell.root?.querySelector(`.mp-api-detail[data-id="${expandedId}"]`);
+      if (previous && detail) readDraft(detail, draftFor(previous));
       expandedId = expandedId === id ? '' : id;
       schemeEdit = null;
+      apiDelete = null;
       ctx.rerender();
       return true;
     }
@@ -497,6 +622,7 @@ export const apiListApp = {
       if (!picked) return true;
       applyChatScheme(ctx.state, picked);
       schemeEdit = null;
+      apiDelete = null;
       ctx.save();
       ctx.rerender();
       ctx.toast(`整体方案换成「${picked.name || '未命名'}」`);
@@ -507,9 +633,10 @@ export const apiListApp = {
       const target = store.presets.find(preset => preset.id === String(data.value || ''));
       if (!target) return true;
       store.activeChat = target.id;
+      apiDelete = null;
       ctx.save();
       ctx.rerender();
-      ctx.toast(`聊天 API 换成「${target.name || '未命名'}」，点保存写入方案`);
+      ctx.toast(`当前聊天 API 换成「${target.name || '未命名'}」；保存后写进方案`);
       return true;
     }
 
@@ -517,9 +644,22 @@ export const apiListApp = {
       const target = replyPresetsOf(ctx.state).find(item => item.id === String(data.value || ''));
       if (!target) return true;
       ctx.state.settings.reply.activeId = target.id;
+      apiDelete = null;
       ctx.save();
       ctx.rerender();
-      ctx.toast(`回复预设换成「${target.name || '未命名'}」，点保存写入方案`);
+      ctx.toast(`当前回复预设换成「${target.name || '未命名'}」；保存后写进方案`);
+      return true;
+    }
+
+    if (act === 'api-scheme-revert') {
+      if (!scheme) { ctx.toast('先选一套整体方案'); return true; }
+      const savedApi = store.presets.find(preset => preset.id === scheme.apiId);
+      const savedReply = replyPresetsOf(ctx.state).find(item => item.id === scheme.replyId);
+      if (savedApi) store.activeChat = savedApi.id;
+      if (savedReply) ctx.state.settings.reply.activeId = savedReply.id;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast('已恢复成这套方案保存的值');
       return true;
     }
 
@@ -601,36 +741,59 @@ export const apiListApp = {
     if (act === 'api-scheme-del') {
       if (!scheme) { ctx.toast('先选一套整体方案'); return true; }
       if (chatSchemesOf(ctx.state).length <= 1) { ctx.toast('至少留一套整体方案'); return true; }
-      store.chatSchemes = chatSchemesOf(ctx.state).filter(item => item.id !== scheme.id);
+      apiDelete = { type: 'scheme', id: scheme.id };
+      schemeEdit = null;
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'api-scheme-del-confirm') {
+      const pending = apiDelete?.type === 'scheme'
+        ? chatSchemesOf(ctx.state).find(item => item.id === apiDelete.id)
+        : null;
+      if (!pending) { apiDelete = null; ctx.rerender(); return true; }
+      if (chatSchemesOf(ctx.state).length <= 1) {
+        apiDelete = null;
+        ctx.rerender();
+        ctx.toast('至少留一套整体方案');
+        return true;
+      }
+      store.chatSchemes = chatSchemesOf(ctx.state).filter(item => item.id !== pending.id);
       const next = store.chatSchemes[0];
       if (next) applyChatScheme(ctx.state, next);
+      apiDelete = null;
       schemeEdit = null;
       ctx.save();
       ctx.rerender();
-      ctx.toast('这套整体方案删掉了');
+      ctx.toast(`整体方案「${pending.name || '未命名'}」删掉了`);
+      return true;
+    }
+
+    if (act === 'api-delete-cancel') {
+      apiDelete = null;
+      ctx.rerender();
       return true;
     }
 
     if (act === 'api-engine') {
       const preset = store.presets.find(item => item.id === String(data.id || ''));
       if (!preset) return true;
-      readDraft(event?.target?.closest('.mp-api-detail'), preset);
-      preset.engine = String(data.value || 'openai');
-      preset.path = defaultPath(preset.engine);
-      if (preset.engine === 'tavern') {
-        preset.url = '';
-        preset.key = '';
-        preset.model = '';
-      } else if (preset.engine === 'openai') {
-        if (!preset.url || preset.url === 'https://api.openai.com') preset.url = 'https://api.openai.com';
-        if (!preset.model) preset.model = 'gpt-4o-mini';
-        if (!preset.path) preset.path = '/v1/chat/completions';
-      } else if (preset.url === 'https://api.openai.com') {
-        preset.url = '';
+      const draft = readDraft(event?.target?.closest('.mp-api-detail'), draftFor(preset));
+      draft.engine = String(data.value || 'openai');
+      draft.path = defaultPath(draft.engine);
+      if (draft.engine === 'tavern') {
+        draft.url = '';
+        draft.key = '';
+        draft.model = '';
+      } else if (draft.engine === 'openai') {
+        if (!draft.url || draft.url === 'https://api.openai.com') draft.url = 'https://api.openai.com';
+        if (!draft.model) draft.model = 'gpt-4o-mini';
+        if (!draft.path) draft.path = '/v1/chat/completions';
+      } else if (draft.url === 'https://api.openai.com') {
+        draft.url = '';
       }
       preset.status = null;
       preset.models = [];
-      ctx.save();
       ctx.rerender();
       return true;
     }
@@ -638,21 +801,21 @@ export const apiListApp = {
     if (act === 'api-model-select') {
       const preset = store.presets.find(item => item.id === String(data.id || ''));
       if (!preset) return true;
-      readDraft(event?.target?.closest('.mp-api-detail'), preset);
-      preset.model = String(data.value || '').trim();
-      ctx.save();
+      const draft = readDraft(event?.target?.closest('.mp-api-detail'), draftFor(preset));
+      draft.model = String(data.value || '').trim();
       ctx.rerender();
-      ctx.toast(`模型换成「${preset.model || '没填'}」`);
       return true;
     }
 
     if (act === 'api-inline-save') {
       const preset = store.presets.find(item => item.id === String(data.id || ''));
       if (!preset) return true;
-      const before = { url: preset.url, path: preset.path, key: preset.key };
-      readDraft(event?.target?.closest('.mp-api-detail'), preset);
+      const draft = readDraft(event?.target?.closest('.mp-api-detail'), draftFor(preset));
+      const before = { url: preset.url, path: preset.path, key: preset.key, engine: preset.engine };
+      Object.assign(preset, draft);
+      drafts.delete(preset.id);
       if (!preset.name) preset.name = '未命名接口';
-      if (before.url !== preset.url || before.path !== preset.path || before.key !== preset.key) {
+      if (before.url !== preset.url || before.path !== preset.path || before.key !== preset.key || before.engine !== preset.engine) {
         preset.status = null;
         preset.models = [];
       }
@@ -662,19 +825,27 @@ export const apiListApp = {
       return true;
     }
 
+    if (act === 'api-draft-reset') {
+      const preset = store.presets.find(item => item.id === String(data.id || ''));
+      if (!preset) return true;
+      drafts.delete(preset.id);
+      ctx.rerender();
+      ctx.toast('这次修改已经取消');
+      return true;
+    }
+
     if (act === 'api-test' || act === 'api-models') {
       const preset = store.presets.find(item => item.id === String(data.id || ''));
       if (!preset) return true;
-      readDraft(event?.target?.closest('.mp-api-detail'), preset);
-      if (!apiRoot(preset) && typeof ctx.host?.listModels !== 'function') {
-        ctx.toast(act === 'api-test' ? '先填接口地址，再测试连接' : '先填接口地址，再拉模型');
+      const draft = readDraft(event?.target?.closest('.mp-api-detail'), draftFor(preset));
+      const probe = { ...preset, ...draft };
+      if (!apiRoot(probe) && typeof ctx.host?.listModels !== 'function') {
+        ctx.toast('先填接口地址，再连接');
         return true;
       }
-      refreshModels(ctx, preset).then(list => {
+      refreshModels(ctx, preset, probe).then(list => {
         if (!list) return;
-        ctx.toast(act === 'api-test'
-          ? `连接正常，拉到 ${list.length} 个模型`
-          : `拉到 ${list.length} 个模型，已放进下拉框`);
+        ctx.toast(`连接正常，拉到 ${list.length} 个模型`);
       });
       return true;
     }
@@ -682,11 +853,13 @@ export const apiListApp = {
     if (act === 'api-use-chat') {
       const preset = store.presets.find(item => item.id === String(data.id || ''));
       if (!preset) return true;
-      readDraft(event?.target?.closest('.mp-api-detail'), preset);
+      const draft = readDraft(event?.target?.closest('.mp-api-detail'), draftFor(preset));
+      Object.assign(preset, draft);
+      drafts.delete(preset.id);
       store.activeChat = preset.id;
       ctx.save();
       ctx.rerender();
-      ctx.toast(`聊天换成「${preset.name || '未命名'}」，点保存写入方案`);
+      ctx.toast(`聊天换成「${preset.name || '未命名'}」；保存后写进方案`);
       return true;
     }
 
@@ -707,19 +880,40 @@ export const apiListApp = {
       const preset = store.presets.find(item => item.id === String(data.id || ''));
       if (!preset) return true;
       if (preset.engine === 'tavern') { ctx.toast('酒馆 API 留着兜底，删不掉'); return true; }
-      if (store.presets.length <= 1) { ctx.toast('至少留一套'); return true; }
-      store.presets = store.presets.filter(item => item.id !== preset.id);
+      if (store.presets.length <= 1) { ctx.toast('至少留一套接口'); return true; }
+      apiDelete = { type: 'api', id: preset.id };
+      schemeEdit = null;
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'api-del-confirm') {
+      const pending = apiDelete?.type === 'api'
+        ? store.presets.find(item => item.id === apiDelete.id)
+        : null;
+      if (!pending) { apiDelete = null; ctx.rerender(); return true; }
+      if (pending.engine === 'tavern' || store.presets.length <= 1) {
+        apiDelete = null;
+        ctx.rerender();
+        ctx.toast('至少留一套接口');
+        return true;
+      }
+      const linkedCount = chatSchemesOf(ctx.state).filter(item => item.apiId === pending.id).length;
+      const chatCount = Object.values(ctx.state.chats || {}).filter(chat => chat.llmPresetId === pending.id).length;
+      store.presets = store.presets.filter(item => item.id !== pending.id);
       const fallback = store.presets[0];
-      if (store.activeChat === preset.id) store.activeChat = fallback.id;
-      store.chatSchemes.forEach(item => { if (item.apiId === preset.id) item.apiId = fallback.id; });
+      if (store.activeChat === pending.id) store.activeChat = fallback.id;
+      store.chatSchemes.forEach(item => { if (item.apiId === pending.id) item.apiId = fallback.id; });
       /* 单个聊天如果引用过这套接口，清掉引用，别留下空 id */
       Object.values(ctx.state.chats || {}).forEach(chat => {
-        if (chat && chat.llmPresetId === preset.id) chat.llmPresetId = '';
+        if (chat && chat.llmPresetId === pending.id) chat.llmPresetId = '';
       });
-      if (expandedId === preset.id) expandedId = '';
+      if (expandedId === pending.id) expandedId = '';
+      drafts.delete(pending.id);
+      apiDelete = null;
       ctx.save();
       ctx.rerender();
-      ctx.toast('这套接口删掉了');
+      ctx.toast(`接口「${pending.name || '未命名'}」删掉了${linkedCount ? `，${linkedCount} 套方案已改指兜底` : ''}${chatCount ? `，${chatCount} 个会话恢复跟随手机` : ''}`);
       return true;
     }
 

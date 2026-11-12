@@ -114,7 +114,7 @@ export async function buildMemoryContext(state, chat, limit = 1200) {
       const latestFile = chatKey(latest?.file);
       const sameChat = !currentFile || !latestFile || currentFile === latestFile;
       if (sameCharacter && sameChat) {
-        const legacy = summaryText({ skipFirstFloor: Boolean(preset?.skipFirstFloor) });
+        const legacy = summaryText({ skipFirstFloor: Boolean(preset?.skipFirstFloor), name: contact?.name });
         if (legacy.nodes.length) {
           data = legacy;
           demo = Boolean(legacy.demo);

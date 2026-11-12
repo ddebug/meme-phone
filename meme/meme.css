@@ -1591,6 +1591,31 @@
 }
 .mp-sheet-select { padding: 11px 36px 11px 12px; }
 .mp-sheet-form-textarea { height: 116px; }
+.mp-sheet-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 0;
+}
+.mp-sheet-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 9px;
+  border-radius: 11px;
+  border: 1px solid var(--field-border);
+  background: var(--field-solid);
+  color: var(--text);
+  font-size: calc(12px * var(--font-scale));
+  cursor: pointer;
+}
+.mp-sheet-check input {
+  width: 13px;
+  height: 13px;
+  accent-color: var(--accent);
+  margin: 0;
+}
+.mp-sheet-check span { max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .mp-toast {
   position: absolute;
@@ -2423,6 +2448,74 @@
   color: var(--text-3);
 }
 
+/* --------------------------------------------------- 接口：当前生效 / 方案保存 / 草稿 */
+.mp-root .mp-api-state {
+  display: grid;
+  gap: 4px;
+  margin: 10px 2px 2px;
+  font-size: calc(11.5px * var(--font-scale));
+  color: var(--text-3);
+}
+.mp-root .mp-api-state div {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+.mp-root .mp-api-state span {
+  flex: none;
+  min-width: 4.5em;
+  color: var(--text-4);
+}
+.mp-root .mp-api-state strong {
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-root .mp-api-dirty {
+  margin: 8px 2px 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(226, 170, 82, .12);
+  color: #8a6224;
+  font-size: calc(11px * var(--font-scale));
+  line-height: calc(1.55 * var(--line-scale));
+}
+.mp-root .mp-api-dirty.is-clear {
+  background: rgba(79, 138, 99, .1);
+  color: #4f8a63;
+}
+.mp-root .mp-api-tag.is-draft {
+  background: rgba(226, 170, 82, .16);
+  color: #8a6224;
+}
+.mp-root .mp-api-draft-note {
+  margin: 2px 2px 6px;
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text-4);
+}
+.mp-root .mp-api-draft-note.is-on { color: #8a6224; }
+.mp-root .mp-api-delete {
+  margin: 12px 0 0;
+  padding: 12px 12px 10px;
+  border-radius: 16px;
+  background: rgba(214, 96, 96, .09);
+  box-shadow: var(--shadow-s);
+}
+.mp-root .mp-api-delete-title {
+  font-size: calc(13px * var(--font-scale));
+  font-weight: 600;
+  color: var(--text);
+}
+.mp-root .mp-api-delete-sub {
+  margin-top: 5px;
+  font-size: calc(11.5px * var(--font-scale));
+  line-height: calc(1.65 * var(--line-scale));
+  color: var(--text-3);
+}
+
 /* --------------------------------------------------- 接口：列表内展开详情 */
 .mp-root .mp-api-stack + .mp-api-stack { margin-top: 8px; }
 .mp-root .mp-api-row.is-open {
@@ -2450,6 +2543,10 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 9px;
+}
+.mp-root .mp-mem-edit {
+  margin: 4px 0 10px;
+  padding: 12px;
 }
 .mp-root .mp-api-field {
   display: grid;

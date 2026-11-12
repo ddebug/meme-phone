@@ -275,6 +275,14 @@ export function createShell(options) {
         let control = '';
         if (field.type === 'textarea') {
           control = `<textarea id="${id}" class="mp-sheet-textarea mp-sheet-form-textarea" maxlength="${field.maxLength || 4000}" placeholder="${esc(field.placeholder || '')}">${esc(field.value || '')}</textarea>`;
+        } else if (field.type === 'checks') {
+          const picked = new Set(Array.isArray(field.value) ? field.value.map(String) : []);
+          const options = (field.options || []).map(option => `
+            <label class="mp-sheet-check">
+              <input type="checkbox" data-check-field="${esc(field.name)}" value="${esc(option.value)}"${picked.has(String(option.value)) ? ' checked' : ''}>
+              <span>${esc(option.label)}</span>
+            </label>`).join('');
+          control = `<div class="mp-sheet-checks">${options}</div>`;
         } else if (field.type === 'select') {
           const options = (field.options || []).map(option => `<option value="${esc(option.value)}"${String(option.value) === String(field.value) ? ' selected' : ''}>${esc(option.label)}</option>`).join('');
           control = `<div class="mp-select-wrap"><select id="${id}" class="mp-sheet-input mp-sheet-select">${options}</select>${ico('chevron')}</div>`;
@@ -331,7 +339,7 @@ export function createShell(options) {
             <div class="mp-wallpaper"></div>
             <div class="mp-scrim"></div>
             <div class="mp-status">
-              <span class="mp-status-left">${shell.stack.length ? `<button class="mp-status-back" data-act="back" type="button" aria-label="返回">${ico('back')}</button>` : ''}</span>
+              <span class="mp-status-left"></span>
               <span class="mp-status-right">${clockText()}</span>
             </div>
             ${shell.stack.length ? pageHtml() : desktopHtml()}
@@ -417,6 +425,10 @@ export function createShell(options) {
       const fields = sheet?.fields || [];
       const values = {};
       fields.forEach((field, index) => {
+        if (field.type === 'checks') {
+          values[field.name] = [...root.querySelectorAll(`[data-check-field="${field.name}"]`)].filter(node => node.checked).map(node => node.value);
+          return;
+        }
         const node = root.querySelector(`#mpField${index}`);
         values[field.name] = node ? node.value : '';
       });
@@ -579,11 +591,13 @@ export function createShell(options) {
 
   /* 输入：不整页重绘，只切发送键状态并同步草稿 */
   root.addEventListener('input', event => {
+    const entry = shell.stack[shell.stack.length - 1];
+    const app = entry ? apps[entry.view] : null;
+    if (app && typeof app.onInput === 'function' && app.onInput(ctx, event)) return;
     const input = event.target.closest('.mp-compose-box input');
     if (!input) return;
     shell.live.inputValue = input.value;
     shell.improveSendState();
-    const entry = shell.stack[shell.stack.length - 1];
     if (entry && ctx.onDraft) ctx.onDraft(entry, input.value);
   });
 

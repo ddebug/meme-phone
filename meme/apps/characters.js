@@ -303,7 +303,7 @@ export const characterApp = {
             ${icon(inContacts ? 'contacts' : 'plus')}<span>${inContacts ? '已在通讯录' : '存进通讯录'}</span>
           </button>
         </div>
-        <div class="mp-foot-note">只读卡片，不会改动酒馆里的角色。</div>
+        <div class="mp-foot-note">角色卡正文只读；上方世界书开关会写回酒馆，影响所有会话。</div>
       </div>`;
   },
 

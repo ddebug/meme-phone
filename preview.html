@@ -9448,9 +9448,11 @@ const apiListApp = {
     const rows = store.presets.map(preset => {
       const active = preset.id === store.activeChat ? '聊天' : '';
       const use = active;
+      const inTavern = Boolean(preset.tavernSource) && preset.engine !== 'tavern' && !preset.key;
+      const keyNote = inTavern ? 'Key 留在酒馆里' : `Key ${mask(preset.key)}`;
       const sub = preset.engine === 'tavern' && !preset.model
         ? '借酒馆自己的模型，不用填地址'
-        : `${engineLabel(preset.engine)}${preset.model ? ` · ${preset.model}` : ''} · Key ${mask(preset.key)}`;
+        : `${engineLabel(preset.engine)}${preset.model ? ` · ${preset.model}` : ''} · ${keyNote}`;
       return `
         <button class="mp-row mp-api-row" data-act="api-open" data-id="${preset.id}" type="button">
           ${ctx.icon ? ctx.icon('code') : icon('code')}

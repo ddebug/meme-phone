@@ -251,10 +251,16 @@ async function importTavernPreset(ctx, store) {
     return;
   }
 
-  const label = SOURCE_LABELS[info.source] || info.source || '酒馆';
+  const profileLabel = String(info.name || '').trim();
+  const sourceLabel = SOURCE_LABELS[info.source] || info.source || '酒馆';
+  const label = profileLabel || sourceLabel;
+  const autoName = `酒馆 · ${label}`;
   const importedUrl = String(info.url || '').trim().replace(/\/+$/, '');
-  const same = store.presets.find(item => item.tavernSource === info.source)
-    || store.presets.find(item => item.name === `酒馆 · ${label}`);
+  const legacyName = `酒馆 · ${sourceLabel}`;
+  const same = store.presets.find(item => info.profileId && item.tavernProfileId === info.profileId)
+    || store.presets.find(item => item.name === autoName)
+    || store.presets.find(item => item.tavernSource === info.source && !item.tavernProfileId && (item.name === legacyName || (!item.tavernAutoName && item.name.startsWith('酒馆 · '))))
+    || null;
   if (same) {
     /* 再点一次导入 = 用酒馆现在这套刷新地址 / Key / 模型，不动小手机里别的预设 */
     same.engine = info.source === 'custom' ? 'custom' : 'openai';
@@ -263,6 +269,11 @@ async function importTavernPreset(ctx, store) {
     if (info.key) same.key = info.key;
     if (info.model) same.model = info.model;
     same.tavernSource = info.source;
+    if (info.profileId) same.tavernProfileId = info.profileId;
+    /* 只有名字还是上次导入自动起的，才跟着酒馆的新名字改；用户改过名就不动 */
+    const prevAuto = same.tavernAutoName || legacyName;
+    if (!same.name || same.name === prevAuto) same.name = autoName;
+    same.tavernAutoName = autoName;
     editingId = same.id;
     ctx.save();
     ctx.go('api-item');
@@ -272,7 +283,7 @@ async function importTavernPreset(ctx, store) {
 
   const preset = {
     id: newId('api'),
-    name: `酒馆 · ${label}`,
+    name: autoName,
     engine: info.source === 'custom' ? 'custom' : 'openai',
     url: importedUrl,
     path: '/v1/chat/completions',
@@ -280,6 +291,8 @@ async function importTavernPreset(ctx, store) {
     key: info.key || '',
     temp: 0.8,
     tavernSource: info.source,
+    tavernProfileId: info.profileId || '',
+    tavernAutoName: autoName,
     models: [],
   };
   store.presets.push(preset);

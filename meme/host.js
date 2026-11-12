@@ -650,12 +650,27 @@ export async function readTavernApi() {
     if (!url && source === 'openai') url = 'https://api.openai.com';
     if (!url && source === 'openrouter') url = 'https://openrouter.ai/api';
 
+    /* 酒馆新版把「接口名字」放在连接配置里；有选中项就带上名字，导入时直接用它命名 */
+    const manager = script.extensionSettings?.connectionManager
+      || ctx.extensionSettings?.connectionManager
+      || {};
+    const profiles = Array.isArray(manager.profiles) ? manager.profiles : [];
+    const selected = typeof manager.selectedProfile === 'object' && manager.selectedProfile
+      ? manager.selectedProfile
+      : profiles.find(item => item && item.id === manager.selectedProfile) || null;
+    const profile = selected
+      || profiles.find(item => String(item?.['api-url'] || '').trim().replace(/\/+$/, '') === url)
+      || null;
+    const profileName = String(profile?.name || '').trim();
+
     return {
       available: true,
       source,
       url,
       key,
       model,
+      name: profileName,
+      profileId: profile?.id || '',
       direct: Boolean(proxy || customUrl),
       reason: url ? '' : '酒馆这套走内部转发，没有可直连的地址',
     };

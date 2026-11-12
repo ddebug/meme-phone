@@ -5721,12 +5721,27 @@ async function readTavernApi() {
     if (!url && source === 'openai') url = 'https://api.openai.com';
     if (!url && source === 'openrouter') url = 'https://openrouter.ai/api';
 
+    /* 酒馆新版把「接口名字」放在连接配置里；有选中项就带上名字，导入时直接用它命名 */
+    const manager = script.extensionSettings?.connectionManager
+      || ctx.extensionSettings?.connectionManager
+      || {};
+    const profiles = Array.isArray(manager.profiles) ? manager.profiles : [];
+    const selected = typeof manager.selectedProfile === 'object' && manager.selectedProfile
+      ? manager.selectedProfile
+      : profiles.find(item => item && item.id === manager.selectedProfile) || null;
+    const profile = selected
+      || profiles.find(item => String(item?.['api-url'] || '').trim().replace(/\/+$/, '') === url)
+      || null;
+    const profileName = String(profile?.name || '').trim();
+
     return {
       available: true,
       source,
       url,
       key,
       model,
+      name: profileName,
+      profileId: profile?.id || '',
       direct: Boolean(proxy || customUrl),
       reason: url ? '' : '酒馆这套走内部转发，没有可直连的地址',
     };
@@ -9959,10 +9974,16 @@ async function importTavernPreset(ctx, store) {
     return;
   }
 
-  const label = SOURCE_LABELS[info.source] || info.source || '酒馆';
+  const profileLabel = String(info.name || '').trim();
+  const sourceLabel = SOURCE_LABELS[info.source] || info.source || '酒馆';
+  const label = profileLabel || sourceLabel;
+  const autoName = `酒馆 · ${label}`;
   const importedUrl = String(info.url || '').trim().replace(/\/+$/, '');
-  const same = store.presets.find(item => item.tavernSource === info.source)
-    || store.presets.find(item => item.name === `酒馆 · ${label}`);
+  const legacyName = `酒馆 · ${sourceLabel}`;
+  const same = store.presets.find(item => info.profileId && item.tavernProfileId === info.profileId)
+    || store.presets.find(item => item.name === autoName)
+    || store.presets.find(item => item.tavernSource === info.source && !item.tavernProfileId && (item.name === legacyName || (!item.tavernAutoName && item.name.startsWith('酒馆 · '))))
+    || null;
   if (same) {
     /* 再点一次导入 = 用酒馆现在这套刷新地址 / Key / 模型，不动小手机里别的预设 */
     same.engine = info.source === 'custom' ? 'custom' : 'openai';
@@ -9971,6 +9992,11 @@ async function importTavernPreset(ctx, store) {
     if (info.key) same.key = info.key;
     if (info.model) same.model = info.model;
     same.tavernSource = info.source;
+    if (info.profileId) same.tavernProfileId = info.profileId;
+    /* 只有名字还是上次导入自动起的，才跟着酒馆的新名字改；用户改过名就不动 */
+    const prevAuto = same.tavernAutoName || legacyName;
+    if (!same.name || same.name === prevAuto) same.name = autoName;
+    same.tavernAutoName = autoName;
     editingId = same.id;
     ctx.save();
     ctx.go('api-item');
@@ -9980,7 +10006,7 @@ async function importTavernPreset(ctx, store) {
 
   const preset = {
     id: newId('api'),
-    name: `酒馆 · ${label}`,
+    name: autoName,
     engine: info.source === 'custom' ? 'custom' : 'openai',
     url: importedUrl,
     path: '/v1/chat/completions',
@@ -9988,6 +10014,8 @@ async function importTavernPreset(ctx, store) {
     key: info.key || '',
     temp: 0.8,
     tavernSource: info.source,
+    tavernProfileId: info.profileId || '',
+    tavernAutoName: autoName,
     models: [],
   };
   store.presets.push(preset);

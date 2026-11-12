@@ -30,15 +30,22 @@ function promptItems(preset) {
 }
 
 function itemNote(preset) {
-  const count = promptItems(preset).length;
-  return count ? `附加 ${count} 条提示` : '没有附加提示';
+  const items = promptItems(preset);
+  const chat = items.filter(item => item.kind !== 'app').length;
+  const app = items.filter(item => item.kind === 'app').length;
+  if (!items.length) return '没有附加提示';
+  return app ? `聊天 ${chat} 条 · 其他软件 ${app} 条` : `附加 ${chat} 条提示`;
+}
+
+function itemKindLabel(item) {
+  return item.kind === 'app' ? `其他软件${item.app ? ` · ${item.app}` : ''}` : '聊天';
 }
 
 function roleLabel(role) {
   return role === 'user' ? '用户' : role === 'assistant' ? '角色示例' : '系统';
 }
 
-function openItemForm(ctx, preset, itemId = '') {
+function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
   const items = promptItems(preset);
   const index = itemId ? items.findIndex(item => item.id === itemId) : -1;
   const item = index >= 0 ? items[index] : null;
@@ -46,12 +53,18 @@ function openItemForm(ctx, preset, itemId = '') {
     ctx.toast('这条是固定条目，不能改内容');
     return;
   }
+  const defaultKind = item?.kind || (scope === 'app' ? 'app' : 'chat');
   ctx.openSheet({
     kind: 'form',
     title: item ? '编辑提示词条目' : '添加提示词条目',
     confirm: item ? '保存' : '添加',
     fields: [
       { name: 'label', type: 'text', label: '名称', value: item?.label || '', placeholder: '比如：聊天任务、行为要求', maxLength: 30 },
+      { name: 'kind', type: 'select', label: '类型', value: defaultKind, options: [
+        { value: 'chat', label: '聊天行为（聊天软件）' },
+        { value: 'app', label: '其他软件' },
+      ] },
+      { name: 'app', type: 'text', label: '软件名', value: item?.app || '', placeholder: '日历 / 外卖 / 音乐 / 购物', maxLength: 20, hint: '类型选“其他软件”时才填，聊天条目留空' },
       { name: 'role', type: 'select', label: '角色', value: item?.role || 'system', options: [
         { value: 'system', label: '系统（system）' },
         { value: 'user', label: '用户（user）' },
@@ -64,6 +77,8 @@ function openItemForm(ctx, preset, itemId = '') {
       const nextItem = {
         id: item?.id || newId('item'),
         label: String(values.label || '').trim().slice(0, 30) || '自定义条目',
+        kind: values.kind === 'app' ? 'app' : 'chat',
+        app: values.kind === 'app' ? String(values.app || '').trim().slice(0, 20) : '',
         role: ['system', 'user', 'assistant'].includes(values.role) ? values.role : 'system',
         content: String(values.content || '').trim().slice(0, 4000),
         enabled: item?.enabled !== false,
@@ -177,7 +192,7 @@ export const presetsApp = {
           <button class="mp-icon-btn" data-act="reply-more" type="button" aria-label="导入导出">${icon('more')}</button>
           <button class="mp-icon-btn" data-act="reply-new" type="button" aria-label="新建预设">${icon('plus')}</button>
         </div>
-        <div class="mp-subtitle">一套预设由回复指令、提示词条目和注入的上下文组成；可以加条目、改角色、调顺序，聊天设置里还能给单个会话换一套</div>
+        <div class="mp-subtitle">一套预设由回复指令、聊天行为条目、其他软件条目和注入的上下文组成；聊天设置里还能给单个会话换一套</div>
 
         <div class="mp-group-label" style="margin-top:14px">手机默认 · ${list.length} 套</div>
         <div class="mp-group-box">
@@ -257,11 +272,15 @@ export const replyPresetApp = {
     const text = String(preset.text || '');
     const context = normalizeReplyContext(preset.context);
     const items = promptItems(preset);
-    const itemRows = items.map((item, index) => `
+    const chatItems = items.filter(item => item.kind !== 'app');
+    const appItems = items.filter(item => item.kind === 'app');
+    const itemRow = (item) => {
+      const index = items.indexOf(item);
+      return `
       <div class="mp-preset-item">
         <button class="mp-preset-item-main" data-act="reply-item-open" data-id="${esc(item.id)}" type="button">
           <span class="mp-preset-item-label">${esc(item.label)}</span>
-          <span class="mp-preset-item-sub">${esc(roleLabel(item.role))} · ${item.enabled ? '已启用' : '已关闭'} · ${item.content.length} 字</span>
+          <span class="mp-preset-item-sub">${esc(itemKindLabel(item))} · ${esc(roleLabel(item.role))} · ${item.enabled ? '已启用' : '已关闭'} · ${item.content.length} 字</span>
         </button>
         <div class="mp-preset-item-actions">
           <button class="mp-item-mini${item.enabled ? ' is-on' : ' is-muted'}" data-act="reply-item-toggle" data-id="${esc(item.id)}" type="button" title="${item.enabled ? '关闭' : '启用'}">${item.enabled ? '开' : '关'}</button>
@@ -269,7 +288,10 @@ export const replyPresetApp = {
           <button class="mp-item-mini" data-act="reply-item-down" data-id="${esc(item.id)}" type="button" title="下移"${index === items.length - 1 ? ' disabled' : ''}>${icon('chevron')}</button>
           <button class="mp-item-mini" data-act="reply-item-del" data-id="${esc(item.id)}" type="button" title="删除">${icon('trash')}</button>
         </div>
-      </div>`).join('');
+      </div>`;
+    };
+    const chatRows = chatItems.map(itemRow).join('');
+    const appRows = appItems.map(itemRow).join('');
     const contextRows = [
       ['character', '角色档案', '人设、性格、场景'],
       ['user', '我的设定', '当前酒馆用户的名字和设定'],
@@ -315,11 +337,19 @@ export const replyPresetApp = {
         </div>
 
         <div class="mp-group-head" style="margin-top:16px">
-          <div class="mp-group-label">提示词条目 · ${items.length} 条</div>
-          <button class="mp-icon-btn" data-act="reply-item-add" type="button" aria-label="添加条目">${icon('plus')}</button>
+          <div class="mp-group-label">聊天行为条目 · ${chatItems.length} 条</div>
+          <button class="mp-icon-btn" data-act="reply-item-add" data-scope="chat" type="button" aria-label="添加聊天条目">${icon('plus')}</button>
         </div>
         <div class="mp-group">
-          ${itemRows || '<div class="mp-empty" style="padding:16px 14px">还没有附加条目，点上面的加号加一条。</div>'}
+          ${chatRows || '<div class="mp-empty" style="padding:16px 14px">还没有聊天行为条目，点上面的加号加一条。</div>'}
+        </div>
+
+        <div class="mp-group-head" style="margin-top:16px">
+          <div class="mp-group-label">其他软件条目 · ${appItems.length} 条</div>
+          <button class="mp-icon-btn" data-act="reply-item-add" data-scope="app" type="button" aria-label="添加其他软件条目">${icon('plus')}</button>
+        </div>
+        <div class="mp-group">
+          ${appRows || '<div class="mp-empty" style="padding:16px 14px">日历、外卖、音乐之类的提示写在里，不会混进聊天回复。</div>'}
         </div>
 
         <div class="mp-group-label" style="margin-top:16px">注入上下文</div>
@@ -343,7 +373,7 @@ export const replyPresetApp = {
         </div>
 
         <div class="mp-api-note" style="margin-top:14px">
-          点「回复指令」改主指令；提示词条目会按顺序接在它后面，可以把 system / user / assistant 分开写；下面打开的上下文会再拼到后面。单个聊天可以在聊天设置里单独选一套。
+          点「回复指令」改主指令；聊天行为条目会按角色接在它后面，其他软件条目单独存着，不会混进聊天回复。下面的上下文开关只作用于聊天。单个聊天可以在聊天设置里单独选一套。
         </div>
       </div>`;
   },
@@ -399,7 +429,7 @@ export const replyPresetApp = {
     }
 
     if (act === 'reply-item-add') {
-      openItemForm(ctx, preset);
+      openItemForm(ctx, preset, '', data.scope === 'app' ? 'app' : 'chat');
       return true;
     }
 

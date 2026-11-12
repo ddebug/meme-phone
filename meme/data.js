@@ -69,11 +69,14 @@ export function normalizeReplyItems(raw) {
   const source = Array.isArray(raw) ? raw : defaultReplyItems();
   return source.slice(0, 24).map((item, index) => {
     const role = ['system', 'user', 'assistant'].includes(item?.role) ? item.role : 'system';
+    const kind = item?.kind === 'app' ? 'app' : 'chat';
     const order = Number(item?.order);
     return {
       id: String(item?.id || newId('item')),
       label: String(item?.label || '').trim().slice(0, 30) || `条目 ${index + 1}`,
       role,
+      kind,
+      app: kind === 'app' ? String(item?.app || '').trim().slice(0, 20) : '',
       content: String(item?.content || '').trim().slice(0, 4000),
       enabled: item?.enabled !== false,
       editable: item?.editable !== false,
@@ -339,13 +342,34 @@ export function fillPromptTokens(text, state, chat) {
     .replace(/\{\{当前时间\}\}/g, now);
 }
 
-/** 真正发给模型的 system 文本：主回复指令 + 开启的 system 条目。 */
+/** 真正发给模型的 system 文本：主回复指令 + 开启的聊天 system 条目。 */
 export function replySystemFor(state, chat) {
   const preset = replyPresetFor(state, chat);
   const items = normalizeReplyItems(preset?.items)
-    .filter(item => item.enabled && item.role === 'system' && item.content)
+    .filter(item => item.kind !== 'app' && item.enabled && item.role === 'system' && item.content)
     .map(item => fillPromptTokens(item.content, state, chat));
   return [fillPromptTokens(preset?.text, state, chat), ...items].filter(Boolean).join('\n\n');
+}
+
+/** 聊天软件用的条目：过滤掉「其他软件」条目。 */
+export function replyChatItemsFor(state, chat) {
+  return replyItemsFor(state, chat).filter(item => item.kind !== 'app');
+}
+
+/** 某个其他软件用的条目；不传软件名时返回全部其他软件条目。 */
+export function appReplyItemsFor(state, chat, app = '') {
+  const items = replyItemsFor(state, chat).filter(item => item.kind === 'app');
+  const target = String(app || '').trim();
+  if (!target) return items;
+  return items.filter(item => !item.app || item.app === target);
+}
+
+/** 其他软件的 system 提示词；这些条目不会混进聊天回复。 */
+export function appSystemFor(state, chat, app = '') {
+  return appReplyItemsFor(state, chat, app)
+    .filter(item => item.enabled && item.role === 'system' && item.content)
+    .map(item => fillPromptTokens(item.content, state, chat))
+    .join('\n\n');
 }
 
 /** 手机里保存的 LLM 整体方案：一套聊天 API + 一套酒馆记忆 + 一套回复预设。 */

@@ -88,7 +88,7 @@ let followTimer = 0;
 
 function roleNote(items, role, title, state, chat) {
   const lines = items
-    .filter(item => item.enabled && item.role === role && item.content)
+    .filter(item => item.kind !== 'app' && item.enabled && item.role === role && item.content)
     .map(item => fillPromptTokens(item.content, state, chat));
   return lines.length ? `【${title}】\n${lines.join('\n')}` : '';
 }

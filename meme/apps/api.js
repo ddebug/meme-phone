@@ -33,6 +33,54 @@ let expandedId = '';
 let schemeEdit = null;   // { mode: 'new' | 'rename', value: '' }，放在方案按钮下面直接改
 let apiDelete = null;    // { type: 'scheme' | 'api', id }：页面内删除确认，不直接执行
 const drafts = new Map(); // preset.id -> 尚未保存的字段草稿，收起/切行都不丢
+const DRAFTS_KEY = 'meme-phone:api-drafts:v1';
+let draftsReady = false;
+
+function draftStorage() {
+  try {
+    return globalThis.sessionStorage || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/* 草稿只存在当前浏览器会话里：刷新、离开页面后回来还能接着改；
+   关掉整个浏览器就丢掉，不把未保存的 Key 长期落盘。 */
+function persistDrafts(state) {
+  const storage = draftStorage();
+  if (!storage) return;
+  try {
+    const presets = Array.isArray(state?.settings?.api?.presets) ? state.settings.api.presets : [];
+    /* 只把真正改过的字段存进会话草稿，没改过的预设不占地方，也不重复存 Key */
+    const changed = [...drafts.entries()].filter(([id, draft]) => {
+      const preset = presets.find(item => item.id === id);
+      if (!preset) return false;
+      return ['name', 'engine', 'temp', 'url', 'path', 'model', 'key']
+        .some(key => String(draft[key] ?? '') !== String(preset[key] ?? ''));
+    });
+    storage.setItem(DRAFTS_KEY, JSON.stringify(changed));
+  } catch (error) { /* 容量或隐私模式失败时退回内存草稿 */ }
+}
+
+function hydrateDrafts(state) {
+  if (draftsReady) return;
+  draftsReady = true;
+  const storage = draftStorage();
+  if (!storage) return;
+  try {
+    const raw = storage.getItem(DRAFTS_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (Array.isArray(saved)) {
+      saved.forEach(entry => {
+        if (!Array.isArray(entry) || !entry[0] || !entry[1] || typeof entry[1] !== 'object') return;
+        drafts.set(String(entry[0]), entry[1]);
+      });
+    }
+  } catch (error) {
+    drafts.clear();
+  }
+}
 
 function engineLabel(value) {
   return (ENGINES.find(item => item.value === value) || ENGINES[0]).label;
@@ -460,27 +508,83 @@ function deleteConfirm(state, store) {
   if (!preset) return '';
   const linked = chatSchemesOf(state).filter(item => item.apiId === preset.id);
   const chats = Object.values(state.chats || {}).filter(chat => chat.llmPresetId === preset.id);
-  const fallback = store.presets.find(item => item.id !== preset.id) || null;
   return `
     <div class="mp-api-delete">
       <div class="mp-api-delete-title">删除接口「${esc(preset.name || '未命名')}」？</div>
       <div class="mp-api-delete-sub">
-        删除后不能恢复。${linked.length ? `${linked.length} 套整体方案会改指「${esc(fallback?.name || '酒馆 API')}」。` : '没有整体方案引用它，但可能正被当前聊天临时使用。'}
+        删除后不能恢复。${linked.length ? `${linked.length} 套整体方案引用它，可以选择一起删除。` : '没有整体方案引用它，但可能正被当前聊天临时使用。'}
         ${store.activeChat === preset.id ? '当前聊天正在用它，删除后会改指兜底。' : ''}
         ${chats.length ? `${chats.length} 个单独引用它的会话会恢复跟随手机。` : ''}
+        ${linked.length ? '只删接口时方案会改指兜底；删空方案时会自动补一套兜底方案。' : ''}
       </div>
       <div class="mp-draw-actions">
-        <button class="mp-draw-action is-danger" data-act="api-del-confirm" type="button">确认删除接口</button>
+        ${linked.length ? `<button class="mp-draw-action is-danger" data-act="api-del-schemes-confirm" type="button">删除接口 + ${linked.length} 套方案</button>` : ''}
+        <button class="mp-draw-action${linked.length ? '' : ' is-danger'}" data-act="api-del-confirm" type="button">只删接口</button>
         <button class="mp-draw-action" data-act="api-delete-cancel" type="button">取消</button>
       </div>
     </div>`;
+}
+
+function deleteApiPreset(ctx, store, pending, withSchemes) {
+  const linked = chatSchemesOf(ctx.state).filter(item => item.apiId === pending.id);
+  const linkedCount = linked.length;
+  const chatCount = Object.values(ctx.state.chats || {}).filter(chat => chat.llmPresetId === pending.id).length;
+  store.presets = store.presets.filter(item => item.id !== pending.id);
+  const fallback = store.presets[0];
+  let fallbackCreated = false;
+
+  if (withSchemes) {
+    const kept = chatSchemesOf(ctx.state).filter(item => item.apiId !== pending.id);
+    if (!kept.length) {
+      const reply = replyPresetFor(ctx.state, null);
+      const scheme = { id: newId('lsch'), name: '默认', apiId: fallback.id, replyId: reply?.id || '' };
+      store.chatSchemes = [scheme];
+      store.chatSchemeId = scheme.id;
+      fallbackCreated = true;
+    } else {
+      store.chatSchemes = kept;
+      if (!kept.some(item => item.id === store.chatSchemeId)) store.chatSchemeId = kept[0].id;
+    }
+  } else {
+    store.chatSchemes.forEach(item => { if (item.apiId === pending.id) item.apiId = fallback.id; });
+    if (!store.chatSchemes.some(item => item.id === store.chatSchemeId)) {
+      store.chatSchemeId = store.chatSchemes[0]?.id || '';
+    }
+  }
+
+  if (store.activeChat === pending.id) store.activeChat = fallback.id;
+  /* 单个聊天如果引用过这套接口，清掉引用，别留下空 id */
+  Object.values(ctx.state.chats || {}).forEach(chat => {
+    if (chat && chat.llmPresetId === pending.id) chat.llmPresetId = '';
+  });
+  if (expandedId === pending.id) expandedId = '';
+  drafts.delete(pending.id);
+  persistDrafts(ctx.state);
+  apiDelete = null;
+  ctx.save();
+  ctx.rerender();
+  const parts = [`接口「${pending.name || '未命名'}」删掉了`];
+  if (fallbackCreated) parts.push('方案删空，补了一套「默认」');
+  else if (withSchemes && linkedCount) parts.push(`${linkedCount} 套方案一起删了`);
+  else if (linkedCount) parts.push(`${linkedCount} 套方案已改指兜底`);
+  if (chatCount) parts.push(`${chatCount} 个会话恢复跟随手机`);
+  ctx.toast(parts.join('，'));
 }
 
 export const apiListApp = {
   id: 'api', name: '接口', icon: 'code',
 
   render(ctx) {
+    hydrateDrafts(ctx.state);
     const store = api(ctx.state);
+    const staleDrafts = [...drafts.keys()].filter(id => {
+      const preset = store.presets.find(item => item.id === id);
+      return !preset || !draftChanged(preset);
+    });
+    if (staleDrafts.length) {
+      staleDrafts.forEach(id => drafts.delete(id));
+      persistDrafts(ctx.state);
+    }
     const schemes = chatSchemesOf(ctx.state);
     const scheme = activeChatScheme(ctx.state);
     const currentReply = replyPresetFor(ctx.state, null);
@@ -535,7 +639,7 @@ export const apiListApp = {
             <div><span>方案保存</span><strong>${esc(savedSummary)}</strong></div>
           </div>
           ${schemeDirty
-            ? `<div class="mp-api-dirty">当前选择还没保存：改 API 或回复预设会先影响新聊天，点「保存当前组合」才写进这套方案。</div>`
+            ? `<div class="mp-api-dirty">当前选择还没保存：改 API 或回复预设会先影响新聊天，点「保存当前选择到方案」才写进这套方案。</div>`
             : '<div class="mp-api-dirty is-clear">当前选择和方案保存一致。</div>'}
           <div class="mp-ios-two">
             <label class="mp-ios-field">
@@ -549,7 +653,7 @@ export const apiListApp = {
           </div>
 
           <div class="mp-draw-actions">
-            <button class="mp-draw-action is-primary" data-act="api-scheme-save" type="button">保存当前组合</button>
+            <button class="mp-draw-action is-primary" data-act="api-scheme-save" type="button">保存当前选择到方案</button>
             ${schemeDirty ? '<button class="mp-draw-action" data-act="api-scheme-revert" type="button">恢复为方案值</button>' : ''}
           </div>
           <div class="mp-draw-actions">
@@ -598,6 +702,7 @@ export const apiListApp = {
       draft[key] = String(input.value || '').trim();
     }
     markDraftNote(input);
+    persistDrafts(ctx.state);
     return true;
   },
 
@@ -794,6 +899,7 @@ export const apiListApp = {
       }
       preset.status = null;
       preset.models = [];
+      persistDrafts(ctx.state);
       ctx.rerender();
       return true;
     }
@@ -803,6 +909,7 @@ export const apiListApp = {
       if (!preset) return true;
       const draft = readDraft(event?.target?.closest('.mp-api-detail'), draftFor(preset));
       draft.model = String(data.value || '').trim();
+      persistDrafts(ctx.state);
       ctx.rerender();
       return true;
     }
@@ -811,17 +918,30 @@ export const apiListApp = {
       const preset = store.presets.find(item => item.id === String(data.id || ''));
       if (!preset) return true;
       const draft = readDraft(event?.target?.closest('.mp-api-detail'), draftFor(preset));
+      const previous = { ...preset };
+      const savedDraft = { ...draft };
       const before = { url: preset.url, path: preset.path, key: preset.key, engine: preset.engine };
       Object.assign(preset, draft);
-      drafts.delete(preset.id);
       if (!preset.name) preset.name = '未命名接口';
       if (before.url !== preset.url || before.path !== preset.path || before.key !== preset.key || before.engine !== preset.engine) {
         preset.status = null;
         preset.models = [];
       }
-      ctx.save();
       ctx.rerender();
-      ctx.toast(`已保存「${preset.name}」`);
+      ctx.save().then(saved => {
+        if (saved === false) {
+          /* 落盘失败：把界面退回去，草稿留着，别让用户以为已经写进去了 */
+          Object.assign(preset, previous);
+          drafts.set(preset.id, savedDraft);
+          persistDrafts(ctx.state);
+          ctx.rerender();
+          return;
+        }
+        drafts.delete(preset.id);
+        persistDrafts(ctx.state);
+        ctx.rerender();
+        ctx.toast(`已保存「${preset.name}」`);
+      });
       return true;
     }
 
@@ -829,6 +949,7 @@ export const apiListApp = {
       const preset = store.presets.find(item => item.id === String(data.id || ''));
       if (!preset) return true;
       drafts.delete(preset.id);
+      persistDrafts(ctx.state);
       ctx.rerender();
       ctx.toast('这次修改已经取消');
       return true;
@@ -856,6 +977,7 @@ export const apiListApp = {
       const draft = readDraft(event?.target?.closest('.mp-api-detail'), draftFor(preset));
       Object.assign(preset, draft);
       drafts.delete(preset.id);
+      persistDrafts(ctx.state);
       store.activeChat = preset.id;
       ctx.save();
       ctx.rerender();
@@ -887,7 +1009,7 @@ export const apiListApp = {
       return true;
     }
 
-    if (act === 'api-del-confirm') {
+    if (act === 'api-del-confirm' || act === 'api-del-schemes-confirm') {
       const pending = apiDelete?.type === 'api'
         ? store.presets.find(item => item.id === apiDelete.id)
         : null;
@@ -898,22 +1020,7 @@ export const apiListApp = {
         ctx.toast('至少留一套接口');
         return true;
       }
-      const linkedCount = chatSchemesOf(ctx.state).filter(item => item.apiId === pending.id).length;
-      const chatCount = Object.values(ctx.state.chats || {}).filter(chat => chat.llmPresetId === pending.id).length;
-      store.presets = store.presets.filter(item => item.id !== pending.id);
-      const fallback = store.presets[0];
-      if (store.activeChat === pending.id) store.activeChat = fallback.id;
-      store.chatSchemes.forEach(item => { if (item.apiId === pending.id) item.apiId = fallback.id; });
-      /* 单个聊天如果引用过这套接口，清掉引用，别留下空 id */
-      Object.values(ctx.state.chats || {}).forEach(chat => {
-        if (chat && chat.llmPresetId === pending.id) chat.llmPresetId = '';
-      });
-      if (expandedId === pending.id) expandedId = '';
-      drafts.delete(pending.id);
-      apiDelete = null;
-      ctx.save();
-      ctx.rerender();
-      ctx.toast(`接口「${pending.name || '未命名'}」删掉了${linkedCount ? `，${linkedCount} 套方案已改指兜底` : ''}${chatCount ? `，${chatCount} 个会话恢复跟随手机` : ''}`);
+      deleteApiPreset(ctx, store, pending, act === 'api-del-schemes-confirm');
       return true;
     }
 

@@ -358,7 +358,7 @@ function doSend(ctx, chatId) {
   reply(ctx, chat, contact);
 }
 
-function reply(ctx, chat, contact) {
+function reply(ctx, chat, contact, replaceId = '') {
   chat.typing = true;
   ctx.rerender();
   scrollToBottom(ctx);
@@ -372,7 +372,18 @@ function reply(ctx, chat, contact) {
       text = '';
     }
     chat.typing = false;
-    if (text) pushMessage(ctx.state, chat.id, { from: 'them', text });
+    if (text) {
+      const index = replaceId ? chat.messages.findIndex(item => item.id === replaceId) : -1;
+      if (index >= 0) {
+        /* 重新生成：新内容回来后才覆盖原来那条，生成失败时原消息还在 */
+        chat.messages[index] = { ...chat.messages[index], text, at: Date.now() };
+        chat.updatedAt = chat.messages[index].at;
+      } else {
+        pushMessage(ctx.state, chat.id, { from: 'them', text });
+      }
+    } else if (replaceId) {
+      ctx.toast('这次没生成出来，原来那条留着了');
+    }
     ctx.save();
     ctx.rerender();
     scrollToBottom(ctx);
@@ -810,11 +821,7 @@ export const threadApp = {
             ctx.toast('已存进小剧场');
           }
           if (value === 'regen') {
-            const index = chat.messages.indexOf(message);
-            chat.messages.splice(index, 1);
-            ctx.save();
-            ctx.rerender();
-            reply(ctx, chat, contact);
+            reply(ctx, chat, contact, message.id);
           }
           if (value === 'delete') {
             ctx.openSheet({

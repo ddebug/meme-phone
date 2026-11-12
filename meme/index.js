@@ -338,8 +338,9 @@ export async function openMemePhone(options = {}) {
     ai,
     host,
     save: () => {
-      store.touch().catch(error => {
+      return store.touch().then(() => true).catch(error => {
         ctx.toast?.(error.message || '保存失败，先去设置里导出备份');
+        return false;
       });
     },
     reset: () => {

@@ -97,6 +97,8 @@ export const extraDetailApp = {
 
 /* ------------------------------------------------------------ 表情 */
 
+let emojiAdding = false;
+
 export const emojiApp = {
   id: 'emoji', name: '表情', icon: 'smile',
 
@@ -112,11 +114,17 @@ export const emojiApp = {
               <div style="font-size: calc(11px * var(--font-scale));color:var(--text-3);margin-top:5px">${esc(item.name)}</div>
             </button>`).join('')}
         </div>
-        <button class="mp-btn" data-act="emoji-add" type="button" style="margin-top:14px;width:100%">${icon('plus')}加一个</button>
+        ${emojiAdding ? `
+        <div class="mp-api-name-edit mp-emoji-form">
+          <input class="mp-api-input" data-emoji-char type="text" maxlength="8" placeholder="表情字符">
+          <input class="mp-api-input" data-emoji-name type="text" maxlength="8" placeholder="名字">
+          <button class="mp-draw-side is-primary" data-act="emoji-add-save" type="button">保存</button>
+          <button class="mp-draw-side" data-act="emoji-add-cancel" type="button">取消</button>
+        </div>` : `<button class="mp-btn" data-act="emoji-add" type="button" style="margin-top:14px;width:100%">${icon('plus')}加一个</button>`}
       </div>`;
   },
 
-  handle(ctx, act, data) {
+  handle(ctx, act, data, event) {
     if (act === 'emoji-pick') {
       const item = ctx.state.emoji.find(entry => entry.id === data.id);
       if (!item) return true;
@@ -124,7 +132,30 @@ export const emojiApp = {
       return true;
     }
     if (act === 'emoji-add') {
-      ctx.toast('这个先留着：表情库下一步接自定义上传');
+      emojiAdding = true;
+      ctx.rerender();
+      return true;
+    }
+    if (act === 'emoji-add-cancel') {
+      emojiAdding = false;
+      ctx.rerender();
+      return true;
+    }
+    if (act === 'emoji-add-save') {
+      const form = event?.target?.closest('.mp-emoji-form');
+      const char = String(form?.querySelector('[data-emoji-char]')?.value || '').trim();
+      const name = String(form?.querySelector('[data-emoji-name]')?.value || '').trim();
+      if (!char) { ctx.toast('先写一个表情字符'); return true; }
+      if (!Array.isArray(ctx.state.emoji)) ctx.state.emoji = [];
+      ctx.state.emoji.push({
+        id: 'e' + Date.now().toString(36),
+        char: Array.from(char).slice(0, 2).join(''),
+        name: name || '自定义',
+      });
+      emojiAdding = false;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast('表情加进列表了');
       return true;
     }
     return false;

@@ -616,8 +616,8 @@ export async function readTavernPersonas() {
   const script = await loadHostScript();
   if (!script) return { available: false, list: [], current: '' };
   try {
-    const ctx = script.getContext?.() || {};
-    const pu = script.power_user || ctx.powerUser || globalThis.power_user || {};
+    const ctx = script.getContext?.() || script;
+    const pu = script.power_user || script.powerUser || ctx.powerUser || ctx.powerUserSettings || globalThis.power_user || {};
     const names = pu.personas && typeof pu.personas === 'object' ? pu.personas : null;
     if (!names) return { available: false, list: [], current: '' };
     const descs = pu.persona_descriptions && typeof pu.persona_descriptions === 'object' ? pu.persona_descriptions : {};
@@ -644,8 +644,8 @@ export async function readTavernPersonas() {
  */
 export async function writeTavernPersona({ key, name, description, lorebook }) {
   const script = await loadHostScript();
-  const ctx = script?.getContext?.() || {};
-  const pu = script?.power_user || ctx.powerUser || globalThis.power_user;
+  const ctx = script?.getContext?.() || script || {};
+  const pu = script?.power_user || script?.powerUser || ctx.powerUser || ctx.powerUserSettings || globalThis.power_user;
   if (!pu || !pu.personas) throw new Error('没接上酒馆，改不了酒馆那一边');
   if (!key) throw new Error('这条没有对应的酒馆用户');
 

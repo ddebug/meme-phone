@@ -211,9 +211,12 @@
 .mp-status .mp-status-back .mp-i { width: 19px; height: 19px; }
 
 /* 返回键统一放到状态栏左边，页面里的旧返回键不再重复显示 */
-.mp-nav .mp-back[data-act="back"]
-.mp-thread-head .mp-back[data-act="back"]
+.mp-nav .mp-back[data-act="back"],
+.mp-thread-head .mp-back[data-act="back"],
 .mp-root .mp-back[data-act="back"] { display: none; }
+
+/* 返回键改到状态栏后，聊天页头像让出左上角的位置 */
+.mp-thread-head { padding-left: 52px; }
 
 /* 顶部中间：拖动手机壳 */
 .mp-drag-handle {

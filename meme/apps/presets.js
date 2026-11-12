@@ -462,8 +462,8 @@ export const replyPresetApp = {
       <div class="mp-nav">
         <button class="mp-back" data-act="back" type="button">${icon('back')}</button>
         <span style="flex:1"></span>
-        <button class="mp-back" data-act="reply-item-reset" type="button" title="恢复默认条目">${icon('refresh')}</button>
-        <button class="mp-back" data-act="reply-del" type="button" title="删除">${icon('trash')}</button>
+        <button class="mp-icon-btn" data-act="reply-item-reset" type="button" title="恢复默认条目">${icon('refresh')}</button>
+        <button class="mp-icon-btn" data-act="reply-del" type="button" title="删除">${icon('trash')}</button>
       </div>
       <div class="mp-page-body">
         <div class="mp-title" style="margin-top:0">${esc(preset.name || '未命名预设')}</div>

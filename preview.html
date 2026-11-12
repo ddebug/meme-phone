@@ -228,9 +228,12 @@ body {
 .mp-status .mp-status-back .mp-i { width: 19px; height: 19px; }
 
 /* 返回键统一放到状态栏左边，页面里的旧返回键不再重复显示 */
-.mp-nav .mp-back[data-act="back"]
-.mp-thread-head .mp-back[data-act="back"]
+.mp-nav .mp-back[data-act="back"],
+.mp-thread-head .mp-back[data-act="back"],
 .mp-root .mp-back[data-act="back"] { display: none; }
+
+/* 返回键改到状态栏后，聊天页头像让出左上角的位置 */
+.mp-thread-head { padding-left: 52px; }
 
 /* 顶部中间：拖动手机壳 */
 .mp-drag-handle {
@@ -8284,7 +8287,7 @@ function createShell(options) {
             <div class="mp-wallpaper"></div>
             <div class="mp-scrim"></div>
             <div class="mp-status">
-              <span class="mp-status-left"></span>
+              <span class="mp-status-left">${shell.stack.length && !shell.sheet ? `<button class="mp-status-back" data-act="back" type="button" aria-label="返回">${ico('back')}</button>` : ''}</span>
               <span class="mp-status-right">${clockText()}</span>
             </div>
             ${shell.stack.length ? pageHtml() : desktopHtml()}
@@ -16190,8 +16193,8 @@ const replyPresetApp = {
       <div class="mp-nav">
         <button class="mp-back" data-act="back" type="button">${icon('back')}</button>
         <span style="flex:1"></span>
-        <button class="mp-back" data-act="reply-item-reset" type="button" title="恢复默认条目">${icon('refresh')}</button>
-        <button class="mp-back" data-act="reply-del" type="button" title="删除">${icon('trash')}</button>
+        <button class="mp-icon-btn" data-act="reply-item-reset" type="button" title="恢复默认条目">${icon('refresh')}</button>
+        <button class="mp-icon-btn" data-act="reply-del" type="button" title="删除">${icon('trash')}</button>
       </div>
       <div class="mp-page-body">
         <div class="mp-title" style="margin-top:0">${esc(preset.name || '未命名预设')}</div>

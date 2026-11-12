@@ -339,7 +339,7 @@ export function createShell(options) {
             <div class="mp-wallpaper"></div>
             <div class="mp-scrim"></div>
             <div class="mp-status">
-              <span class="mp-status-left"></span>
+              <span class="mp-status-left">${shell.stack.length && !shell.sheet ? `<button class="mp-status-back" data-act="back" type="button" aria-label="返回">${ico('back')}</button>` : ''}</span>
               <span class="mp-status-right">${clockText()}</span>
             </div>
             ${shell.stack.length ? pageHtml() : desktopHtml()}

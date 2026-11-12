@@ -439,6 +439,9 @@ export function createShell(options) {
   };
 
   root.addEventListener('click', event => {
+    /* 原生 <select> 的选项变化只走下面的 change 事件；click 阶段没有选中值，
+       不能按按钮动作执行，否则打开下拉时会被默认值保存并整页重渲染。 */
+    if (event.target.closest('select[data-act]')) return;
     const target = event.target.closest('[data-act]');
     if (!target || !root.contains(target)) return;
     const act = target.dataset.act;

@@ -149,6 +149,14 @@ export function createShell(options) {
     const diary = latestDiary(state);
     const recentContact = recent ? contactById(state, recent.contactId) : null;
     const recentMsg = recent ? lastMessage(recent) : null;
+    const me = Array.isArray(state.users)
+      ? state.users.find(item => item && item.key && item.key === state.settings.user.key) || null
+      : null;
+    const myName = state.settings.user.name || me?.name || '我';
+    const myAvatar = state.settings.user.avatar || me?.avatarUrl || '';
+    const myBio = String(me?.description || '把每天的事，记在这台小手机里。').trim();
+    const myHandle = `@${String(myName).trim().replace(/\s+/g, '_') || 'me'}`;
+    const stampText = dateText().replace('<br>', ' · ');
 
     const iconButtons = desktopApps.map(app => `
       <button class="mp-app" data-act="open-app" data-app="${app.id}" type="button" aria-label="${esc(app.name)}">
@@ -167,23 +175,35 @@ export function createShell(options) {
 
     return `
       <div class="mp-desktop">
-        <div class="mp-widget" data-act="open-app" data-app="diary">
-          <div class="mp-widget-top">
-            <div class="mp-clock">${clockText()}</div>
-            <div class="mp-date">${dateText()}</div>
-          </div>
-          <div class="mp-di-card">
-            <div class="mp-di-label">${ico('diary')} 昨日日记${diary ? ` · ${esc(diaryDateLabel(diary))}` : ''}</div>
-            <div class="mp-di-text">${diary ? esc(diary.text).replace(/\n/g, '<br>') : '这一格还空着。写一句今天的事，它就会留在这里。'}</div>
-          </div>
-          ${recentContact ? `
-          <div class="mp-recent">
-            ${avatarHtml(recentContact.name, recentContact.avatar, 'mp-avatar')}
-            <div class="mp-recent-body">
-              <div class="mp-recent-name">${esc(recentContact.name)}${recent.unread ? ` · ${recent.unread} 条未读` : ''}</div>
-              <div class="mp-recent-msg">${esc(recentMsg?.text || '')}</div>
-            </div>
-          </div>` : ''}
+        <button class="mp-profile" data-act="open-app" data-app="user" type="button" aria-label="我的资料">
+          <span class="mp-profile-banner">
+            <span class="mp-profile-stamp">${stampText}</span>
+          </span>
+          ${avatarHtml(myName, myAvatar, 'mp-profile-avatar')}
+          <span class="mp-profile-name">${esc(myName)}</span>
+          <span class="mp-profile-handle">${esc(myHandle)}</span>
+          <span class="mp-profile-bio">${esc(myBio)}</span>
+          <span class="mp-profile-loc">${ico('home')}<span>在酒馆里</span></span>
+        </button>
+
+        <div class="mp-widget-strip">
+          <button class="mp-mini-widget" data-act="open-app" data-app="chat" type="button">
+            <span class="mp-mini-head">${ico('chat')} 最近</span>
+            ${recentContact ? `
+            <span class="mp-mini-main">
+              ${avatarHtml(recentContact.name, recentContact.avatar, 'mp-mini-avatar')}
+              <span class="mp-mini-copy">
+                <span class="mp-mini-name">${esc(recentContact.name)}</span>
+                <span class="mp-mini-msg">${esc(recentMsg?.text || '')}</span>
+              </span>
+            </span>` : `
+            <span class="mp-mini-empty">等一条新消息</span>`}
+          </button>
+
+          <button class="mp-mini-widget" data-act="open-app" data-app="diary" type="button">
+            <span class="mp-mini-head">${ico('diary')} ${diary ? esc(diaryDateLabel(diary)) : '昨日日记'}</span>
+            <span class="mp-mini-text">${diary ? esc(diary.text) : '这一格还空着。写一句今天的事，它就会留在这里。'}</span>
+          </button>
         </div>
 
         <div class="mp-apps">${iconButtons}</div>

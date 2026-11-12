@@ -360,20 +360,257 @@ body {
   margin-top: 2px;
 }
 
+/* ------------------------------------------------------ 桌面资料卡 */
+.mp-profile {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+  width: 100%;
+  padding: 0 0 12px;
+  border: 0;
+  border-radius: 28px;
+  overflow: hidden;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  background: linear-gradient(168deg, rgba(255, 255, 255, .96), rgba(255, 255, 255, .86));
+  backdrop-filter: blur(24px) saturate(155%);
+  -webkit-backdrop-filter: blur(24px) saturate(155%);
+  box-shadow: 0 18px 40px rgba(120, 108, 180, .16), inset 0 0 0 1px rgba(255, 255, 255, .86);
+  transition: transform .22s cubic-bezier(.22, .68, .38, 1);
+}
+
+.mp-profile:active { transform: scale(.985); }
+
+.mp-profile-banner {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 86px;
+  overflow: hidden;
+  background:
+    radial-gradient(110% 150% at 8% 0%, rgba(255, 190, 218, .94), transparent 58%),
+    radial-gradient(110% 140% at 100% 10%, rgba(188, 226, 255, .9), transparent 62%),
+    linear-gradient(135deg, #ffe3ef, #e8e1ff 52%, #ddf7ee);
+}
+
+.mp-profile-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--wall-custom, none);
+  background-size: cover;
+  background-position: center;
+  opacity: .42;
+  filter: saturate(1.08);
+}
+
+.mp-profile-banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .26), transparent 40%, rgba(255, 255, 255, .34));
+}
+
+.mp-profile-stamp {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 12px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .62);
+  color: rgba(48, 42, 72, .62);
+  font-size: calc(10.5px * var(--font-scale));
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.mp-profile-avatar {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: -32px auto 0;
+  border: 2.5px solid rgba(255, 255, 255, .96);
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  color: #fff;
+  font-size: calc(21px * var(--font-scale));
+  font-weight: 600;
+  box-shadow: 0 8px 18px rgba(95, 80, 140, .2), inset 0 0 0 1px rgba(255, 255, 255, .3);
+}
+
+.mp-profile-name {
+  position: relative;
+  z-index: 2;
+  margin-top: 6px;
+  color: var(--text);
+  font-size: calc(16.5px * var(--font-scale));
+  font-weight: 650;
+  letter-spacing: -.01em;
+}
+
+.mp-profile-handle {
+  position: relative;
+  z-index: 2;
+  margin-top: 0;
+  color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale));
+}
+
+.mp-profile-bio {
+  position: relative;
+  z-index: 2;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 290px;
+  margin-top: 5px;
+  padding: 0 12px;
+  color: var(--text-2);
+  font-size: calc(12px * var(--font-scale));
+  line-height: calc(1.45 * var(--line-scale));
+}
+
+.mp-profile-loc {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .62);
+  color: var(--text-3);
+  font-size: calc(10px * var(--font-scale));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .58);
+}
+
+.mp-profile-loc .mp-i { width: 12px; height: 12px; }
+
+/* ------------------------------------------------------ 桌面小部件条 */
+.mp-widget-strip {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.mp-mini-widget {
+  min-width: 0;
+  padding: 10px 12px 11px;
+  border: 0;
+  border-radius: 20px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  background: linear-gradient(160deg, rgba(255, 255, 255, .8), rgba(255, 255, 255, .56));
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  box-shadow: 0 10px 24px rgba(120, 108, 180, .12), inset 0 0 0 1px rgba(255, 255, 255, .74);
+  transition: transform .2s cubic-bezier(.22, .68, .38, 1);
+}
+
+.mp-mini-widget:active { transform: scale(.97); }
+
+.mp-mini-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale));
+  letter-spacing: .01em;
+}
+
+.mp-mini-head .mp-i { width: 13px; height: 13px; }
+
+.mp-mini-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+  min-width: 0;
+}
+
+.mp-mini-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  background-size: cover;
+  background-position: center;
+  color: #fff;
+  font-size: calc(10px * var(--font-scale));
+  font-weight: 600;
+}
+
+.mp-mini-copy { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+
+.mp-mini-name {
+  color: var(--text);
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-mini-msg,
+.mp-mini-empty {
+  color: var(--text-3);
+  font-size: calc(11px * var(--font-scale));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-mini-empty { display: block; margin-top: 9px; }
+
+.mp-mini-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 6px;
+  color: var(--text-2);
+  font-size: calc(11.5px * var(--font-scale));
+  line-height: calc(1.45 * var(--line-scale));
+}
+
 /* ------------------------------------------------------ 桌面图标网格 */
 .mp-apps {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-content: flex-start;
-  row-gap: 22px;
-  padding: 24px 0 0;
+  row-gap: 8px;
+  padding: 14px 0 0;
   overflow-y: auto;
   scrollbar-width: none;
 }
 
-.mp-apps > .mp-app { flex: 0 0 25%; }
+.mp-apps > .mp-app { flex: 0 0 50%; }
 
 .mp-apps::-webkit-scrollbar { display: none; }
 
@@ -1410,6 +1647,30 @@ body {
   box-shadow: 0 18px 42px rgba(0, 0, 0, .42), inset 0 0 0 1px rgba(255, 255, 255, .10);
 }
 
+.mp-root[data-mp-theme="night"] .mp-profile {
+  background: linear-gradient(168deg, rgba(44, 38, 68, .9), rgba(30, 26, 48, .78));
+  box-shadow: 0 18px 42px rgba(0, 0, 0, .42), inset 0 0 0 1px rgba(255, 255, 255, .10);
+}
+
+.mp-root[data-mp-theme="night"] .mp-profile-banner {
+  background:
+    radial-gradient(110% 150% at 8% 0%, rgba(129, 86, 136, .9), transparent 58%),
+    radial-gradient(110% 140% at 100% 10%, rgba(73, 102, 145, .88), transparent 62%),
+    linear-gradient(135deg, #3a2946, #2c2a53 52%, #1f3a3d);
+}
+
+.mp-root[data-mp-theme="night"] .mp-profile-stamp,
+.mp-root[data-mp-theme="night"] .mp-profile-loc {
+  background: rgba(255, 255, 255, .08);
+  color: rgba(236, 233, 247, .62);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .10);
+}
+
+.mp-root[data-mp-theme="night"] .mp-mini-widget {
+  background: linear-gradient(160deg, rgba(44, 38, 66, .74), rgba(30, 26, 48, .58));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .34), inset 0 0 0 1px rgba(255, 255, 255, .10);
+}
+
 .mp-root[data-mp-theme="night"] .mp-di-card { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .08); }
 .mp-root[data-mp-theme="night"] .mp-dock { background: linear-gradient(180deg, rgba(44, 38, 66, .7), rgba(26, 22, 42, .62)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .10), 0 16px 34px rgba(0, 0, 0, .4); }
 .mp-root[data-mp-theme="night"] .mp-row,
@@ -1564,21 +1825,21 @@ body {
 }
 
 .mp-app .mp-tile {
-  width: 64px;
-  height: 64px;
-  border-radius: 19px;
+  width: 58px;
+  height: 58px;
+  border-radius: 17px;
 }
 
-.mp-app .mp-tile .mp-i { width: 27px; height: 27px; }
+.mp-app .mp-tile .mp-i { width: 25px; height: 25px; }
 
 .mp-app .mp-app-label {
-  font-size: calc(11.5px * var(--font-scale));
-  margin-top: 7px;
+  font-size: calc(11px * var(--font-scale));
+  margin-top: 4px;
 }
 
 .mp-apps {
-  gap: 24px 0;
-  padding-top: 26px;
+  gap: 7px 0;
+  padding-top: 12px;
 }
 
 .mp-di-text { -webkit-line-clamp: 3; }
@@ -6112,6 +6373,14 @@ function createShell(options) {
     const diary = latestDiary(state);
     const recentContact = recent ? contactById(state, recent.contactId) : null;
     const recentMsg = recent ? lastMessage(recent) : null;
+    const me = Array.isArray(state.users)
+      ? state.users.find(item => item && item.key && item.key === state.settings.user.key) || null
+      : null;
+    const myName = state.settings.user.name || me?.name || '我';
+    const myAvatar = state.settings.user.avatar || me?.avatarUrl || '';
+    const myBio = String(me?.description || '把每天的事，记在这台小手机里。').trim();
+    const myHandle = `@${String(myName).trim().replace(/\s+/g, '_') || 'me'}`;
+    const stampText = dateText().replace('<br>', ' · ');
 
     const iconButtons = desktopApps.map(app => `
       <button class="mp-app" data-act="open-app" data-app="${app.id}" type="button" aria-label="${esc(app.name)}">
@@ -6130,23 +6399,35 @@ function createShell(options) {
 
     return `
       <div class="mp-desktop">
-        <div class="mp-widget" data-act="open-app" data-app="diary">
-          <div class="mp-widget-top">
-            <div class="mp-clock">${clockText()}</div>
-            <div class="mp-date">${dateText()}</div>
-          </div>
-          <div class="mp-di-card">
-            <div class="mp-di-label">${ico('diary')} 昨日日记${diary ? ` · ${esc(diaryDateLabel(diary))}` : ''}</div>
-            <div class="mp-di-text">${diary ? esc(diary.text).replace(/\n/g, '<br>') : '这一格还空着。写一句今天的事，它就会留在这里。'}</div>
-          </div>
-          ${recentContact ? `
-          <div class="mp-recent">
-            ${avatarHtml(recentContact.name, recentContact.avatar, 'mp-avatar')}
-            <div class="mp-recent-body">
-              <div class="mp-recent-name">${esc(recentContact.name)}${recent.unread ? ` · ${recent.unread} 条未读` : ''}</div>
-              <div class="mp-recent-msg">${esc(recentMsg?.text || '')}</div>
-            </div>
-          </div>` : ''}
+        <button class="mp-profile" data-act="open-app" data-app="user" type="button" aria-label="我的资料">
+          <span class="mp-profile-banner">
+            <span class="mp-profile-stamp">${stampText}</span>
+          </span>
+          ${avatarHtml(myName, myAvatar, 'mp-profile-avatar')}
+          <span class="mp-profile-name">${esc(myName)}</span>
+          <span class="mp-profile-handle">${esc(myHandle)}</span>
+          <span class="mp-profile-bio">${esc(myBio)}</span>
+          <span class="mp-profile-loc">${ico('home')}<span>在酒馆里</span></span>
+        </button>
+
+        <div class="mp-widget-strip">
+          <button class="mp-mini-widget" data-act="open-app" data-app="chat" type="button">
+            <span class="mp-mini-head">${ico('chat')} 最近</span>
+            ${recentContact ? `
+            <span class="mp-mini-main">
+              ${avatarHtml(recentContact.name, recentContact.avatar, 'mp-mini-avatar')}
+              <span class="mp-mini-copy">
+                <span class="mp-mini-name">${esc(recentContact.name)}</span>
+                <span class="mp-mini-msg">${esc(recentMsg?.text || '')}</span>
+              </span>
+            </span>` : `
+            <span class="mp-mini-empty">等一条新消息</span>`}
+          </button>
+
+          <button class="mp-mini-widget" data-act="open-app" data-app="diary" type="button">
+            <span class="mp-mini-head">${ico('diary')} ${diary ? esc(diaryDateLabel(diary)) : '昨日日记'}</span>
+            <span class="mp-mini-text">${diary ? esc(diary.text) : '这一格还空着。写一句今天的事，它就会留在这里。'}</span>
+          </button>
         </div>
 
         <div class="mp-apps">${iconButtons}</div>

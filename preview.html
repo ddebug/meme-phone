@@ -12913,20 +12913,41 @@ async function fetchModels(ctx, preset) {
   throw new Error(last || hostReason || '拉不到模型列表，可以手动填模型名');
 }
 
+function apiDetailNode(ctx, preset) {
+  const root = ctx?.shell?.root;
+  if (!root || !preset) return null;
+  return [...root.querySelectorAll('.mp-api-detail')].find(node => node.dataset.id === String(preset.id)) || null;
+}
+
+/* 拉模型只更新这一块，不重画整页，避免看起来像页面被刷新 */
+function paintDetailStatus(ctx, preset, { models = false } = {}) {
+  const detail = apiDetailNode(ctx, preset);
+  if (!detail) return;
+  const status = detail.querySelector('.mp-api-status-inline');
+  if (status) {
+    status.textContent = preset.status?.text || '';
+    status.classList.toggle('is-ok', Boolean(preset.status?.ok));
+  }
+  if (models) {
+    const slot = detail.querySelector('[data-api-model-slot]');
+    if (slot) slot.innerHTML = modelPickerHtml(preset, draftFor(preset));
+  }
+}
+
 async function refreshModels(ctx, preset, values = preset) {
   preset.status = { ok: false, text: '正在连接…', at: Date.now() };
-  redraw(ctx);
+  paintDetailStatus(ctx, preset);
   try {
     const { url, list } = await fetchModels(ctx, values);
     preset.models = [...new Set(list)].sort();
     preset.status = { ok: true, text: `连接正常 · ${preset.models.length} 个模型 · ${url}`, at: Date.now() };
     ctx.save();
-    redraw(ctx);
+    paintDetailStatus(ctx, preset, { models: true });
     return preset.models;
   } catch (error) {
     preset.status = { ok: false, text: error.message || String(error), at: Date.now() };
     ctx.save();
-    redraw(ctx);
+    paintDetailStatus(ctx, preset);
     say(ctx, preset.status.text);
     return null;
   }
@@ -12998,11 +13019,23 @@ async function importTavernPreset(ctx, store) {
 
 /* 把展开面板里手填的值读回草稿；点任何操作前先读，避免一刷新就把刚改的字弄丢 */
 
+function modelPickerHtml(preset, draft) {
+  const models = Array.isArray(preset.models) ? preset.models : [];
+  const modelOptions = models.map(name => `
+    <option value="${esc(name)}"${name === draft.model ? ' selected' : ''}>${esc(name)}</option>`).join('');
+  return models.length ? `
+    <div class="mp-api-model">
+      <div class="mp-select-wrap mp-api-mini-select"><select data-act="api-model-select" data-id="${preset.id}" aria-label="从拉取到的模型里选">
+        ${modelOptions}
+      </select>${icon('chevron')}</div>
+      <input class="mp-api-input" data-api-field="model" type="text" value="${esc(draft.model || '')}" placeholder="也可以手填模型名" spellcheck="false">
+    </div>` : `<input class="mp-api-input" data-api-field="model" type="text" value="${esc(draft.model || '')}" placeholder="gpt-4o-mini" spellcheck="false">`;
+}
+
 function presetDetail(ctx, store, preset) {
   const draft = draftFor(preset);
   const tavern = draft.engine === 'tavern';
   const status = preset.status || null;
-  const models = Array.isArray(preset.models) ? preset.models : [];
   const hasUrl = Boolean(apiRoot(draft));
   const showKey = revealed.has(preset.id);
   const inTavern = Boolean(preset.tavernSource) && !tavern && !draft.key;
@@ -13013,15 +13046,7 @@ function presetDetail(ctx, store, preset) {
       : `<div class="mp-api-field-hint">${draft.key ? 'Key 已填，默认掩码显示' : '还没填 Key'}</div>`;
   const engineOptions = ENGINES.filter(item => item.value !== 'tavern').map(item => `
     <option value="${item.value}"${item.value === draft.engine ? ' selected' : ''}>${esc(item.label)}</option>`).join('');
-  const modelOptions = models.map(name => `
-    <option value="${esc(name)}"${name === draft.model ? ' selected' : ''}>${esc(name)}</option>`).join('');
-  const modelPicker = models.length ? `
-    <div class="mp-api-model">
-      <div class="mp-select-wrap mp-api-mini-select"><select data-act="api-model-select" data-id="${preset.id}" aria-label="从拉取到的模型里选">
-        ${modelOptions}
-      </select>${icon('chevron')}</div>
-      <input class="mp-api-input" data-api-field="model" type="text" value="${esc(draft.model || '')}" placeholder="也可以手填模型名" spellcheck="false">
-    </div>` : `<input class="mp-api-input" data-api-field="model" type="text" value="${esc(draft.model || '')}" placeholder="gpt-4o-mini" spellcheck="false">`;
+  const modelPicker = `<div class="mp-api-model-slot" data-api-model-slot>${modelPickerHtml(preset, draft)}</div>`;
 
   return `
     <div class="mp-api-detail" data-id="${preset.id}">
@@ -13207,9 +13232,6 @@ const apiListApp = {
     const scheme = activeChatScheme(ctx.state);
     const currentReply = replyPresetFor(ctx.state, null);
     const schemeDirty = Boolean(scheme && (scheme.apiId !== store.activeChat || scheme.replyId !== currentReply?.id));
-    const savedSummary = scheme
-      ? `${presetName(store, scheme.apiId)} · ${replyNameFor(ctx.state, scheme.replyId)}`
-      : '';
     const schemeReplyName = scheme ? replyNameFor(ctx.state, scheme.replyId) : '没选';
     const schemeOptions = schemes.length
       ? schemes.map(item => ({ value: item.id, label: item.name || '未命名' }))
@@ -13275,11 +13297,7 @@ const apiListApp = {
             </label>
           </div>
 
-          <div class="mp-api-hint ${schemeDirty ? 'is-dirty' : 'is-clear'}">
-            ${schemeDirty
-              ? `当前选择还没保存。这套方案里存的是「${esc(savedSummary)}」。`
-              : (scheme ? '当前选择和这套方案一致。' : '先选一套方案，再保存当前选择。')}
-          </div>
+          ${schemeDirty ? '<div class="mp-api-hint is-dirty">当前改动还没保存。</div>' : ''}
 
           <div class="mp-api-save-row">
             <button class="mp-api-btn is-primary mp-api-save" data-act="api-scheme-save" type="button">保存</button>
@@ -13324,7 +13342,6 @@ const apiListApp = {
           <div class="mp-api-reply-main">
             <span class="mp-api-reply-label">当前方案使用</span>
             <span class="mp-api-reply-name">${esc(schemeReplyName)}</span>
-            ${schemeDirty && currentReply ? `<span class="mp-api-reply-hint">当前临时选的是「${esc(currentReply.name || '未命名')}」，保存后生效</span>` : ''}
           </div>
           <button class="mp-api-reply-link" data-act="api-open-presets" type="button">管理回复预设${icon('chevron')}</button>
         </div>
@@ -13398,7 +13415,7 @@ const apiListApp = {
       apiDelete = null;
       ctx.save();
       redraw(ctx);
-      say(ctx, `当前聊天 API 换成「${target.name || '未命名'}」；保存后写进方案`);
+      say(ctx, `聊天 API 已换成「${target.name || '未命名'}」`);
       return true;
     }
 
@@ -13409,7 +13426,7 @@ const apiListApp = {
       apiDelete = null;
       ctx.save();
       redraw(ctx);
-      say(ctx, `当前回复预设换成「${target.name || '未命名'}」；保存后写进方案`);
+      say(ctx, `回复预设已换成「${target.name || '未命名'}」`);
       return true;
     }
 

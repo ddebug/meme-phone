@@ -12910,7 +12910,7 @@ const apiListApp = {
             <div><span>方案保存</span><strong>${esc(savedSummary)}</strong></div>
           </div>
           ${schemeDirty
-            ? `<div class="mp-api-dirty">当前选择还没保存：改 API 或回复预设会先影响新聊天，点「保存当前选择到方案」才写进这套方案。</div>`
+            ? `<div class="mp-api-dirty">当前选择和方案保存不一致：上面是手机真实在用的组合；点「保存当前选择到方案」才写进这套方案。</div>`
             : '<div class="mp-api-dirty is-clear">当前选择和方案保存一致。</div>'}
           <div class="mp-ios-two">
             <label class="mp-ios-field">

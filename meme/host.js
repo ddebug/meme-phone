@@ -454,8 +454,8 @@ async function presetCompletion(preset, { prompt, system, messages }) {
 
 /**
  * NovelAI 出图。
- * 请求体按 NovelAI 官方 v4 格式：n_samples 固定 1，seed 由调用方给。
- * 返回 { url } 时是 data URI（图小，直接塞进内存够用）；失败抛错，由界面提示。
+ * 请求包裹结构与官方前端 / 参考扩展一致：{ input, model, action, parameters }；
+ * 返回是 msgpack zip，需要解出第一张图，不能按普通 JSON images 接口解析。
  */
 export async function novelaiImage({
   engine = 'novelai',
@@ -478,19 +478,11 @@ export async function novelaiImage({
 
   if (!token) throw new Error('先填 NovelAI 的 Key');
 
-  const payload = {
-    width, height, n_samples: 1, steps, scale,
-    sampler, noise_schedule: noise, cfg_rescale: 0,
-    seed: Number(seed) || Math.floor(Math.random() * 4294967295),
-    qualityToggle: true, sm: false, sm_dyn: false,
-    negative_prompt: negative || '',
-    v4_prompt: { caption: { base_caption: prompt, char_captions: [] }, use_coords: false, use_order: false },
-  };
-  if (model) payload.model = model;
+  const payload = buildNaiPayload({ model, width, height, steps, scale, sampler, noise, seed, prompt, negative });
 
   let res;
   try {
-    res = await fetch(`${base}/ai/generate-image`, {
+    res = await fetch(naiEndpoint(base, 'generate-image'), {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -498,9 +490,203 @@ export async function novelaiImage({
   } catch (error) {
     throw new Error(`连不上 ${base}：${error.message}`);
   }
-  if (!res.ok) throw new Error(`NovelAI 返回 ${res.status}（Key 或额度不对）`);
+  if (!res.ok) throw await naiHttpError(res);
 
-  return imageFromResponse(res, 'NovelAI');
+  const { base64, filename } = await unzipNaiImage(await res.arrayBuffer());
+  const format = (filename.split('.').pop() || 'png').toLowerCase();
+  return { url: `data:image/${format === 'jpg' ? 'jpeg' : format};base64,${base64}` };
+}
+
+function naiEndpoint(base, path = 'generate-image') {
+  const clean = String(base || '').trim().replace(/\/+$/, '');
+  if (!clean) throw new Error('先填 NovelAI 接口地址');
+  const seg = String(path || '').replace(/^\/+/, '');
+  if (clean.endsWith(`/ai/${seg}`) || clean.endsWith(`/${seg}`)) return clean;
+  return `${clean}/ai/${seg}`;
+}
+
+function isNai3Model(model) {
+  return String(model || '').includes('diffusion-3');
+}
+
+function buildNaiPayload({ model, width, height, steps, scale, sampler, noise, seed, prompt, negative }) {
+  const n3 = isNai3Model(model);
+  const paramsVersion = /nai-diffusion-5/.test(String(model || '')) ? 4 : 3;
+  const params = {
+    params_version: paramsVersion,
+    width,
+    height,
+    scale,
+    sampler,
+    steps,
+    n_samples: 1,
+    ucPreset: 3,
+    qualityToggle: true,
+    dynamic_thresholding: false,
+    controlnet_strength: 1,
+    legacy: false,
+    legacy_uc: false,
+    add_original_image: true,
+    cfg_rescale: 0,
+    noise_schedule: noise,
+    skip_cfg_above_sigma: null,
+    legacy_v3_extend: false,
+    stream: 'msgpack',
+    seed: Number(seed) > 0 ? Number(seed) : Math.floor(Math.random() * 2 ** 32),
+    negative_prompt: negative || '',
+    reference_strength_multiple: [],
+    normalize_reference_strength_multiple: true,
+    use_coords: false,
+  };
+
+  if (n3) {
+    params.sm = false;
+    params.sm_dyn = false;
+    params.reference_image_multiple = [];
+    params.reference_information_extracted_multiple = [];
+  } else {
+    params.reference_image_multiple_cached = [];
+    params.characterPrompts = [];
+    params.v4_prompt = {
+      caption: { base_caption: prompt, char_captions: [] },
+      use_coords: false,
+      use_order: true,
+    };
+    params.v4_negative_prompt = {
+      caption: {
+        base_caption: negative || '',
+        char_captions: [],
+      },
+      legacy_uc: false,
+    };
+  }
+
+  if (sampler === 'k_euler_ancestral') {
+    params.deliberate_euler_ancestral_bug = false;
+    params.prefer_brownian = true;
+  }
+
+  const body = {
+    input: prompt,
+    action: 'generate',
+    parameters: params,
+    use_new_shared_trial: true,
+  };
+  if (model) body.model = model;
+  return body;
+}
+
+async function naiHttpError(resp) {
+  const text = (await resp.text().catch(() => '')).trim();
+  let detail = text;
+  try {
+    const json = JSON.parse(text);
+    if (typeof json?.message === 'string') detail = json.message;
+  } catch {
+    /* 非 JSON 错误体直接用原文 */
+  }
+  switch (resp.status) {
+    case 400:
+      return new Error(`NovelAI 请求校验失败：${detail.slice(0, 300) || '参数不对'}`);
+    case 401:
+      return new Error('NovelAI API Key 错误或无效');
+    case 402:
+      return new Error('NovelAI 需要有效订阅');
+    case 429:
+      return new Error('NovelAI 请求过于频繁，稍后再试');
+    default:
+      return new Error(`NovelAI 返回 ${resp.status}${detail ? `：${detail.slice(0, 300)}` : ''}`);
+  }
+}
+
+function bytesToBase64(bytes) {
+  let bin = '';
+  const CHUNK = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(offset, offset + CHUNK));
+  }
+  return btoa(bin);
+}
+
+async function inflateRaw(bytes) {
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error('当前环境不支持解压 NovelAI 返回的 zip 包');
+  }
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function readZipEntries(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const entries = {};
+  let centralOffset = -1;
+  let centralCount = 0;
+
+  for (let i = Math.max(0, bytes.length - 22); i >= 0; i -= 1) {
+    if (bytes[i] === 0x50 && bytes[i + 1] === 0x4b && bytes[i + 2] === 0x05 && bytes[i + 3] === 0x06) {
+      const eocd = new DataView(bytes.buffer, bytes.byteOffset + i);
+      centralCount = eocd.getUint16(10, true);
+      centralOffset = eocd.getUint32(16, true);
+      break;
+    }
+  }
+
+  if (centralOffset >= 0) {
+    let cursor = centralOffset;
+    for (let index = 0; index < centralCount; index += 1) {
+      if (bytes[cursor] !== 0x50 || bytes[cursor + 1] !== 0x4b || bytes[cursor + 2] !== 0x02 || bytes[cursor + 3] !== 0x03) break;
+      const central = new DataView(bytes.buffer, bytes.byteOffset + cursor);
+      const method = central.getUint16(10, true);
+      const compressedSize = central.getUint32(20, true);
+      const nameLength = central.getUint16(28, true);
+      const extraLength = central.getUint16(30, true);
+      const commentLength = central.getUint16(32, true);
+      const localOffset = central.getUint32(42, true);
+      const name = new TextDecoder().decode(bytes.subarray(cursor + 46, cursor + 46 + nameLength));
+
+      const local = new DataView(bytes.buffer, bytes.byteOffset + localOffset);
+      const localNameLength = local.getUint16(26, true);
+      const localExtraLength = local.getUint16(28, true);
+      const localCompressedSize = local.getUint32(18, true);
+      const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+      const size = compressedSize || localCompressedSize;
+      const raw = bytes.subarray(dataStart, dataStart + size);
+      entries[name] = method === 8 ? await inflateRaw(raw) : raw;
+      cursor += 46 + nameLength + extraLength + commentLength;
+    }
+  }
+
+  if (!Object.keys(entries).length) {
+    let offset = 0;
+    while (offset + 30 <= bytes.length) {
+      if (bytes[offset] !== 0x50 || bytes[offset + 1] !== 0x4b || bytes[offset + 2] !== 0x03 || bytes[offset + 3] !== 0x04) break;
+      const local = new DataView(bytes.buffer, bytes.byteOffset + offset);
+      const method = local.getUint16(8, true);
+      const compressedSize = local.getUint32(18, true);
+      const nameLength = local.getUint16(26, true);
+      const extraLength = local.getUint16(28, true);
+      const name = new TextDecoder().decode(bytes.subarray(offset + 30, offset + 30 + nameLength));
+      const dataStart = offset + 30 + nameLength + extraLength;
+      const raw = bytes.subarray(dataStart, dataStart + compressedSize);
+      entries[name] = method === 8 ? await inflateRaw(raw) : raw;
+      offset = dataStart + compressedSize;
+    }
+  }
+
+  return entries;
+}
+
+export async function unzipNaiImage(buffer) {
+  let entries;
+  try {
+    entries = await readZipEntries(buffer);
+  } catch (error) {
+    throw new Error(`NovelAI 返回不是有效的 zip 包：${error.message}`);
+  }
+  const names = Object.keys(entries);
+  const name = names.find(item => /\.(png|jpe?g|webp)$/i.test(item)) || names[0];
+  if (!name) throw new Error('NovelAI 返回的 zip 包里没有图片');
+  return { base64: bytesToBase64(entries[name]), filename: name };
 }
 
 /** 豆包 Seedream（火山方舟）：images/generations，字段比 OpenAI 多一个 watermark / 组图开关。 */

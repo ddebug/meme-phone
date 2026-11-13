@@ -2565,6 +2565,8 @@ body {
   gap: 9px;
 }
 .mp-root .mp-mem-edit {
+  display: grid;
+  gap: 9px;
   margin: 4px 0 10px;
   padding: 12px;
 }
@@ -2847,22 +2849,6 @@ body {
 }
 .mp-root .mp-api-test .mp-i { width: 14px; height: 14px; }
 
-.mp-root .mp-api-add {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  width: 100%;
-  margin-top: 9px;
-  padding: 11px 10px;
-  border: 0;
-  border-radius: 14px;
-  background: rgba(142, 123, 242, .09);
-  color: var(--accent-deep);
-  font: inherit;
-  font-size: calc(12.5px * var(--font-scale));
-}
-.mp-root .mp-api-add .mp-i { width: 14px; height: 14px; }
 .mp-root .mp-api-import {
   display: block;
   width: 100%;
@@ -2894,11 +2880,6 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.mp-root .mp-api-reply-hint {
-  font-size: calc(10.5px * var(--font-scale));
-  line-height: calc(1.45 * var(--line-scale));
-  color: #8a6224;
-}
 .mp-root .mp-api-reply-link {
   display: flex;
   align-items: center;
@@ -2917,17 +2898,15 @@ body {
 .mp-root .mp-api-reply-link .mp-i { width: 14px; height: 14px; transform: rotate(-90deg); }
 
 /* 聊天模型页：夜间把浅底语义色换成亮色，避免深底上看不清 */
-.mp-root[data-mp-theme="night"] :is(.mp-api-btn.is-primary, .mp-api-add, .mp-api-count, .mp-api-chip, .mp-api-reply-link) { color: #c3b6ff; }
+.mp-root[data-mp-theme="night"] :is(.mp-api-btn.is-primary, .mp-api-count, .mp-api-chip, .mp-api-reply-link) { color: #c3b6ff; }
 .mp-root[data-mp-theme="night"] .mp-api-chip.is-draft { color: #f0c07a; }
 .mp-root[data-mp-theme="night"] .mp-api-pill.is-saved,
 .mp-root[data-mp-theme="night"] .mp-api-hint.is-clear { color: #8fe4b8; }
 .mp-root[data-mp-theme="night"] .mp-api-pill.is-dirty,
-.mp-root[data-mp-theme="night"] .mp-api-hint.is-dirty,
-.mp-root[data-mp-theme="night"] .mp-api-reply-hint { color: #f0c07a; }
+.mp-root[data-mp-theme="night"] .mp-api-hint.is-dirty { color: #f0c07a; }
 .mp-root[data-mp-theme="night"] .mp-api-btn.is-danger,
 .mp-root[data-mp-theme="night"] .mp-api-more-btn.is-danger { color: #f0a3a3; }
 .mp-root[data-mp-theme="night"] .mp-api-dot.is-bad { background: #e07878; }
-.mp-root[data-mp-theme="night"] .mp-api-add { background: rgba(167, 149, 255, .16); }
 
 /* 预设页的内联新建 / 改名 / 删除确认 */
 .mp-root .mp-api-inline {
@@ -3009,7 +2988,7 @@ body {
 }
 .mp-root .mp-api-note.is-warn { color: #d94b4b; }
 
-/* 酒馆记忆页：已读记忆只读展示 */
+/* 酒馆记忆页：顶部只报现在读到了什么（方式 + 段/层/字） */
 .mp-root .mp-mem-card { padding: 12px 14px; }
 .mp-root .mp-mem-text {
   white-space: pre-wrap;
@@ -3026,6 +3005,77 @@ body {
   font-size: calc(10.5px * var(--font-scale));
   line-height: calc(1.5 * var(--line-scale));
 }
+
+.mp-root .mp-mem-now { display: grid; gap: 8px; min-width: 0; }
+.mp-root .mp-mem-now-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.mp-root .mp-mem-chip {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border-radius: 9px;
+  background: rgba(142, 123, 242, .13);
+  color: var(--accent-deep);
+  font-size: calc(10.5px * var(--font-scale));
+  font-weight: 600;
+  line-height: calc(1.6 * var(--line-scale));
+}
+.mp-root .mp-mem-chip.is-recent { background: rgba(112, 158, 214, .16); color: #4d78a8; }
+.mp-root .mp-mem-chip.is-empty { background: rgba(120, 120, 130, .12); color: var(--text-3); }
+.mp-root .mp-mem-now-plan {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale));
+}
+.mp-root .mp-mem-nums { display: flex; align-items: baseline; gap: 16px; }
+.mp-root .mp-mem-num { display: inline-flex; align-items: baseline; gap: 3px; }
+.mp-root .mp-mem-num b {
+  font-size: calc(19px * var(--font-scale));
+  font-weight: 600;
+  letter-spacing: -.02em;
+  color: var(--text);
+}
+.mp-root .mp-mem-num i {
+  font-style: normal;
+  color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale));
+}
+.mp-root .mp-mem-now-empty {
+  color: var(--text-3);
+  font-size: calc(11.5px * var(--font-scale));
+  line-height: calc(1.55 * var(--line-scale));
+}
+.mp-root .mp-mem-now-foot {
+  color: var(--text-4);
+  font-size: calc(10px * var(--font-scale));
+  line-height: calc(1.45 * var(--line-scale));
+}
+.mp-root .mp-mem-panel-note {
+  color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale));
+  line-height: calc(1.5 * var(--line-scale));
+}
+.mp-root .mp-mem-first {
+  margin-top: 6px;
+  padding: 8px 2px;
+  background: none;
+  box-shadow: none;
+}
+.mp-root .mp-mem-first .mp-set-name small { margin-top: 2px; }
+.mp-root[data-mp-theme="night"] .mp-mem-chip { background: rgba(167, 149, 255, .16); color: #c3b6ff; }
+.mp-root[data-mp-theme="night"] .mp-mem-chip.is-recent { background: rgba(120, 170, 230, .16); color: #9fc4ea; }
+.mp-root[data-mp-theme="night"] .mp-mem-chip.is-empty { background: rgba(255, 255, 255, .08); color: var(--text-3); }
+
+/* 置灰的开关行：能看见，但点不动 */
+.mp-root .mp-set-row.is-off { cursor: default; opacity: .62; }
+.mp-root .mp-set-row.is-off .mp-switch { background: #e9e9ea; }
+.mp-root[data-mp-theme="night"] .mp-set-row.is-off .mp-switch { background: #3a3a40; }
 
 .mp-root .mp-reply-preview {
   display: -webkit-box;
@@ -6196,6 +6246,9 @@ function emptyState() {
           { id: 'mem_summary', name: '只看总结', mode: 'summary', floors: 10, skipFirstFloor: false },
           { id: 'mem_recent', name: '最近原文', mode: 'recent', floors: 20, skipFirstFloor: false },
         ],
+        /* 手机默认读总结还是原文；按角色单独设过的，写在 byContact 里 */
+        readMode: 'summary',
+        byContact: {},
       },
       /* 回复预设：真正告诉模型「这通聊天该怎么说话」的一段指令 */
       reply: {
@@ -6375,6 +6428,23 @@ function memoryPresetFor(state, chat) {
   const own = list.find(preset => preset.id === chat?.memoryPresetId);
   if (own) return own;
   return list.find(preset => preset.id === state?.settings?.memory?.activeId) || list[0] || null;
+}
+
+/** 手机全局默认：读总结（有总结就用，没有退原文）还是只读原文。 */
+function memoryGlobalReadMode(state) {
+  return state?.settings?.memory?.readMode === 'recent' ? 'recent' : 'summary';
+}
+
+/**
+ * 这位角色读总结还是原文。三层兜底：角色单独设过 > 方案里固定的来源 > 手机默认。
+ * 返回 'auto'（有总结读总结，没有退原文）/ 'summary'（只用总结）/ 'recent'（只读原文）。
+ */
+function memoryReadModeFor(state, contactId, preset) {
+  const store = state?.settings?.memory || {};
+  const own = contactId ? store.byContact?.[contactId] : '';
+  if (own === 'auto' || own === 'recent') return own;
+  if (preset?.mode === 'summary' || preset?.mode === 'recent') return preset.mode;
+  return memoryGlobalReadMode(state) === 'recent' ? 'recent' : 'auto';
 }
 
 /** 手机里保存的回复预设：每套由主回复指令、提示词条目和上下文配置组成。 */
@@ -6873,6 +6943,18 @@ function normalize(raw) {
     ...base.settings.memory,
     ...(memoryRaw && typeof memoryRaw === 'object' ? memoryRaw : {}),
     presets: memoryPresets.length ? memoryPresets : base.settings.memory.presets,
+    readMode: memoryRaw?.readMode === 'recent' ? 'recent' : 'summary',
+    byContact: (() => {
+      const raw2 = memoryRaw?.byContact;
+      const clean = {};
+      if (!raw2 || typeof raw2 !== 'object' || Array.isArray(raw2)) return clean;
+      for (const [contactId, mode] of Object.entries(raw2)) {
+        if (!contactId) continue;
+        if (mode !== 'auto' && mode !== 'recent') continue;
+        clean[String(contactId).slice(0, 60)] = mode;
+      }
+      return clean;
+    })(),
   };
   if (!merged.settings.memory.presets.some(item => item.id === merged.settings.memory.activeId)) {
     merged.settings.memory.activeId = merged.settings.memory.presets[0].id;
@@ -7055,6 +7137,8 @@ exports["apiPresetsOf"] = apiPresetsOf;
 exports["llmPresetFor"] = llmPresetFor;
 exports["memoryPresetsOf"] = memoryPresetsOf;
 exports["memoryPresetFor"] = memoryPresetFor;
+exports["memoryGlobalReadMode"] = memoryGlobalReadMode;
+exports["memoryReadModeFor"] = memoryReadModeFor;
 exports["replyPresetsOf"] = replyPresetsOf;
 exports["replyPresetFor"] = replyPresetFor;
 exports["replyPromptFor"] = replyPromptFor;
@@ -7684,8 +7768,8 @@ async function presetCompletion(preset, { prompt, system, messages }) {
 
 /**
  * NovelAI 出图。
- * 请求体按 NovelAI 官方 v4 格式：n_samples 固定 1，seed 由调用方给。
- * 返回 { url } 时是 data URI（图小，直接塞进内存够用）；失败抛错，由界面提示。
+ * 请求包裹结构与官方前端 / 参考扩展一致：{ input, model, action, parameters }；
+ * 返回是 msgpack zip，需要解出第一张图，不能按普通 JSON images 接口解析。
  */
 async function novelaiImage({
   engine = 'novelai',
@@ -7708,19 +7792,11 @@ async function novelaiImage({
 
   if (!token) throw new Error('先填 NovelAI 的 Key');
 
-  const payload = {
-    width, height, n_samples: 1, steps, scale,
-    sampler, noise_schedule: noise, cfg_rescale: 0,
-    seed: Number(seed) || Math.floor(Math.random() * 4294967295),
-    qualityToggle: true, sm: false, sm_dyn: false,
-    negative_prompt: negative || '',
-    v4_prompt: { caption: { base_caption: prompt, char_captions: [] }, use_coords: false, use_order: false },
-  };
-  if (model) payload.model = model;
+  const payload = buildNaiPayload({ model, width, height, steps, scale, sampler, noise, seed, prompt, negative });
 
   let res;
   try {
-    res = await fetch(`${base}/ai/generate-image`, {
+    res = await fetch(naiEndpoint(base, 'generate-image'), {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -7728,9 +7804,203 @@ async function novelaiImage({
   } catch (error) {
     throw new Error(`连不上 ${base}：${error.message}`);
   }
-  if (!res.ok) throw new Error(`NovelAI 返回 ${res.status}（Key 或额度不对）`);
+  if (!res.ok) throw await naiHttpError(res);
 
-  return imageFromResponse(res, 'NovelAI');
+  const { base64, filename } = await unzipNaiImage(await res.arrayBuffer());
+  const format = (filename.split('.').pop() || 'png').toLowerCase();
+  return { url: `data:image/${format === 'jpg' ? 'jpeg' : format};base64,${base64}` };
+}
+
+function naiEndpoint(base, path = 'generate-image') {
+  const clean = String(base || '').trim().replace(/\/+$/, '');
+  if (!clean) throw new Error('先填 NovelAI 接口地址');
+  const seg = String(path || '').replace(/^\/+/, '');
+  if (clean.endsWith(`/ai/${seg}`) || clean.endsWith(`/${seg}`)) return clean;
+  return `${clean}/ai/${seg}`;
+}
+
+function isNai3Model(model) {
+  return String(model || '').includes('diffusion-3');
+}
+
+function buildNaiPayload({ model, width, height, steps, scale, sampler, noise, seed, prompt, negative }) {
+  const n3 = isNai3Model(model);
+  const paramsVersion = /nai-diffusion-5/.test(String(model || '')) ? 4 : 3;
+  const params = {
+    params_version: paramsVersion,
+    width,
+    height,
+    scale,
+    sampler,
+    steps,
+    n_samples: 1,
+    ucPreset: 3,
+    qualityToggle: true,
+    dynamic_thresholding: false,
+    controlnet_strength: 1,
+    legacy: false,
+    legacy_uc: false,
+    add_original_image: true,
+    cfg_rescale: 0,
+    noise_schedule: noise,
+    skip_cfg_above_sigma: null,
+    legacy_v3_extend: false,
+    stream: 'msgpack',
+    seed: Number(seed) > 0 ? Number(seed) : Math.floor(Math.random() * 2 ** 32),
+    negative_prompt: negative || '',
+    reference_strength_multiple: [],
+    normalize_reference_strength_multiple: true,
+    use_coords: false,
+  };
+
+  if (n3) {
+    params.sm = false;
+    params.sm_dyn = false;
+    params.reference_image_multiple = [];
+    params.reference_information_extracted_multiple = [];
+  } else {
+    params.reference_image_multiple_cached = [];
+    params.characterPrompts = [];
+    params.v4_prompt = {
+      caption: { base_caption: prompt, char_captions: [] },
+      use_coords: false,
+      use_order: true,
+    };
+    params.v4_negative_prompt = {
+      caption: {
+        base_caption: negative || '',
+        char_captions: [],
+      },
+      legacy_uc: false,
+    };
+  }
+
+  if (sampler === 'k_euler_ancestral') {
+    params.deliberate_euler_ancestral_bug = false;
+    params.prefer_brownian = true;
+  }
+
+  const body = {
+    input: prompt,
+    action: 'generate',
+    parameters: params,
+    use_new_shared_trial: true,
+  };
+  if (model) body.model = model;
+  return body;
+}
+
+async function naiHttpError(resp) {
+  const text = (await resp.text().catch(() => '')).trim();
+  let detail = text;
+  try {
+    const json = JSON.parse(text);
+    if (typeof json?.message === 'string') detail = json.message;
+  } catch {
+    /* 非 JSON 错误体直接用原文 */
+  }
+  switch (resp.status) {
+    case 400:
+      return new Error(`NovelAI 请求校验失败：${detail.slice(0, 300) || '参数不对'}`);
+    case 401:
+      return new Error('NovelAI API Key 错误或无效');
+    case 402:
+      return new Error('NovelAI 需要有效订阅');
+    case 429:
+      return new Error('NovelAI 请求过于频繁，稍后再试');
+    default:
+      return new Error(`NovelAI 返回 ${resp.status}${detail ? `：${detail.slice(0, 300)}` : ''}`);
+  }
+}
+
+function bytesToBase64(bytes) {
+  let bin = '';
+  const CHUNK = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(offset, offset + CHUNK));
+  }
+  return btoa(bin);
+}
+
+async function inflateRaw(bytes) {
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error('当前环境不支持解压 NovelAI 返回的 zip 包');
+  }
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function readZipEntries(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const entries = {};
+  let centralOffset = -1;
+  let centralCount = 0;
+
+  for (let i = Math.max(0, bytes.length - 22); i >= 0; i -= 1) {
+    if (bytes[i] === 0x50 && bytes[i + 1] === 0x4b && bytes[i + 2] === 0x05 && bytes[i + 3] === 0x06) {
+      const eocd = new DataView(bytes.buffer, bytes.byteOffset + i);
+      centralCount = eocd.getUint16(10, true);
+      centralOffset = eocd.getUint32(16, true);
+      break;
+    }
+  }
+
+  if (centralOffset >= 0) {
+    let cursor = centralOffset;
+    for (let index = 0; index < centralCount; index += 1) {
+      if (bytes[cursor] !== 0x50 || bytes[cursor + 1] !== 0x4b || bytes[cursor + 2] !== 0x02 || bytes[cursor + 3] !== 0x03) break;
+      const central = new DataView(bytes.buffer, bytes.byteOffset + cursor);
+      const method = central.getUint16(10, true);
+      const compressedSize = central.getUint32(20, true);
+      const nameLength = central.getUint16(28, true);
+      const extraLength = central.getUint16(30, true);
+      const commentLength = central.getUint16(32, true);
+      const localOffset = central.getUint32(42, true);
+      const name = new TextDecoder().decode(bytes.subarray(cursor + 46, cursor + 46 + nameLength));
+
+      const local = new DataView(bytes.buffer, bytes.byteOffset + localOffset);
+      const localNameLength = local.getUint16(26, true);
+      const localExtraLength = local.getUint16(28, true);
+      const localCompressedSize = local.getUint32(18, true);
+      const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+      const size = compressedSize || localCompressedSize;
+      const raw = bytes.subarray(dataStart, dataStart + size);
+      entries[name] = method === 8 ? await inflateRaw(raw) : raw;
+      cursor += 46 + nameLength + extraLength + commentLength;
+    }
+  }
+
+  if (!Object.keys(entries).length) {
+    let offset = 0;
+    while (offset + 30 <= bytes.length) {
+      if (bytes[offset] !== 0x50 || bytes[offset + 1] !== 0x4b || bytes[offset + 2] !== 0x03 || bytes[offset + 3] !== 0x04) break;
+      const local = new DataView(bytes.buffer, bytes.byteOffset + offset);
+      const method = local.getUint16(8, true);
+      const compressedSize = local.getUint32(18, true);
+      const nameLength = local.getUint16(26, true);
+      const extraLength = local.getUint16(28, true);
+      const name = new TextDecoder().decode(bytes.subarray(offset + 30, offset + 30 + nameLength));
+      const dataStart = offset + 30 + nameLength + extraLength;
+      const raw = bytes.subarray(dataStart, dataStart + compressedSize);
+      entries[name] = method === 8 ? await inflateRaw(raw) : raw;
+      offset = dataStart + compressedSize;
+    }
+  }
+
+  return entries;
+}
+
+async function unzipNaiImage(buffer) {
+  let entries;
+  try {
+    entries = await readZipEntries(buffer);
+  } catch (error) {
+    throw new Error(`NovelAI 返回不是有效的 zip 包：${error.message}`);
+  }
+  const names = Object.keys(entries);
+  const name = names.find(item => /\.(png|jpe?g|webp)$/i.test(item)) || names[0];
+  if (!name) throw new Error('NovelAI 返回的 zip 包里没有图片');
+  return { base64: bytesToBase64(entries[name]), filename: name };
 }
 
 /** 豆包 Seedream（火山方舟）：images/generations，字段比 OpenAI 多一个 watermark / 组图开关。 */
@@ -8099,6 +8369,7 @@ exports["readUserAvatar"] = readUserAvatar;
 exports["tavernQuietPrompt"] = tavernQuietPrompt;
 exports["generate"] = generate;
 exports["novelaiImage"] = novelaiImage;
+exports["unzipNaiImage"] = unzipNaiImage;
 exports["readWorldBookNames"] = readWorldBookNames;
 exports["readTavernPersonas"] = readTavernPersonas;
 exports["writeTavernPersona"] = writeTavernPersona;
@@ -8572,6 +8843,9 @@ function createShell(options) {
     if (!root) return;
     const state = ctx.state;
     const status = state.settings.theme === 'night' ? 'night' : 'day';
+    /* 同一页重绘（切下拉、保存、开关）时把滚动位置带回原位，别让它看起来像整页刷新 */
+    const prevView = shell.stack[shell.stack.length - 1]?.view || '';
+    const prevScroll = root.querySelector('.mp-page-body')?.scrollTop || 0;
     root.className = 'mp-root';
     root.dataset.mpTheme = status;
     applyWall(root, state.settings);
@@ -8600,6 +8874,10 @@ function createShell(options) {
 
     restoreLive();
     shell.improveSendState();
+    if (prevScroll > 0 && (shell.stack[shell.stack.length - 1]?.view || '') === prevView) {
+      const box = root.querySelector('.mp-page-body');
+      if (box) box.scrollTop = prevScroll;
+    }
     if (shell.sheet) shell.sheetAnimated = true;
   }
 
@@ -8699,9 +8977,9 @@ function createShell(options) {
   };
 
   root.addEventListener('click', event => {
-    /* 原生 <select> 的选项变化只走下面的 change 事件；click 阶段没有选中值，
-       不能按按钮动作执行，否则打开下拉时会被默认值保存并整页重渲染。 */
-    if (event.target.closest('select[data-act]')) return;
+    /* 原生 <select> / <input> 的取值只走下面的 change 事件；click 阶段还没有选中值，
+       不能按按钮动作执行，否则打开下拉或聚焦输入框时会被默认值保存并整页重渲染。 */
+    if (event.target.closest('select[data-act], input[data-act], textarea[data-act]')) return;
     const target = event.target.closest('[data-act]');
     if (!target || !root.contains(target)) return;
     const act = target.dataset.act;
@@ -8716,10 +8994,11 @@ function createShell(options) {
     if (typeof ctx.onGlobalAct === 'function' && ctx.onGlobalAct(act, data, event)) return;
   });
 
-  /* 下拉框：原生 select 只负责取值，动作仍走统一 handle */
+  /* 下拉框 / 输入框：原生控件只负责取值，动作仍走统一 handle */
   root.addEventListener('change', event => {
-    const target = event.target.closest('select[data-act]');
+    const target = event.target.closest('[data-act]');
     if (!target || !root.contains(target)) return;
+    if (!['SELECT', 'INPUT', 'TEXTAREA'].includes(target.tagName)) return;
     const act = target.dataset.act;
     const data = Object.assign({}, target.dataset, { value: target.value });
     const entry = shell.stack[shell.stack.length - 1];
@@ -9254,7 +9533,7 @@ __mods["meme/memory.js"] = function(module, exports, __req){
  * 手机默认一套方案，某个会话可以单独换一套。
  */
 
-const { contactById, memoryPresetFor } = __req("meme/data.js");
+const { contactById, memoryPresetFor, memoryReadModeFor } = __req("meme/data.js");
 const { chatMemorySummary, summaryText } = __req("meme/book.js");
 const { readLatestTavernChat, readTavernContext } = __req("meme/host.js");
 
@@ -9273,7 +9552,7 @@ function memoryPresetSummary(preset) {
   if (!preset) return '还没设记忆方案';
   const floors = Math.max(1, Math.min(50, Number(preset.floors) || 10));
   const first = preset.skipFirstFloor ? ' · 首楼用原文' : '';
-  if (preset.mode === 'summary') return `${memoryModeLabel(preset.mode)} · 只读总结${first}`;
+  if (preset.mode === 'summary') return `${memoryModeLabel(preset.mode)}${first}`;
   if (preset.mode === 'recent') return `${memoryModeLabel(preset.mode)} · 最近 ${floors} 层${first}`;
   return `${memoryModeLabel(preset.mode)} · 有总结先用，否则 ${floors} 层${first}`;
 }
@@ -9315,31 +9594,57 @@ function chatKey(file) {
   return String(file || '').replace(/\.jsonl$/i, '').trim();
 }
 
+/** 总结有几段、几层、多少字；页面顶部只报数字，不铺正文。 */
+function summaryMetrics(data) {
+  const nodes = Array.isArray(data?.nodes) ? data.nodes : [];
+  const chars = nodes.reduce((sum, node) => sum + String(node.text || '').length, 0)
+    + String(data?.firstText || '').length;
+  const depth = nodes.reduce((max, node) => Math.max(max, Number(node.level) || 1), 0);
+  return { segments: nodes.length, depth, chars };
+}
+
+function emptyResult(preset, floors, extra = {}) {
+  return {
+    text: '',
+    source: 'empty',
+    preset,
+    floors,
+    summaryCount: 0,
+    demo: false,
+    mode: 'recent',
+    hasSummary: false,
+    metrics: { chars: 0, segments: 0, depth: 0, lines: 0, floors },
+    ...extra,
+  };
+}
+
 /**
  * 读这个会话的酒馆记忆。
  * limit 是总字数预算，层数是方案里的 floors。
+ * 实际读总结还是原文由 memoryReadModeFor 决定（角色开关 > 方案 > 手机默认）。
  */
 async function buildMemoryContext(state, chat, limit = 1200) {
   const preset = activeMemoryPreset(state, chat);
   const contact = contactById(state, chat?.contactId);
-  const mode = preset?.mode || 'auto';
+  const wanted = memoryReadModeFor(state, chat?.contactId, preset);
   const floors = Math.max(1, Math.min(50, Number(preset?.floors) || 10));
   const summaryLimit = Math.max(300, Math.floor(limit * 0.75));
 
   /* 先找到这个角色最新的一份酒馆聊天。柏宝书只按这份聊天文件读：
      文件里有 chat_metadata[baibai_book] / 消息 extra.bbs_leaf 就直接用；
-     没有才回退到当前打开聊天的只读接口。 */
+     没有才回退到当前打开聊天的只读接口。
+     不管这次读不读总结，都先把总结摸一遍——顶部要报「有没有总结、能不能切」。 */
   const latest = contact?.name
     ? await readLatestTavernChat({
       name: contact.name,
       avatar: contact.tavernAvatar || '',
       floors,
-      includeMemory: mode !== 'recent',
+      includeMemory: true,
     })
     : null;
 
   let summary = null;
-  if (mode !== 'recent') {
+  {
     const fileData = latest?.messages?.length
       ? chatMemorySummary({
         metadata: latest.metadata,
@@ -9376,11 +9681,21 @@ async function buildMemoryContext(state, chat, limit = 1200) {
         parts.push(label ? `【${label}】\n${node.text}` : node.text);
       });
       const text = clip(parts.join('\n\n'), summaryLimit);
-      if (text) summary = { text, count: data.nodes.length, demo };
+      if (text) {
+        summary = {
+          text,
+          count: data.nodes.length,
+          demo,
+          metrics: summaryMetrics(data),
+        };
+      }
     }
   }
 
-  if (summary && mode !== 'recent') {
+  const hasSummary = Boolean(summary);
+  const numbers = summary?.metrics || { chars: 0, segments: 0, depth: 0 };
+
+  if (summary && wanted !== 'recent') {
     return {
       text: `【酒馆总结】\n${summary.text}`,
       source: 'summary',
@@ -9388,38 +9703,33 @@ async function buildMemoryContext(state, chat, limit = 1200) {
       floors,
       summaryCount: summary.count,
       demo: summary.demo,
+      mode: wanted,
+      hasSummary,
+      metrics: { chars: numbers.chars, segments: numbers.segments, depth: numbers.depth, lines: 0, floors },
     };
   }
 
-  if (mode === 'summary') {
-    return {
-      text: '',
-      source: 'empty',
-      preset,
-      floors,
-      summaryCount: 0,
-      demo: false,
-    };
+  /* 方案/默认写明「只用总结」时保持原样：没有总结就是空的，不擅自换成原文 */
+  if (wanted === 'summary') {
+    return emptyResult(preset, floors, {
+      mode: 'summary',
+      hasSummary,
+      metrics: { chars: numbers.chars, segments: numbers.segments, depth: numbers.depth, lines: 0, floors },
+    });
   }
 
   if (!contact?.name) {
-    return { text: '', source: 'empty', preset, floors, summaryCount: 0, demo: false };
+    return emptyResult(preset, floors, { mode: wanted === 'recent' ? 'recent' : 'auto', hasSummary });
   }
 
-  const taverner = latest || await readLatestTavernChat({
+  const taverner = latest?.lines?.length ? latest : await readLatestTavernChat({
     name: contact.name,
     avatar: contact.tavernAvatar || '',
     floors,
   });
   if (!taverner?.lines?.length) {
-    return {
-      text: summary ? `【酒馆总结】\n${summary.text}` : '',
-      source: summary ? 'summary' : 'empty',
-      preset,
-      floors,
-      summaryCount: summary?.count || 0,
-      demo: Boolean(summary?.demo),
-    };
+    /* 明确选了读原文、但聊天文件里没有楼层：就是空的，不偷偷换成总结 */
+    return emptyResult(preset, floors, { mode: wanted === 'recent' ? 'recent' : 'auto', hasSummary });
   }
 
   const text = fitRecent(taverner.lines, limit);
@@ -9432,6 +9742,9 @@ async function buildMemoryContext(state, chat, limit = 1200) {
     file: taverner.file,
     summaryCount: 0,
     demo: false,
+    mode: wanted === 'recent' ? 'recent' : 'auto',
+    hasSummary,
+    metrics: { chars: text.length, segments: 0, depth: 0, lines: taverner.lines.length, floors },
   };
 }
 
@@ -10857,6 +11170,14 @@ const settingsApp = {
         </div>
 
         <div class="mp-group">
+          <div class="mp-group-label">记忆</div>
+          <div class="mp-group-box">
+            ${row(ctx, { iconName: 'book', title: '默认读总结', sub: state.settings.memory.readMode === 'recent' ? '关着：没单独设置的角色读最近原文' : '开着：有柏宝书总结就先读总结，没有才读原文', act: 'set-toggle-memory-read', toggle: state.settings.memory.readMode !== 'recent' })}
+            ${row(ctx, { iconName: 'search', title: '酒馆记忆', sub: '看当前读到了什么；按角色切换总结或原文', act: 'set-open', app: 'memory-presets' })}
+          </div>
+        </div>
+
+        <div class="mp-group">
           <div class="mp-group-label">主动开口</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'spark', title: '允许主动开口', sub: state.settings.proactive.enabled ? '开着：空发送可以触发；没有定时任务' : '已关闭：空发送不会触发', act: 'set-toggle-proactive', toggle: state.settings.proactive.enabled })}
@@ -10925,6 +11246,17 @@ const settingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(state.settings.chat.wake ? '空发送可以触发主动开口' : '空发送不再触发');
+      return true;
+    }
+
+    if (act === 'set-toggle-memory-read') {
+      const store = state.settings.memory;
+      store.readMode = store.readMode === 'recent' ? 'summary' : 'recent';
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(store.readMode === 'recent'
+        ? '默认改成读原文；按角色单独切过的仍然按开关'
+        : '默认改回读总结；没有总结时自动读原文');
       return true;
     }
 
@@ -13326,10 +13658,10 @@ const apiListApp = {
             <div class="mp-api-sec-title">API 接口</div>
             <div class="mp-api-sec-sub">管理可供聊天方案使用的模型服务。</div>
           </div>
+          <button class="mp-icon-btn" data-act="api-new" type="button" aria-label="新建 API 接口">${icon('plus')}</button>
           <span class="mp-api-count">${store.presets.length} 套</span>
         </div>
         <div class="mp-api-list">${rows}</div>
-        <button class="mp-api-add" data-act="api-new" type="button">${icon('plus')}<span>添加 API 接口</span></button>
         <button class="mp-api-import" data-act="api-import-tavern" type="button">从酒馆导入当前接口</button>
 
         <div class="mp-api-sec-head">
@@ -14059,7 +14391,7 @@ __mods["meme/apps/characters.js"] = function(module, exports, __req){
 
 const { icon } = __req("meme/icons.js");
 const { esc, avatarHtml } = __req("meme/shell.js");
-const { addContact, contactsOf } = __req("meme/data.js");
+const { addContact, contactsOf, memoryPresetFor, memoryReadModeFor, memoryGlobalReadMode } = __req("meme/data.js");
 
 const SECTIONS = [
   ['描述', 'description'],
@@ -14332,6 +14664,15 @@ const characterApp = {
 
     const tags = (card.tags || []).map(tag => `<span class="mp-char-tag">${esc(tag)}</span>`).join('');
     const bookState = ensureBooks(ctx, card);
+    const contact = contactsOf(state).find(item => item.name === card.name) || null;
+    const memPreset = memoryPresetFor(state, null);
+    const memMode = contact ? memoryReadModeFor(state, contact.id, memPreset) : memoryGlobalReadMode(state);
+    const readSummary = memMode !== 'recent';
+    const memHint = !contact
+      ? '先把这个角色存进通讯录，手机才记得住它的读取方式'
+      : readSummary
+        ? '打开：有柏宝书总结就读总结，没有就读最近原文'
+        : '关着：只读最近几楼的原文';
 
     return `
       <div class="mp-page-body">
@@ -14343,6 +14684,13 @@ const characterApp = {
         </div>
 
         ${body || '<div class="mp-empty">这张卡只有名字。</div>'}
+
+        <div class="mp-group-label" style="margin-top:14px">记忆读取</div>
+        <button class="mp-set-row${contact ? '' : ' is-off'}" data-act="char-mem-toggle" data-name="${esc(card.name)}" type="button"${contact ? '' : ' disabled aria-disabled="true"'}>
+          <span class="mp-set-ico">${icon('book')}</span>
+          <span class="mp-set-name">读酒馆总结<small>${esc(memHint)}</small></span>
+          <span class="mp-switch${contact && readSummary ? ' on' : ''}"></span>
+        </button>
 
         <div class="mp-wi-head">
           <span class="mp-wi-title">关联世界书</span>
@@ -14361,6 +14709,22 @@ const characterApp = {
 
   handle(ctx, act, data) {
     const state = ctx.state;
+
+    /* 这位角色读总结还是原文：存在通讯录联系人上，选角色时就顺手设好 */
+    if (act === 'char-mem-toggle') {
+      const card = findCard(state, String(data?.name || ''));
+      const contact = card ? contactsOf(state).find(item => item.name === card.name) || null : null;
+      if (!contact) { ctx.toast('先存进通讯录，才能记住这位角色的读取方式'); return true; }
+      const store = state.settings.memory;
+      if (!store.byContact || typeof store.byContact !== 'object') store.byContact = {};
+      const next = memoryReadModeFor(state, contact.id, memoryPresetFor(state, null)) === 'recent' ? 'auto' : 'recent';
+      store.byContact[contact.id] = next;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(next === 'recent' ? `${contact.name} 改成读最近原文` : `${contact.name} 改回读总结`);
+      return true;
+    }
+
     if (act === 'char-add') {
       const card = findCard(state, String(data?.name || ''));
       if (!card) return true;
@@ -15729,18 +16093,25 @@ exports["musicPlaylistApp"] = musicPlaylistApp;
 };
 __mods["meme/apps/memory.js"] = function(module, exports, __req){
 /**
- * meme-phone · 酒馆记忆预设页
+ * meme-phone · 酒馆记忆页
  *
- * 从聊天设置里的「酒馆记忆」进来：给手机选默认方案，也能新建 / 改名 / 改来源 / 改层数 / 删除。
+ * 顶上只报「现在读的是总结还是原文、多少楼、多少字、多少层」，不铺全文；
+ * 下面一个开关切换这位角色读总结还是原文（没有总结时置灰），
+ * 再往下才是记忆方案（层数 / 首楼 / 改名 / 复制 / 删除）。
  */
 
 const { icon } = __req("meme/icons.js");
-const { newId, memoryPresetsOf, contactById, chatsOf } = __req("meme/data.js");
+const {
+  newId, memoryPresetsOf, contactById, chatsOf, memoryPresetFor, memoryReadModeFor, memoryGlobalReadMode,
+} = __req("meme/data.js");
 const { esc } = __req("meme/shell.js");
-const { MEMORY_MODES, memoryModeLabel, memoryPresetSummary, buildMemoryContext } = __req("meme/memory.js");
+const { memoryModeLabel, memoryPresetSummary, buildMemoryContext } = __req("meme/memory.js");
 
 let memoryChosen = '';
-let memoryView = { contactId: '', loading: false, error: '', text: '', source: '', file: '', demo: false, summaryCount: 0 };
+let memoryView = {
+  contactId: '', loading: false, error: '', text: '', source: '', file: '', demo: false,
+  summaryCount: 0, mode: '', hasSummary: false, metrics: null,
+};
 let memoryAutoKey = '';
 let memEdit = '';
 let memRename = false;
@@ -15756,14 +16127,42 @@ function defaultMemoryContact(state) {
   return byChat || singleContacts(state)[0] || null;
 }
 
-function readMemory(ctx, contactId) {
+function emptyView(contactId) {
+  return {
+    contactId, loading: false, error: '', text: '', source: 'empty', file: '', demo: false,
+    summaryCount: 0, mode: '', hasSummary: false, metrics: null,
+  };
+}
+
+/* 重渲染会把整页重建、滚动回顶部，看起来像刷新；这里把滚动位置带过去 */
+function pageBox(ctx) {
+  return ctx?.shell?.root?.querySelector('.mp-page-body') || null;
+}
+
+function redraw(ctx) {
+  const top = pageBox(ctx)?.scrollTop || 0;
+  ctx.rerender();
+  const box = pageBox(ctx);
+  if (box) box.scrollTop = top;
+}
+
+function say(ctx, message) {
+  const top = pageBox(ctx)?.scrollTop || 0;
+  ctx.toast(message);
+  const box = pageBox(ctx);
+  if (box) box.scrollTop = top;
+}
+
+function readMemory(ctx, contactId, note = '') {
   const contact = contactById(ctx.state, contactId);
   if (!contact) {
-    memoryView = { contactId, loading: false, error: '', text: '', source: 'empty', file: '', demo: false, summaryCount: 0 };
+    memoryView = emptyView(contactId);
     return;
   }
-  memoryView = { contactId, loading: true, error: '', text: '', source: '', file: '', demo: false, summaryCount: 0 };
-  ctx.rerender();
+  /* 读的过程中状态卡会缩成一行，滚动位置会被夹小；读完按原位置放回去 */
+  const top = pageBox(ctx)?.scrollTop || 0;
+  memoryView = { ...emptyView(contactId), loading: true };
+  redraw(ctx);
   buildMemoryContext(ctx.state, { contactId }, 1600).then(result => {
     memoryView = {
       contactId,
@@ -15774,18 +16173,32 @@ function readMemory(ctx, contactId) {
       file: String(result?.file || ''),
       demo: Boolean(result?.demo),
       summaryCount: Number(result?.summaryCount) || 0,
+      mode: String(result?.mode || ''),
+      hasSummary: Boolean(result?.hasSummary),
+      metrics: result?.metrics || null,
     };
-    ctx.rerender();
+    redraw(ctx);
+    const box = pageBox(ctx);
+    if (box && top) box.scrollTop = top;
+    if (note) say(ctx, note);
   }).catch(error => {
-    memoryView = { contactId, loading: false, error: error?.message || '读取失败', text: '', source: '', file: '', demo: false, summaryCount: 0 };
-    ctx.rerender();
+    memoryView = { ...emptyView(contactId), error: error?.message || '读取失败' };
+    redraw(ctx);
+    const box = pageBox(ctx);
+    if (box && top) box.scrollTop = top;
   });
 }
 
-function memorySourceLabel(view) {
-  if (view.source === 'summary') return `柏宝书总结 · ${view.summaryCount} 段`;
-  if (view.source === 'recent') return '最近几层酒馆聊天原文';
-  return '没有可用的记忆';
+function num(value) {
+  const n = Number(value) || 0;
+  if (n < 10000) return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${(n / 10000).toFixed(1)} 万`;
+}
+
+function readModeLabel(mode) {
+  if (mode === 'summary') return '只用总结';
+  if (mode === 'recent') return '只读原文';
+  return '有总结读总结';
 }
 
 function presetById(state, id) {
@@ -15803,32 +16216,69 @@ function row(state, preset) {
     </button>`;
 }
 
-/* 方案管理不再走弹窗：在当前列表里展开，改完点保存 */
+/** 顶部：现在读到了什么。只报数字，不铺正文。 */
+function statusCard(ctx, chosen, view, preset) {
+  if (!chosen) {
+    return '<div class="mp-empty" style="padding:14px">还没有角色，先去通讯录或酒馆拉一份名单。</div>';
+  }
+  if (view.loading) return '<div class="mp-api-note" style="margin:0">正在读这个角色最新的聊天文件…</div>';
+  if (view.error) return `<div class="mp-api-note is-warn" style="margin:0">${esc(view.error)}</div>`;
+
+  const source = view.source === 'summary' ? 'summary' : view.source === 'recent' ? 'recent' : 'empty';
+  const metrics = view.metrics || {};
+  const nums = source === 'summary'
+    ? [['segments', '段'], ['depth', '层'], ['chars', '字']]
+    : source === 'recent'
+      ? [['lines', '楼'], ['chars', '字']]
+      : [];
+  const label = source === 'summary' ? '总结' : source === 'recent' ? '原文' : '没有记忆';
+  const foot = [
+    `方案「${preset?.name || '默认'}」`,
+    view.file ? String(view.file).replace(/\.jsonl$/i, '') : '',
+    view.demo ? '演示数据' : '',
+  ].filter(Boolean).join(' · ');
+
+  const emptyHint = view.hasSummary
+    ? '这套方式现在只读原文，但这位角色的聊天文件里没有可读的楼层。'
+    : '这位角色暂时没读到柏宝书总结，也没有酒馆聊天原文。';
+
+  return `
+    <div class="mp-mem-now">
+      <div class="mp-mem-now-head">
+        <span class="mp-mem-chip${source === 'recent' ? ' is-recent' : ''}${source === 'empty' ? ' is-empty' : ''}">${label}</span>
+        <span class="mp-mem-now-plan">${esc(foot)}</span>
+      </div>
+      ${nums.length ? `
+      <div class="mp-mem-nums">
+        ${nums.map(([key, unit]) => `<span class="mp-mem-num"><b>${num(metrics[key])}</b><i>${unit}</i></span>`).join('')}
+      </div>` : `<div class="mp-mem-now-empty">${esc(emptyHint)}</div>`}
+      ${source === 'summary' ? `<div class="mp-mem-now-foot">柏宝书总结按段读，不铺原文</div>` : ''}
+      ${source === 'empty' ? `<div class="mp-mem-now-foot">只读当前角色最新的聊天文件，没有记忆时就是空的，不会改酒馆。</div>` : ''}
+    </div>`;
+}
+
+/* 方案管理不再走弹窗：在当前列表里展开，改完就地保存 */
 function presetPanel(ctx, preset) {
   const state = ctx.state;
   const active = state.settings.memory?.activeId === preset.id;
+  const modeNote = preset.mode === 'auto'
+    ? '方案来源：跟随上面的开关'
+    : `方案来源：${memoryModeLabel(preset.mode)}（按角色的开关优先）`;
   return `
-    <div class="mp-card mp-api-edit mp-mem-edit">
+    <div class="mp-card mp-mem-edit">
       <div class="mp-card-title">${esc(preset.name)}${active ? '<span class="mp-api-tag">使用中</span>' : ''}</div>
       <label class="mp-api-field">
-        <span>记忆来源</span>
-        <div class="mp-select-wrap mp-api-mini-select">
-          <select data-act="mem-mode-select" data-id="${esc(preset.id)}">
-            ${MEMORY_MODES.map(item => `<option value="${item.value}"${item.value === preset.mode ? ' selected' : ''}>${esc(item.label)}</option>`).join('')}
-          </select>${icon('chevron')}
-        </div>
-      </label>
-      <label class="mp-api-field">
         <span>保留层数</span>
-        <input id="mem-floors-input" class="mp-api-input" type="text" value="${esc(String(preset.floors || 10))}" placeholder="1 到 50">
+        <input id="mem-floors-input" class="mp-api-input" type="text" value="${esc(String(preset.floors || 10))}"
+          placeholder="1 到 50" inputmode="numeric" data-act="mem-floors" data-id="${esc(preset.id)}">
       </label>
-      <div class="mp-api-draft-note" style="grid-column:1/-1">${esc(memoryModeLabel(preset.mode))} · 最近 ${preset.floors || 10} 层 · ${preset.skipFirstFloor ? '首楼用原文' : '首楼用总结'}</div>
+      <div class="mp-mem-panel-note">${esc(modeNote)} · 最近 ${preset.floors || 10} 层 · ${preset.skipFirstFloor ? '首楼用原文' : '首楼用总结'}</div>
+      <button class="mp-set-row mp-mem-first" data-act="mem-first" data-id="${esc(preset.id)}" type="button">
+        <span class="mp-set-name">首楼用原文<small>首楼总结丢东西时再开</small></span>
+        <span class="mp-switch${preset.skipFirstFloor ? ' on' : ''}"></span>
+      </button>
       <div class="mp-draw-actions">
-        <button class="mp-draw-action" data-act="mem-floors-save" data-id="${esc(preset.id)}" type="button">保存层数</button>
-        <button class="mp-draw-action" data-act="mem-first" data-id="${esc(preset.id)}" type="button">${preset.skipFirstFloor ? '首楼改回总结' : '首楼改用原文'}</button>
-      </div>
-      <div class="mp-draw-actions">
-        ${active ? '' : `<button class="mp-draw-action is-primary" data-act="mem-use" data-id="${esc(preset.id)}" type="button">设为手机默认</button>`}
+        ${active ? '' : `<button class="mp-draw-action is-primary" data-act="mem-use" data-id="${esc(preset.id)}" type="button">设为手机默认方案</button>`}
         <button class="mp-draw-action" data-act="mem-rename-open" data-id="${esc(preset.id)}" type="button">改名</button>
         <button class="mp-draw-action" data-act="mem-clone" data-id="${esc(preset.id)}" type="button">复制一套</button>
         <button class="mp-draw-action is-danger" data-act="mem-del" data-id="${esc(preset.id)}" type="button">删除这套</button>
@@ -15853,10 +16303,11 @@ function presetPanel(ctx, preset) {
 }
 
 function renderPage(ctx) {
-  const presets = memoryPresetsOf(ctx.state);
-  const active = presetById(ctx.state, ctx.state.settings.memory?.activeId) || presets[0] || null;
-  const contacts = singleContacts(ctx.state);
-  const fallback = defaultMemoryContact(ctx.state);
+  const state = ctx.state;
+  const presets = memoryPresetsOf(state);
+  const active = presetById(state, state.settings.memory?.activeId) || presets[0] || null;
+  const contacts = singleContacts(state);
+  const fallback = defaultMemoryContact(state);
   const chosen = contacts.find(contact => contact.id === memoryChosen) || fallback || null;
   if (chosen) memoryChosen = chosen.id;
 
@@ -15865,26 +16316,32 @@ function renderPage(ctx) {
     memoryAutoKey = chosen.id;
     setTimeout(() => readMemory(ctx, chosen.id), 0);
   }
-  const view = memoryView.contactId === chosen?.id ? memoryView : { loading: true, text: '', error: '', source: '', file: '', demo: false, summaryCount: 0 };
-  const memoryBody = !chosen
-    ? '<div class="mp-empty" style="padding:14px">还没有角色，先去通讯录或酒馆拉一份名单。</div>'
+
+  const view = memoryView.contactId === chosen?.id
+    ? memoryView
+    : { ...emptyView(chosen?.id || ''), loading: true };
+  const preset = memoryPresetFor(state, null);
+  const mode = view.mode || memoryReadModeFor(state, chosen?.id, preset);
+  const hasSummary = Boolean(view.hasSummary);
+  const readSummary = mode !== 'recent';
+  const canSwitch = hasSummary;
+  const switchHint = !chosen
+    ? '先选一位角色'
     : view.loading
-      ? '<div class="mp-api-note" style="margin:0">正在读这个角色最新的聊天文件…</div>'
-      : view.error
-        ? `<div class="mp-api-note is-warn" style="margin:0">${esc(view.error)}</div>`
-        : view.text
-          ? `<div class="mp-mem-text">${esc(view.text)}</div>
-             <div class="mp-mem-meta">${esc(memorySourceLabel(view))}${view.file ? ` · ${esc(view.file.replace(/\.jsonl$/i, ''))}` : ''}${view.demo ? ' · 演示数据' : ''}</div>`
-          : `<div class="mp-empty" style="padding:14px">这位角色暂时没读到柏宝书记忆，也没有酒馆聊天原文。</div>
-             <div class="mp-api-note" style="margin:0">只读当前角色最新的聊天文件；没有记忆时就是空的，不会去改酒馆里的聊天。</div>`;
+      ? '正在读这位角色的聊天文件…'
+      : !canSwitch
+        ? '这位角色还没有柏宝书总结，暂时只能读原文'
+        : readSummary
+          ? '读柏宝书总结；关掉就读最近几楼的原文'
+          : '读最近几楼的原文；打开就读柏宝书总结';
 
   return `
     <div class="mp-page-body">
       <div class="mp-title">酒馆记忆</div>
-      <div class="mp-subtitle">读角色最新聊天文件；有柏宝书记忆时先用记忆</div>
+      <div class="mp-subtitle">读角色最新聊天文件；有总结可切总结，没有就读最近原文</div>
 
       <div class="mp-group-head" style="margin-top:16px">
-        <div class="mp-group-label">已读记忆 · 当前会话角色</div>
+        <div class="mp-group-label">当前读取</div>
         <button class="mp-draw-side" data-act="mem-read" type="button"${view.loading ? ' disabled' : ''}>${view.loading ? '读取中…' : '重新读取'}</button>
       </div>
       <div class="mp-group">
@@ -15894,34 +16351,36 @@ function renderPage(ctx) {
             ${contacts.map(contact => `<option value="${esc(contact.id)}"${contact.id === chosen?.id ? ' selected' : ''}>${esc(contact.name || '未命名')}</option>`).join('')}
           </select>${icon('chevron')}
         </div>` : ''}
-        <div class="mp-card mp-mem-card">${memoryBody}</div>
+        <div class="mp-card mp-mem-card">${statusCard(ctx, chosen, view, preset)}</div>
       </div>
 
-      <div class="mp-group" style="margin-top:16px">
-        <div class="mp-group-label">手机默认方案</div>
-        <div class="mp-group-box">
-          ${presets.map(item => `${row(ctx.state, item)}${memEdit === item.id ? presetPanel(ctx, item) : ''}`).join('') || '<div class="mp-empty">还没有方案。</div>'}
-        </div>
+      <div class="mp-group-label" style="margin-top:16px">读取方式</div>
+      <div class="mp-group-box">
+        <button class="mp-set-row${canSwitch ? '' : ' is-off'}" data-act="mem-toggle-read" type="button"${canSwitch ? '' : ' disabled aria-disabled="true"'}>
+          <span class="mp-set-ico">${icon('book')}</span>
+          <span class="mp-set-name">读总结<small>${esc(switchHint)}</small></span>
+          <span class="mp-switch${readSummary && canSwitch ? ' on' : ''}"></span>
+        </button>
       </div>
 
-      <div class="mp-group">
-        <div class="mp-group-box">
-          <button class="mp-set-row" data-act="mem-new" type="button">
-            <span class="mp-set-ico">${icon('plus')}</span>
-            <span class="mp-set-name">新建一套<small>在「${esc(active?.name || '默认')}」的基础上改</small></span>
-            <span style="color:var(--text-4)">${icon('chevron')}</span>
-          </button>
-        </div>
+      <div class="mp-group-label" style="margin-top:16px">记忆方案</div>
+      <div class="mp-group-box">
+        ${presets.map(item => `${row(state, item)}${memEdit === item.id ? presetPanel(ctx, item) : ''}`).join('') || '<div class="mp-empty">还没有方案。</div>'}
+      </div>
+      <div class="mp-group-box">
+        <button class="mp-set-row" data-act="mem-new" type="button">
+          <span class="mp-set-ico">${icon('plus')}</span>
+          <span class="mp-set-name">新建一套<small>在「${esc(active?.name || '默认')}」的基础上改</small></span>
+          <span style="color:var(--text-4)">${icon('chevron')}</span>
+        </button>
       </div>
 
       <div class="mp-group-label" style="margin-top:16px">怎么读</div>
       <div class="mp-card">
-        <div class="mp-card-title">自动（默认）</div>
-        <div class="mp-card-sub">这个角色最新的聊天文件里有柏宝书记忆，就注入记忆；没有记忆，才读最近几层酒馆聊天原文。</div>
-        <div class="mp-card-title" style="margin-top:12px">层数</div>
+        <div class="mp-card-title">层数</div>
         <div class="mp-card-sub">一层就是酒馆里的一条消息。层数越多，模型记得越远，但占的上下文也越多。</div>
-        <div class="mp-card-title" style="margin-top:12px">首楼</div>
-        <div class="mp-card-sub">默认连首楼一起读总结；如果首楼总结丢了三件事或说话方式，可以在方案里改成「首楼用原文」。</div>
+        <div class="mp-card-title" style="margin-top:12px">默认</div>
+        <div class="mp-card-sub">手机默认读${memoryGlobalReadMode(state) === 'recent' ? '原文' : '总结'}（在「设置 · 记忆」里改）；这位角色单独切过就按开关。</div>
       </div>
     </div>`;
 }
@@ -15938,10 +16397,28 @@ function handle(ctx, act, data) {
 
   if (act === 'mem-read') {
     const contact = contactById(ctx.state, memoryChosen) || defaultMemoryContact(ctx.state);
-    if (!contact) { ctx.toast('还没有角色可读'); return true; }
+    if (!contact) { say(ctx, '还没有角色可读'); return true; }
     memoryChosen = contact.id;
     memoryAutoKey = contact.id;
     readMemory(ctx, contact.id);
+    return true;
+  }
+
+  /* 读取方式开关：写进这位角色的单独设置；没有总结就不让切 */
+  if (act === 'mem-toggle-read') {
+    const contact = contactById(ctx.state, memoryChosen) || defaultMemoryContact(ctx.state);
+    if (!contact) { say(ctx, '先选一位角色'); return true; }
+    if (memoryView.contactId !== contact.id || !memoryView.hasSummary) {
+      say(ctx, '这位角色还没有柏宝书总结，只能读原文');
+      return true;
+    }
+    const store = ctx.state.settings.memory;
+    if (!store.byContact || typeof store.byContact !== 'object') store.byContact = {};
+    const next = memoryReadModeFor(ctx.state, contact.id, memoryPresetFor(ctx.state, null)) === 'recent' ? 'auto' : 'recent';
+    store.byContact[contact.id] = next;
+    ctx.save();
+    /* 切完立刻按新方式重读一遍：顶部数字跟着变，不会停在旧的「总结」上 */
+    readMemory(ctx, contact.id, next === 'recent' ? '这位角色改成读原文' : '这位角色改回读总结');
     return true;
   }
 
@@ -15950,7 +16427,7 @@ function handle(ctx, act, data) {
     memEdit = memEdit === id ? '' : id;
     memRename = false;
     memDelete = '';
-    ctx.rerender();
+    redraw(ctx);
     return true;
   }
 
@@ -15958,7 +16435,7 @@ function handle(ctx, act, data) {
     memEdit = '';
     memRename = false;
     memDelete = '';
-    ctx.rerender();
+    redraw(ctx);
     return true;
   }
 
@@ -15976,29 +16453,19 @@ function handle(ctx, act, data) {
     memRename = false;
     memDelete = '';
     ctx.save();
-    ctx.rerender();
+    redraw(ctx);
     return true;
   }
 
-  if (act === 'mem-mode-select') {
-    const live = presetById(ctx.state, String(data.id || ''));
-    if (!live || !['auto', 'summary', 'recent'].includes(String(data.value || ''))) return true;
-    live.mode = String(data.value);
-    ctx.save();
-    ctx.rerender();
-    ctx.toast(`记忆来源改成「${memoryModeLabel(live.mode)}」`);
-    return true;
-  }
-
-  if (act === 'mem-floors-save') {
+  /* 层数就地保存：改完直接写，不再单独一个「保存层数」按钮 */
+  if (act === 'mem-floors') {
     const live = presetById(ctx.state, String(data.id || ''));
     if (!live) return true;
-    const input = ctx.shell.root?.querySelector('#mem-floors-input');
-    const floors = Math.max(1, Math.min(50, Number(String(input?.value || '').replace(/[^\d]/g, '')) || 10));
+    const floors = Math.max(1, Math.min(50, Number(String(data.value || '').replace(/[^\d]/g, '')) || 10));
+    if (floors === live.floors) return true;
     live.floors = floors;
     ctx.save();
-    ctx.rerender();
-    ctx.toast(`最近 ${floors} 层`);
+    say(ctx, `最近 ${floors} 层`);
     return true;
   }
 
@@ -16007,8 +16474,8 @@ function handle(ctx, act, data) {
     if (!live) return true;
     live.skipFirstFloor = !live.skipFirstFloor;
     ctx.save();
-    ctx.rerender();
-    ctx.toast(live.skipFirstFloor ? '首楼改成注入原文' : '首楼恢复用总结');
+    redraw(ctx);
+    say(ctx, live.skipFirstFloor ? '首楼改成注入原文' : '首楼恢复用总结');
     return true;
   }
 
@@ -16017,15 +16484,15 @@ function handle(ctx, act, data) {
     if (!live) return true;
     ctx.state.settings.memory.activeId = live.id;
     ctx.save();
-    ctx.rerender();
-    ctx.toast(`手机默认记忆改成「${live.name}」`);
+    redraw(ctx);
+    say(ctx, `手机默认记忆方案改成「${live.name}」`);
     return true;
   }
 
   if (act === 'mem-rename-open') {
     memRename = true;
     memDelete = '';
-    ctx.rerender();
+    redraw(ctx);
     return true;
   }
 
@@ -16034,18 +16501,18 @@ function handle(ctx, act, data) {
     if (!live) return true;
     const input = ctx.shell.root?.querySelector('#mem-rename-input');
     const name = String(input?.value || '').trim().slice(0, 20);
-    if (!name) { ctx.toast('名字不能空着'); return true; }
+    if (!name) { say(ctx, '名字不能空着'); return true; }
     live.name = name;
     memRename = false;
     ctx.save();
-    ctx.rerender();
-    ctx.toast('名字改好了');
+    redraw(ctx);
+    say(ctx, '名字改好了');
     return true;
   }
 
   if (act === 'mem-rename-cancel') {
     memRename = false;
-    ctx.rerender();
+    redraw(ctx);
     return true;
   }
 
@@ -16064,24 +16531,24 @@ function handle(ctx, act, data) {
     memRename = false;
     memDelete = '';
     ctx.save();
-    ctx.rerender();
-    ctx.toast(`复制成「${copy.name}」`);
+    redraw(ctx);
+    say(ctx, `复制成「${copy.name}」`);
     return true;
   }
 
   if (act === 'mem-del') {
     const live = presetById(ctx.state, String(data.id || ''));
     if (!live) return true;
-    if (memoryPresetsOf(ctx.state).length <= 1) { ctx.toast('至少留一套记忆方案'); return true; }
+    if (memoryPresetsOf(ctx.state).length <= 1) { say(ctx, '至少留一套记忆方案'); return true; }
     memDelete = live.id;
     memRename = false;
-    ctx.rerender();
+    redraw(ctx);
     return true;
   }
 
   if (act === 'mem-del-cancel') {
     memDelete = '';
-    ctx.rerender();
+    redraw(ctx);
     return true;
   }
 
@@ -16089,7 +16556,7 @@ function handle(ctx, act, data) {
     const store = ctx.state.settings.memory;
     const live = presetById(ctx.state, String(data.id || ''));
     if (!live) return true;
-    if (memoryPresetsOf(ctx.state).length <= 1) { ctx.toast('至少留一套记忆方案'); return true; }
+    if (memoryPresetsOf(ctx.state).length <= 1) { say(ctx, '至少留一套记忆方案'); return true; }
     const index = store.presets.findIndex(item => item.id === live.id);
     if (index < 0) return true;
     store.presets.splice(index, 1);
@@ -16098,8 +16565,8 @@ function handle(ctx, act, data) {
     memEdit = '';
     memRename = false;
     ctx.save();
-    ctx.rerender();
-    ctx.toast(`记忆方案「${live.name}」删掉了`);
+    redraw(ctx);
+    say(ctx, `记忆方案「${live.name}」删掉了`);
     return true;
   }
 

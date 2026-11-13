@@ -278,6 +278,9 @@ export function emptyState() {
           { id: 'mem_summary', name: '只看总结', mode: 'summary', floors: 10, skipFirstFloor: false },
           { id: 'mem_recent', name: '最近原文', mode: 'recent', floors: 20, skipFirstFloor: false },
         ],
+        /* 手机默认读总结还是原文；按角色单独设过的，写在 byContact 里 */
+        readMode: 'summary',
+        byContact: {},
       },
       /* 回复预设：真正告诉模型「这通聊天该怎么说话」的一段指令 */
       reply: {
@@ -457,6 +460,23 @@ export function memoryPresetFor(state, chat) {
   const own = list.find(preset => preset.id === chat?.memoryPresetId);
   if (own) return own;
   return list.find(preset => preset.id === state?.settings?.memory?.activeId) || list[0] || null;
+}
+
+/** 手机全局默认：读总结（有总结就用，没有退原文）还是只读原文。 */
+export function memoryGlobalReadMode(state) {
+  return state?.settings?.memory?.readMode === 'recent' ? 'recent' : 'summary';
+}
+
+/**
+ * 这位角色读总结还是原文。三层兜底：角色单独设过 > 方案里固定的来源 > 手机默认。
+ * 返回 'auto'（有总结读总结，没有退原文）/ 'summary'（只用总结）/ 'recent'（只读原文）。
+ */
+export function memoryReadModeFor(state, contactId, preset) {
+  const store = state?.settings?.memory || {};
+  const own = contactId ? store.byContact?.[contactId] : '';
+  if (own === 'auto' || own === 'recent') return own;
+  if (preset?.mode === 'summary' || preset?.mode === 'recent') return preset.mode;
+  return memoryGlobalReadMode(state) === 'recent' ? 'recent' : 'auto';
 }
 
 /** 手机里保存的回复预设：每套由主回复指令、提示词条目和上下文配置组成。 */
@@ -955,6 +975,18 @@ export function normalize(raw) {
     ...base.settings.memory,
     ...(memoryRaw && typeof memoryRaw === 'object' ? memoryRaw : {}),
     presets: memoryPresets.length ? memoryPresets : base.settings.memory.presets,
+    readMode: memoryRaw?.readMode === 'recent' ? 'recent' : 'summary',
+    byContact: (() => {
+      const raw2 = memoryRaw?.byContact;
+      const clean = {};
+      if (!raw2 || typeof raw2 !== 'object' || Array.isArray(raw2)) return clean;
+      for (const [contactId, mode] of Object.entries(raw2)) {
+        if (!contactId) continue;
+        if (mode !== 'auto' && mode !== 'recent') continue;
+        clean[String(contactId).slice(0, 60)] = mode;
+      }
+      return clean;
+    })(),
   };
   if (!merged.settings.memory.presets.some(item => item.id === merged.settings.memory.activeId)) {
     merged.settings.memory.activeId = merged.settings.memory.presets[0].id;

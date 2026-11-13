@@ -752,10 +752,10 @@ export const apiListApp = {
             <div class="mp-api-sec-title">API 接口</div>
             <div class="mp-api-sec-sub">管理可供聊天方案使用的模型服务。</div>
           </div>
+          <button class="mp-icon-btn" data-act="api-new" type="button" aria-label="新建 API 接口">${icon('plus')}</button>
           <span class="mp-api-count">${store.presets.length} 套</span>
         </div>
         <div class="mp-api-list">${rows}</div>
-        <button class="mp-api-add" data-act="api-new" type="button">${icon('plus')}<span>添加 API 接口</span></button>
         <button class="mp-api-import" data-act="api-import-tavern" type="button">从酒馆导入当前接口</button>
 
         <div class="mp-api-sec-head">

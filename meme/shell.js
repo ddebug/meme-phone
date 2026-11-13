@@ -324,6 +324,9 @@ export function createShell(options) {
     if (!root) return;
     const state = ctx.state;
     const status = state.settings.theme === 'night' ? 'night' : 'day';
+    /* 同一页重绘（切下拉、保存、开关）时把滚动位置带回原位，别让它看起来像整页刷新 */
+    const prevView = shell.stack[shell.stack.length - 1]?.view || '';
+    const prevScroll = root.querySelector('.mp-page-body')?.scrollTop || 0;
     root.className = 'mp-root';
     root.dataset.mpTheme = status;
     applyWall(root, state.settings);
@@ -352,6 +355,10 @@ export function createShell(options) {
 
     restoreLive();
     shell.improveSendState();
+    if (prevScroll > 0 && (shell.stack[shell.stack.length - 1]?.view || '') === prevView) {
+      const box = root.querySelector('.mp-page-body');
+      if (box) box.scrollTop = prevScroll;
+    }
     if (shell.sheet) shell.sheetAnimated = true;
   }
 
@@ -451,9 +458,9 @@ export function createShell(options) {
   };
 
   root.addEventListener('click', event => {
-    /* 原生 <select> 的选项变化只走下面的 change 事件；click 阶段没有选中值，
-       不能按按钮动作执行，否则打开下拉时会被默认值保存并整页重渲染。 */
-    if (event.target.closest('select[data-act]')) return;
+    /* 原生 <select> / <input> 的取值只走下面的 change 事件；click 阶段还没有选中值，
+       不能按按钮动作执行，否则打开下拉或聚焦输入框时会被默认值保存并整页重渲染。 */
+    if (event.target.closest('select[data-act], input[data-act], textarea[data-act]')) return;
     const target = event.target.closest('[data-act]');
     if (!target || !root.contains(target)) return;
     const act = target.dataset.act;
@@ -468,10 +475,11 @@ export function createShell(options) {
     if (typeof ctx.onGlobalAct === 'function' && ctx.onGlobalAct(act, data, event)) return;
   });
 
-  /* 下拉框：原生 select 只负责取值，动作仍走统一 handle */
+  /* 下拉框 / 输入框：原生控件只负责取值，动作仍走统一 handle */
   root.addEventListener('change', event => {
-    const target = event.target.closest('select[data-act]');
+    const target = event.target.closest('[data-act]');
     if (!target || !root.contains(target)) return;
+    if (!['SELECT', 'INPUT', 'TEXTAREA'].includes(target.tagName)) return;
     const act = target.dataset.act;
     const data = Object.assign({}, target.dataset, { value: target.value });
     const entry = shell.stack[shell.stack.length - 1];

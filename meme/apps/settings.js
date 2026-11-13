@@ -59,6 +59,14 @@ export const settingsApp = {
         </div>
 
         <div class="mp-group">
+          <div class="mp-group-label">记忆</div>
+          <div class="mp-group-box">
+            ${row(ctx, { iconName: 'book', title: '默认读总结', sub: state.settings.memory.readMode === 'recent' ? '关着：没单独设置的角色读最近原文' : '开着：有柏宝书总结就先读总结，没有才读原文', act: 'set-toggle-memory-read', toggle: state.settings.memory.readMode !== 'recent' })}
+            ${row(ctx, { iconName: 'search', title: '酒馆记忆', sub: '看当前读到了什么；按角色切换总结或原文', act: 'set-open', app: 'memory-presets' })}
+          </div>
+        </div>
+
+        <div class="mp-group">
           <div class="mp-group-label">主动开口</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'spark', title: '允许主动开口', sub: state.settings.proactive.enabled ? '开着：空发送可以触发；没有定时任务' : '已关闭：空发送不会触发', act: 'set-toggle-proactive', toggle: state.settings.proactive.enabled })}
@@ -127,6 +135,17 @@ export const settingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(state.settings.chat.wake ? '空发送可以触发主动开口' : '空发送不再触发');
+      return true;
+    }
+
+    if (act === 'set-toggle-memory-read') {
+      const store = state.settings.memory;
+      store.readMode = store.readMode === 'recent' ? 'summary' : 'recent';
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(store.readMode === 'recent'
+        ? '默认改成读原文；按角色单独切过的仍然按开关'
+        : '默认改回读总结；没有总结时自动读原文');
       return true;
     }
 

@@ -7,7 +7,7 @@
 
 import { icon } from '../icons.js';
 import { esc, avatarHtml } from '../shell.js';
-import { addContact, contactsOf } from '../data.js';
+import { addContact, contactsOf, memoryPresetFor, memoryReadModeFor, memoryGlobalReadMode } from '../data.js';
 
 const SECTIONS = [
   ['描述', 'description'],
@@ -280,6 +280,15 @@ export const characterApp = {
 
     const tags = (card.tags || []).map(tag => `<span class="mp-char-tag">${esc(tag)}</span>`).join('');
     const bookState = ensureBooks(ctx, card);
+    const contact = contactsOf(state).find(item => item.name === card.name) || null;
+    const memPreset = memoryPresetFor(state, null);
+    const memMode = contact ? memoryReadModeFor(state, contact.id, memPreset) : memoryGlobalReadMode(state);
+    const readSummary = memMode !== 'recent';
+    const memHint = !contact
+      ? '先把这个角色存进通讯录，手机才记得住它的读取方式'
+      : readSummary
+        ? '打开：有柏宝书总结就读总结，没有就读最近原文'
+        : '关着：只读最近几楼的原文';
 
     return `
       <div class="mp-page-body">
@@ -291,6 +300,13 @@ export const characterApp = {
         </div>
 
         ${body || '<div class="mp-empty">这张卡只有名字。</div>'}
+
+        <div class="mp-group-label" style="margin-top:14px">记忆读取</div>
+        <button class="mp-set-row${contact ? '' : ' is-off'}" data-act="char-mem-toggle" data-name="${esc(card.name)}" type="button"${contact ? '' : ' disabled aria-disabled="true"'}>
+          <span class="mp-set-ico">${icon('book')}</span>
+          <span class="mp-set-name">读酒馆总结<small>${esc(memHint)}</small></span>
+          <span class="mp-switch${contact && readSummary ? ' on' : ''}"></span>
+        </button>
 
         <div class="mp-wi-head">
           <span class="mp-wi-title">关联世界书</span>
@@ -309,6 +325,22 @@ export const characterApp = {
 
   handle(ctx, act, data) {
     const state = ctx.state;
+
+    /* 这位角色读总结还是原文：存在通讯录联系人上，选角色时就顺手设好 */
+    if (act === 'char-mem-toggle') {
+      const card = findCard(state, String(data?.name || ''));
+      const contact = card ? contactsOf(state).find(item => item.name === card.name) || null : null;
+      if (!contact) { ctx.toast('先存进通讯录，才能记住这位角色的读取方式'); return true; }
+      const store = state.settings.memory;
+      if (!store.byContact || typeof store.byContact !== 'object') store.byContact = {};
+      const next = memoryReadModeFor(state, contact.id, memoryPresetFor(state, null)) === 'recent' ? 'auto' : 'recent';
+      store.byContact[contact.id] = next;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(next === 'recent' ? `${contact.name} 改成读最近原文` : `${contact.name} 改回读总结`);
+      return true;
+    }
+
     if (act === 'char-add') {
       const card = findCard(state, String(data?.name || ''));
       if (!card) return true;

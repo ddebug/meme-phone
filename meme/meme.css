@@ -2548,6 +2548,8 @@
   gap: 9px;
 }
 .mp-root .mp-mem-edit {
+  display: grid;
+  gap: 9px;
   margin: 4px 0 10px;
   padding: 12px;
 }
@@ -2830,22 +2832,6 @@
 }
 .mp-root .mp-api-test .mp-i { width: 14px; height: 14px; }
 
-.mp-root .mp-api-add {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  width: 100%;
-  margin-top: 9px;
-  padding: 11px 10px;
-  border: 0;
-  border-radius: 14px;
-  background: rgba(142, 123, 242, .09);
-  color: var(--accent-deep);
-  font: inherit;
-  font-size: calc(12.5px * var(--font-scale));
-}
-.mp-root .mp-api-add .mp-i { width: 14px; height: 14px; }
 .mp-root .mp-api-import {
   display: block;
   width: 100%;
@@ -2877,11 +2863,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.mp-root .mp-api-reply-hint {
-  font-size: calc(10.5px * var(--font-scale));
-  line-height: calc(1.45 * var(--line-scale));
-  color: #8a6224;
-}
 .mp-root .mp-api-reply-link {
   display: flex;
   align-items: center;
@@ -2900,17 +2881,15 @@
 .mp-root .mp-api-reply-link .mp-i { width: 14px; height: 14px; transform: rotate(-90deg); }
 
 /* 聊天模型页：夜间把浅底语义色换成亮色，避免深底上看不清 */
-.mp-root[data-mp-theme="night"] :is(.mp-api-btn.is-primary, .mp-api-add, .mp-api-count, .mp-api-chip, .mp-api-reply-link) { color: #c3b6ff; }
+.mp-root[data-mp-theme="night"] :is(.mp-api-btn.is-primary, .mp-api-count, .mp-api-chip, .mp-api-reply-link) { color: #c3b6ff; }
 .mp-root[data-mp-theme="night"] .mp-api-chip.is-draft { color: #f0c07a; }
 .mp-root[data-mp-theme="night"] .mp-api-pill.is-saved,
 .mp-root[data-mp-theme="night"] .mp-api-hint.is-clear { color: #8fe4b8; }
 .mp-root[data-mp-theme="night"] .mp-api-pill.is-dirty,
-.mp-root[data-mp-theme="night"] .mp-api-hint.is-dirty,
-.mp-root[data-mp-theme="night"] .mp-api-reply-hint { color: #f0c07a; }
+.mp-root[data-mp-theme="night"] .mp-api-hint.is-dirty { color: #f0c07a; }
 .mp-root[data-mp-theme="night"] .mp-api-btn.is-danger,
 .mp-root[data-mp-theme="night"] .mp-api-more-btn.is-danger { color: #f0a3a3; }
 .mp-root[data-mp-theme="night"] .mp-api-dot.is-bad { background: #e07878; }
-.mp-root[data-mp-theme="night"] .mp-api-add { background: rgba(167, 149, 255, .16); }
 
 /* 预设页的内联新建 / 改名 / 删除确认 */
 .mp-root .mp-api-inline {
@@ -2992,7 +2971,7 @@
 }
 .mp-root .mp-api-note.is-warn { color: #d94b4b; }
 
-/* 酒馆记忆页：已读记忆只读展示 */
+/* 酒馆记忆页：顶部只报现在读到了什么（方式 + 段/层/字） */
 .mp-root .mp-mem-card { padding: 12px 14px; }
 .mp-root .mp-mem-text {
   white-space: pre-wrap;
@@ -3009,6 +2988,77 @@
   font-size: calc(10.5px * var(--font-scale));
   line-height: calc(1.5 * var(--line-scale));
 }
+
+.mp-root .mp-mem-now { display: grid; gap: 8px; min-width: 0; }
+.mp-root .mp-mem-now-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.mp-root .mp-mem-chip {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border-radius: 9px;
+  background: rgba(142, 123, 242, .13);
+  color: var(--accent-deep);
+  font-size: calc(10.5px * var(--font-scale));
+  font-weight: 600;
+  line-height: calc(1.6 * var(--line-scale));
+}
+.mp-root .mp-mem-chip.is-recent { background: rgba(112, 158, 214, .16); color: #4d78a8; }
+.mp-root .mp-mem-chip.is-empty { background: rgba(120, 120, 130, .12); color: var(--text-3); }
+.mp-root .mp-mem-now-plan {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale));
+}
+.mp-root .mp-mem-nums { display: flex; align-items: baseline; gap: 16px; }
+.mp-root .mp-mem-num { display: inline-flex; align-items: baseline; gap: 3px; }
+.mp-root .mp-mem-num b {
+  font-size: calc(19px * var(--font-scale));
+  font-weight: 600;
+  letter-spacing: -.02em;
+  color: var(--text);
+}
+.mp-root .mp-mem-num i {
+  font-style: normal;
+  color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale));
+}
+.mp-root .mp-mem-now-empty {
+  color: var(--text-3);
+  font-size: calc(11.5px * var(--font-scale));
+  line-height: calc(1.55 * var(--line-scale));
+}
+.mp-root .mp-mem-now-foot {
+  color: var(--text-4);
+  font-size: calc(10px * var(--font-scale));
+  line-height: calc(1.45 * var(--line-scale));
+}
+.mp-root .mp-mem-panel-note {
+  color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale));
+  line-height: calc(1.5 * var(--line-scale));
+}
+.mp-root .mp-mem-first {
+  margin-top: 6px;
+  padding: 8px 2px;
+  background: none;
+  box-shadow: none;
+}
+.mp-root .mp-mem-first .mp-set-name small { margin-top: 2px; }
+.mp-root[data-mp-theme="night"] .mp-mem-chip { background: rgba(167, 149, 255, .16); color: #c3b6ff; }
+.mp-root[data-mp-theme="night"] .mp-mem-chip.is-recent { background: rgba(120, 170, 230, .16); color: #9fc4ea; }
+.mp-root[data-mp-theme="night"] .mp-mem-chip.is-empty { background: rgba(255, 255, 255, .08); color: var(--text-3); }
+
+/* 置灰的开关行：能看见，但点不动 */
+.mp-root .mp-set-row.is-off { cursor: default; opacity: .62; }
+.mp-root .mp-set-row.is-off .mp-switch { background: #e9e9ea; }
+.mp-root[data-mp-theme="night"] .mp-set-row.is-off .mp-switch { background: #3a3a40; }
 
 .mp-root .mp-reply-preview {
   display: -webkit-box;

@@ -698,8 +698,7 @@ export const apiListApp = {
         <span style="flex:1"></span>
       </div>
       <div class="mp-page-body">
-        <div class="mp-title" style="margin-top:0">聊天模型</div>
-        <div class="mp-subtitle">管理当前聊天方案、模型接口和回复预设。</div>
+        <div class="mp-subtitle" style="margin-top:0">管理当前聊天方案、模型接口和回复预设。</div>
 
         <section class="mp-ios-card mp-api-scheme" aria-label="当前聊天方案">
           <div class="mp-api-sec-head is-inside">

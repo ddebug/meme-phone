@@ -5,7 +5,7 @@
 import { icon } from '../icons.js';
 import { contactsOf, contactById, chatFor, chatById, lastMessage, addContact, syncTavernContacts } from '../data.js';
 import { avatarHtml, esc, shortText } from '../shell.js';
-import { charactersPanel, charactersHandle } from './characters.js';
+import { charactersPanel, charactersHandle, characterDetailHtml, characterCardHandle } from './characters.js';
 
 function groupOf(contact) {
   if (contact.kind === 'group') return '群聊';
@@ -178,14 +178,18 @@ export const contactApp = {
           <button class="mp-btn" data-act="contact-extras" data-contact="${contact.id}" type="button" style="flex:1">${icon('theater')}小剧场 ${extras.length || ''}</button>
         </div>
         ${contact.kind === 'group' ? '' : `<button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button">${icon('search')}查 TA 的手机</button>`}
-        ${contact.kind === 'group' ? '' : `<button class="mp-btn mp-cp-entry" data-act="contact-memory" data-contact="${contact.id}" type="button">${icon('book')}酒馆记忆 · 看这位读到什么</button>`}
-        ${card ? `<button class="mp-btn mp-cp-entry" data-act="contact-card" data-name="${esc(card.name)}" type="button">${icon('contacts')}看 TA 的角色卡</button>` : ''}
         ${rows}
+        ${card ? characterDetailHtml(ctx, card) : ''}
       </div>`;
   },
 
   handle(ctx, act, data) {
     const contact = contactById(ctx.state, data.contact);
+
+    /* 角色卡正文已经摊在这一页里，卡片上的开关（记忆读取、世界书）也归这里管 */
+    if (String(act).startsWith('char-')) {
+      return characterCardHandle(ctx, act, data);
+    }
 
     if (act === 'open-thread') {
       const chat = chatById(ctx.state, data.chat);
@@ -202,13 +206,6 @@ export const contactApp = {
       return true;
     }
 
-    /* 点角色看这位自己的酒馆记忆：不再另设独立入口 */
-    if (act === 'contact-memory') {
-      if (!contact) return true;
-      ctx.go('memory-presets', { contactId: contact.id });
-      return true;
-    }
-
     if (act === 'contact-extras') {
       ctx.go('app-extras', { contactId: data.contact });
       return true;
@@ -217,12 +214,6 @@ export const contactApp = {
     if (act === 'contact-phone') {
       if (!contact) return true;
       ctx.go('p-charphone', { contactId: contact.id });
-      return true;
-    }
-
-    if (act === 'contact-card') {
-      const name = String(data.name || '');
-      if (name) ctx.go('character-card', { name });
       return true;
     }
 

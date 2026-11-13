@@ -72,12 +72,12 @@ function ensureBooks(ctx, card) {
   return ctx.shell.charBooks[card.name];
 }
 
-function bookEntryRow(book, entry) {
+function bookEntryRow(book, entry, cardName = '') {
   const keys = entry.keys?.length ? entry.keys.join('、') : '没有关键词';
   const preview = String(entry.content || '').replace(/\s+/g, ' ').slice(0, 72);
   const sub = [keys, entry.constant ? '常驻' : '', preview].filter(Boolean).join(' · ');
   return `
-    <button class="mp-wi-row${entry.disabled ? ' is-off' : ''}" data-act="char-wi-toggle"
+    <button class="mp-wi-row${entry.disabled ? ' is-off' : ''}" data-act="char-wi-toggle" data-name="${esc(cardName)}"
       data-book="${esc(book.name)}" data-uid="${esc(entry.uid)}" type="button" role="switch" aria-checked="${entry.disabled ? 'false' : 'true'}">
       <span class="mp-wi-main">
         <span class="mp-wi-name">${esc(entry.title)}</span>
@@ -112,7 +112,7 @@ function booksHtml(cache, cardName) {
             </div>
             ${book.error ? `<div class="mp-wi-note">${esc(book.error)}</div>` : ''}
             <div class="mp-card mp-wi-list">
-              ${book.entries.length ? book.entries.map(entry => bookEntryRow(book, entry)).join('') : '<div class="mp-empty">这本世界书里没有条目。</div>'}
+              ${book.entries.length ? book.entries.map(entry => bookEntryRow(book, entry, cardName)).join('') : '<div class="mp-empty">这本世界书里没有条目。</div>'}
             </div>
           </div>`;
       }).join('')}
@@ -221,7 +221,7 @@ export function charactersHandle(ctx, act, data) {
     }
 
     if (act === 'char-wi-toggle') {
-      const card = findCard(state, activeCardName);
+      const card = findCard(state, String(data?.name || activeCardName || ''));
       const cache = card ? bookCache(ctx, card) : null;
       const book = cache?.books?.find(item => item.name === String(data?.book || ''));
       const entry = book?.entries?.find(item => String(item.uid) === String(data?.uid || ''));
@@ -259,6 +259,57 @@ export function charactersHandle(ctx, act, data) {
     return false;
 }
 
+/**
+ * 角色卡内容本体：正文各段 + 记忆读取 + 关联世界书。
+ * 通讯录里点开角色的那一级页面直接用这块，不再另开「看 TA 的角色卡」一层。
+ */
+export function characterDetailHtml(ctx, card) {
+  const state = ctx.state;
+  const body = SECTIONS
+    .filter(([, key]) => String(card[key] || '').trim())
+    .map(([label, key]) => `
+      <div class="mp-char-block">
+        <div class="mp-char-label">${label}</div>
+        <div class="mp-char-text">${esc(card[key]).replace(/\n/g, '<br>')}</div>
+      </div>`).join('');
+
+  const bookState = ensureBooks(ctx, card);
+  const contact = contactsOf(state).find(item => item.name === card.name) || null;
+  const memPreset = memoryPresetFor(state, null);
+  const memMode = contact ? memoryReadModeFor(state, contact.id, memPreset) : memoryGlobalReadMode(state);
+  const readSummary = memMode !== 'recent';
+  const memHint = !contact
+    ? '先存进通讯录，才记得住'
+    : readSummary
+      ? '有总结读总结，没有读原文'
+      : '只读最近几楼的原文';
+
+  return `
+    <div class="mp-group-label" style="margin-top:14px">角色卡</div>
+    ${body || '<div class="mp-empty">这张卡只有名字。</div>'}
+
+    <div class="mp-group-label" style="margin-top:14px">记忆读取</div>
+    <div class="mp-group-box">
+      <button class="mp-set-row${contact ? '' : ' is-off'}" data-act="char-mem-toggle" data-name="${esc(card.name)}" type="button"${contact ? '' : ' disabled aria-disabled="true"'}>
+        <span class="mp-set-ico">${icon('book')}</span>
+        <span class="mp-set-name">读酒馆总结<small>${esc(memHint)}</small></span>
+        <span class="mp-switch${contact && readSummary ? ' on' : ''}"></span>
+      </button>
+      ${contact ? `
+      <button class="mp-set-row" data-act="char-mem-open" data-id="${esc(contact.id)}" type="button">
+        <span class="mp-set-ico">${icon('search')}</span>
+        <span class="mp-set-name">${esc(card.name)} 的记忆<small>看读到几段 / 几楼、多少字，也能换记忆方案</small></span>
+        <span style="color:var(--text-4)">${icon('chevron')}</span>
+      </button>` : ''}
+    </div>
+
+    <div class="mp-wi-head">
+      <span class="mp-wi-title">关联世界书</span>
+      <button class="mp-wi-scan" data-act="char-wi-scan" data-name="${esc(card.name)}" type="button">${icon('refresh')}<span>重新扫描</span></button>
+    </div>
+    ${booksHtml(bookState, card.name)}`;
+}
+
 export const characterApp = {
   id: 'character-card',
 
@@ -270,25 +321,7 @@ export const characterApp = {
 
     const inContacts = contactsOf(state).some(contact => contact.name === card.name);
 
-    const body = SECTIONS
-      .filter(([, key]) => String(card[key] || '').trim())
-      .map(([label, key]) => `
-        <div class="mp-char-block">
-          <div class="mp-char-label">${label}</div>
-          <div class="mp-char-text">${esc(card[key]).replace(/\n/g, '<br>')}</div>
-        </div>`).join('');
-
     const tags = (card.tags || []).map(tag => `<span class="mp-char-tag">${esc(tag)}</span>`).join('');
-    const bookState = ensureBooks(ctx, card);
-    const contact = contactsOf(state).find(item => item.name === card.name) || null;
-    const memPreset = memoryPresetFor(state, null);
-    const memMode = contact ? memoryReadModeFor(state, contact.id, memPreset) : memoryGlobalReadMode(state);
-    const readSummary = memMode !== 'recent';
-    const memHint = !contact
-      ? '先存进通讯录，才记得住'
-      : readSummary
-        ? '有总结读总结，没有读原文'
-        : '只读最近几楼的原文';
 
     return `
       <div class="mp-page-body">
@@ -299,28 +332,7 @@ export const characterApp = {
           ${tags ? `<div class="mp-char-tags">${tags}</div>` : ''}
         </div>
 
-        ${body || '<div class="mp-empty">这张卡只有名字。</div>'}
-
-        <div class="mp-group-label" style="margin-top:14px">记忆读取</div>
-        <div class="mp-group-box">
-          <button class="mp-set-row${contact ? '' : ' is-off'}" data-act="char-mem-toggle" data-name="${esc(card.name)}" type="button"${contact ? '' : ' disabled aria-disabled="true"'}>
-            <span class="mp-set-ico">${icon('book')}</span>
-            <span class="mp-set-name">读酒馆总结<small>${esc(memHint)}</small></span>
-            <span class="mp-switch${contact && readSummary ? ' on' : ''}"></span>
-          </button>
-          ${contact ? `
-          <button class="mp-set-row" data-act="char-mem-open" data-id="${esc(contact.id)}" type="button">
-            <span class="mp-set-ico">${icon('search')}</span>
-            <span class="mp-set-name">${esc(card.name)} 的记忆<small>看读到几段 / 几楼、多少字，也能换记忆方案</small></span>
-            <span style="color:var(--text-4)">${icon('chevron')}</span>
-          </button>` : ''}
-        </div>
-
-        <div class="mp-wi-head">
-          <span class="mp-wi-title">关联世界书</span>
-          <button class="mp-wi-scan" data-act="char-wi-scan" data-name="${esc(card.name)}" type="button">${icon('refresh')}<span>重新扫描</span></button>
-        </div>
-        ${booksHtml(bookState, card.name)}
+        ${characterDetailHtml(ctx, card)}
 
         <div class="mp-user-actions">
           <button class="mp-btn${inContacts ? '' : ' accent'}" data-act="char-add" data-name="${esc(card.name)}" type="button">
@@ -371,3 +383,8 @@ export const characterApp = {
     return false;
   },
 };
+
+/** 角色卡这一页上的动作（记忆读取、世界书开关）：通讯录把卡片摊进一级页面后也走这套 */
+export function characterCardHandle(ctx, act, data) {
+  return characterApp.handle(ctx, act, data);
+}

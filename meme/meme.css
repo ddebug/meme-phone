@@ -1710,22 +1710,10 @@
   background: linear-gradient(180deg, rgba(10, 8, 20, .18) 0%, rgba(10, 8, 20, .32) 60%, rgba(10, 8, 20, .52) 100%);
 }
 
-/* ------------------------------------------------------------ 缩放适配 */
-@media (max-height: 900px) {
-  .mp-device { transform: scale(.94); }
-}
-
-@media (max-height: 820px) {
-  .mp-device { transform: scale(.86); }
-}
-
-@media (max-height: 720px) {
-  .mp-device { transform: scale(.76); }
-}
-
-@media (max-height: 640px) {
-  .mp-device { transform: scale(.66); }
-}
+/* ------------------------------------------------------------ 缩放适配
+   手机壳的尺寸由 shell.js 的 deviceScale() 按可用视口算好后写进
+   inline transform（translate + scale 一起），这里不再用媒体查询改
+   transform —— 否则会被 inline style 直接覆盖，短窗口下手机被上下裁掉。 */
 
 @media (prefers-reduced-motion: reduce) {
   .mp-page .mp-thread .mp-sheet { animation: none; }

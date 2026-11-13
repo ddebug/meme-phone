@@ -320,6 +320,20 @@ export function createShell(options) {
       </div>`;
   }
 
+  /* 桌面宿主的窗口往往装不下 844 高的手机：按可用视口等比缩小，整机才不会被裁掉 */
+  function deviceScale() {
+    const vw = window.visualViewport?.width || window.innerWidth || 0;
+    const vh = window.visualViewport?.height || window.innerHeight || 0;
+    if (!vw || !vh) return 1;
+    const fit = Math.min((vw - 48) / 390, (vh - 48) / 844);
+    return Math.max(0.45, Math.min(1, fit));
+  }
+
+  function deviceTransform() {
+    const offset = shell.deviceOffset || { x: 0, y: 0 };
+    return `translate(${Math.round(offset.x || 0)}px, ${Math.round(offset.y || 0)}px) scale(${deviceScale().toFixed(4)})`;
+  }
+
   function render() {
     if (!root) return;
     const state = ctx.state;
@@ -331,11 +345,9 @@ export function createShell(options) {
     root.dataset.mpTheme = status;
     applyWall(root, state.settings);
     applyLook(root, state.settings);
-    const offsetX = Math.round(shell.deviceOffset?.x || 0);
-    const offsetY = Math.round(shell.deviceOffset?.y || 0);
     root.innerHTML = `
       <div class="mp-overlay">
-        <div class="mp-device" style="transform: translate(${offsetX}px, ${offsetY}px)">
+        <div class="mp-device" style="transform: ${deviceTransform()}">
           <div class="mp-screen">
             ${state.settings.dress?.island === 'hide' ? '' : '<div class="mp-island"></div>'}
             <div class="mp-drag-handle" data-drag="phone" title="按住顶部拖动手机"></div>
@@ -492,8 +504,9 @@ export function createShell(options) {
   /* 顶部中间拖动手机壳：只在最上面一条区域响应，不影响页面里的滑动 */
   let phoneDrag = null;
   function clampDeviceOffset(x, y) {
-    const maxX = Math.max(0, (window.innerWidth + 390) / 2 - 90);
-    const maxY = Math.max(0, (window.innerHeight + 844) / 2 - 120);
+    const scale = deviceScale();
+    const maxX = Math.max(0, (window.innerWidth + 390 * scale) / 2 - 90 * scale);
+    const maxY = Math.max(0, (window.innerHeight + 844 * scale) / 2 - 120 * scale);
     return {
       x: Math.max(-maxX, Math.min(maxX, x)),
       y: Math.max(-maxY, Math.min(maxY, y)),
@@ -525,7 +538,7 @@ export function createShell(options) {
       phoneDrag.baseY + event.clientY - phoneDrag.startY
     );
     shell.deviceOffset = next;
-    device.style.transform = `translate(${Math.round(next.x)}px, ${Math.round(next.y)}px)`;
+    device.style.transform = deviceTransform();
     event.preventDefault();
   }, { passive: false });
   const endPhoneDrag = event => {
@@ -538,7 +551,7 @@ export function createShell(options) {
   window.addEventListener('resize', () => {
     shell.deviceOffset = clampDeviceOffset(shell.deviceOffset?.x || 0, shell.deviceOffset?.y || 0);
     const device = root.querySelector('.mp-device');
-    if (device) device.style.transform = `translate(${Math.round(shell.deviceOffset.x)}px, ${Math.round(shell.deviceOffset.y)}px)`;
+    if (device) device.style.transform = deviceTransform();
   });
 
   /* 上滑：页面里快速上滑一段就回桌面 */

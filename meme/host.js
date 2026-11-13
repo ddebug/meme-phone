@@ -856,15 +856,16 @@ export async function readWorldBookNames() {
  */
 export async function readTavernPersonas() {
   const script = await loadHostScript();
-  if (!script) return { available: false, list: [], current: '' };
+  if (!script) return { available: false, list: [], current: '', currentName: '', currentAvatar: '' };
   try {
     const ctx = script.getContext?.() || script;
     const pu = script.power_user || script.powerUser || ctx.powerUser || ctx.powerUserSettings || globalThis.power_user || {};
     const names = pu.personas && typeof pu.personas === 'object' ? pu.personas : null;
-    if (!names) return { available: false, list: [], current: '' };
+    if (!names) return { available: false, list: [], current: '', currentName: '', currentAvatar: '' };
     const descs = pu.persona_descriptions && typeof pu.persona_descriptions === 'object' ? pu.persona_descriptions : {};
     const thumb = script.getThumbnailUrl;
     const current = String(script.user_avatar || ctx.user_avatar || '');
+    const currentName = String(script.name1 || ctx.name1 || '');
     const list = Object.entries(names)
       .filter(([, name]) => Boolean(name))
       .map(([key, name]) => ({
@@ -874,9 +875,16 @@ export async function readTavernPersonas() {
         lorebook: String(descs[key]?.lorebook || (key === current ? pu.persona_description_lorebook : '') || ''),
         avatarUrl: typeof thumb === 'function' ? thumb('persona', key) : '',
       }));
-    return { available: true, list, current };
+    return {
+      available: true,
+      list,
+      current,
+      currentName,
+      /* 当前这人可能没设显示名、被上面的过滤筛掉，头像仍按文件名取 */
+      currentAvatar: typeof thumb === 'function' && current ? thumb('persona', current) : '',
+    };
   } catch {
-    return { available: false, list: [], current: '' };
+    return { available: false, list: [], current: '', currentName: '', currentAvatar: '' };
   }
 }
 

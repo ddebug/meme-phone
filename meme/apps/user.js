@@ -28,10 +28,16 @@ function activeUser(state) {
 }
 
 function applyUser(state, user) {
-  if (!user) return;
+  /* 没有这一位、或这一位没头像时，把旧名字和旧头像清掉，别留在主页上张冠李戴 */
+  if (!user) {
+    state.settings.user.name = '我';
+    state.settings.user.key = '';
+    state.settings.user.avatar = '';
+    return;
+  }
   state.settings.user.name = user.name || '我';
   state.settings.user.key = user.key || '';
-  if (user.avatarUrl) state.settings.user.avatar = user.avatarUrl;
+  state.settings.user.avatar = user.avatarUrl || '';
 }
 
 /* ----------------------------------------------------- 名单 */
@@ -136,7 +142,24 @@ export const userListApp = {
         return true;
       }
       state.settings.userMode = 'follow';
-      applyUser(state, userByKey(state, state.settings.user.key));
+      /* 切回跟随要立刻问一次酒馆现在是谁，不能沿用上一条 state 里的旧 key */
+      const sync = ctx.host?.syncUsers;
+      if (typeof sync === 'function') {
+        sync().then(result => {
+          applyUser(state, userByKey(state, state.settings.user.key));
+          ctx.save();
+          ctx.rerender();
+          const name = state.settings.user.name;
+          ctx.toast(result?.current ? `跟着酒馆走 · ${name}` : '跟着酒馆走，酒馆那边还没选用户');
+        }).catch(error => {
+          applyUser(state, null);
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(error.message || '跟着酒馆走');
+        });
+        return true;
+      }
+      applyUser(state, null);
       ctx.save();
       ctx.toast('跟着酒馆走');
       ctx.rerender();

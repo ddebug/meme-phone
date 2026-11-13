@@ -8158,15 +8158,16 @@ async function readWorldBookNames() {
  */
 async function readTavernPersonas() {
   const script = await loadHostScript();
-  if (!script) return { available: false, list: [], current: '' };
+  if (!script) return { available: false, list: [], current: '', currentName: '', currentAvatar: '' };
   try {
     const ctx = script.getContext?.() || script;
     const pu = script.power_user || script.powerUser || ctx.powerUser || ctx.powerUserSettings || globalThis.power_user || {};
     const names = pu.personas && typeof pu.personas === 'object' ? pu.personas : null;
-    if (!names) return { available: false, list: [], current: '' };
+    if (!names) return { available: false, list: [], current: '', currentName: '', currentAvatar: '' };
     const descs = pu.persona_descriptions && typeof pu.persona_descriptions === 'object' ? pu.persona_descriptions : {};
     const thumb = script.getThumbnailUrl;
     const current = String(script.user_avatar || ctx.user_avatar || '');
+    const currentName = String(script.name1 || ctx.name1 || '');
     const list = Object.entries(names)
       .filter(([, name]) => Boolean(name))
       .map(([key, name]) => ({
@@ -8176,9 +8177,16 @@ async function readTavernPersonas() {
         lorebook: String(descs[key]?.lorebook || (key === current ? pu.persona_description_lorebook : '') || ''),
         avatarUrl: typeof thumb === 'function' ? thumb('persona', key) : '',
       }));
-    return { available: true, list, current };
+    return {
+      available: true,
+      list,
+      current,
+      currentName,
+      /* 当前这人可能没设显示名、被上面的过滤筛掉，头像仍按文件名取 */
+      currentAvatar: typeof thumb === 'function' && current ? thumb('persona', current) : '',
+    };
   } catch {
-    return { available: false, list: [], current: '' };
+    return { available: false, list: [], current: '', currentName: '', currentAvatar: '' };
   }
 }
 
@@ -14139,10 +14147,16 @@ function activeUser(state) {
 }
 
 function applyUser(state, user) {
-  if (!user) return;
+  /* 没有这一位、或这一位没头像时，把旧名字和旧头像清掉，别留在主页上张冠李戴 */
+  if (!user) {
+    state.settings.user.name = '我';
+    state.settings.user.key = '';
+    state.settings.user.avatar = '';
+    return;
+  }
   state.settings.user.name = user.name || '我';
   state.settings.user.key = user.key || '';
-  if (user.avatarUrl) state.settings.user.avatar = user.avatarUrl;
+  state.settings.user.avatar = user.avatarUrl || '';
 }
 
 /* ----------------------------------------------------- 名单 */
@@ -14247,7 +14261,24 @@ const userListApp = {
         return true;
       }
       state.settings.userMode = 'follow';
-      applyUser(state, userByKey(state, state.settings.user.key));
+      /* 切回跟随要立刻问一次酒馆现在是谁，不能沿用上一条 state 里的旧 key */
+      const sync = ctx.host?.syncUsers;
+      if (typeof sync === 'function') {
+        sync().then(result => {
+          applyUser(state, userByKey(state, state.settings.user.key));
+          ctx.save();
+          ctx.rerender();
+          const name = state.settings.user.name;
+          ctx.toast(result?.current ? `跟着酒馆走 · ${name}` : '跟着酒馆走，酒馆那边还没选用户');
+        }).catch(error => {
+          applyUser(state, null);
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(error.message || '跟着酒馆走');
+        });
+        return true;
+      }
+      applyUser(state, null);
       ctx.save();
       ctx.toast('跟着酒馆走');
       ctx.rerender();
@@ -18140,11 +18171,12 @@ async function openMemePhone(options = {}) {
     });
     state.usersFromTavern = true;
 
-    const useUser = (user) => {
-      if (!user) return;
-      state.settings.user.name = user.name || '我';
-      state.settings.user.key = user.key || '';
-      if (user.avatarUrl) state.settings.user.avatar = user.avatarUrl;
+    /* 换人时头像必须跟着换：新这位没头像就清掉，别留着上一个人的图 */
+    const useUser = (user, fallback = {}) => {
+      const key = String(user?.key || fallback.key || '');
+      state.settings.user.key = key;
+      state.settings.user.name = String(user?.name || fallback.name || '我');
+      state.settings.user.avatar = String(user?.avatarUrl || fallback.avatar || '');
     };
 
     if (state.settings.userMode === 'pin') {
@@ -18155,7 +18187,10 @@ async function openMemePhone(options = {}) {
         useUser(state.users[0]);
       }
     } else {
-      useUser(state.users.find(user => user.key === result.current) || null);
+      useUser(
+        state.users.find(user => user.key === result.current) || null,
+        { key: result.current, name: result.currentName, avatar: result.currentAvatar },
+      );
     }
     return result;
   };
@@ -18325,13 +18360,15 @@ async function openMemePhone(options = {}) {
     try {
       const result = await readTavernPersonas();
       if (!result.available) return;
-      const current = result.list.find(user => user.key === result.current);
-      if (!current || current.key === state.settings.user.key) return;
+      const key = String(result.current || '');
+      if (!key || key === state.settings.user.key) return;
+      /* 这位可能在名单里被筛掉（没设显示名），名字退回酒馆里的 name1，头像按文件名取 */
+      const current = result.list.find(user => user.key === key) || null;
       state.users = result.list;
       state.usersFromTavern = true;
-      state.settings.user.name = current.name || '我';
-      state.settings.user.key = current.key;
-      if (current.avatarUrl) state.settings.user.avatar = current.avatarUrl;
+      state.settings.user.key = key;
+      state.settings.user.name = String(current?.name || result.currentName || '我');
+      state.settings.user.avatar = String(current?.avatarUrl || result.currentAvatar || '');
       store.touch();
       shellApi?.render();
     } catch { /* 换不过来就算了，等下次打开 */ }

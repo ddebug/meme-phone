@@ -293,11 +293,12 @@ export async function openMemePhone(options = {}) {
     });
     state.usersFromTavern = true;
 
-    const useUser = (user) => {
-      if (!user) return;
-      state.settings.user.name = user.name || '我';
-      state.settings.user.key = user.key || '';
-      if (user.avatarUrl) state.settings.user.avatar = user.avatarUrl;
+    /* 换人时头像必须跟着换：新这位没头像就清掉，别留着上一个人的图 */
+    const useUser = (user, fallback = {}) => {
+      const key = String(user?.key || fallback.key || '');
+      state.settings.user.key = key;
+      state.settings.user.name = String(user?.name || fallback.name || '我');
+      state.settings.user.avatar = String(user?.avatarUrl || fallback.avatar || '');
     };
 
     if (state.settings.userMode === 'pin') {
@@ -308,7 +309,10 @@ export async function openMemePhone(options = {}) {
         useUser(state.users[0]);
       }
     } else {
-      useUser(state.users.find(user => user.key === result.current) || null);
+      useUser(
+        state.users.find(user => user.key === result.current) || null,
+        { key: result.current, name: result.currentName, avatar: result.currentAvatar },
+      );
     }
     return result;
   };
@@ -478,13 +482,15 @@ export async function openMemePhone(options = {}) {
     try {
       const result = await readTavernPersonas();
       if (!result.available) return;
-      const current = result.list.find(user => user.key === result.current);
-      if (!current || current.key === state.settings.user.key) return;
+      const key = String(result.current || '');
+      if (!key || key === state.settings.user.key) return;
+      /* 这位可能在名单里被筛掉（没设显示名），名字退回酒馆里的 name1，头像按文件名取 */
+      const current = result.list.find(user => user.key === key) || null;
       state.users = result.list;
       state.usersFromTavern = true;
-      state.settings.user.name = current.name || '我';
-      state.settings.user.key = current.key;
-      if (current.avatarUrl) state.settings.user.avatar = current.avatarUrl;
+      state.settings.user.key = key;
+      state.settings.user.name = String(current?.name || result.currentName || '我');
+      state.settings.user.avatar = String(current?.avatarUrl || result.currentAvatar || '');
       store.touch();
       shellApi?.render();
     } catch { /* 换不过来就算了，等下次打开 */ }

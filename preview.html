@@ -11055,18 +11055,6 @@ const contactsApp = {
           </button>`).join('')}`;
     }).join('');
 
-    /* 记忆入口收在通讯录里：入口和「按角色改读取方式」在一起，桌面上不再放独立 App */
-    const memoryRow = `
-      <div class="mp-group" style="margin-top:10px">
-        <div class="mp-group-box">
-          <button class="mp-set-row" data-act="contacts-memory" type="button">
-            <span class="mp-set-ico">${icon('book')}</span>
-            <span class="mp-set-name">酒馆记忆<small>看当前读的是总结还是原文；按角色单独改</small></span>
-            <span style="color:var(--text-4)">${icon('chevron')}</span>
-          </button>
-        </div>
-      </div>`;
-
     return `
       <div class="mp-page-body">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
@@ -11084,7 +11072,7 @@ const contactsApp = {
 
         ${tab === 'cards'
           ? charactersPanel(ctx)
-          : `${memoryRow}${body || '<div class="mp-empty">通讯录还是空的。<br>点右上角，把酒馆里的角色同步过来。</div>'}`}
+          : (body || '<div class="mp-empty">通讯录还是空的。<br>点右上角，把酒馆里的角色同步过来。</div>')}
       </div>`;
   },
 
@@ -11108,11 +11096,6 @@ const contactsApp = {
 
     if (act === 'open-contact') {
       ctx.go('contact', { contactId: data.contact });
-      return true;
-    }
-
-    if (act === 'contacts-memory') {
-      ctx.go('memory-presets');
       return true;
     }
 
@@ -11213,6 +11196,7 @@ const contactApp = {
           <button class="mp-btn" data-act="contact-extras" data-contact="${contact.id}" type="button" style="flex:1">${icon('theater')}小剧场 ${extras.length || ''}</button>
         </div>
         ${contact.kind === 'group' ? '' : `<button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button">${icon('search')}查 TA 的手机</button>`}
+        ${contact.kind === 'group' ? '' : `<button class="mp-btn mp-cp-entry" data-act="contact-memory" data-contact="${contact.id}" type="button">${icon('book')}酒馆记忆 · 看这位读到什么</button>`}
         ${card ? `<button class="mp-btn mp-cp-entry" data-act="contact-card" data-name="${esc(card.name)}" type="button">${icon('contacts')}看 TA 的角色卡</button>` : ''}
         ${rows}
       </div>`;
@@ -11233,6 +11217,13 @@ const contactApp = {
       const chat = chatFor(ctx.state, data.contact);
       ctx.save();
       ctx.go('thread', { chatId: chat.id });
+      return true;
+    }
+
+    /* 点角色看这位自己的酒馆记忆：不再另设独立入口 */
+    if (act === 'contact-memory') {
+      if (!contact) return true;
+      ctx.go('memory-presets', { contactId: contact.id });
       return true;
     }
 
@@ -11386,7 +11377,6 @@ const settingsApp = {
           <div class="mp-group-label">记忆</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'book', title: '默认读总结', sub: state.settings.memory.readMode === 'recent' ? '关着：没单独设置的角色读最近原文' : '开着：有柏宝书总结就先读总结，没有才读原文', act: 'set-toggle-memory-read', toggle: state.settings.memory.readMode !== 'recent' })}
-            ${row(ctx, { iconName: 'search', title: '酒馆记忆', sub: '看当前读到了什么；按角色切换总结或原文', act: 'set-open', app: 'memory-presets' })}
           </div>
         </div>
 
@@ -14964,11 +14954,19 @@ const characterApp = {
         ${body || '<div class="mp-empty">这张卡只有名字。</div>'}
 
         <div class="mp-group-label" style="margin-top:14px">记忆读取</div>
-        <button class="mp-set-row${contact ? '' : ' is-off'}" data-act="char-mem-toggle" data-name="${esc(card.name)}" type="button"${contact ? '' : ' disabled aria-disabled="true"'}>
-          <span class="mp-set-ico">${icon('book')}</span>
-          <span class="mp-set-name">读酒馆总结<small>${esc(memHint)}</small></span>
-          <span class="mp-switch${contact && readSummary ? ' on' : ''}"></span>
-        </button>
+        <div class="mp-group-box">
+          <button class="mp-set-row${contact ? '' : ' is-off'}" data-act="char-mem-toggle" data-name="${esc(card.name)}" type="button"${contact ? '' : ' disabled aria-disabled="true"'}>
+            <span class="mp-set-ico">${icon('book')}</span>
+            <span class="mp-set-name">读酒馆总结<small>${esc(memHint)}</small></span>
+            <span class="mp-switch${contact && readSummary ? ' on' : ''}"></span>
+          </button>
+          ${contact ? `
+          <button class="mp-set-row" data-act="char-mem-open" data-id="${esc(contact.id)}" type="button">
+            <span class="mp-set-ico">${icon('search')}</span>
+            <span class="mp-set-name">${esc(card.name)} 的记忆<small>看读到几段 / 几楼、多少字，也能换记忆方案</small></span>
+            <span style="color:var(--text-4)">${icon('chevron')}</span>
+          </button>` : ''}
+        </div>
 
         <div class="mp-wi-head">
           <span class="mp-wi-title">关联世界书</span>
@@ -15000,6 +14998,14 @@ const characterApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(next === 'recent' ? `${contact.name} 改成读最近原文` : `${contact.name} 改回读总结`);
+      return true;
+    }
+
+    if (act === 'char-mem-open') {
+      const contactId = String(data?.id || '');
+      const contact = contactId ? contactsOf(state).find(item => item.id === contactId) : null;
+      if (!contact) { ctx.toast('先存进通讯录，才看得到这位的记忆'); return true; }
+      ctx.go('memory-presets', { contactId: contact.id });
       return true;
     }
 
@@ -16852,7 +16858,15 @@ function handle(ctx, act, data) {
 
 const memoryPresetsApp = {
   id: 'memory-presets', name: '酒馆记忆', icon: 'book',
-  render(ctx) { return renderPage(ctx); },
+  render(ctx, params = {}) {
+    /* 从角色卡点进来时直接定位到这位，并重新读一次他的聊天文件 */
+    const wanted = String(params.contactId || '');
+    if (wanted && contactById(ctx.state, wanted)) {
+      if (memoryChosen !== wanted) memoryAutoKey = '';
+      memoryChosen = wanted;
+    }
+    return renderPage(ctx);
+  },
   handle(ctx, act, data) { return handle(ctx, act, data); },
 };
 

@@ -480,6 +480,14 @@ function handle(ctx, act, data) {
 
 export const memoryPresetsApp = {
   id: 'memory-presets', name: '酒馆记忆', icon: 'book',
-  render(ctx) { return renderPage(ctx); },
+  render(ctx, params = {}) {
+    /* 从角色卡点进来时直接定位到这位，并重新读一次他的聊天文件 */
+    const wanted = String(params.contactId || '');
+    if (wanted && contactById(ctx.state, wanted)) {
+      if (memoryChosen !== wanted) memoryAutoKey = '';
+      memoryChosen = wanted;
+    }
+    return renderPage(ctx);
+  },
   handle(ctx, act, data) { return handle(ctx, act, data); },
 };

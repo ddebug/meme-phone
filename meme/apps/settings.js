@@ -62,7 +62,6 @@ export const settingsApp = {
           <div class="mp-group-label">记忆</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'book', title: '默认读总结', sub: state.settings.memory.readMode === 'recent' ? '关着：没单独设置的角色读最近原文' : '开着：有柏宝书总结就先读总结，没有才读原文', act: 'set-toggle-memory-read', toggle: state.settings.memory.readMode !== 'recent' })}
-            ${row(ctx, { iconName: 'search', title: '酒馆记忆', sub: '看当前读到了什么；按角色切换总结或原文', act: 'set-open', app: 'memory-presets' })}
           </div>
         </div>
 

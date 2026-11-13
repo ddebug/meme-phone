@@ -302,11 +302,19 @@ export const characterApp = {
         ${body || '<div class="mp-empty">这张卡只有名字。</div>'}
 
         <div class="mp-group-label" style="margin-top:14px">记忆读取</div>
-        <button class="mp-set-row${contact ? '' : ' is-off'}" data-act="char-mem-toggle" data-name="${esc(card.name)}" type="button"${contact ? '' : ' disabled aria-disabled="true"'}>
-          <span class="mp-set-ico">${icon('book')}</span>
-          <span class="mp-set-name">读酒馆总结<small>${esc(memHint)}</small></span>
-          <span class="mp-switch${contact && readSummary ? ' on' : ''}"></span>
-        </button>
+        <div class="mp-group-box">
+          <button class="mp-set-row${contact ? '' : ' is-off'}" data-act="char-mem-toggle" data-name="${esc(card.name)}" type="button"${contact ? '' : ' disabled aria-disabled="true"'}>
+            <span class="mp-set-ico">${icon('book')}</span>
+            <span class="mp-set-name">读酒馆总结<small>${esc(memHint)}</small></span>
+            <span class="mp-switch${contact && readSummary ? ' on' : ''}"></span>
+          </button>
+          ${contact ? `
+          <button class="mp-set-row" data-act="char-mem-open" data-id="${esc(contact.id)}" type="button">
+            <span class="mp-set-ico">${icon('search')}</span>
+            <span class="mp-set-name">${esc(card.name)} 的记忆<small>看读到几段 / 几楼、多少字，也能换记忆方案</small></span>
+            <span style="color:var(--text-4)">${icon('chevron')}</span>
+          </button>` : ''}
+        </div>
 
         <div class="mp-wi-head">
           <span class="mp-wi-title">关联世界书</span>
@@ -338,6 +346,14 @@ export const characterApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(next === 'recent' ? `${contact.name} 改成读最近原文` : `${contact.name} 改回读总结`);
+      return true;
+    }
+
+    if (act === 'char-mem-open') {
+      const contactId = String(data?.id || '');
+      const contact = contactId ? contactsOf(state).find(item => item.id === contactId) : null;
+      if (!contact) { ctx.toast('先存进通讯录，才看得到这位的记忆'); return true; }
+      ctx.go('memory-presets', { contactId: contact.id });
       return true;
     }
 

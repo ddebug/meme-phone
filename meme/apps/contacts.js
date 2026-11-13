@@ -37,18 +37,6 @@ export const contactsApp = {
           </button>`).join('')}`;
     }).join('');
 
-    /* 记忆入口收在通讯录里：入口和「按角色改读取方式」在一起，桌面上不再放独立 App */
-    const memoryRow = `
-      <div class="mp-group" style="margin-top:10px">
-        <div class="mp-group-box">
-          <button class="mp-set-row" data-act="contacts-memory" type="button">
-            <span class="mp-set-ico">${icon('book')}</span>
-            <span class="mp-set-name">酒馆记忆<small>看当前读的是总结还是原文；按角色单独改</small></span>
-            <span style="color:var(--text-4)">${icon('chevron')}</span>
-          </button>
-        </div>
-      </div>`;
-
     return `
       <div class="mp-page-body">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
@@ -66,7 +54,7 @@ export const contactsApp = {
 
         ${tab === 'cards'
           ? charactersPanel(ctx)
-          : `${memoryRow}${body || '<div class="mp-empty">通讯录还是空的。<br>点右上角，把酒馆里的角色同步过来。</div>'}`}
+          : (body || '<div class="mp-empty">通讯录还是空的。<br>点右上角，把酒馆里的角色同步过来。</div>')}
       </div>`;
   },
 
@@ -90,11 +78,6 @@ export const contactsApp = {
 
     if (act === 'open-contact') {
       ctx.go('contact', { contactId: data.contact });
-      return true;
-    }
-
-    if (act === 'contacts-memory') {
-      ctx.go('memory-presets');
       return true;
     }
 
@@ -195,6 +178,7 @@ export const contactApp = {
           <button class="mp-btn" data-act="contact-extras" data-contact="${contact.id}" type="button" style="flex:1">${icon('theater')}小剧场 ${extras.length || ''}</button>
         </div>
         ${contact.kind === 'group' ? '' : `<button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button">${icon('search')}查 TA 的手机</button>`}
+        ${contact.kind === 'group' ? '' : `<button class="mp-btn mp-cp-entry" data-act="contact-memory" data-contact="${contact.id}" type="button">${icon('book')}酒馆记忆 · 看这位读到什么</button>`}
         ${card ? `<button class="mp-btn mp-cp-entry" data-act="contact-card" data-name="${esc(card.name)}" type="button">${icon('contacts')}看 TA 的角色卡</button>` : ''}
         ${rows}
       </div>`;
@@ -215,6 +199,13 @@ export const contactApp = {
       const chat = chatFor(ctx.state, data.contact);
       ctx.save();
       ctx.go('thread', { chatId: chat.id });
+      return true;
+    }
+
+    /* 点角色看这位自己的酒馆记忆：不再另设独立入口 */
+    if (act === 'contact-memory') {
+      if (!contact) return true;
+      ctx.go('memory-presets', { contactId: contact.id });
       return true;
     }
 

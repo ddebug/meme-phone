@@ -17106,8 +17106,8 @@ const replyPresetApp = {
         <button class="mp-icon-btn" data-act="reply-del" type="button" title="删除">${icon('trash')}</button>
       </div>
       <div class="mp-page-body">
-        <div class="mp-title" style="margin-top:0">${esc(preset.name || '未命名预设')}</div>
-        <div class="mp-subtitle">${isActive ? '手机现在默认用这套' : '只在聊天设置里选中它时生效'} · 条目按顺序拼进模型消息</div>
+        <div class="mp-title" style="margin-top:0">回复预设</div>
+        <div class="mp-subtitle">条目按顺序拼进模型消息 · ${isActive ? '手机现在默认用这套' : '只在聊天设置里选中它时生效'}</div>
 
         ${deleting ? `
         <div class="mp-group mp-api-inline is-danger" style="margin-top:12px">
@@ -17116,7 +17116,8 @@ const replyPresetApp = {
           <button class="mp-draw-side" data-act="reply-del-cancel" type="button">取消</button>
         </div>` : ''}
 
-        <div class="mp-group" style="margin-top:14px">
+        <div class="mp-group-label" style="margin-top:14px">基本信息</div>
+        <div class="mp-group">
           ${renaming ? `
           <div class="mp-api-inline">
             <input id="mpReplyName" class="mp-api-input" type="text" maxlength="20" value="${esc(preset.name || '')}" placeholder="预设名字">
@@ -17124,7 +17125,7 @@ const replyPresetApp = {
             <button class="mp-draw-side" data-act="reply-rename-cancel" type="button">取消</button>
           </div>` : `
           <button class="mp-row" data-act="reply-field" data-key="name" type="button">
-            <span class="mp-row-name" style="flex:none">名称</span>
+            <span class="mp-row-name" style="flex:none">预设名称</span>
             <span class="mp-api-value">${esc(preset.name || '没填')}</span>
             ${icon('chevron')}
           </button>`}

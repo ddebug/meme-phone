@@ -37,6 +37,18 @@ export const contactsApp = {
           </button>`).join('')}`;
     }).join('');
 
+    /* 记忆入口收在通讯录里：入口和「按角色改读取方式」在一起，桌面上不再放独立 App */
+    const memoryRow = `
+      <div class="mp-group" style="margin-top:10px">
+        <div class="mp-group-box">
+          <button class="mp-set-row" data-act="contacts-memory" type="button">
+            <span class="mp-set-ico">${icon('book')}</span>
+            <span class="mp-set-name">酒馆记忆<small>看当前读的是总结还是原文；按角色单独改</small></span>
+            <span style="color:var(--text-4)">${icon('chevron')}</span>
+          </button>
+        </div>
+      </div>`;
+
     return `
       <div class="mp-page-body">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
@@ -54,7 +66,7 @@ export const contactsApp = {
 
         ${tab === 'cards'
           ? charactersPanel(ctx)
-          : (body || '<div class="mp-empty">通讯录还是空的。<br>点右上角，把酒馆里的角色同步过来。</div>')}
+          : `${memoryRow}${body || '<div class="mp-empty">通讯录还是空的。<br>点右上角，把酒馆里的角色同步过来。</div>'}`}
       </div>`;
   },
 
@@ -78,6 +90,11 @@ export const contactsApp = {
 
     if (act === 'open-contact') {
       ctx.go('contact', { contactId: data.contact });
+      return true;
+    }
+
+    if (act === 'contacts-memory') {
+      ctx.go('memory-presets');
       return true;
     }
 

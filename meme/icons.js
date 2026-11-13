@@ -98,7 +98,6 @@ export const APP_ICON_TARGETS = [
   { id: 'draw', name: '绘图', icon: 'image' },
   { id: 'plans', name: '计划', icon: 'plan' },
   { id: 'dress', name: '装扮', icon: 'brush' },
-  { id: 'memory-presets', name: '记忆', icon: 'book' },
   { id: 'presets', name: '预设', icon: 'reply' },
   { id: 'api', name: '接口', icon: 'code' },
 ];

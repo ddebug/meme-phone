@@ -2069,6 +2069,7 @@ body {
   justify-content: space-between;
   gap: 8px;
   margin-top: 12px;
+  margin-bottom: 6px;
 }
 
 .mp-root .mp-draw-group-head .mp-group-label {
@@ -2147,6 +2148,28 @@ body {
   color: var(--accent-deep);
   font-weight: 600;
 }
+/* 预设行的低频操作：新建 / 改名 / 删除收成方图标按钮，不再占一整排 */
+.mp-root .mp-draw-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  padding: 0;
+  border: 1px solid var(--field-border);
+  border-radius: 14px;
+  background: var(--field-solid);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.mp-root .mp-draw-icon .mp-i { width: 17px; height: 17px; }
+.mp-root .mp-draw-icon:active { transform: scale(.95); }
+.mp-root .mp-draw-group-head .mp-draw-icon {
+  width: 34px;
+  height: 30px;
+  border-radius: 11px;
+}
+.mp-root .mp-draw-icon.is-danger { color: #b75a73; }
+.mp-root[data-mp-theme="night"] .mp-draw-icon.is-danger { color: #ee9bb1; }
 .mp-root .mp-draw-side.is-danger { color: #d94b4b; }
 
 .mp-root .mp-draw-hint {
@@ -12475,13 +12498,15 @@ const drawApp = {
           <button class="mp-draw-state-btn" data-act="${ep.engine === 'custom' ? 'draw-url' : 'draw-key'}" type="button">${ep.engine === 'custom' ? '改地址' : '填 Key'}</button>
         </div>
 
-        <div class="mp-group-label" style="margin-top:12px">整体方案</div>
-        <div class="mp-select-wrap"><select data-act="draw-scheme">${schemeOptions}</select>${icon('chevron')}</div>
-        <div class="mp-draw-actions">
-          <button class="mp-draw-action is-primary" data-act="draw-scheme-save" type="button">保存</button>
-          <button class="mp-draw-action" data-act="draw-scheme-new" type="button">新建</button>
-          <button class="mp-draw-action" data-act="draw-scheme-rename" type="button">改名</button>
-          <button class="mp-draw-action is-danger" data-act="draw-scheme-del" type="button">删除</button>
+        <div class="mp-draw-group-head">
+          <span class="mp-group-label">整体方案</span>
+          <button class="mp-draw-icon" data-act="draw-scheme-new" type="button" aria-label="新建整体方案">${icon('plus')}</button>
+        </div>
+        <div class="mp-draw-switch-row">
+          <div class="mp-select-wrap"><select data-act="draw-scheme">${schemeOptions}</select>${icon('chevron')}</div>
+          <button class="mp-draw-side is-primary" data-act="draw-scheme-save" type="button">保存</button>
+          <button class="mp-draw-icon" data-act="draw-scheme-rename" type="button" aria-label="改方案名">${icon('brush')}</button>
+          <button class="mp-draw-icon is-danger" data-act="draw-scheme-del" type="button" aria-label="删除这套方案">${icon('trash')}</button>
         </div>
         ${drawEdit?.kind === 'scheme' ? nameEditBlock('scheme', drawEdit.value) : ''}
         ${drawDel?.kind === 'scheme' ? deleteConfirmBlock('scheme', `只会删「${scheme?.name || '当前方案'}」这套组合，接口预设和提示词预设都还在。`) : ''}
@@ -12491,15 +12516,13 @@ const drawApp = {
 
         <div class="mp-draw-group-head">
           <span class="mp-group-label">绘图接口预设</span>
+          <button class="mp-draw-icon" data-act="draw-api-new" type="button" aria-label="新建接口预设">${icon('plus')}</button>
         </div>
         <div class="mp-draw-switch-row">
           <div class="mp-select-wrap"><select data-act="draw-api">${apiOptions}</select>${icon('chevron')}</div>
           <button class="mp-draw-side is-primary" data-act="draw-api-save" type="button">保存</button>
-          <button class="mp-draw-side is-danger" data-act="draw-api-del" type="button">删除</button>
-        </div>
-        <div class="mp-draw-actions">
-          <button class="mp-draw-action" data-act="draw-api-new" type="button">＋ 新建接口预设</button>
-          <button class="mp-draw-action" data-act="draw-api-rename" type="button">改名</button>
+          <button class="mp-draw-icon" data-act="draw-api-rename" type="button" aria-label="改接口名">${icon('brush')}</button>
+          <button class="mp-draw-icon is-danger" data-act="draw-api-del" type="button" aria-label="删除这套接口">${icon('trash')}</button>
         </div>
         ${drawEdit?.kind === 'api' ? nameEditBlock('api', drawEdit.value) : ''}
         ${drawDel?.kind === 'api' ? deleteConfirmBlock('api', `只会删「${ep.name || '当前接口'}」这套接口，用它的整体方案会换回第一套接口。`) : ''}
@@ -12535,15 +12558,13 @@ const drawApp = {
 
         <div class="mp-draw-group-head">
           <span class="mp-group-label">提示词预设</span>
+          <button class="mp-draw-icon" data-act="draw-preset-new" type="button" aria-label="新建提示词预设">${icon('plus')}</button>
         </div>
         <div class="mp-draw-switch-row">
           <div class="mp-select-wrap"><select data-act="draw-preset">${promptOptions}</select>${icon('chevron')}</div>
           <button class="mp-draw-side is-primary" data-act="draw-prompt-save" type="button">保存</button>
-          <button class="mp-draw-side is-danger" data-act="draw-prompt-del" type="button">删除</button>
-        </div>
-        <div class="mp-draw-actions">
-          <button class="mp-draw-action" data-act="draw-preset-new" type="button">＋ 新建提示词预设</button>
-          <button class="mp-draw-action" data-act="draw-preset-rename" type="button">改名</button>
+          <button class="mp-draw-icon" data-act="draw-preset-rename" type="button" aria-label="改提示词名">${icon('brush')}</button>
+          <button class="mp-draw-icon is-danger" data-act="draw-preset-del" type="button" aria-label="删除这套提示词">${icon('trash')}</button>
         </div>
         ${drawEdit?.kind === 'preset' ? nameEditBlock('preset', drawEdit.value) : ''}
         ${drawDel?.kind === 'preset' ? deleteConfirmBlock('preset', `只会删「${preset?.name || '当前提示词'}」这套提示词，用它的整体方案会换回第一套提示词。`) : ''}

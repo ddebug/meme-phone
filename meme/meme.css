@@ -2052,6 +2052,7 @@
   justify-content: space-between;
   gap: 8px;
   margin-top: 12px;
+  margin-bottom: 6px;
 }
 
 .mp-root .mp-draw-group-head .mp-group-label {
@@ -2130,6 +2131,28 @@
   color: var(--accent-deep);
   font-weight: 600;
 }
+/* 预设行的低频操作：新建 / 改名 / 删除收成方图标按钮，不再占一整排 */
+.mp-root .mp-draw-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  padding: 0;
+  border: 1px solid var(--field-border);
+  border-radius: 14px;
+  background: var(--field-solid);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.mp-root .mp-draw-icon .mp-i { width: 17px; height: 17px; }
+.mp-root .mp-draw-icon:active { transform: scale(.95); }
+.mp-root .mp-draw-group-head .mp-draw-icon {
+  width: 34px;
+  height: 30px;
+  border-radius: 11px;
+}
+.mp-root .mp-draw-icon.is-danger { color: #b75a73; }
+.mp-root[data-mp-theme="night"] .mp-draw-icon.is-danger { color: #ee9bb1; }
 .mp-root .mp-draw-side.is-danger { color: #d94b4b; }
 
 .mp-root .mp-draw-hint {

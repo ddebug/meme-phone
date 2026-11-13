@@ -158,8 +158,7 @@ function statusCard(ctx, chosen, view, preset) {
       <div class="mp-mem-nums">
         ${nums.map(([key, unit]) => `<span class="mp-mem-num"><b>${num(metrics[key])}</b><i>${unit}</i></span>`).join('')}
       </div>` : `<div class="mp-mem-now-empty">${esc(emptyHint)}</div>`}
-      ${source === 'summary' ? `<div class="mp-mem-now-foot">柏宝书总结按段读，不铺原文</div>` : ''}
-      ${source === 'empty' ? `<div class="mp-mem-now-foot">只读当前角色最新的聊天文件，没有记忆时就是空的，不会改酒馆。</div>` : ''}
+      ${source === 'summary' ? '<div class="mp-mem-now-foot">柏宝书总结按段读，不铺原文</div>' : ''}
     </div>`;
 }
 
@@ -236,10 +235,10 @@ function renderPage(ctx) {
     : view.loading
       ? '正在读这位角色的聊天文件…'
       : !canSwitch
-        ? '这位角色还没有柏宝书总结，暂时只能读原文'
+        ? '这位角色还没有柏宝书总结，只能读原文'
         : readSummary
-          ? '读柏宝书总结；关掉就读最近几楼的原文'
-          : '读最近几楼的原文；打开就读柏宝书总结';
+          ? '有柏宝书总结就读总结，关掉读原文'
+          : '读最近几楼的原文，打开就换回总结';
 
   return `
     <div class="mp-page-body">

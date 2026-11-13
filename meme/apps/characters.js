@@ -285,10 +285,10 @@ export const characterApp = {
     const memMode = contact ? memoryReadModeFor(state, contact.id, memPreset) : memoryGlobalReadMode(state);
     const readSummary = memMode !== 'recent';
     const memHint = !contact
-      ? '先把这个角色存进通讯录，手机才记得住它的读取方式'
+      ? '先存进通讯录，才记得住'
       : readSummary
-        ? '打开：有柏宝书总结就读总结，没有就读最近原文'
-        : '关着：只读最近几楼的原文';
+        ? '有总结读总结，没有读原文'
+        : '只读最近几楼的原文';
 
     return `
       <div class="mp-page-body">

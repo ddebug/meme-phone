@@ -452,6 +452,9 @@ async function presetCompletion(preset, { prompt, system, messages }) {
 }
 
 
+const NAI_MAX_ATTEMPTS = 4;
+const NAI_MAX_WAIT_MS = 60_000;
+
 /**
  * NovelAI 出图。
  * 请求包裹结构与官方前端 / 参考扩展一致：{ input, model, action, parameters }；
@@ -480,21 +483,40 @@ export async function novelaiImage({
 
   const payload = buildNaiPayload({ model, width, height, steps, scale, sampler, noise, seed, prompt, negative });
 
-  let res;
-  try {
-    res = await fetch(naiEndpoint(base, 'generate-image'), {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-  } catch (error) {
-    throw new Error(`连不上 ${base}：${error.message}`);
-  }
-  if (!res.ok) throw await naiHttpError(res);
+  let result;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      let res;
+      try {
+        res = await fetch(naiEndpoint(base, 'generate-image'), {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } catch (error) {
+        const wrapped = new Error(`连不上 ${base}：${error.message}`);
+        wrapped.network = true;
+        throw wrapped;
+      }
+      if (!res.ok) throw await naiHttpError(res);
 
-  const { base64, filename } = await unzipNaiImage(await res.arrayBuffer());
-  const format = (filename.split('.').pop() || 'png').toLowerCase();
-  return { url: `data:image/${format === 'jpg' ? 'jpeg' : format};base64,${base64}` };
+      const { base64, filename } = await unzipNaiImage(await res.arrayBuffer());
+      const format = (filename.split('.').pop() || 'png').toLowerCase();
+      result = { url: `data:image/${format === 'jpg' ? 'jpeg' : format};base64,${base64}` };
+      break;
+    } catch (error) {
+      if (!naiShouldRetry(error, attempt)) throw error;
+      const retryAfterMs = typeof error?.retryAfterMs === 'number' ? error.retryAfterMs : null;
+      const waitMs = Math.min(Math.max(
+        Math.round(2000 * 2 ** (attempt - 1) * (0.5 + 0.5 * Math.random())),
+        retryAfterMs ?? 0,
+      ), NAI_MAX_WAIT_MS);
+      console.warn(`[meme-phone] NAI 请求失败，${Math.round(waitMs / 1000)}s 后重试（第 ${attempt}/${NAI_MAX_ATTEMPTS - 1} 次）`, error);
+      await naiDelay(waitMs);
+    }
+  }
+
+  return result;
 }
 
 function naiEndpoint(base, path = 'generate-image') {
@@ -503,6 +525,30 @@ function naiEndpoint(base, path = 'generate-image') {
   const seg = String(path || '').replace(/^\/+/, '');
   if (clean.endsWith(`/ai/${seg}`) || clean.endsWith(`/${seg}`)) return clean;
   return `${clean}/ai/${seg}`;
+}
+
+function parseRetryAfter(value) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  if (/^\d+$/.test(text)) {
+    const ms = Number(text) * 1000;
+    return Number.isFinite(ms) ? Math.min(ms, NAI_MAX_WAIT_MS) : null;
+  }
+  const at = Date.parse(text);
+  return Number.isNaN(at) ? null : Math.min(Math.max(0, at - Date.now()), NAI_MAX_WAIT_MS);
+}
+
+function naiShouldRetry(error, attempt) {
+  if (attempt >= NAI_MAX_ATTEMPTS) return false;
+  const status = typeof error?.status === 'number' ? error.status : undefined;
+  if (status !== undefined) {
+    return status === 408 || status === 429 || (status >= 500 && status !== 501);
+  }
+  return Boolean(error?.network);
+}
+
+function naiDelay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function isNai3Model(model) {
@@ -585,18 +631,28 @@ async function naiHttpError(resp) {
   } catch {
     /* 非 JSON 错误体直接用原文 */
   }
+  const retryAfterMs = parseRetryAfter(resp.headers?.get('Retry-After'));
+  let message;
   switch (resp.status) {
     case 400:
-      return new Error(`NovelAI 请求校验失败：${detail.slice(0, 300) || '参数不对'}`);
+      message = `NovelAI 请求校验失败：${detail.slice(0, 300) || '参数不对'}`;
+      break;
     case 401:
-      return new Error('NovelAI API Key 错误或无效');
+      message = 'NovelAI API Key 错误或无效';
+      break;
     case 402:
-      return new Error('NovelAI 需要有效订阅');
+      message = 'NovelAI 需要有效订阅';
+      break;
     case 429:
-      return new Error('NovelAI 请求过于频繁，稍后再试');
+      message = 'NovelAI 请求过于频繁，稍后再试';
+      break;
     default:
-      return new Error(`NovelAI 返回 ${resp.status}${detail ? `：${detail.slice(0, 300)}` : ''}`);
+      message = `NovelAI 返回 ${resp.status}${detail ? `：${detail.slice(0, 300)}` : ''}`;
   }
+  const error = new Error(message);
+  error.status = resp.status;
+  error.retryAfterMs = retryAfterMs;
+  return error;
 }
 
 function bytesToBase64(bytes) {

@@ -32,8 +32,8 @@ export const settingsApp = {
     const imageLabel = image.engine === 'custom' ? '自定义接口' : image.engine === 'doubao' ? '豆包 · 火山方舟' : 'NovelAI 官方';
     const imageReady = image.engine === 'custom' ? Boolean(image.url) : Boolean(image.url && image.key);
     const wallLabel = state.settings.wallpaper === 'none' ? '素色底'
-      : state.settings.wallpaper === 'day' ? '晨光粉彩'
-        : state.settings.wallpaper === 'night' ? '夜色'
+      : state.settings.wallpaper === 'day' ? '晨光素色'
+        : state.settings.wallpaper === 'night' ? '夜色素色'
           : '自定义壁纸';
 
     return `
@@ -240,8 +240,8 @@ export const appearanceApp = {
 
     const walls = [
       { key: 'none', title: '素色', sub: '不铺图片，屏幕里用干净的浅色纸（壳外仍透出酒馆）', swatch: 'repeating-conic-gradient(rgba(160,150,200,.18) 0% 25%, rgba(255,255,255,0) 0% 50%) 50% / 16px 16px' },
-      { key: 'day', title: '晨光粉彩', sub: '樱粉与薄荷的柔光壁纸', swatch: 'linear-gradient(150deg,#ffe3ef,#e4f7f0 55%,#efe6ff)' },
-      { key: 'night', title: '夜色', sub: '深墨蓝到紫罗兰的流体光带', swatch: 'linear-gradient(150deg,#1a1f2b,#2b2350 60%,#0a0c11)' },
+      { key: 'day', title: '晨光素色', sub: '樱粉到薄荷的淡渐变，不铺图片', swatch: 'linear-gradient(160deg,#fbf7ff,#f2f5fd 48%,#f6faf5)' },
+      { key: 'night', title: '夜色素色', sub: '深墨蓝到紫罗兰的渐变，不铺图片', swatch: 'linear-gradient(160deg,#191627,#141222 52%,#0f141a)' },
       { key: 'custom', title: '自定义', sub: customWall ? '用你选的那张图，只铺在手机屏幕里' : '从相册选一张图，壳外仍然透明', swatch: customWall ? `url("${customWall}") center / cover` : 'linear-gradient(150deg,#e7e1f7,#f7e8ef 55%,#e8f5f2)' },
     ];
 
@@ -307,8 +307,8 @@ export const appearanceApp = {
       ctx.rerender();
       ctx.save();
       ctx.toast(wall === 'none' ? '屏幕内换成素色底'
-        : wall === 'day' ? '换成晨光粉彩壁纸'
-          : wall === 'night' ? '换成夜色壁纸' : '换成自定义壁纸');
+        : wall === 'day' ? '换成晨光素色'
+          : wall === 'night' ? '换成夜色素色' : '换成自定义壁纸');
       return true;
     }
     if (act === 'choose-custom-wall') {

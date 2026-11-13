@@ -48,8 +48,8 @@
   --field-solid: #ffffff;
   --field-border: rgba(43, 41, 55, .12);
 
-  --wall-day: url("../assets/wallpaper-day.jpg");
-  --wall-night: url("../assets/wallpaper-night.jpg");
+  --wall-day: linear-gradient(160deg, #fbf7ff 0%, #f2f5fd 48%, #f6faf5 100%);
+  --wall-night: linear-gradient(160deg, #191627 0%, #141222 52%, #0f141a 100%);
   --wall-custom: var(--wall-day);
   --wallpaper: var(--wall-day);
 }
@@ -1865,7 +1865,7 @@
 
 /* ======================================================= 透明背景 + 回桌面 */
 
-/* 背景四种：none 透明 / day 樱粉 / night 夜色 / custom 用户图片 */
+/* 背景四种：none 透明 / day 晨光素色 / night 夜色素色 / custom 用户图片 */
 .mp-root[data-mp-wall="day"] .mp-wallpaper {
   background-image: var(--wall-day);
 }

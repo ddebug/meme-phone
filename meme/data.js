@@ -253,7 +253,7 @@ export function emptyState() {
     createdAt: Date.now(),
     settings: {
       theme: 'day',              // day | night
-      wallpaper: 'day',          // day | night | none | custom（默认铺壁纸，不透出酒馆背景）
+      wallpaper: 'day',          // day | night | none | custom（默认是素色渐变，不透出酒馆背景；不再铺照片）
       customWall: '',            // 自定义壁纸的 data URL
       /* 装扮：字体、字号、行距、灵动岛、每个 App 的自定义图标 */
       dress: {
@@ -351,7 +351,7 @@ export function emptyState() {
       current: null,
     },
     extras: {},
-    dress: { wallpaperDay: 'assets/wallpaper-day.jpg', wallpaperNight: 'assets/wallpaper-night.jpg', accent: '#8e7bf2' },
+    dress: { accent: '#8e7bf2' },
   };
 }
 

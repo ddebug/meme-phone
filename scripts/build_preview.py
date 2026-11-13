@@ -159,8 +159,6 @@ def build() -> str:
 
     with open(os.path.join(ROOT, "meme", "meme.css"), "r", encoding="utf-8") as handle:
         css = handle.read().replace('url("../assets/', 'url("assets/')
-    css = css.replace('url("assets/wallpaper-day.jpg")', f'url("{data_uri("assets/wallpaper-day.jpg")}")')
-    css = css.replace('url("assets/wallpaper-night.jpg")', f'url("{data_uri("assets/wallpaper-night.jpg")}")')
 
     html = f"""<!doctype html>
 <html lang="zh-CN">

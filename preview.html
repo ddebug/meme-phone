@@ -10075,8 +10075,7 @@ function settingsBody(ctx, chatId) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-title" style="margin-top:0">聊天设置</div>
-      <div class="mp-subtitle">只改这个会话的开关和引用；角色卡、世界书是全局的，改会写到酒馆</div>
+      <div class="mp-subtitle" style="margin-top:0">聊天设置 · 只改这个会话的开关和引用；角色卡、世界书是全局的，改会写到酒馆</div>
 
       <div class="mp-chat-set-head">
         ${avatarHtml(contact?.name || '?', contact?.avatar)}
@@ -10186,10 +10185,10 @@ function listBody(ctx) {
   return `
     <div class="mp-page-body">
       <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-        <div class="mp-title" style="flex:1">聊天</div>
+        <span style="flex:1"></span>
         <button class="mp-icon-btn" data-act="chat-new" type="button" aria-label="新建会话">${icon('plus')}</button>
       </div>
-      <div class="mp-subtitle">${chats.length} 个会话 · ${unreadTotal(state)} 条未读</div>
+      <div class="mp-subtitle">聊天 · ${chats.length} 个会话 · ${unreadTotal(state)} 条未读</div>
       ${rows || '<div class="mp-empty">还没有会话。<br>先去「通讯录」把角色加进来。</div>'}
     </div>`;
 }
@@ -10914,8 +10913,7 @@ function renderPage(ctx, params = {}) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-title">${contactId ? `${esc(contact?.name || 'TA')}的日记` : '日记'}</div>
-      <div class="mp-subtitle">${contactId ? '只记录这个角色和你的聊天' : '写过的日子会有小圆点'}</div>
+      <div class="mp-subtitle" style="margin-top:0">${contactId ? `${esc(contact?.name || 'TA')}的日记 · 只记录这个角色和你的聊天` : '日记 · 写过的日子会有小圆点'}</div>
       <div class="mp-month-bar">
         <button class="mp-icon-btn" data-act="diary-prev" data-contact="${esc(contactId)}" type="button" aria-label="上个月">${icon('back')}</button>
         <span class="mp-month">${target.getFullYear()} 年 ${target.getMonth() + 1} 月</span>
@@ -11058,12 +11056,12 @@ const contactsApp = {
     return `
       <div class="mp-page-body">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <div class="mp-title" style="flex:1">通讯录</div>
+          <span style="flex:1"></span>
           ${tab === 'cards'
             ? `<button class="mp-icon-btn" data-act="char-search" type="button" aria-label="查角色">${icon('search')}</button>`
             : `<button class="mp-icon-btn" data-act="contact-add" type="button" aria-label="添加">${icon('plus')}</button>`}
         </div>
-        <div class="mp-subtitle">${tab === 'cards' ? '酒馆里的角色卡，按卡片原样看' : `${contacts.length} 位 · 只有在这里的人才会出现在聊天里`}</div>
+        <div class="mp-subtitle">${tab === 'cards' ? '查角色 · 酒馆里的角色卡，按卡片原样看' : `通讯录 · ${contacts.length} 位 · 只有在这里的人才会出现在聊天里`}</div>
 
         <div class="mp-seg" style="margin:2px 0 12px">
           <button class="${tab === 'contacts' ? 'on' : ''}" data-act="contacts-tab" data-tab="contacts" type="button">通讯录</button>
@@ -11344,8 +11342,7 @@ const settingsApp = {
 
     return `
       <div class="mp-page-body">
-        <div class="mp-title">设置</div>
-        <div class="mp-subtitle">meme-phone · 0.1.0</div>
+        <div class="mp-subtitle" style="margin-top:0">设置 · meme-phone 0.1.0</div>
 
         <div class="mp-group">
           <div class="mp-group-label">账号</div>
@@ -11562,8 +11559,7 @@ const appearanceApp = {
     return `
       <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button><span style="flex:1"></span></div>
       <div class="mp-page-body">
-        <div class="mp-title" style="margin-top:0">壁纸与主题</div>
-        <div class="mp-subtitle">背景和明暗；字体、灵动岛与图标在「装扮」里</div>
+        <div class="mp-subtitle" style="margin-top:0">壁纸与主题：背景和明暗；字体、灵动岛与图标在「装扮」里</div>
 
         <div class="mp-group-label" style="margin-top:10px">背景</div>
         ${walls.map(item => row(item, 'pick-wall', 'wall')).join('')}
@@ -11647,7 +11643,7 @@ const { contactsOf, contactById, extrasOf } = __req("meme/data.js");
 const { PIXEL_BUNNY } = __req("meme/theme-data.js");
 
 function head(title, sub) {
-  return `<div class="mp-title" style="margin-top:2px">${esc(title)}</div><div class="mp-subtitle">${esc(sub)}</div>`;
+  return `<div class="mp-subtitle" style="margin-top:2px">${esc(title)} · ${esc(sub)}</div>`;
 }
 
 /* --------------------------------------------------------- 小剧场 */
@@ -12468,8 +12464,7 @@ const drawApp = {
         <span style="flex:1"></span>
       </div>
       <div class="mp-page-body">
-        <div class="mp-title" style="margin-top:0">绘图</div>
-        <div class="mp-subtitle">${ep.engine === 'novelai' ? 'NovelAI 官方' : ep.engine === 'doubao' ? '豆包 Seedream · 火山方舟' : '自定义接口'} · 中文描述会先翻成 danbooru tag</div>
+        <div class="mp-subtitle" style="margin-top:0">绘图：${ep.engine === 'novelai' ? 'NovelAI 官方' : ep.engine === 'doubao' ? '豆包 Seedream · 火山方舟' : '自定义接口'} · 中文描述会先翻成 danbooru tag</div>
 
         <div class="mp-draw-state${ready ? ' is-on' : ''}">
           ${icon(ready ? 'spark' : 'help')}
@@ -14297,7 +14292,7 @@ const { icon } = __req("meme/icons.js");
 const { esc, avatarHtml } = __req("meme/shell.js");
 
 function head(title, sub) {
-  return `<div class="mp-title" style="margin-top:2px">${esc(title)}</div><div class="mp-subtitle">${esc(sub)}</div>`;
+  return `<div class="mp-subtitle" style="margin-top:2px">${esc(title)} · ${esc(sub)}</div>`;
 }
 
 function usersOf(state) {
@@ -16253,8 +16248,7 @@ const musicApp = {
       <div class="mp-page-body mp-music">
         <div class="mp-music-hero">
           <div>
-            <div class="mp-title" style="margin-top:2px">音乐</div>
-            <div class="mp-subtitle">把喜欢的歌单放进口袋</div>
+            <div class="mp-subtitle" style="margin-top:2px">音乐 · 把喜欢的歌单放进口袋</div>
           </div>
           <button class="mp-icon-btn" data-act="music-import" type="button" aria-label="导入歌单">${icon('plus')}</button>
         </div>
@@ -16628,8 +16622,7 @@ function renderPage(ctx) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-title">酒馆记忆</div>
-      <div class="mp-subtitle">读角色最新聊天文件；有总结可切总结，没有就读最近原文</div>
+      <div class="mp-subtitle" style="margin-top:0">酒馆记忆：读角色最新聊天文件；有总结可切总结，没有就读最近原文</div>
 
       <div class="mp-group-head" style="margin-top:16px">
         <div class="mp-group-label">当前读取</div>
@@ -17209,11 +17202,11 @@ const presetsApp = {
     return `
       <div class="mp-page-body">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <div class="mp-title" style="flex:1">回复预设</div>
+          <span style="flex:1"></span>
           <button class="mp-icon-btn" data-act="reply-more" type="button" aria-label="导入导出">${icon('more')}</button>
           <button class="mp-icon-btn" data-act="reply-new" type="button" aria-label="新建预设">${icon('plus')}</button>
         </div>
-        <div class="mp-subtitle">一套预设就是一条条提示词：回复指令、聊天行为、其他软件、上下文注入都在同一个列表里，能开关能排序</div>
+        <div class="mp-subtitle">回复预设：一套预设就是一条条提示词：回复指令、聊天行为、其他软件、上下文注入都在同一个列表里，能开关能排序</div>
 
         ${creating ? `
         <div class="mp-group mp-api-inline" style="margin-top:12px">
@@ -17349,8 +17342,7 @@ const replyPresetApp = {
         <button class="mp-icon-btn" data-act="reply-del" type="button" title="删除">${icon('trash')}</button>
       </div>
       <div class="mp-page-body">
-        <div class="mp-title" style="margin-top:0">回复预设</div>
-        <div class="mp-subtitle">条目按顺序拼进模型消息 · ${isActive ? '手机现在默认用这套' : '只在聊天设置里选中它时生效'}</div>
+        <div class="mp-subtitle" style="margin-top:0">回复预设 · 条目按顺序拼进模型消息 · ${isActive ? '手机现在默认用这套' : '只在聊天设置里选中它时生效'}</div>
 
         ${deleting ? `
         <div class="mp-group mp-api-inline is-danger" style="margin-top:12px">

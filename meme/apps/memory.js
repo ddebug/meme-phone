@@ -242,8 +242,7 @@ function renderPage(ctx) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-title">酒馆记忆</div>
-      <div class="mp-subtitle">读角色最新聊天文件；有总结可切总结，没有就读最近原文</div>
+      <div class="mp-subtitle" style="margin-top:0">酒馆记忆：读角色最新聊天文件；有总结可切总结，没有就读最近原文</div>
 
       <div class="mp-group-head" style="margin-top:16px">
         <div class="mp-group-label">当前读取</div>

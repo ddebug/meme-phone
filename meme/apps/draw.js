@@ -319,8 +319,7 @@ export const drawApp = {
         <span style="flex:1"></span>
       </div>
       <div class="mp-page-body">
-        <div class="mp-title" style="margin-top:0">绘图</div>
-        <div class="mp-subtitle">${ep.engine === 'novelai' ? 'NovelAI 官方' : ep.engine === 'doubao' ? '豆包 Seedream · 火山方舟' : '自定义接口'} · 中文描述会先翻成 danbooru tag</div>
+        <div class="mp-subtitle" style="margin-top:0">绘图：${ep.engine === 'novelai' ? 'NovelAI 官方' : ep.engine === 'doubao' ? '豆包 Seedream · 火山方舟' : '自定义接口'} · 中文描述会先翻成 danbooru tag</div>
 
         <div class="mp-draw-state${ready ? ' is-on' : ''}">
           ${icon(ready ? 'spark' : 'help')}

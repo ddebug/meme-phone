@@ -790,8 +790,7 @@ export const musicApp = {
       <div class="mp-page-body mp-music">
         <div class="mp-music-hero">
           <div>
-            <div class="mp-title" style="margin-top:2px">音乐</div>
-            <div class="mp-subtitle">把喜欢的歌单放进口袋</div>
+            <div class="mp-subtitle" style="margin-top:2px">音乐 · 把喜欢的歌单放进口袋</div>
           </div>
           <button class="mp-icon-btn" data-act="music-import" type="button" aria-label="导入歌单">${icon('plus')}</button>
         </div>

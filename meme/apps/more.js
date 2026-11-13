@@ -9,7 +9,7 @@ import { contactsOf, contactById, extrasOf } from '../data.js';
 import { PIXEL_BUNNY } from '../theme-data.js';
 
 function head(title, sub) {
-  return `<div class="mp-title" style="margin-top:2px">${esc(title)}</div><div class="mp-subtitle">${esc(sub)}</div>`;
+  return `<div class="mp-subtitle" style="margin-top:2px">${esc(title)} · ${esc(sub)}</div>`;
 }
 
 /* --------------------------------------------------------- 小剧场 */

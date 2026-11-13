@@ -122,8 +122,7 @@ function settingsBody(ctx, chatId) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-title" style="margin-top:0">聊天设置</div>
-      <div class="mp-subtitle">只改这个会话的开关和引用；角色卡、世界书是全局的，改会写到酒馆</div>
+      <div class="mp-subtitle" style="margin-top:0">聊天设置 · 只改这个会话的开关和引用；角色卡、世界书是全局的，改会写到酒馆</div>
 
       <div class="mp-chat-set-head">
         ${avatarHtml(contact?.name || '?', contact?.avatar)}
@@ -233,10 +232,10 @@ function listBody(ctx) {
   return `
     <div class="mp-page-body">
       <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-        <div class="mp-title" style="flex:1">聊天</div>
+        <span style="flex:1"></span>
         <button class="mp-icon-btn" data-act="chat-new" type="button" aria-label="新建会话">${icon('plus')}</button>
       </div>
-      <div class="mp-subtitle">${chats.length} 个会话 · ${unreadTotal(state)} 条未读</div>
+      <div class="mp-subtitle">聊天 · ${chats.length} 个会话 · ${unreadTotal(state)} 条未读</div>
       ${rows || '<div class="mp-empty">还没有会话。<br>先去「通讯录」把角色加进来。</div>'}
     </div>`;
 }

@@ -109,8 +109,7 @@ function renderPage(ctx, params = {}) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-title">${contactId ? `${esc(contact?.name || 'TA')}的日记` : '日记'}</div>
-      <div class="mp-subtitle">${contactId ? '只记录这个角色和你的聊天' : '写过的日子会有小圆点'}</div>
+      <div class="mp-subtitle" style="margin-top:0">${contactId ? `${esc(contact?.name || 'TA')}的日记 · 只记录这个角色和你的聊天` : '日记 · 写过的日子会有小圆点'}</div>
       <div class="mp-month-bar">
         <button class="mp-icon-btn" data-act="diary-prev" data-contact="${esc(contactId)}" type="button" aria-label="上个月">${icon('back')}</button>
         <span class="mp-month">${target.getFullYear()} 年 ${target.getMonth() + 1} 月</span>

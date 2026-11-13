@@ -38,8 +38,7 @@ export const settingsApp = {
 
     return `
       <div class="mp-page-body">
-        <div class="mp-title">设置</div>
-        <div class="mp-subtitle">meme-phone · 0.1.0</div>
+        <div class="mp-subtitle" style="margin-top:0">设置 · meme-phone 0.1.0</div>
 
         <div class="mp-group">
           <div class="mp-group-label">账号</div>
@@ -256,8 +255,7 @@ export const appearanceApp = {
     return `
       <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button><span style="flex:1"></span></div>
       <div class="mp-page-body">
-        <div class="mp-title" style="margin-top:0">壁纸与主题</div>
-        <div class="mp-subtitle">背景和明暗；字体、灵动岛与图标在「装扮」里</div>
+        <div class="mp-subtitle" style="margin-top:0">壁纸与主题：背景和明暗；字体、灵动岛与图标在「装扮」里</div>
 
         <div class="mp-group-label" style="margin-top:10px">背景</div>
         ${walls.map(item => row(item, 'pick-wall', 'wall')).join('')}

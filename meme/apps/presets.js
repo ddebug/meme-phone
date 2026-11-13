@@ -326,11 +326,11 @@ export const presetsApp = {
     return `
       <div class="mp-page-body">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <div class="mp-title" style="flex:1">回复预设</div>
+          <span style="flex:1"></span>
           <button class="mp-icon-btn" data-act="reply-more" type="button" aria-label="导入导出">${icon('more')}</button>
           <button class="mp-icon-btn" data-act="reply-new" type="button" aria-label="新建预设">${icon('plus')}</button>
         </div>
-        <div class="mp-subtitle">一套预设就是一条条提示词：回复指令、聊天行为、其他软件、上下文注入都在同一个列表里，能开关能排序</div>
+        <div class="mp-subtitle">回复预设：一套预设就是一条条提示词：回复指令、聊天行为、其他软件、上下文注入都在同一个列表里，能开关能排序</div>
 
         ${creating ? `
         <div class="mp-group mp-api-inline" style="margin-top:12px">
@@ -466,8 +466,7 @@ export const replyPresetApp = {
         <button class="mp-icon-btn" data-act="reply-del" type="button" title="删除">${icon('trash')}</button>
       </div>
       <div class="mp-page-body">
-        <div class="mp-title" style="margin-top:0">回复预设</div>
-        <div class="mp-subtitle">条目按顺序拼进模型消息 · ${isActive ? '手机现在默认用这套' : '只在聊天设置里选中它时生效'}</div>
+        <div class="mp-subtitle" style="margin-top:0">回复预设 · 条目按顺序拼进模型消息 · ${isActive ? '手机现在默认用这套' : '只在聊天设置里选中它时生效'}</div>
 
         ${deleting ? `
         <div class="mp-group mp-api-inline is-danger" style="margin-top:12px">

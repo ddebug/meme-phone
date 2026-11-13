@@ -40,12 +40,12 @@ export const contactsApp = {
     return `
       <div class="mp-page-body">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <div class="mp-title" style="flex:1">通讯录</div>
+          <span style="flex:1"></span>
           ${tab === 'cards'
             ? `<button class="mp-icon-btn" data-act="char-search" type="button" aria-label="查角色">${icon('search')}</button>`
             : `<button class="mp-icon-btn" data-act="contact-add" type="button" aria-label="添加">${icon('plus')}</button>`}
         </div>
-        <div class="mp-subtitle">${tab === 'cards' ? '酒馆里的角色卡，按卡片原样看' : `${contacts.length} 位 · 只有在这里的人才会出现在聊天里`}</div>
+        <div class="mp-subtitle">${tab === 'cards' ? '查角色 · 酒馆里的角色卡，按卡片原样看' : `通讯录 · ${contacts.length} 位 · 只有在这里的人才会出现在聊天里`}</div>
 
         <div class="mp-seg" style="margin:2px 0 12px">
           <button class="${tab === 'contacts' ? 'on' : ''}" data-act="contacts-tab" data-tab="contacts" type="button">通讯录</button>

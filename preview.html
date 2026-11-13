@@ -16308,8 +16308,7 @@ function statusCard(ctx, chosen, view, preset) {
       <div class="mp-mem-nums">
         ${nums.map(([key, unit]) => `<span class="mp-mem-num"><b>${num(metrics[key])}</b><i>${unit}</i></span>`).join('')}
       </div>` : `<div class="mp-mem-now-empty">${esc(emptyHint)}</div>`}
-      ${source === 'summary' ? `<div class="mp-mem-now-foot">柏宝书总结按段读，不铺原文</div>` : ''}
-      ${source === 'empty' ? `<div class="mp-mem-now-foot">只读当前角色最新的聊天文件，没有记忆时就是空的，不会改酒馆。</div>` : ''}
+      ${source === 'summary' ? '<div class="mp-mem-now-foot">柏宝书总结按段读，不铺原文</div>' : ''}
     </div>`;
 }
 

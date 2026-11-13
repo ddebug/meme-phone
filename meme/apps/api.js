@@ -704,7 +704,6 @@ export const apiListApp = {
           <div class="mp-api-sec-head is-inside">
             <div class="mp-api-sec-copy">
               <div class="mp-api-scheme-kicker">当前聊天方案</div>
-              <div class="mp-api-scheme-name">${esc(scheme?.name || '还没有方案')}</div>
             </div>
             <span class="mp-api-pill ${schemeDirty ? 'is-dirty' : 'is-saved'}">${schemeDirty ? '未保存' : '已保存'}</span>
           </div>

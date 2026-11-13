@@ -266,6 +266,8 @@ export function emptyState() {
         icons: {},               // appId -> { shape?: iconName, image?: dataURL }
       },
       user: { name: '我', avatar: '', key: '' },
+      /* 主界面顶栏：签名自己写，横幅图自己挑；空着就用酒馆里那份 */
+      profile: { bio: '', banner: '' },
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
@@ -1017,6 +1019,15 @@ export function normalize(raw) {
     merged.settings.reply.activeId = merged.settings.reply.presets[0].id;
   }
   merged.settings.customWall = typeof raw.settings?.customWall === 'string' ? raw.settings.customWall : '';
+  const profileRaw = raw.settings?.profile && typeof raw.settings.profile === 'object' && !Array.isArray(raw.settings.profile)
+    ? raw.settings.profile
+    : {};
+  merged.settings.profile = {
+    bio: typeof profileRaw.bio === 'string' ? profileRaw.bio.trim().slice(0, 30) : '',
+    banner: typeof profileRaw.banner === 'string' && profileRaw.banner.startsWith('data:image/') && profileRaw.banner.length < 400000
+      ? profileRaw.banner
+      : '',
+  };
   const dressRaw = raw.settings?.dress && typeof raw.settings.dress === 'object' && !Array.isArray(raw.settings.dress)
     ? raw.settings.dress
     : {};

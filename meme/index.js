@@ -441,6 +441,36 @@ export async function openMemePhone(options = {}) {
     ctx.toast('图标已换上');
   }
 
+  /* 主界面顶栏背景图：裁成横幅比例、缩到 720px 宽，别把存档撑大 */
+  async function useCustomBanner(file) {
+    const looksImage = (file?.type && file.type.startsWith('image/')) || /\.(jpg|jpeg|png|webp|gif|bmp)$/i.test(file?.name || '');
+    if (!looksImage) { ctx.toast('请选一张图片'); return; }
+    const img = await new Promise((resolve, reject) => {
+      const image = new Image();
+      const url = URL.createObjectURL(file);
+      image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+      image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读不出来')); };
+      image.src = url;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = 720;
+    canvas.height = 160;
+    const painter = canvas.getContext('2d');
+    if (!painter) throw new Error('画布不可用');
+    const ratio = canvas.width / canvas.height;
+    const cropW = Math.min(img.width, img.height * ratio);
+    const cropH = cropW / ratio;
+    const sx = Math.max(0, (img.width - cropW) / 2);
+    const sy = Math.max(0, (img.height - cropH) / 2);
+    painter.drawImage(img, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
+    const settings = state.settings;
+    if (!settings.profile || typeof settings.profile !== 'object') settings.profile = { bio: '', banner: '' };
+    settings.profile.banner = canvas.toDataURL('image/jpeg', 0.82);
+    ctx.save();
+    ctx.rerender();
+    ctx.toast('顶栏背景图换好了');
+  }
+
   rootEl.addEventListener('change', event => {
     const id = event.target?.id;
     const file = event.target?.files?.[0];
@@ -449,12 +479,25 @@ export async function openMemePhone(options = {}) {
       if (file) useCustomWall(file).catch(error => ctx.toast(error.message || '换壁纸失败'));
       return;
     }
+    if (id === 'mpProfileBanner') {
+      event.target.value = '';
+      if (file) useCustomBanner(file).catch(error => ctx.toast(error.message || '换背景图失败'));
+      return;
+    }
     if (id === 'mpIconFile') {
       const appId = event.target?.dataset?.app;
       event.target.value = '';
       if (file && appId) useCustomIcon(file, appId).catch(error => ctx.toast(error.message || '换图标失败'));
     }
   });
+  /* 顶栏背景图的 input 藏在桌面里，个别 WebView 不冒泡 change，补一道捕获监听 */
+  const docRef = rootEl.ownerDocument;
+  docRef?.addEventListener('change', event => {
+    if (event.target?.id !== 'mpProfileBanner') return;
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) useCustomBanner(file).catch(error => ctx.toast(error.message || '换背景图失败'));
+  }, true);
 
   /* 用户头像（酒馆里有 persona 头像） */
   try {

@@ -362,7 +362,6 @@
   color: inherit;
   font: inherit;
   text-align: center;
-  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   background: linear-gradient(168deg, rgba(255, 255, 255, .96), rgba(255, 255, 255, .86));
   backdrop-filter: blur(24px) saturate(155%);
@@ -371,7 +370,7 @@
   transition: transform .22s cubic-bezier(.22, .68, .38, 1);
 }
 
-.mp-profile:active { transform: scale(.985); }
+.mp-profile-banner { cursor: pointer; }
 
 .mp-profile-banner {
   position: relative;
@@ -428,14 +427,21 @@
   width: 64px;
   height: 64px;
   margin: -32px auto 0;
+  cursor: pointer;
+  color: #fff;
+  font-size: calc(21px * var(--font-scale));
+  font-weight: 600;
+  text-transform: uppercase;
   border: 2.5px solid rgba(255, 255, 255, .96);
   border-radius: 50%;
   background-size: cover;
   background-position: center;
-  color: #fff;
-  font-size: calc(21px * var(--font-scale));
-  font-weight: 600;
   box-shadow: 0 8px 18px rgba(95, 80, 140, .2), inset 0 0 0 1px rgba(255, 255, 255, .3);
+}
+
+.mp-profile-avatar.is-empty {
+  background: linear-gradient(150deg, #b9c8f2, #cdb7ef);
+  color: #fff;
 }
 
 .mp-profile-name {
@@ -456,20 +462,90 @@
   font-size: calc(10.5px * var(--font-scale));
 }
 
+.mp-profile-banner.is-custom::before { display: none; }
+
 .mp-profile-bio {
   position: relative;
   z-index: 2;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  max-width: 290px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  max-width: 300px;
   margin-top: 5px;
-  padding: 0 12px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
   color: var(--text-2);
+  font: inherit;
   font-size: calc(12px * var(--font-scale));
   line-height: calc(1.45 * var(--line-scale));
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
+
+.mp-profile-bio > span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mp-profile-bio .mp-i {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  opacity: .55;
+}
+
+.mp-profile-bio:active { background: rgba(255, 255, 255, .5); }
+
+.mp-profile-bio-edit {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 32px);
+  margin-top: 6px;
+}
+
+.mp-profile-bio-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .78);
+  box-shadow: inset 0 0 0 1px rgba(140, 130, 190, .2);
+  color: var(--text);
+  font: inherit;
+  font-size: calc(12px * var(--font-scale));
+}
+
+.mp-profile-mini {
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .7);
+  color: var(--text-2);
+  font: inherit;
+  font-size: calc(11.5px * var(--font-scale));
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(140, 130, 190, .16);
+}
+
+.mp-profile-mini.is-primary {
+  background: linear-gradient(150deg, #9583f2, #7f6ce9);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(140, 116, 224, .24);
+}
+
 
 .mp-profile-loc {
   position: relative;

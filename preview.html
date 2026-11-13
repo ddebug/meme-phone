@@ -379,7 +379,6 @@ body {
   color: inherit;
   font: inherit;
   text-align: center;
-  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   background: linear-gradient(168deg, rgba(255, 255, 255, .96), rgba(255, 255, 255, .86));
   backdrop-filter: blur(24px) saturate(155%);
@@ -388,7 +387,7 @@ body {
   transition: transform .22s cubic-bezier(.22, .68, .38, 1);
 }
 
-.mp-profile:active { transform: scale(.985); }
+.mp-profile-banner { cursor: pointer; }
 
 .mp-profile-banner {
   position: relative;
@@ -445,14 +444,21 @@ body {
   width: 64px;
   height: 64px;
   margin: -32px auto 0;
+  cursor: pointer;
+  color: #fff;
+  font-size: calc(21px * var(--font-scale));
+  font-weight: 600;
+  text-transform: uppercase;
   border: 2.5px solid rgba(255, 255, 255, .96);
   border-radius: 50%;
   background-size: cover;
   background-position: center;
-  color: #fff;
-  font-size: calc(21px * var(--font-scale));
-  font-weight: 600;
   box-shadow: 0 8px 18px rgba(95, 80, 140, .2), inset 0 0 0 1px rgba(255, 255, 255, .3);
+}
+
+.mp-profile-avatar.is-empty {
+  background: linear-gradient(150deg, #b9c8f2, #cdb7ef);
+  color: #fff;
 }
 
 .mp-profile-name {
@@ -473,20 +479,90 @@ body {
   font-size: calc(10.5px * var(--font-scale));
 }
 
+.mp-profile-banner.is-custom::before { display: none; }
+
 .mp-profile-bio {
   position: relative;
   z-index: 2;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  max-width: 290px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  max-width: 300px;
   margin-top: 5px;
-  padding: 0 12px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
   color: var(--text-2);
+  font: inherit;
   font-size: calc(12px * var(--font-scale));
   line-height: calc(1.45 * var(--line-scale));
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
+
+.mp-profile-bio > span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mp-profile-bio .mp-i {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  opacity: .55;
+}
+
+.mp-profile-bio:active { background: rgba(255, 255, 255, .5); }
+
+.mp-profile-bio-edit {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 32px);
+  margin-top: 6px;
+}
+
+.mp-profile-bio-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .78);
+  box-shadow: inset 0 0 0 1px rgba(140, 130, 190, .2);
+  color: var(--text);
+  font: inherit;
+  font-size: calc(12px * var(--font-scale));
+}
+
+.mp-profile-mini {
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .7);
+  color: var(--text-2);
+  font: inherit;
+  font-size: calc(11.5px * var(--font-scale));
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(140, 130, 190, .16);
+}
+
+.mp-profile-mini.is-primary {
+  background: linear-gradient(150deg, #9583f2, #7f6ce9);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(140, 116, 224, .24);
+}
+
 
 .mp-profile-loc {
   position: relative;
@@ -6245,6 +6321,8 @@ function emptyState() {
         icons: {},               // appId -> { shape?: iconName, image?: dataURL }
       },
       user: { name: '我', avatar: '', key: '' },
+      /* 主界面顶栏：签名自己写，横幅图自己挑；空着就用酒馆里那份 */
+      profile: { bio: '', banner: '' },
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
@@ -6996,6 +7074,15 @@ function normalize(raw) {
     merged.settings.reply.activeId = merged.settings.reply.presets[0].id;
   }
   merged.settings.customWall = typeof raw.settings?.customWall === 'string' ? raw.settings.customWall : '';
+  const profileRaw = raw.settings?.profile && typeof raw.settings.profile === 'object' && !Array.isArray(raw.settings.profile)
+    ? raw.settings.profile
+    : {};
+  merged.settings.profile = {
+    bio: typeof profileRaw.bio === 'string' ? profileRaw.bio.trim().slice(0, 30) : '',
+    banner: typeof profileRaw.banner === 'string' && profileRaw.banner.startsWith('data:image/') && profileRaw.banner.length < 400000
+      ? profileRaw.banner
+      : '',
+  };
   const dressRaw = raw.settings?.dress && typeof raw.settings.dress === 'object' && !Array.isArray(raw.settings.dress)
     ? raw.settings.dress
     : {};
@@ -8838,6 +8925,7 @@ function createShell(options) {
     toastTimer: 0,
     live: { inputValue: '', focus: false },
     scroller: null,
+    bioEdit: false,
     deviceOffset: { x: 0, y: 0 },
   };
 
@@ -8874,10 +8962,12 @@ function createShell(options) {
     const themed = state.settings.dress?.theme === 'pixel' ? PIXEL_BUNNY : null;
     const myName = themed ? themed.profile.name : (state.settings.user.name || me?.name || '我');
     const myAvatar = themed ? themed.avatar : (state.settings.user.avatar || me?.avatarUrl || '');
-    const myBio = themed ? themed.profile.bio : String(me?.description || '把每天的事，记在这台小手机里。').trim();
-    const myHandle = themed ? themed.profile.handle : `@${String(myName).trim().replace(/\s+/g, '_') || 'me'}`;
-    const myLocation = themed ? themed.profile.location : '在酒馆里';
-    const myBanner = themed ? ` style="--theme-banner:url(&quot;${themed.banner}&quot;)"` : '';
+    const ownBio = String(state.settings.profile?.bio || '').trim();
+    const myBio = ownBio || (themed ? themed.profile.bio : String(me?.description || '把每天的事，记在这台小手机里。').trim());
+    const ownBanner = String(state.settings.profile?.banner || '').trim();
+    const themedBanner = themed ? themed.banner : '';
+    const bannerImage = ownBanner || themedBanner;
+    const bannerStyle = bannerImage ? ` style="background-image:url(&quot;${bannerImage}&quot;);background-size:cover;background-position:center"` : '';
     const stampText = dateText().replace('<br>', ' · ');
 
     const iconButtons = desktopApps.map(app => `
@@ -8897,16 +8987,24 @@ function createShell(options) {
 
     return `
       <div class="mp-desktop">
-        <button class="mp-profile" data-act="open-app" data-app="user" type="button" aria-label="我的资料">
-          <span class="mp-profile-banner"${myBanner}>
+        <div class="mp-profile">
+          <span class="mp-profile-banner${bannerImage ? ' is-custom' : ''}" data-act="profile-banner"${bannerStyle} title="点一下换背景图">
             <span class="mp-profile-stamp">${stampText}</span>
           </span>
-          ${avatarHtml(myName, myAvatar, 'mp-profile-avatar')}
-          <span class="mp-profile-name">${esc(myName)}</span>
-          <span class="mp-profile-handle">${esc(myHandle)}</span>
-          <span class="mp-profile-bio">${esc(myBio)}</span>
-          <span class="mp-profile-loc">${ico('home')}<span>${esc(myLocation)}</span></span>
-        </button>
+          <span class="mp-profile-avatar${myAvatar ? '' : ' is-empty'}" data-act="open-app" data-app="user"${myAvatar ? ` style="background-image:url(&quot;${myAvatar}&quot;)"` : ''}>${myAvatar ? '' : esc(String(myName).slice(0, 1))}</span>
+          <span class="mp-profile-name" data-act="open-app" data-app="user">${esc(myName)}</span>
+          ${shell.bioEdit ? `
+          <div class="mp-profile-bio-edit">
+            <input id="mpProfileBio" class="mp-profile-bio-input" type="text" maxlength="30" value="${esc(myBio)}" placeholder="写一句签名">
+            <button class="mp-profile-mini is-primary" data-act="profile-bio-save" type="button">存</button>
+            <button class="mp-profile-mini" data-act="profile-bio-cancel" type="button">取消</button>
+          </div>` : `
+          <button class="mp-profile-bio" data-act="profile-bio-edit" type="button">
+            <span>${esc(myBio || '点这里写签名')}</span>
+            ${ico('brush')}
+          </button>`}
+        </div>
+        <input id="mpProfileBanner" type="file" accept="image/*" style="position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0">
 
         <div class="mp-widget-strip">
           <button class="mp-mini-widget" data-act="open-app" data-app="chat" type="button">
@@ -9160,6 +9258,38 @@ function createShell(options) {
       if (!shell.sheet) render();
     },
     'toast': (data) => ctx.toast(data.message || ''),
+    'profile-banner': () => { root.querySelector('#mpProfileBanner')?.click(); },
+    'profile-bio-edit': () => {
+      shell.bioEdit = true;
+      render();
+      setTimeout(() => {
+        const node = root.querySelector('#mpProfileBio');
+        if (!node) return;
+        node.focus();
+        node.select();
+        node.onkeydown = (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            root.querySelector('[data-act="profile-bio-save"]')?.click();
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            root.querySelector('[data-act="profile-bio-cancel"]')?.click();
+          }
+        };
+      }, 60);
+    },
+    'profile-bio-save': () => {
+      const node = root.querySelector('#mpProfileBio');
+      const value = String(node ? node.value : '').trim().slice(0, 30);
+      const settings = ctx.state.settings;
+      if (!settings.profile || typeof settings.profile !== 'object') settings.profile = { bio: '', banner: '' };
+      settings.profile.bio = value;
+      shell.bioEdit = false;
+      render();
+      ctx.save();
+      ctx.toast(value ? '签名已经换了' : '签名清空了');
+    },
+    'profile-bio-cancel': () => { shell.bioEdit = false; render(); },
     'phone-close': () => { if (typeof ctx.onClose === 'function') ctx.onClose(); },
     'toggle-theme': () => {
       const settings = ctx.state.settings;
@@ -18727,6 +18857,36 @@ async function openMemePhone(options = {}) {
     ctx.toast('图标已换上');
   }
 
+  /* 主界面顶栏背景图：裁成横幅比例、缩到 720px 宽，别把存档撑大 */
+  async function useCustomBanner(file) {
+    const looksImage = (file?.type && file.type.startsWith('image/')) || /\.(jpg|jpeg|png|webp|gif|bmp)$/i.test(file?.name || '');
+    if (!looksImage) { ctx.toast('请选一张图片'); return; }
+    const img = await new Promise((resolve, reject) => {
+      const image = new Image();
+      const url = URL.createObjectURL(file);
+      image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+      image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读不出来')); };
+      image.src = url;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = 720;
+    canvas.height = 160;
+    const painter = canvas.getContext('2d');
+    if (!painter) throw new Error('画布不可用');
+    const ratio = canvas.width / canvas.height;
+    const cropW = Math.min(img.width, img.height * ratio);
+    const cropH = cropW / ratio;
+    const sx = Math.max(0, (img.width - cropW) / 2);
+    const sy = Math.max(0, (img.height - cropH) / 2);
+    painter.drawImage(img, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
+    const settings = state.settings;
+    if (!settings.profile || typeof settings.profile !== 'object') settings.profile = { bio: '', banner: '' };
+    settings.profile.banner = canvas.toDataURL('image/jpeg', 0.82);
+    ctx.save();
+    ctx.rerender();
+    ctx.toast('顶栏背景图换好了');
+  }
+
   rootEl.addEventListener('change', event => {
     const id = event.target?.id;
     const file = event.target?.files?.[0];
@@ -18735,12 +18895,25 @@ async function openMemePhone(options = {}) {
       if (file) useCustomWall(file).catch(error => ctx.toast(error.message || '换壁纸失败'));
       return;
     }
+    if (id === 'mpProfileBanner') {
+      event.target.value = '';
+      if (file) useCustomBanner(file).catch(error => ctx.toast(error.message || '换背景图失败'));
+      return;
+    }
     if (id === 'mpIconFile') {
       const appId = event.target?.dataset?.app;
       event.target.value = '';
       if (file && appId) useCustomIcon(file, appId).catch(error => ctx.toast(error.message || '换图标失败'));
     }
   });
+  /* 顶栏背景图的 input 藏在桌面里，个别 WebView 不冒泡 change，补一道捕获监听 */
+  const docRef = rootEl.ownerDocument;
+  docRef?.addEventListener('change', event => {
+    if (event.target?.id !== 'mpProfileBanner') return;
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) useCustomBanner(file).catch(error => ctx.toast(error.message || '换背景图失败'));
+  }, true);
 
   /* 用户头像（酒馆里有 persona 头像） */
   try {

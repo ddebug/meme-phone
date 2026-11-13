@@ -136,6 +136,7 @@ export function createShell(options) {
     toastTimer: 0,
     live: { inputValue: '', focus: false },
     scroller: null,
+    bioEdit: false,
     deviceOffset: { x: 0, y: 0 },
   };
 
@@ -172,10 +173,12 @@ export function createShell(options) {
     const themed = state.settings.dress?.theme === 'pixel' ? PIXEL_BUNNY : null;
     const myName = themed ? themed.profile.name : (state.settings.user.name || me?.name || '我');
     const myAvatar = themed ? themed.avatar : (state.settings.user.avatar || me?.avatarUrl || '');
-    const myBio = themed ? themed.profile.bio : String(me?.description || '把每天的事，记在这台小手机里。').trim();
-    const myHandle = themed ? themed.profile.handle : `@${String(myName).trim().replace(/\s+/g, '_') || 'me'}`;
-    const myLocation = themed ? themed.profile.location : '在酒馆里';
-    const myBanner = themed ? ` style="--theme-banner:url(&quot;${themed.banner}&quot;)"` : '';
+    const ownBio = String(state.settings.profile?.bio || '').trim();
+    const myBio = ownBio || (themed ? themed.profile.bio : String(me?.description || '把每天的事，记在这台小手机里。').trim());
+    const ownBanner = String(state.settings.profile?.banner || '').trim();
+    const themedBanner = themed ? themed.banner : '';
+    const bannerImage = ownBanner || themedBanner;
+    const bannerStyle = bannerImage ? ` style="background-image:url(&quot;${bannerImage}&quot;);background-size:cover;background-position:center"` : '';
     const stampText = dateText().replace('<br>', ' · ');
 
     const iconButtons = desktopApps.map(app => `
@@ -195,16 +198,24 @@ export function createShell(options) {
 
     return `
       <div class="mp-desktop">
-        <button class="mp-profile" data-act="open-app" data-app="user" type="button" aria-label="我的资料">
-          <span class="mp-profile-banner"${myBanner}>
+        <div class="mp-profile">
+          <span class="mp-profile-banner${bannerImage ? ' is-custom' : ''}" data-act="profile-banner"${bannerStyle} title="点一下换背景图">
             <span class="mp-profile-stamp">${stampText}</span>
           </span>
-          ${avatarHtml(myName, myAvatar, 'mp-profile-avatar')}
-          <span class="mp-profile-name">${esc(myName)}</span>
-          <span class="mp-profile-handle">${esc(myHandle)}</span>
-          <span class="mp-profile-bio">${esc(myBio)}</span>
-          <span class="mp-profile-loc">${ico('home')}<span>${esc(myLocation)}</span></span>
-        </button>
+          <span class="mp-profile-avatar${myAvatar ? '' : ' is-empty'}" data-act="open-app" data-app="user"${myAvatar ? ` style="background-image:url(&quot;${myAvatar}&quot;)"` : ''}>${myAvatar ? '' : esc(String(myName).slice(0, 1))}</span>
+          <span class="mp-profile-name" data-act="open-app" data-app="user">${esc(myName)}</span>
+          ${shell.bioEdit ? `
+          <div class="mp-profile-bio-edit">
+            <input id="mpProfileBio" class="mp-profile-bio-input" type="text" maxlength="30" value="${esc(myBio)}" placeholder="写一句签名">
+            <button class="mp-profile-mini is-primary" data-act="profile-bio-save" type="button">存</button>
+            <button class="mp-profile-mini" data-act="profile-bio-cancel" type="button">取消</button>
+          </div>` : `
+          <button class="mp-profile-bio" data-act="profile-bio-edit" type="button">
+            <span>${esc(myBio || '点这里写签名')}</span>
+            ${ico('brush')}
+          </button>`}
+        </div>
+        <input id="mpProfileBanner" type="file" accept="image/*" style="position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0">
 
         <div class="mp-widget-strip">
           <button class="mp-mini-widget" data-act="open-app" data-app="chat" type="button">
@@ -458,6 +469,38 @@ export function createShell(options) {
       if (!shell.sheet) render();
     },
     'toast': (data) => ctx.toast(data.message || ''),
+    'profile-banner': () => { root.querySelector('#mpProfileBanner')?.click(); },
+    'profile-bio-edit': () => {
+      shell.bioEdit = true;
+      render();
+      setTimeout(() => {
+        const node = root.querySelector('#mpProfileBio');
+        if (!node) return;
+        node.focus();
+        node.select();
+        node.onkeydown = (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            root.querySelector('[data-act="profile-bio-save"]')?.click();
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            root.querySelector('[data-act="profile-bio-cancel"]')?.click();
+          }
+        };
+      }, 60);
+    },
+    'profile-bio-save': () => {
+      const node = root.querySelector('#mpProfileBio');
+      const value = String(node ? node.value : '').trim().slice(0, 30);
+      const settings = ctx.state.settings;
+      if (!settings.profile || typeof settings.profile !== 'object') settings.profile = { bio: '', banner: '' };
+      settings.profile.bio = value;
+      shell.bioEdit = false;
+      render();
+      ctx.save();
+      ctx.toast(value ? '签名已经换了' : '签名清空了');
+    },
+    'profile-bio-cancel': () => { shell.bioEdit = false; render(); },
     'phone-close': () => { if (typeof ctx.onClose === 'function') ctx.onClose(); },
     'toggle-theme': () => {
       const settings = ctx.state.settings;

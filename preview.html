@@ -12401,9 +12401,130 @@ function deleteConfirmBlock(kind, note) {
     </div>`;
 }
 
-/* 方案管理的页面内联状态：改名只开一个输入行，删除只开一条确认，不走弹层 */
-let drawEdit = null;   // { kind: 'scheme' | 'api' | 'preset', value }
+/* 统一的 iOS 风格下拉框：跟聊天接口页同一套样式和取值方式 */
+function iosSelect(act, items, value, attrs = '') {
+  const options = items.map(item => `
+    <option value="${esc(item.value)}"${String(item.value) === String(value) ? ' selected' : ''}>${esc(item.label)}</option>`).join('');
+  return `<div class="mp-select-wrap"><select data-act="${act}"${attrs}>${options}</select>${icon('chevron')}</div>`;
+}
+
+function engineLabel(engine) {
+  return engine === 'novelai' ? 'NovelAI 官方' : engine === 'doubao' ? '豆包 · 火山方舟' : '自定义接口';
+}
+
+function engineNote(engine) {
+  return engine === 'novelai' ? '官方端点，只用 Key' : engine === 'doubao' ? '火山方舟 images 接口，只用 Key' : '地址 + Key 自己填';
+}
+
+function apiDot(preset) {
+  if (preset?.status) {
+    return preset.status.ok
+      ? { cls: 'is-ok', text: preset.status.text || '连接正常' }
+      : { cls: 'is-bad', text: preset.status.text || '连接失败' };
+  }
+  return { cls: 'is-idle', text: '还没测试连接' };
+}
+
+function presetEndpoint(preset) {
+  const engine = ['custom', 'doubao'].includes(preset?.engine) ? preset.engine : 'novelai';
+  return {
+    engine,
+    url: String(preset?.url || '').trim(),
+    path: engine === 'custom' ? String(preset?.path || '/v1/images/generations').trim() : '',
+    key: String(preset?.key || '').trim(),
+    model: String(preset?.model || '').trim(),
+  };
+}
+
+function presetStatusText(p) {
+  if (p.status?.text) return p.status.text;
+  const ep = presetEndpoint(p);
+  return endpointReady(ep) ? '还没测试连接' : '先填地址和 Key，再测试连接 · 拉取模型';
+}
+
+function apiDetailMarkup(p) {
+  return `
+    <div class="mp-api-detail" data-id="${p.id}">
+      <div class="mp-api-block">
+        <div class="mp-api-block-title">基本信息</div>
+        <div class="mp-api-edit">
+          <div class="mp-api-field" style="grid-column:1/-1">
+            <span>引擎</span>
+            <button class="mp-row" data-act="draw-engine" data-id="${p.id}" type="button">
+              <span class="mp-row-main">
+                <span class="mp-row-name">${esc(engineLabel(p.engine))}</span>
+                <span class="mp-row-sub">${esc(engineNote(p.engine))}</span>
+              </span>${icon('chevron')}
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="mp-api-block">
+        <div class="mp-api-block-title">连接信息</div>
+        <div class="mp-api-edit">
+          <div class="mp-api-field" style="grid-column:1/-1">
+            <span>地址</span>
+            <button class="mp-row" data-act="draw-url" data-id="${p.id}" type="button">
+              <span class="mp-row-main"><span class="mp-row-name">${p.engine === 'custom' ? '接口地址' : 'API 地址'}</span><span class="mp-row-sub">${esc(p.url || '没填')}</span></span>${icon('chevron')}
+            </button>
+          </div>
+          <div class="mp-api-field" style="grid-column:1/-1">
+            <span>Key</span>
+            <button class="mp-row" data-act="draw-key" data-id="${p.id}" type="button">
+              <span class="mp-row-main"><span class="mp-row-name">${p.engine === 'novelai' ? 'NovelAI Key' : p.engine === 'doubao' ? 'ARK API Key' : '接口 Key'}</span><span class="mp-row-sub">${esc(maskKey(p.key))}</span></span>${icon('chevron')}
+            </button>
+          </div>
+          <div class="mp-api-field" style="grid-column:1/-1">
+            <span>模型</span>
+            <button class="mp-row" data-act="draw-model" data-id="${p.id}" type="button">
+              <span class="mp-row-main"><span class="mp-row-name">模型</span><span class="mp-row-sub">${esc(p.model || '没选')}</span></span>${icon('chevron')}
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="mp-api-status-inline${p.status?.ok ? ' is-ok' : ''}">${esc(presetStatusText(p))}</div>
+      <button class="mp-api-test" data-act="draw-test" data-id="${p.id}" type="button">${icon('refresh')}<span>测试连接 · 拉取模型</span></button>
+      <div class="mp-api-more">
+        <button class="mp-api-more-btn" data-act="draw-api-rename" data-id="${p.id}" type="button">改名</button>
+        <button class="mp-api-more-btn" data-act="draw-api-new" data-id="${p.id}" type="button">复制接口</button>
+        <button class="mp-api-more-btn is-danger" data-act="draw-api-del" data-id="${p.id}" type="button">删除接口</button>
+      </div>
+    </div>`;
+}
+
+function promptDetailMarkup(p) {
+  return `
+    <div class="mp-api-detail" data-id="${p.id}">
+      <div class="mp-api-block">
+        <div class="mp-api-block-title">提示词</div>
+        <div class="mp-api-edit">
+          <div class="mp-api-field" style="grid-column:1/-1">
+            <span>正向 · 质量词</span>
+            <button class="mp-row" data-act="draw-pos" data-id="${p.id}" type="button">
+              <span class="mp-row-main"><span class="mp-row-sub" style="white-space:normal">${esc(p.pos || QUALITY)}</span></span>${icon('chevron')}
+            </button>
+          </div>
+          <div class="mp-api-field" style="grid-column:1/-1">
+            <span>反向 · 不要什么</span>
+            <button class="mp-row" data-act="draw-neg" data-id="${p.id}" type="button">
+              <span class="mp-row-main"><span class="mp-row-sub" style="white-space:normal">${esc(p.neg || DEFAULT_NEG)}</span></span>${icon('chevron')}
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="mp-api-more">
+        <button class="mp-api-more-btn" data-act="draw-preset-rename" data-id="${p.id}" type="button">改名</button>
+        <button class="mp-api-more-btn" data-act="draw-preset-new" data-id="${p.id}" type="button">复制预设</button>
+        <button class="mp-api-more-btn is-danger" data-act="draw-preset-del" data-id="${p.id}" type="button">删除预设</button>
+      </div>
+    </div>`;
+}
+
+/* 方案管理的页面内联状态：改名只开一个输入行，删除只开一条确认，不走弹层；展开哪条预设也只在页内记一下 */
+let drawEdit = null;   // { kind: 'scheme' | 'api' | 'preset', id, value }
 let drawDel = null;    // { kind: 'scheme' | 'api' | 'preset', id }
+let expandedApiId = '';
+let expandedPromptId = '';
 
 const drawApp = {
   id: 'draw', name: '绘图', icon: 'image',
@@ -12411,28 +12532,25 @@ const drawApp = {
   render(ctx) {
     const draw = ensure(ctx.state);
     const cfg = draw.config;
+    const image = ctx.state.settings.image;
+    const apiPresets = image.presets || [];
     const preset = draw.presets[draw.presetIdx] || draw.presets[0];
     const size = sizeOf(cfg.size);
     const ep = imageEndpoint(ctx.state);
     const ready = endpointReady(ep);
-    const apiPreset = activeApi(ctx.state);
-    const apiStatus = apiPreset?.status || null;
-    const statusText = apiStatus?.text || (ready ? '还没测试连接' : '先填地址和 Key，再测试连接 · 拉取模型');
+    const scheme = draw.schemes.find(item => item.id === draw.schemeId) || null;
+    const schemeDirty = Boolean(scheme && (scheme.apiId !== image.activeId || scheme.promptId !== preset.id));
     const busy = Boolean(draw.busy);
-    const schemeIndex = draw.schemes.findIndex(item => item.id === draw.schemeId);
-    const scheme = draw.schemes[schemeIndex] || null;
-    const schemeApi = scheme ? (ctx.state.settings.image.presets || []).find(item => item.id === scheme.apiId) : null;
-    const schemePrompt = scheme ? draw.presets.find(item => item.id === scheme.promptId) : null;
-    const schemeDirty = Boolean(scheme && (scheme.apiId !== ctx.state.settings.image.activeId || scheme.promptId !== preset.id));
 
-    const promptOptions = draw.presets.map((item, index) => `
-      <option value="${index}"${index === draw.presetIdx ? ' selected' : ''}>${esc(item.name || `预设 ${index + 1}`)}</option>`).join('');
-
-    const apiOptions = (ctx.state.settings.image.presets || []).map((item, index) => `
-      <option value="${index}"${item.id === ctx.state.settings.image.activeId ? ' selected' : ''}>${esc(item.name || `接口 ${index + 1}`)}</option>`).join('');
-
-    const schemeOptions = draw.schemes.map((item, index) => `
-      <option value="${index}"${item.id === draw.schemeId ? ' selected' : ''}>${esc(item.name || `方案 ${index + 1}`)}</option>`).join('');
+    const schemeOptions = draw.schemes.map((item, index) => ({
+      value: item.id, label: item.name || `方案 ${index + 1}`,
+    }));
+    const apiOptions = apiPresets.map((item, index) => ({
+      value: item.id, label: item.name || `接口 ${index + 1}`,
+    }));
+    const promptOptions = draw.presets.map((item, index) => ({
+      value: item.id, label: item.name || `预设 ${index + 1}`,
+    }));
 
     const rows = [
       { act: 'draw-size', label: '尺寸', value: size.label },
@@ -12458,6 +12576,54 @@ const drawApp = {
         </div>
       </div>`).join('');
 
+    const apiRows = apiPresets.map(p => {
+      const active = p.id === image.activeId;
+      const open = p.id === expandedApiId;
+      const deleting = drawDel?.kind === 'api' && drawDel.id === p.id;
+      const editing = drawEdit?.kind === 'api' && drawEdit.id === p.id;
+      const dot = apiDot(p);
+      const sub = `${engineLabel(p.engine)} · ${p.model || '未选模型'}`;
+      return `
+        <div class="mp-api-stack">
+          <button class="mp-row mp-api-row${open ? ' is-open' : ''}" data-act="draw-api-toggle" data-id="${p.id}" type="button" aria-expanded="${open}">
+            ${icon('code')}
+            <span class="mp-row-main">
+              <span class="mp-row-name">${esc(p.name || '未命名')}${active ? '<span class="mp-api-chip">当前</span>' : ''}</span>
+              <span class="mp-row-sub">${esc(sub)}</span>
+            </span>
+            <span class="mp-api-row-side">
+              <span class="mp-api-dot ${dot.cls}" title="${esc(dot.text)}" aria-label="${esc(dot.text)}"></span>
+              <span class="mp-api-caret">${icon('chevron')}</span>
+            </span>
+          </button>
+          ${open ? apiDetailMarkup(p) : ''}
+          ${editing ? nameEditBlock('api', drawEdit.value) : ''}
+          ${deleting ? deleteConfirmBlock('api', `只会删「${p.name || '当前接口'}」这套接口，引用它的方案会换回第一套接口。`) : ''}
+        </div>`;
+    }).join('');
+
+    const promptRows = draw.presets.map(p => {
+      const active = p.id === preset.id;
+      const open = p.id === expandedPromptId;
+      const deleting = drawDel?.kind === 'preset' && drawDel.id === p.id;
+      const editing = drawEdit?.kind === 'preset' && drawEdit.id === p.id;
+      const sub = `${(p.pos || '').slice(0, 22) || '无正向词'} · 反向 ${(p.neg || '').slice(0, 16) || '默认'}`;
+      return `
+        <div class="mp-api-stack">
+          <button class="mp-row mp-api-row${open ? ' is-open' : ''}" data-act="draw-preset-toggle" data-id="${p.id}" type="button" aria-expanded="${open}">
+            ${icon('brush')}
+            <span class="mp-row-main">
+              <span class="mp-row-name">${esc(p.name || '未命名')}${active ? '<span class="mp-api-chip">当前</span>' : ''}</span>
+              <span class="mp-row-sub">${esc(sub)}</span>
+            </span>
+            <span class="mp-api-row-side"><span class="mp-api-caret">${icon('chevron')}</span></span>
+          </button>
+          ${open ? promptDetailMarkup(p) : ''}
+          ${editing ? nameEditBlock('preset', drawEdit.value) : ''}
+          ${deleting ? deleteConfirmBlock('preset', `只会删「${p.name || '当前提示词'}」这套提示词，引用它的方案会换回第一套提示词。`) : ''}
+        </div>`;
+    }).join('');
+
     return `
       <div class="mp-nav">
         <button class="mp-back" data-act="back" type="button">${icon('back')}</button>
@@ -12474,77 +12640,66 @@ const drawApp = {
           <button class="mp-draw-state-btn" data-act="${ep.engine === 'custom' ? 'draw-url' : 'draw-key'}" type="button">${ep.engine === 'custom' ? '改地址' : '填 Key'}</button>
         </div>
 
-        <div class="mp-draw-group-head">
-          <span class="mp-group-label">整体方案</span>
-          <button class="mp-draw-icon" data-act="draw-scheme-new" type="button" aria-label="新建整体方案">${icon('plus')}</button>
-        </div>
-        <div class="mp-draw-switch-row">
-          <div class="mp-select-wrap"><select data-act="draw-scheme">${schemeOptions}</select>${icon('chevron')}</div>
-          <button class="mp-draw-side is-primary" data-act="draw-scheme-save" type="button">保存</button>
-          <button class="mp-draw-icon" data-act="draw-scheme-rename" type="button" aria-label="改方案名">${icon('brush')}</button>
-          <button class="mp-draw-icon is-danger" data-act="draw-scheme-del" type="button" aria-label="删除这套方案">${icon('trash')}</button>
-        </div>
-        ${drawEdit?.kind === 'scheme' ? nameEditBlock('scheme', drawEdit.value) : ''}
-        ${drawDel?.kind === 'scheme' ? deleteConfirmBlock('scheme', `只会删「${scheme?.name || '当前方案'}」这套组合，接口预设和提示词预设都还在。`) : ''}
-        <div class="mp-draw-hint">改完接口或提示词后点「保存」，把当前组合写进这套方案；切走再回来不会丢。${scheme
-          ? `当前方案存的是「${esc(schemeApi?.name || '接口')}」 / 「${esc(schemePrompt?.name || '提示词')}」。${schemeDirty ? '当前选择还没保存。' : ''}`
-          : ''}</div>
+        <section class="mp-ios-card mp-api-scheme" aria-label="当前绘图方案">
+          <div class="mp-api-sec-head is-inside">
+            <div class="mp-api-sec-copy">
+              <div class="mp-api-scheme-kicker">当前绘图方案</div>
+            </div>
+            <span class="mp-api-pill ${schemeDirty ? 'is-dirty' : 'is-saved'}">${schemeDirty ? '未保存' : '已保存'}</span>
+          </div>
 
-        <div class="mp-draw-group-head">
-          <span class="mp-group-label">绘图接口预设</span>
-          <button class="mp-draw-icon" data-act="draw-api-new" type="button" aria-label="新建接口预设">${icon('plus')}</button>
-        </div>
-        <div class="mp-draw-switch-row">
-          <div class="mp-select-wrap"><select data-act="draw-api">${apiOptions}</select>${icon('chevron')}</div>
-          <button class="mp-draw-side is-primary" data-act="draw-api-save" type="button">保存</button>
-          <button class="mp-draw-icon" data-act="draw-api-rename" type="button" aria-label="改接口名">${icon('brush')}</button>
-          <button class="mp-draw-icon is-danger" data-act="draw-api-del" type="button" aria-label="删除这套接口">${icon('trash')}</button>
-        </div>
-        ${drawEdit?.kind === 'api' ? nameEditBlock('api', drawEdit.value) : ''}
-        ${drawDel?.kind === 'api' ? deleteConfirmBlock('api', `只会删「${ep.name || '当前接口'}」这套接口，用它的整体方案会换回第一套接口。`) : ''}
-        <div class="mp-draw-hint">接口地址、Key、模型改完会存进这套接口预设；点「保存」再把当前接口记到整体方案里。</div>
-        <div class="mp-group">
-          <button class="mp-row" data-act="draw-engine" type="button">
-            <span class="mp-row-main">
-              <span class="mp-row-name">${esc(ep.name)}</span>
-              <span class="mp-row-sub">${esc(ep.engine === 'novelai' ? '官方端点，只用 Key' : ep.engine === 'doubao' ? '火山方舟 images 接口，只用 Key' : '地址 + Key 自己填')}</span>
-            </span>${icon('chevron')}
-          </button>
-          <button class="mp-row" data-act="draw-url" type="button">
-            <span class="mp-row-main">
-              <span class="mp-row-name">地址</span>
-              <span class="mp-row-sub">${esc(ep.url || '没填')}</span>
-            </span>${icon('chevron')}
-          </button>
-          <button class="mp-row" data-act="draw-key" type="button">
-            <span class="mp-row-main">
-              <span class="mp-row-name">Key</span>
-              <span class="mp-row-sub">${esc(maskKey(ep.key))}</span>
-            </span>${icon('chevron')}
-          </button>
-          <button class="mp-row" data-act="draw-model" type="button">
-            <span class="mp-row-main">
-              <span class="mp-row-name">模型</span>
-              <span class="mp-row-sub">${esc(ep.model || '没选')}</span>
-            </span>${icon('chevron')}
-          </button>
-        </div>
-        <div class="mp-api-status-inline${apiStatus?.ok ? ' is-ok' : ''}">${esc(statusText)}</div>
-        <button class="mp-api-test" data-act="draw-test" type="button">${icon('refresh')}<span>测试连接 · 拉取模型</span></button>
+          ${iosSelect('draw-scheme', schemeOptions, scheme?.id || '', ' aria-label="选择整体方案"')}
 
-        <div class="mp-draw-group-head">
-          <span class="mp-group-label">提示词预设</span>
-          <button class="mp-draw-icon" data-act="draw-preset-new" type="button" aria-label="新建提示词预设">${icon('plus')}</button>
+          <div class="mp-api-scheme-fields">
+            <label class="mp-api-scheme-field">
+              <span>绘图 API</span>
+              ${iosSelect('draw-api', apiOptions, image.activeId, ' aria-label="这套方案使用的绘图接口"')}
+            </label>
+            <label class="mp-api-scheme-field">
+              <span>提示词预设</span>
+              ${iosSelect('draw-preset', promptOptions, preset.id, ' aria-label="这套方案使用的提示词预设"')}
+            </label>
+          </div>
+
+          ${schemeDirty ? '<div class="mp-api-hint is-dirty">当前改动还没保存。</div>' : ''}
+
+          <div class="mp-api-save-row">
+            <button class="mp-api-btn is-primary mp-api-save" data-act="draw-scheme-save" type="button">保存</button>
+            ${schemeDirty ? '<button class="mp-api-more-btn" data-act="draw-scheme-revert" type="button">恢复为方案值</button>' : ''}
+          </div>
+
+          <div class="mp-api-more is-spaced">
+            <button class="mp-api-more-btn" data-act="draw-scheme-new" type="button">新建方案</button>
+            <button class="mp-api-more-btn" data-act="draw-scheme-rename" type="button">改名</button>
+            <button class="mp-api-more-btn" data-act="draw-scheme-copy" type="button">复制</button>
+            <button class="mp-api-more-btn is-danger" data-act="draw-scheme-del" type="button">删除</button>
+          </div>
+
+          ${drawEdit?.kind === 'scheme' ? nameEditBlock('scheme', drawEdit.value) : ''}
+          ${drawDel?.kind === 'scheme' ? deleteConfirmBlock('scheme', `只会删「${scheme?.name || '当前方案'}」这套组合，接口预设和提示词预设都还在。`) : ''}
+        </section>
+
+        <div class="mp-api-sec-head">
+          <div class="mp-api-sec-copy">
+            <div class="mp-api-sec-title">绘图接口</div>
+            <div class="mp-api-sec-sub">管理可供绘图方案使用的接口连接。</div>
+          </div>
+          <button class="mp-icon-btn" data-act="draw-api-new" type="button" aria-label="新建接口预设">${icon('plus')}</button>
+          <span class="mp-api-count">${apiPresets.length} 套</span>
         </div>
-        <div class="mp-draw-switch-row">
-          <div class="mp-select-wrap"><select data-act="draw-preset">${promptOptions}</select>${icon('chevron')}</div>
-          <button class="mp-draw-side is-primary" data-act="draw-prompt-save" type="button">保存</button>
-          <button class="mp-draw-icon" data-act="draw-preset-rename" type="button" aria-label="改提示词名">${icon('brush')}</button>
-          <button class="mp-draw-icon is-danger" data-act="draw-preset-del" type="button" aria-label="删除这套提示词">${icon('trash')}</button>
+        <div class="mp-api-list">${apiRows}</div>
+
+        <div class="mp-api-sec-head">
+          <div class="mp-api-sec-copy">
+            <div class="mp-api-sec-title">提示词预设</div>
+            <div class="mp-api-sec-sub">正向 / 反向提示词，供绘图方案选用。</div>
+          </div>
+          <button class="mp-icon-btn" data-act="draw-preset-new" type="button" aria-label="新建提示词预设">${icon('plus')}</button>
+          <span class="mp-api-count">${draw.presets.length} 套</span>
         </div>
-        ${drawEdit?.kind === 'preset' ? nameEditBlock('preset', drawEdit.value) : ''}
-        ${drawDel?.kind === 'preset' ? deleteConfirmBlock('preset', `只会删「${preset?.name || '当前提示词'}」这套提示词，用它的整体方案会换回第一套提示词。`) : ''}
-        <div class="mp-draw-hint">正向、反向改完会存进这套提示词预设；点「保存」再把当前提示词记到整体方案里。</div>
+        <div class="mp-api-list">${promptRows}</div>
+
+        <div class="mp-api-note">方案只记「接口 + 提示词预设」的组合；地址、Key、模型在各自展开面板里改。</div>
 
         <div class="mp-group-label" style="margin-top:14px">画面</div>
         <button class="mp-draw-desc" data-act="draw-prompt" type="button">
@@ -12556,20 +12711,6 @@ const drawApp = {
 
         <button class="mp-draw-run${busy ? ' is-busy' : ''}" data-act="draw-run" type="button">
           ${icon('spark')}<span>${busy ? '生成中…' : '生成一张'}</span>
-        </button>
-
-        <div class="mp-group-label" style="margin-top:14px">这套预设的提示词</div>
-        <button class="mp-row" data-act="draw-pos" type="button" style="padding:12px">
-          <span class="mp-row-main">
-            <span class="mp-row-name">正向 · 质量词</span>
-            <span class="mp-row-sub" style="white-space:normal">${esc(preset.pos || QUALITY)}</span>
-          </span>${icon('chevron')}
-        </button>
-        <button class="mp-row" data-act="draw-neg" type="button" style="padding:12px">
-          <span class="mp-row-main">
-            <span class="mp-row-name">反向 · 不要什么</span>
-            <span class="mp-row-sub" style="white-space:normal">${esc(preset.neg || DEFAULT_NEG)}</span>
-          </span>${icon('chevron')}
         </button>
 
         <div class="mp-group-label" style="margin-top:12px">参数</div>
@@ -12591,14 +12732,16 @@ const drawApp = {
     const draw = ensure(ctx.state);
     const cfg = draw.config;
     const image = ctx.state.settings.image;
-    const apiPreset = activeApi(ctx.state);
-    const engine = apiPreset?.engine || 'novelai';
-    const target = apiPreset || {};
-    const preset = draw.presets[draw.presetIdx] || draw.presets[0];
+    const apiPresets = image.presets || [];
+    const activeApiPreset = activeApi(ctx.state);
+    const activePrompt = draw.presets[draw.presetIdx] || draw.presets[0];
     const scheme = draw.schemes.find(item => item.id === draw.schemeId);
 
+    const apiById = id => apiPresets.find(p => p.id === String(id || '')) || activeApiPreset || null;
+    const promptById = id => draw.presets.find(p => p.id === String(id || '')) || activePrompt || null;
+
     if (act === 'draw-scheme') {
-      const picked = draw.schemes[Number(data.i ?? data.value)];
+      const picked = draw.schemes.find(item => item.id === String(data.value || ''));
       if (!picked) return true;
       applyScheme(ctx.state, picked);
       ctx.save();
@@ -12610,13 +12753,13 @@ const drawApp = {
     if (act === 'draw-scheme-new') {
       const copy = {
         id: newId('ds'),
-        name: `${preset.name || '提示词'} · ${target.name || '接口'}`,
+        name: `${activePrompt.name || '提示词'} · ${activeApiPreset?.name || '接口'}`,
         apiId: image.activeId,
-        promptId: preset.id,
+        promptId: activePrompt.id,
       };
       draw.schemes.push(copy);
       draw.schemeId = copy.id;
-      drawEdit = { kind: 'scheme', value: copy.name };
+      drawEdit = { kind: 'scheme', id: copy.id, value: copy.name };
       drawDel = null;
       ctx.save();
       ctx.rerender();
@@ -12627,16 +12770,47 @@ const drawApp = {
     if (act === 'draw-scheme-save') {
       if (!scheme) { ctx.toast('先选一套整体方案'); return true; }
       scheme.apiId = image.activeId;
-      scheme.promptId = preset.id;
+      scheme.promptId = activePrompt.id;
       ctx.save();
       ctx.rerender();
       ctx.toast(`已保存到方案「${scheme.name || '未命名'}」`);
       return true;
     }
 
+    if (act === 'draw-scheme-revert') {
+      if (!scheme) { ctx.toast('先选一套整体方案'); return true; }
+      const savedApi = apiPresets.find(p => p.id === scheme.apiId);
+      const savedPrompt = draw.presets.find(p => p.id === scheme.promptId);
+      if (savedApi) { image.activeId = savedApi.id; image.engine = savedApi.engine; }
+      if (savedPrompt) draw.presetIdx = draw.presets.indexOf(savedPrompt);
+      ctx.save();
+      ctx.rerender();
+      ctx.toast('已恢复成这套方案保存的值');
+      return true;
+    }
+
+    if (act === 'draw-scheme-copy') {
+      if (!scheme) { ctx.toast('先选一套整体方案'); return true; }
+      const copy = {
+        id: newId('ds'),
+        name: `${scheme.name || '方案'} 副本`.slice(0, 20),
+        apiId: scheme.apiId,
+        promptId: scheme.promptId,
+      };
+      draw.schemes.push(copy);
+      draw.schemeId = copy.id;
+      applyScheme(ctx.state, copy);
+      drawEdit = null;
+      drawDel = null;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`复制成「${copy.name}」`);
+      return true;
+    }
+
     if (act === 'draw-scheme-rename') {
       if (!scheme) { ctx.toast('先选一套整体方案'); return true; }
-      drawEdit = { kind: 'scheme', value: scheme.name || '' };
+      drawEdit = { kind: 'scheme', id: scheme.id, value: scheme.name || '' };
       drawDel = null;
       ctx.rerender();
       return true;
@@ -12645,7 +12819,10 @@ const drawApp = {
     if (act === 'draw-scheme-name-save') {
       const input = globalThis.document?.getElementById('drawSchemeName');
       const name = String(input?.value || '').trim().slice(0, 20);
-      if (scheme && name) scheme.name = name;
+      const editing = scheme && drawEdit?.kind === 'scheme'
+        ? draw.schemes.find(item => item.id === drawEdit.id) || scheme
+        : scheme;
+      if (editing && name) editing.name = name;
       drawEdit = null;
       ctx.save();
       ctx.rerender();
@@ -12687,8 +12864,17 @@ const drawApp = {
       return true;
     }
 
+    if (act === 'draw-api-toggle') {
+      const id = String(data.id || '');
+      expandedApiId = expandedApiId === id ? '' : id;
+      drawEdit = null;
+      drawDel = null;
+      ctx.rerender();
+      return true;
+    }
+
     if (act === 'draw-api') {
-      const picked = image.presets[Number(data.i ?? data.value)];
+      const picked = apiPresets.find(p => p.id === String(data.value || ''));
       if (!picked) return true;
       image.activeId = picked.id;
       image.engine = picked.engine;
@@ -12698,20 +12884,10 @@ const drawApp = {
       return true;
     }
 
-    if (act === 'draw-api-save') {
-      if (!target?.id) { ctx.toast('现在还没有接口预设'); return true; }
-      if (scheme) scheme.apiId = target.id;
-      image.activeId = target.id;
-      image.engine = target.engine;
-      ctx.save();
-      ctx.rerender();
-      ctx.toast(scheme ? `接口「${target.name || '未命名'}」已保存到当前方案` : `接口「${target.name || '未命名'}」已保存`);
-      return true;
-    }
-
     if (act === 'draw-api-rename') {
+      const target = apiById(data.id);
       if (!target?.id) { ctx.toast('现在还没有接口预设'); return true; }
-      drawEdit = { kind: 'api', value: target.name || '' };
+      drawEdit = { kind: 'api', id: target.id, value: target.name || '' };
       drawDel = null;
       ctx.rerender();
       return true;
@@ -12720,6 +12896,7 @@ const drawApp = {
     if (act === 'draw-api-name-save') {
       const input = globalThis.document?.getElementById('drawApiName');
       const name = String(input?.value || '').trim().slice(0, 20);
+      const target = apiPresets.find(p => p.id === drawEdit?.id) || activeApiPreset;
       if (target?.id && name) target.name = name;
       drawEdit = null;
       ctx.save();
@@ -12735,6 +12912,7 @@ const drawApp = {
     }
 
     if (act === 'draw-api-del') {
+      const target = apiById(data.id);
       if (!target?.id) { ctx.toast('现在还没有接口预设'); return true; }
       if (image.presets.length <= 1) { ctx.toast('至少留一套接口预设'); return true; }
       drawDel = { kind: 'api', id: target.id };
@@ -12744,14 +12922,15 @@ const drawApp = {
     }
 
     if (act === 'draw-api-del-confirm') {
-      if (!target?.id) return true;
-      const removedId = target.id;
+      const removedId = drawDel?.id || '';
+      if (!image.presets.some(item => item.id === removedId)) { drawDel = null; return true; }
       image.presets = image.presets.filter(item => item.id !== removedId);
       image.activeId = image.presets[0].id;
       image.engine = image.presets[0].engine;
       draw.schemes.forEach(item => { if (item.apiId === removedId) item.apiId = image.activeId; });
       const current = draw.schemes.find(item => item.id === draw.schemeId);
       if (current) applyScheme(ctx.state, current);
+      if (expandedApiId === removedId) expandedApiId = '';
       drawDel = null;
       ctx.save();
       ctx.rerender();
@@ -12766,11 +12945,13 @@ const drawApp = {
     }
 
     if (act === 'draw-api-new') {
-      const copy = { ...target, id: newId('image'), name: `${target.name || '接口'} 副本` };
+      const source = apiById(data.id) || activeApiPreset || {};
+      const copy = { ...source, id: newId('image'), name: `${source.name || '接口'} 副本` };
       image.presets.push(copy);
       image.activeId = copy.id;
       image.engine = copy.engine;
-      drawEdit = { kind: 'api', value: copy.name };
+      expandedApiId = copy.id;
+      drawEdit = { kind: 'api', id: copy.id, value: copy.name };
       drawDel = null;
       ctx.save();
       ctx.rerender();
@@ -12779,13 +12960,16 @@ const drawApp = {
     }
 
     if (act === 'draw-engine') {
+      const target = apiById(data.id);
+      if (!target) return true;
+      const engine = target.engine;
       ctx.openSheet({
         kind: 'pick', title: '绘图接口',
         items: ENGINES.map(item => ({ value: item.value, label: item.label, note: item.note })),
         onPick: value => {
           const defaults = value === 'novelai' ? (image.novelai || {}) : value === 'doubao' ? (image.doubao || {}) : (image.custom || {});
           target.engine = value;
-          image.engine = value;
+          if (target.id === image.activeId) image.engine = value;
           target.name = value === 'novelai' ? 'NovelAI 官方' : value === 'doubao' ? '豆包 Seedream' : '自定义接口';
           target.url = String(defaults.url || '');
           target.path = value === 'custom' ? String(defaults.path || '/v1/images/generations') : '';
@@ -12801,6 +12985,9 @@ const drawApp = {
     }
 
     if (act === 'draw-url') {
+      const target = apiById(data.id);
+      if (!target) return true;
+      const engine = target.engine;
       ctx.openSheet({
         kind: 'text', title: engine === 'novelai' ? 'NovelAI 地址' : engine === 'doubao' ? '火山方舟地址' : '接口地址',
         placeholder: engine === 'novelai'
@@ -12819,6 +13006,9 @@ const drawApp = {
     }
 
     if (act === 'draw-key') {
+      const target = apiById(data.id);
+      if (!target) return true;
+      const engine = target.engine;
       ctx.openSheet({
         kind: 'text',
         title: engine === 'novelai' ? 'NovelAI Key' : engine === 'doubao' ? 'ARK API Key' : '接口 Key',
@@ -12835,6 +13025,9 @@ const drawApp = {
     }
 
     if (act === 'draw-model') {
+      const target = apiById(data.id);
+      if (!target) return true;
+      const engine = target.engine;
       /* 内置候选 + 拉取到的模型 + 手填；拉不到列表时至少能手填，不让模型选死 */
       const builtin = engine === 'novelai' ? NAI_MODELS : engine === 'doubao' ? DOUBAO_MODELS : [];
       const fetched = (Array.isArray(target.models) ? target.models : [])
@@ -12865,6 +13058,7 @@ const drawApp = {
     }
 
     if (act === 'draw-test') {
+      const target = apiById(data.id);
       if (!target || !image.presets.includes(target)) return true;
       target.status = { ok: false, text: '正在连接…', at: Date.now() };
       ctx.save();
@@ -12895,13 +13089,15 @@ const drawApp = {
     }
 
     if (act === 'draw-pos' || act === 'draw-neg') {
+      const target = promptById(data.id);
+      if (!target) return true;
       const key = act === 'draw-pos' ? 'pos' : 'neg';
       ctx.openSheet({
         kind: 'text', title: act === 'draw-pos' ? '正向提示词' : '反向提示词',
         placeholder: key === 'pos' ? '质量词 + 想要的东西' : '不想要的东西',
-        value: preset[key] || '',
+        value: target[key] || '',
         onText: value => {
-          preset[key] = value;
+          target[key] = value;
           ctx.save();
           ctx.rerender();
         },
@@ -12909,26 +13105,28 @@ const drawApp = {
       return true;
     }
 
-    if (act === 'draw-preset') {
-      const pickedIndex = Number(data.i ?? data.value) || 0;
-      draw.presetIdx = pickedIndex;
-      ctx.save();
+    if (act === 'draw-preset-toggle') {
+      const id = String(data.id || '');
+      expandedPromptId = expandedPromptId === id ? '' : id;
+      drawEdit = null;
+      drawDel = null;
       ctx.rerender();
       return true;
     }
 
-    if (act === 'draw-prompt-save') {
-      if (!preset?.id) { ctx.toast('现在还没有提示词预设'); return true; }
-      if (scheme) scheme.promptId = preset.id;
+    if (act === 'draw-preset') {
+      const picked = draw.presets.find(p => p.id === String(data.value || ''));
+      if (!picked) return true;
+      draw.presetIdx = draw.presets.indexOf(picked);
       ctx.save();
       ctx.rerender();
-      ctx.toast(scheme ? `提示词「${preset.name || '未命名'}」已保存到当前方案` : `提示词「${preset.name || '未命名'}」已保存`);
       return true;
     }
 
     if (act === 'draw-preset-rename') {
-      if (!preset?.id) { ctx.toast('现在还没有提示词预设'); return true; }
-      drawEdit = { kind: 'preset', value: preset.name || '' };
+      const target = promptById(data.id);
+      if (!target?.id) { ctx.toast('现在还没有提示词预设'); return true; }
+      drawEdit = { kind: 'preset', id: target.id, value: target.name || '' };
       drawDel = null;
       ctx.rerender();
       return true;
@@ -12937,7 +13135,8 @@ const drawApp = {
     if (act === 'draw-preset-name-save') {
       const input = globalThis.document?.getElementById('drawPresetName');
       const name = String(input?.value || '').trim().slice(0, 20);
-      if (preset?.id && name) preset.name = name;
+      const target = draw.presets.find(p => p.id === drawEdit?.id) || activePrompt;
+      if (target?.id && name) target.name = name;
       drawEdit = null;
       ctx.save();
       ctx.rerender();
@@ -12951,23 +13150,26 @@ const drawApp = {
       return true;
     }
 
-    if (act === 'draw-prompt-del') {
-      if (!preset?.id) { ctx.toast('现在还没有提示词预设'); return true; }
+    if (act === 'draw-preset-del') {
+      const target = promptById(data.id);
+      if (!target?.id) { ctx.toast('现在还没有提示词预设'); return true; }
       if (draw.presets.length <= 1) { ctx.toast('至少留一套提示词预设'); return true; }
-      drawDel = { kind: 'preset', id: preset.id };
+      drawDel = { kind: 'preset', id: target.id };
       drawEdit = null;
       ctx.rerender();
       return true;
     }
 
     if (act === 'draw-preset-del-confirm') {
-      if (!preset?.id) return true;
-      const removedId = preset.id;
-      draw.presets.splice(draw.presetIdx, 1);
-      draw.presetIdx = Math.max(0, draw.presetIdx - 1);
+      const removedId = drawDel?.id || '';
+      if (!draw.presets.some(p => p.id === removedId)) { drawDel = null; return true; }
+      const removedIndex = draw.presets.findIndex(p => p.id === removedId);
+      draw.presets.splice(removedIndex, 1);
+      draw.presetIdx = Math.max(0, Math.min(draw.presetIdx, draw.presets.length - 1));
       draw.schemes.forEach(item => { if (item.promptId === removedId) item.promptId = draw.presets[0].id; });
       const current = draw.schemes.find(item => item.id === draw.schemeId);
       if (current) applyScheme(ctx.state, current);
+      if (expandedPromptId === removedId) expandedPromptId = '';
       drawDel = null;
       ctx.save();
       ctx.rerender();
@@ -12982,19 +13184,21 @@ const drawApp = {
     }
 
     if (act === 'draw-preset-new') {
+      const source = promptById(data.id) || activePrompt;
       const copy = {
         id: newId('dp'),
-        name: `${preset.name || '预设'} 副本`,
-        pos: preset.pos || '',
-        neg: preset.neg || '',
+        name: `${source.name || '预设'} 副本`,
+        pos: source.pos || '',
+        neg: source.neg || '',
       };
       draw.presets.push(copy);
       draw.presetIdx = draw.presets.length - 1;
-      drawEdit = { kind: 'preset', value: copy.name };
+      expandedPromptId = copy.id;
+      drawEdit = { kind: 'preset', id: copy.id, value: copy.name };
       drawDel = null;
       ctx.save();
       ctx.rerender();
-      ctx.toast(`按「${preset.name || '预设'}」新建了一套，顺手改个名字`);
+      ctx.toast(`按「${source.name || '预设'}」新建了一套，顺手改个名字`);
       return true;
     }
 

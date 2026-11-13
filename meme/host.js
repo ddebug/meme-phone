@@ -555,15 +555,22 @@ function isNai3Model(model) {
   return String(model || '').includes('diffusion-3');
 }
 
+/* NAI 5 只认这几种采样器，别的会被官方判参数错；选错了退回默认那个 */
+const NAI_V5_SAMPLERS = new Set([
+  'k_euler_ancestral', 'k_euler', 'k_dpmpp_2s_ancestral', 'k_dpmpp_2m_sde', 'k_dpmpp_2m', 'k_dpmpp_sde',
+]);
+
 function buildNaiPayload({ model, width, height, steps, scale, sampler, noise, seed, prompt, negative }) {
   const n3 = isNai3Model(model);
-  const paramsVersion = /nai-diffusion-5/.test(String(model || '')) ? 4 : 3;
+  const isV5 = /nai-diffusion-5/.test(String(model || ''));
+  const safeSampler = isV5 && !NAI_V5_SAMPLERS.has(sampler) ? 'k_euler_ancestral' : sampler;
+  const paramsVersion = isV5 ? 4 : 3;
   const params = {
     params_version: paramsVersion,
     width,
     height,
     scale,
-    sampler,
+    sampler: safeSampler,
     steps,
     n_samples: 1,
     ucPreset: 3,
@@ -607,7 +614,7 @@ function buildNaiPayload({ model, width, height, steps, scale, sampler, noise, s
     };
   }
 
-  if (sampler === 'k_euler_ancestral') {
+  if (safeSampler === 'k_euler_ancestral') {
     params.deliberate_euler_ancestral_bug = false;
     params.prefer_brownian = true;
   }
@@ -745,8 +752,109 @@ export async function unzipNaiImage(buffer) {
   return { base64: bytesToBase64(entries[name]), filename: name };
 }
 
-/** 豆包 Seedream（火山方舟）：images/generations，字段比 OpenAI 多一个 watermark / 组图开关。 */
-async function doubaoImage({ base, token, model, width, height, seed, prompt }) {
+/**
+ * 把绘图接口地址剥成根地址，用来拼探测路径。
+ * 用户可能把整条生图地址粘进来（/ai/generate-image、/api/v3/images/generations），
+ * 也可能只填站点（127.0.0.1:7860），这里都收成同一种口径。
+ */
+function imageApiRoot(engine, url, path = '') {
+  let base = String(url || '').trim().replace(/\/+$/, '');
+  if (!base) return '';
+  if (engine === 'novelai') {
+    base = base
+      .replace(/\/ai\/generate-image-stream$/i, '')
+      .replace(/\/ai\/generate-image$/i, '')
+      .replace(/\/generate-image$/i, '');
+    return base.replace(/\/+$/, '');
+  }
+  base = base.replace(/\/images\/generations$/i, '');
+  if (/\/(api\/)?v\d+$/.test(base)) return base;
+  const route = String(path || '').trim();
+  const version = route.match(/\/v\d+/);
+  if (version) base = `${base}${version[0]}`;
+  else if (!/\/(api\/)?v\d+$/.test(base)) base = `${base}/v1`;
+  return base.replace(/\/+$/, '');
+}
+
+/** 各家 /models 返回结构不一样，统一抓成模型名列表。 */
+function modelNamesOf(payload) {
+  const list = Array.isArray(payload?.data) ? payload.data
+    : Array.isArray(payload?.models) ? payload.models
+      : Array.isArray(payload) ? payload : [];
+  const names = list.map(item => {
+    if (typeof item === 'string') return item;
+    return item?.id || item?.name || item?.model || '';
+  }).map(item => String(item || '').trim()).filter(Boolean);
+  return [...new Set(names)].sort();
+}
+
+function naiTierLabel(data) {
+  if (!data || typeof data !== 'object') return '';
+  if (data.active === false) return '没有生效的订阅';
+  const tier = Number(data.tier);
+  if (!Number.isFinite(tier) || tier <= 0) return data.active ? '订阅有效' : '';
+  return ['', 'Tablet', 'Scroll', 'Opus', 'Opus 年付'][tier] || `档位 ${tier}`;
+}
+
+/**
+ * 绘图接口的「测试连接 / 拉取模型」。
+ * NovelAI 官方没有模型列表接口（/ai/models 一律 404），只能拿 /user/subscription 验 Key，
+ * 所以这里回的是内置候选；豆包和自定义是 OpenAI 风格，可以直接 GET /models。
+ */
+export async function probeImageApi({ engine = 'novelai', url = '', key = '', path = '' } = {}) {
+  const base = imageApiRoot(engine, url, path);
+  if (!base) throw new Error('先填接口地址');
+  const token = String(key || '').trim();
+
+  if (engine === 'novelai') {
+    if (!token) throw new Error('先填 NovelAI Key');
+    let res;
+    try {
+      res = await fetch(`${base}/user/subscription`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+        credentials: 'omit',
+      });
+    } catch (error) {
+      throw new Error(`连不上 ${base}：${error.message}`);
+    }
+    if (res.status === 401 || res.status === 403) throw new Error('NovelAI Key 不对，或没权限');
+    if (res.status === 404) {
+      return { ok: false, models: [], text: `${base} 没有订阅接口，Key 没验成；模型只能从内置候选里选或手动填` };
+    }
+    if (!res.ok) throw new Error(`NovelAI 返回 ${res.status}`);
+    const data = await res.json().catch(() => null);
+    const tier = naiTierLabel(data);
+    return {
+      ok: Boolean(tier) && tier !== '没有生效的订阅',
+      models: [],
+      text: `Key 有效${tier ? ` · ${tier}` : ''} · 官方不给模型列表，模型从内置候选里选`,
+    };
+  }
+
+  const headers = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res;
+  try {
+    res = await fetch(`${base}/models`, { method: 'GET', headers, cache: 'no-store', credentials: 'omit' });
+  } catch (error) {
+    throw new Error(`连不上 ${base}：${error.message}`);
+  }
+  if (res.status === 401 || res.status === 403) throw new Error('Key 不对，或没有拉模型的权限');
+  if (res.status === 404 || res.status === 405) {
+    return { ok: false, models: [], text: `${base} 没有模型列表接口，模型只能手动填` };
+  }
+  if (!res.ok) throw new Error(`接口返回 ${res.status}`);
+  const text = await res.text().catch(() => '');
+  let payload = null;
+  try { payload = JSON.parse(text); } catch { throw new Error('模型列表不是 JSON，可能地址填到了网页首页'); }
+  const models = modelNamesOf(payload);
+  if (!models.length) return { ok: false, models: [], text: `${base} 连上了，但没返回模型名` };
+  return { ok: true, models, text: `连接正常 · ${models.length} 个模型 · ${base}` };
+}
+
+/** 豆包 Seedream（火山方舟）：images/generations，字段比 OpenAI 多一个 watermark / 组图开关。 */async function doubaoImage({ base, token, model, width, height, seed, prompt }) {
   const payload = {
     model,
     prompt,

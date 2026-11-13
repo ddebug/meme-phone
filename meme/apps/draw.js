@@ -9,7 +9,7 @@
 import { icon } from '../icons.js';
 import { esc } from '../shell.js';
 import { newId } from '../data.js';
-import { novelaiImage } from '../host.js';
+import { novelaiImage, probeImageApi } from '../host.js';
 
 const SIZES = [
   { key: '832x1216', w: 832, h: 1216, label: '竖版 832×1216' },
@@ -21,11 +21,17 @@ const SIZES = [
 const SAMPLERS = ['k_euler_ancestral', 'k_euler', 'k_dpmpp_2m', 'k_dpmpp_2s_ancestral', 'k_heun'];
 const NOISES = ['karras', 'native', 'exponential', 'polyexponential'];
 
+/* NovelAI 官方不给模型列表接口（/ai/models 一律 404），可选模型是固定的这几款。
+   4.5 以下已基本下线，仍留着是为了让老存档能显示、能改回来。 */
 const NAI_MODELS = [
-  { value: 'nai-diffusion-4-curated-preview', label: 'V4 精选（默认）' },
-  { value: 'nai-diffusion-4-full', label: 'V4 完整' },
-  { value: 'nai-diffusion-3', label: 'V3 动漫' },
-  { value: 'nai-diffusion-3-furry', label: 'V3 兽人' },
+  { value: 'nai-diffusion-5-full', label: 'NAI 5 Full（最新，无过滤）' },
+  { value: 'nai-diffusion-5-curated', label: 'NAI 5 Curated（有内容过滤）' },
+  { value: 'nai-diffusion-4-5-full', label: 'NAI 4.5 Full（无过滤）' },
+  { value: 'nai-diffusion-4-5-curated', label: 'NAI 4.5 Curated（有内容过滤）' },
+  { value: 'nai-diffusion-4-full', label: 'NAI 4 Full（旧版）' },
+  { value: 'nai-diffusion-4-curated-preview', label: 'NAI 4 精选（旧版）' },
+  { value: 'nai-diffusion-3', label: 'NAI 3 动漫（旧版）' },
+  { value: 'nai-diffusion-3-furry', label: 'NAI 3 兽人（旧版）' },
 ];
 
 const DOUBAO_MODELS = [
@@ -264,6 +270,9 @@ export const drawApp = {
     const size = sizeOf(cfg.size);
     const ep = imageEndpoint(ctx.state);
     const ready = endpointReady(ep);
+    const apiPreset = activeApi(ctx.state);
+    const apiStatus = apiPreset?.status || null;
+    const statusText = apiStatus?.text || (ready ? '还没测试连接' : '先填地址和 Key，再测试连接 · 拉取模型');
     const busy = Boolean(draw.busy);
     const schemeIndex = draw.schemes.findIndex(item => item.id === draw.schemeId);
     const scheme = draw.schemes[schemeIndex] || null;
@@ -376,6 +385,8 @@ export const drawApp = {
             </span>${icon('chevron')}
           </button>
         </div>
+        <div class="mp-api-status-inline${apiStatus?.ok ? ' is-ok' : ''}">${esc(statusText)}</div>
+        <button class="mp-api-test" data-act="draw-test" type="button">${icon('refresh')}<span>测试连接 · 拉取模型</span></button>
 
         <div class="mp-draw-group-head">
           <span class="mp-group-label">提示词预设</span>
@@ -682,21 +693,54 @@ export const drawApp = {
     }
 
     if (act === 'draw-model') {
-      if (engine === 'novelai' || engine === 'doubao') {
-        const list = engine === 'novelai' ? NAI_MODELS : DOUBAO_MODELS;
-        ctx.openSheet({
-          kind: 'pick', title: '模型',
-          items: list.map(item => ({ value: item.value, label: item.label })),
-          onPick: value => { target.model = value; setEngineField(image, target.engine, 'model', value); ctx.save(); ctx.rerender(); },
+      /* 内置候选 + 拉取到的模型 + 手填；拉不到列表时至少能手填，不让模型选死 */
+      const builtin = engine === 'novelai' ? NAI_MODELS : engine === 'doubao' ? DOUBAO_MODELS : [];
+      const fetched = (Array.isArray(target.models) ? target.models : [])
+        .map(value => ({ value, label: String(value) }));
+      const seen = new Set(builtin.map(item => item.value));
+      const items = [...builtin, ...fetched.filter(item => !seen.has(item.value))];
+      const pickManual = () => ctx.openSheet({
+        kind: 'text', title: '模型',
+        placeholder: '接口要的模型名，比如 flux-dev',
+        value: String(target.model || ''),
+        onText: value => { target.model = value.trim(); setEngineField(image, target.engine, 'model', target.model); ctx.save(); ctx.rerender(); },
+      });
+      items.push({ value: '__manual__', label: '手动填模型名…', note: '列表里没有就自己写' });
+      ctx.openSheet({
+        kind: 'pick',
+        title: '模型',
+        note: engine === 'novelai' ? '官方不给模型列表，下面是内置候选；也能手填' : '',
+        items,
+        onPick: value => {
+          if (value === '__manual__') { setTimeout(pickManual, 0); return; }
+          target.model = value;
+          setEngineField(image, target.engine, 'model', value);
+          ctx.save();
+          ctx.rerender();
+        },
+      });
+      return true;
+    }
+
+    if (act === 'draw-test') {
+      if (!target || !image.presets.includes(target)) return true;
+      target.status = { ok: false, text: '正在连接…', at: Date.now() };
+      ctx.save();
+      ctx.rerender();
+      probeImageApi({ engine: target.engine, url: target.url, key: target.key, path: target.path })
+        .then(result => {
+          target.status = { ok: Boolean(result?.ok), text: String(result?.text || ''), at: Date.now() };
+          if (Array.isArray(result?.models) && result.models.length) target.models = result.models;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(result?.ok ? '连接正常' : String(result?.text || '没连上'));
+        })
+        .catch(error => {
+          target.status = { ok: false, text: error?.message || String(error), at: Date.now() };
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(error?.message || '没连上');
         });
-      } else {
-        ctx.openSheet({
-          kind: 'text', title: '模型',
-          placeholder: '接口要的模型名，比如 flux-dev',
-          value: String(target.model || ''),
-          onText: value => { target.model = value.trim(); setEngineField(image, target.engine, 'model', target.model); ctx.save(); ctx.rerender(); },
-        });
-      }
       return true;
     }
 

@@ -449,10 +449,12 @@ export const replyPresetApp = {
           <span class="mp-preset-item-sub">${esc(sub)}</span>
         </button>
         <div class="mp-preset-item-actions">
-          <button class="mp-item-switch" data-act="reply-item-toggle" data-id="${esc(item.id)}" type="button" title="${item.enabled ? '关闭' : '启用'}" role="switch" aria-checked="${item.enabled ? 'true' : 'false'}"><span class="mp-switch${item.enabled ? ' on' : ''}"></span></button>
-          <button class="mp-item-mini is-up" data-act="reply-item-up" data-id="${esc(item.id)}" type="button" title="上移"${index === 0 ? ' disabled' : ''}>${icon('chevron')}</button>
-          <button class="mp-item-mini" data-act="reply-item-down" data-id="${esc(item.id)}" type="button" title="下移"${index === items.length - 1 ? ' disabled' : ''}>${icon('chevron')}</button>
-          ${item.deletable ? `<button class="mp-item-mini" data-act="reply-item-del" data-id="${esc(item.id)}" type="button" title="删除">${icon('trash')}</button>` : ''}
+          <div class="mp-preset-item-tools">
+            <button class="mp-item-mini is-up" data-act="reply-item-up" data-id="${esc(item.id)}" type="button" title="上移"${index === 0 ? ' disabled' : ''}>${icon('chevron')}</button>
+            <button class="mp-item-mini" data-act="reply-item-down" data-id="${esc(item.id)}" type="button" title="下移"${index === items.length - 1 ? ' disabled' : ''}>${icon('chevron')}</button>
+            ${item.deletable ? `<button class="mp-item-mini" data-act="reply-item-del" data-id="${esc(item.id)}" type="button" title="删除">${icon('trash')}</button>` : '<span class="mp-item-mini is-placeholder" aria-hidden="true"></span>'}
+          </div>
+          <button class="mp-item-switch" data-act="reply-item-toggle" data-id="${esc(item.id)}" type="button" title="${item.enabled ? '关闭' : '启用'}" role="switch" aria-label="${item.enabled ? '关闭' : '启用'}「${esc(item.label)}」" aria-checked="${item.enabled ? 'true' : 'false'}"><span class="mp-switch${item.enabled ? ' on' : ''}"></span></button>
         </div>
       </div>`;
     };

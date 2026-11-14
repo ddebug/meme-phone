@@ -3546,9 +3546,21 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.mp-root .mp-preset-item-actions { display: flex; align-items: center; gap: 2px; }
+.mp-root .mp-preset-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.mp-root .mp-preset-item-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
 .mp-root .mp-item-switch {
   flex: 0 0 auto;
+  width: 38px;
+  height: 28px;
   display: grid;
   place-items: center;
   padding: 0;
@@ -3556,10 +3568,23 @@ body {
   background: none;
   cursor: pointer;
 }
+.mp-root .mp-preset-item .mp-switch {
+  width: 38px;
+  height: 22px;
+  border-radius: 11px;
+}
+.mp-root .mp-preset-item .mp-switch::after {
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+}
+.mp-root .mp-preset-item .mp-switch.on::after { transform: translateX(16px); }
 .mp-root .mp-item-switch:active .mp-switch { transform: scale(.96); }
 .mp-root .mp-item-mini {
   width: 27px;
   height: 27px;
+  padding: 0;
   border: 0;
   border-radius: 9px;
   background: none;
@@ -3570,11 +3595,13 @@ body {
   display: grid;
   place-items: center;
 }
-.mp-root .mp-item-mini .mp-i { width: 14px; height: 14px; }
+.mp-root .mp-item-mini .mp-i { width: 16px; height: 16px; }
 .mp-root .mp-item-mini.is-on { color: var(--accent); }
 .mp-root .mp-item-mini.is-muted { color: var(--text-4); }
 .mp-root .mp-item-mini.is-up .mp-i { transform: rotate(180deg); }
-.mp-root .mp-item-mini:active { background: rgba(142, 123, 242, .08); }
+.mp-root .mp-item-mini.is-placeholder { visibility: hidden; pointer-events: none; }
+.mp-root .mp-item-mini:disabled { opacity: .26; cursor: default; }
+.mp-root .mp-item-mini:not(:disabled):active { background: rgba(142, 123, 242, .08); }
 .mp-root .mp-api-use {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -18606,10 +18633,12 @@ const replyPresetApp = {
           <span class="mp-preset-item-sub">${esc(sub)}</span>
         </button>
         <div class="mp-preset-item-actions">
-          <button class="mp-item-switch" data-act="reply-item-toggle" data-id="${esc(item.id)}" type="button" title="${item.enabled ? '关闭' : '启用'}" role="switch" aria-checked="${item.enabled ? 'true' : 'false'}"><span class="mp-switch${item.enabled ? ' on' : ''}"></span></button>
-          <button class="mp-item-mini is-up" data-act="reply-item-up" data-id="${esc(item.id)}" type="button" title="上移"${index === 0 ? ' disabled' : ''}>${icon('chevron')}</button>
-          <button class="mp-item-mini" data-act="reply-item-down" data-id="${esc(item.id)}" type="button" title="下移"${index === items.length - 1 ? ' disabled' : ''}>${icon('chevron')}</button>
-          ${item.deletable ? `<button class="mp-item-mini" data-act="reply-item-del" data-id="${esc(item.id)}" type="button" title="删除">${icon('trash')}</button>` : ''}
+          <div class="mp-preset-item-tools">
+            <button class="mp-item-mini is-up" data-act="reply-item-up" data-id="${esc(item.id)}" type="button" title="上移"${index === 0 ? ' disabled' : ''}>${icon('chevron')}</button>
+            <button class="mp-item-mini" data-act="reply-item-down" data-id="${esc(item.id)}" type="button" title="下移"${index === items.length - 1 ? ' disabled' : ''}>${icon('chevron')}</button>
+            ${item.deletable ? `<button class="mp-item-mini" data-act="reply-item-del" data-id="${esc(item.id)}" type="button" title="删除">${icon('trash')}</button>` : '<span class="mp-item-mini is-placeholder" aria-hidden="true"></span>'}
+          </div>
+          <button class="mp-item-switch" data-act="reply-item-toggle" data-id="${esc(item.id)}" type="button" title="${item.enabled ? '关闭' : '启用'}" role="switch" aria-label="${item.enabled ? '关闭' : '启用'}「${esc(item.label)}」" aria-checked="${item.enabled ? 'true' : 'false'}"><span class="mp-switch${item.enabled ? ' on' : ''}"></span></button>
         </div>
       </div>`;
     };

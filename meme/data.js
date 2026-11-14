@@ -353,6 +353,7 @@ export function emptyState() {
       current: null,
     },
     extras: {},
+    extrasOff: [],
     favorites: [],
     dress: { accent: '#8e7bf2' },
   };
@@ -1163,6 +1164,7 @@ export function normalize(raw) {
     ? merged.music.current
     : null;
   merged.extras = merged.extras || {};
+  merged.extrasOff = Array.isArray(merged.extrasOff) ? merged.extrasOff.map(String) : [];
   merged.favorites = Array.isArray(merged.favorites) ? merged.favorites : [];
   merged.emoji = Array.isArray(merged.emoji) && merged.emoji.length ? merged.emoji : base.emoji;
   for (const [chatId, chat] of Object.entries(merged.chats)) {

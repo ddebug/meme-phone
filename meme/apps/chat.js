@@ -742,8 +742,9 @@ export const threadApp = {
           { label: '照片', value: 'photo', icon: 'image', note: '从相册选一张，压小了再存进手机' },
           { label: '表情', value: 'emoji', icon: 'smile', note: '发一个大表情，不是文字里的贴图' },
           { label: '戳一戳', value: 'poke', icon: 'spark', note: '在聊天里留一行「你拍了拍 TA」' },
+          { label: '小剧场', value: 'extras-switch', icon: 'theater', note: '每个角色的开关；看片段去小剧场 App' },
           { label: '引用最近一条', value: 'quote', icon: 'reply' },
-          { label: '存成小剧场', value: 'extra', icon: 'theater' },
+          { label: '把这条存进小剧场', value: 'extra', icon: 'theater' },
         ],
         onPick: (value) => {
           const chat = chatById(ctx.state, chatId);
@@ -778,6 +779,9 @@ export const threadApp = {
             ctx.save();
             ctx.rerender();
             scrollToBottom(ctx);
+          }
+          if (value === 'extras-switch') {
+            ctx.go('extras-switch');
           }
           if (value === 'quote') {
             const last = lastMessage(chat);

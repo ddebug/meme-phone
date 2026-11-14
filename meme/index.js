@@ -24,7 +24,7 @@ import { musicApp, musicPlaylistApp, stopMusic } from './apps/music.js';
 import { memoryPresetsApp } from './apps/memory.js';
 import { presetsApp, replyPresetApp } from './apps/presets.js';
 import {
-  extrasApp, extraDetailApp, emojiApp,
+  extrasApp, extrasSwitchApp, extraDetailApp, emojiApp,
   plansApp, dressApp, iconPickerApp, helpApp,
 } from './apps/more.js';
 
@@ -38,6 +38,7 @@ const APPS = {
   'app-settings': settingsApp,
   'app-appearance': appearanceApp,
   'app-extras': extrasApp,
+  'extras-switch': extrasSwitchApp,
   'app-emoji': emojiApp,
   'app-plans': plansApp,
   'app-dress': dressApp,

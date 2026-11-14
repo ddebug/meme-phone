@@ -4,7 +4,7 @@
  */
 
 import { icon, ICON_NAMES, ICON_LABELS, APP_ICON_TARGETS } from '../icons.js';
-import { esc, tintStyle } from '../shell.js';
+import { esc, tintStyle, chatAvatarHtml } from '../shell.js';
 import { contactsOf, contactById, extrasOf } from '../data.js';
 import { PIXEL_BUNNY } from '../theme-data.js';
 
@@ -19,12 +19,16 @@ export const extrasApp = {
 
   render(ctx, params) {
     const filter = params.contactId;
-    const groups = contactsOf(ctx.state)
-      .filter(contact => !filter || contact.id === filter)
+    const off = new Set(filter ? [] : (ctx.state.extrasOff || []));
+    const visible = contactsOf(ctx.state)
+      .filter(contact => (!filter || contact.id === filter) && !off.has(contact.id))
       .map(contact => ({ contact, list: ctx.state.extras[contact.id] || [] }))
       .filter(group => group.list.length);
+    const hiddenCount = contactsOf(ctx.state)
+      .filter(contact => (!filter || contact.id === filter) && off.has(contact.id) && (ctx.state.extras[contact.id] || []).length)
+      .length;
 
-    const cards = groups.map(group => `
+    const cards = visible.map(group => `
       <div class="mp-group-label" style="margin-top:12px">${esc(group.contact.name)} · ${group.list.length} 段</div>
       ${group.list.map(item => `
         <button class="mp-card" data-act="open-extra" data-contact="${group.contact.id}" data-extra="${item.id}" type="button" style="display:block;width:100%;text-align:left;border:0;font:inherit;cursor:pointer">
@@ -35,7 +39,11 @@ export const extrasApp = {
           <div style="font-family:var(--font-serif);font-size: calc(12.5px * var(--font-scale));line-height: calc(1.7 * var(--line-scale));color:var(--text-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc((item.lines || []).join(' '))}</div>
         </button>`).join('')}`).join('');
 
-    return `<div class="mp-page-body">${head('小剧场', '聊天之外的那些片段')}${cards || '<div class="mp-empty">还没有片段。<br>在会话里长按一句话，可以存成小剧场。</div>'}</div>`;
+    const emptyNote = hiddenCount
+      ? `<div class="mp-empty">${hiddenCount} 个角色的小剧场被开关关掉了。<br>去加号菜单的「小剧场」里打开。</div>`
+      : '<div class="mp-empty">还没有片段。<br>在会话里长按一句话，可以存成小剧场。</div>';
+
+    return `<div class="mp-page-body">${head('小剧场', '聊天之外的那些片段')}${cards || emptyNote}</div>`;
   },
 
   handle(ctx, act, data) {
@@ -63,6 +71,82 @@ export const extrasApp = {
       });
       return true;
     }
+    return false;
+  },
+};
+
+export const extrasSwitchApp = {
+  id: 'extras-switch', name: '小剧场开关', icon: 'theater',
+
+  render(ctx) {
+    const contacts = contactsOf(ctx.state);
+    const off = new Set(ctx.state.extrasOff || []);
+    const allOn = contacts.length ? contacts.every(contact => !off.has(contact.id)) : true;
+
+    const rows = contacts.map(contact => {
+      const count = (ctx.state.extras[contact.id] || []).length;
+      const on = !off.has(contact.id);
+      return `
+        <button class="mp-row" data-act="extra-toggle" data-contact="${contact.id}" type="button" style="width:100%">
+          ${chatAvatarHtml(contact)}
+          <div class="mp-row-main">
+            <div class="mp-row-name">${esc(contact.name)}</div>
+            <div class="mp-row-sub">${count ? `${count} 段` : '还没有片段'}${on ? '' : ' · 已隐藏'}</div>
+          </div>
+          <span class="mp-switch${on ? ' on' : ''}"></span>
+        </button>`;
+    }).join('');
+
+    return `
+      <div class="mp-page-body">
+        <div class="mp-subtitle" style="margin-top:0">小剧场 · 每个角色一个开关；关掉只是不在小剧场里显示，片段还留着</div>
+        <button class="mp-row" data-act="extras-toggle-all" type="button" style="width:100%;margin-top:10px">
+          <span class="mp-set-ico">${icon('theater')}</span>
+          <div class="mp-row-main">
+            <div class="mp-row-name">全部显示</div>
+            <div class="mp-row-sub">一次打开或收起所有角色</div>
+          </div>
+          <span class="mp-switch${allOn ? ' on' : ''}"></span>
+        </button>
+        <div class="mp-group-box" style="margin-top:10px">${rows || '<div class="mp-empty">通讯录里还没有角色。</div>'}</div>
+        <button class="mp-dress-link" data-act="open-extras" type="button" style="margin-top:14px">${icon('theater')}打开小剧场 App</button>
+      </div>`;
+  },
+
+  handle(ctx, act, data) {
+    const off = (ctx.state.extrasOff = Array.isArray(ctx.state.extrasOff) ? ctx.state.extrasOff : []);
+    const contacts = contactsOf(ctx.state);
+
+    if (act === 'extra-toggle') {
+      const contact = contactById(ctx.state, data.contact);
+      if (!contact) return true;
+      const index = off.indexOf(contact.id);
+      if (index >= 0) {
+        off.splice(index, 1);
+        ctx.toast(`「${contact.name}」的小剧场已显示`);
+      } else {
+        off.push(contact.id);
+        ctx.toast(`「${contact.name}」的小剧场已隐藏`);
+      }
+      ctx.save();
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'extras-toggle-all') {
+      const allOn = contacts.length ? contacts.every(contact => !off.includes(contact.id)) : true;
+      ctx.state.extrasOff = allOn ? contacts.map(contact => contact.id) : [];
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(allOn ? '所有小剧场都收起来了' : '所有小剧场都显示了');
+      return true;
+    }
+
+    if (act === 'open-extras') {
+      ctx.go('app-extras');
+      return true;
+    }
+
     return false;
   },
 };
@@ -501,7 +585,8 @@ export const helpApp = {
         </div>
         <div class="mp-card" style="font-size: calc(12.5px * var(--font-scale));line-height: calc(1.95 * var(--line-scale));color:var(--text-2)">
           <b style="color:var(--text)">聊天</b><br>
-          长按一句话：引用、复制、存成小剧场、让 TA 重说、删除。<br>
+          长按一句话：引用、复制、把这条存进小剧场、让 TA 重说、删除。<br>
+          加号里的「小剧场」：按角色开关小剧场 App 的显示，片段不会删。
           输入框空着点发送，不是发空消息，是让 TA 主动开口。
         </div>
         <div class="mp-card" style="font-size: calc(12.5px * var(--font-scale));line-height: calc(1.95 * var(--line-scale));color:var(--text-2)">

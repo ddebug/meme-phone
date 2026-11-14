@@ -353,6 +353,7 @@ export function emptyState() {
       current: null,
     },
     extras: {},
+    favorites: [],
     dress: { accent: '#8e7bf2' },
   };
 }
@@ -588,9 +589,20 @@ export function lastMessage(chat) {
   const list = chat?.messages || [];
   for (let index = list.length - 1; index >= 0; index -= 1) {
     const message = list[index];
-    if (message && message.text) return message;
+    if (!message || message.kind === 'recalled') continue;
+    if (message.text || message.image || message.emoji || message.forward) return message;
   }
   return null;
+}
+
+/** 会话列表/收藏页共用的一句话摘要：图片、表情、转发都别显示成空白 */
+export function messagePreview(message) {
+  if (!message) return '';
+  if (message.kind === 'recalled') return '[已撤回]';
+  if (message.kind === 'image' || message.image) return '[图片]';
+  if (message.kind === 'emoji' || message.emoji) return message.emoji || '[表情]';
+  if (message.forward) return `[转发] ${message.forward.text || ''}`.trim();
+  return message.text || '';
 }
 
 export function pushMessage(state, chatId, message) {
@@ -601,11 +613,14 @@ export function pushMessage(state, chatId, message) {
     from: message.from || 'them',      // me | them | system
     text: message.text || '',
     at: message.at || Date.now(),
-    kind: message.kind || 'text',      // text | system | extra | proactive
+    kind: message.kind || 'text',      // text | system | extra | proactive | image | emoji | poke | recalled | forwarded
     quote: message.quote || null,
     proactive: Boolean(message.proactive),
     pending: Boolean(message.pending),
     speaker: message.speaker || '',
+    image: message.image || '',
+    emoji: message.emoji || '',
+    forward: message.forward || null,
   };
   chat.messages.push(entry);
   chat.updatedAt = entry.at;
@@ -1148,6 +1163,7 @@ export function normalize(raw) {
     ? merged.music.current
     : null;
   merged.extras = merged.extras || {};
+  merged.favorites = Array.isArray(merged.favorites) ? merged.favorites : [];
   merged.emoji = Array.isArray(merged.emoji) && merged.emoji.length ? merged.emoji : base.emoji;
   for (const [chatId, chat] of Object.entries(merged.chats)) {
     chat.messages = Array.isArray(chat.messages)

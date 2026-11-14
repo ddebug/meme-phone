@@ -4,10 +4,12 @@
  */
 
 import { createStore } from './store.js';
-import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor } from './data.js';
+import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, pushMessage } from './data.js';
 import { createShell, applyWall, applyLook } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
+import { favoritesApp } from './apps/favorites.js';
+import { photoApp } from './apps/photo.js';
 import { buildMemoryContext } from './memory.js';
 import { buildReplyMessages, transcript } from './reply-context.js';
 import { diaryApp, threadDiaryApp } from './apps/diary.js';
@@ -28,6 +30,8 @@ import {
 
 const APPS = {
   'app-chat': chatApp,
+  'app-favorites': favoritesApp,
+  'photo-view': photoApp,
   'app-diary': diaryApp,
   'thread-diary': threadDiaryApp,
   'app-contacts': contactsApp,
@@ -471,12 +475,50 @@ export async function openMemePhone(options = {}) {
     ctx.toast('顶栏背景图换好了');
   }
 
+  /* 聊天照片：长边压到 1000px、JPEG 0.78，再存进会话 */
+  async function useMessagePhoto(file, chatId) {
+    if (!chatId) return;
+    const looksImage = (file?.type && file.type.startsWith('image/')) || /\.(jpg|jpeg|png|webp|gif|bmp)$/i.test(file?.name || '');
+    if (!looksImage) { ctx.toast('请选一张图片'); return; }
+    const img = await new Promise((resolve, reject) => {
+      const image = new Image();
+      const url = URL.createObjectURL(file);
+      image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+      image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读不出来')); };
+      image.src = url;
+    });
+    const limit = 1000;
+    const scale = Math.min(1, limit / Math.max(img.width, img.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    const painter = canvas.getContext('2d');
+    if (!painter) throw new Error('画布不可用');
+    painter.drawImage(img, 0, 0, canvas.width, canvas.height);
+    let dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+    if (dataUrl.length > 380000) dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+    pushMessage(state, chatId, { from: 'me', kind: 'image', text: '', image: dataUrl });
+    ctx.save();
+    ctx.rerender();
+    setTimeout(() => {
+      const box = rootEl.querySelector('.mp-messages');
+      if (box) box.scrollTop = box.scrollHeight;
+    }, 30);
+    ctx.toast('照片发过去了');
+  }
+
   rootEl.addEventListener('change', event => {
     const id = event.target?.id;
     const file = event.target?.files?.[0];
     if (id === 'mpWallFile') {
       event.target.value = '';
       if (file) useCustomWall(file).catch(error => ctx.toast(error.message || '换壁纸失败'));
+      return;
+    }
+    if (id === 'mpMsgPhoto') {
+      const chatId = event.target?.dataset?.chat || '';
+      event.target.value = '';
+      if (file) useMessagePhoto(file, chatId).catch(error => ctx.toast(error.message || '照片没发出去'));
       return;
     }
     if (id === 'mpProfileBanner') {
@@ -490,13 +532,17 @@ export async function openMemePhone(options = {}) {
       if (file && appId) useCustomIcon(file, appId).catch(error => ctx.toast(error.message || '换图标失败'));
     }
   });
-  /* 顶栏背景图的 input 藏在桌面里，个别 WebView 不冒泡 change，补一道捕获监听 */
+  /* 顶栏背景图 / 聊天照片的 input 藏在页面里，个别 WebView 不冒泡 change，补一道捕获监听 */
   const docRef = rootEl.ownerDocument;
   docRef?.addEventListener('change', event => {
-    if (event.target?.id !== 'mpProfileBanner') return;
+    const id = event.target?.id;
+    if (id !== 'mpProfileBanner' && id !== 'mpMsgPhoto') return;
     const file = event.target.files?.[0];
+    const chatId = event.target?.dataset?.chat || '';
     event.target.value = '';
-    if (file) useCustomBanner(file).catch(error => ctx.toast(error.message || '换背景图失败'));
+    if (!file) return;
+    if (id === 'mpProfileBanner') useCustomBanner(file).catch(error => ctx.toast(error.message || '换背景图失败'));
+    if (id === 'mpMsgPhoto') useMessagePhoto(file, chatId).catch(error => ctx.toast(error.message || '照片没发出去'));
   }, true);
 
   /* 用户头像（酒馆里有 persona 头像） */

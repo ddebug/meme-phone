@@ -1135,6 +1135,76 @@
   box-shadow: 0 8px 18px rgba(140, 116, 224, .26);
 }
 
+/* 照片、大表情、转发：都是气泡，但长得不一样 */
+.mp-bubble-photo {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  line-height: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
+.mp-msg.me .mp-bubble-photo { background: transparent; box-shadow: none; }
+.mp-bubble-photo img {
+  display: block;
+  max-width: 168px;
+  max-height: 220px;
+  border-radius: var(--r-m);
+  box-shadow: var(--shadow-s);
+}
+
+.mp-bubble-emoji {
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: calc(38px * var(--font-scale));
+  line-height: 1.15;
+}
+.mp-msg.me .mp-bubble-emoji { background: transparent; box-shadow: none; }
+
+.mp-bubble-forward { min-width: 178px; }
+.mp-forward-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 4px;
+  font-size: calc(9.5px * var(--font-scale));
+  color: var(--text-4);
+}
+.mp-forward-head .mp-i { width: 12px; height: 12px; }
+.mp-forward-text { white-space: pre-wrap; word-break: break-word; }
+.mp-forward-src {
+  margin-top: 5px;
+  font-size: calc(9.5px * var(--font-scale));
+  color: var(--text-4);
+}
+.mp-msg.me .mp-forward-head,
+.mp-msg.me .mp-forward-src { color: rgba(255, 255, 255, .78); }
+.mp-msg.me .mp-forward-text { color: #fff; }
+
+.mp-sys.is-poke,
+.mp-sys.is-recall {
+  background: transparent;
+  font-size: calc(10px * var(--font-scale));
+  color: var(--text-4);
+}
+
+/* 看大图 */
+.mp-photo-page { display: flex; flex-direction: column; gap: 10px; height: 100%; }
+.mp-photo-full {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  border-radius: var(--r-m);
+  background: rgba(43, 41, 55, .05);
+}
+.mp-photo-full img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 12px; }
+.mp-photo-bar { display: flex; justify-content: center; padding-bottom: 6px; }
+
 .mp-quote {
   display: block;
   margin-bottom: 6px;
@@ -1599,7 +1669,7 @@
 }
 
 /* 弹层内部重渲染时不要再播放入场动画，否则会闪一下 */
-.mp-mask.is-still
+.mp-mask.is-still,
 .mp-sheet.is-still {
   animation: none;
 }

@@ -6,7 +6,7 @@
 import { icon } from '../icons.js';
 import {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
-  wakeAllowed,
+  wakeAllowed, messagePreview,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, normalizeReplyItems,
 } from '../data.js';
@@ -209,7 +209,7 @@ function listBody(ctx) {
     if (!contact) return '';
     const message = lastMessage(chat);
     const preview = message
-      ? `${message.from === 'me' ? '我：' : ''}${message.text}`
+      ? `${message.from === 'me' ? '我：' : ''}${messagePreview(message)}`
       : '还没有消息，说点什么吧。';
     return `
       <button class="mp-row" data-act="open-thread" data-chat="${chat.id}" data-hold="chat-menu" type="button">
@@ -252,18 +252,39 @@ function threadBody(ctx, chatId) {
 
   const blocks = [];
   let lastAt = 0;
+  const speakerName = (message) => {
+    const speaker = message.speaker ? contactById(state, message.speaker) : null;
+    return speaker?.name || contact?.name || 'TA';
+  };
   for (const message of messages) {
-    if (message.kind === 'system' || message.from === 'system') {
-      blocks.push(`<div class="mp-sys">${esc(message.text)}</div>`);
+    const startGroup = message.at - lastAt > 30 * 60 * 1000;
+    if (message.kind === 'system' || message.from === 'system' || message.kind === 'recalled' || message.kind === 'poke') {
+      if (startGroup) {
+        blocks.push(`<div class="mp-time">${timeText(message.at)}</div>`);
+        lastAt = message.at;
+      }
+      if (message.kind === 'recalled') {
+        blocks.push(`<div class="mp-sys is-recall">${message.from === 'me' ? '你撤回了一条消息' : `${esc(speakerName(message))}撤回了一条消息`}</div>`);
+      } else if (message.kind === 'poke') {
+        blocks.push(`<div class="mp-sys is-poke">${message.from === 'me' ? `你拍了拍「${esc(contact?.name || 'TA')}」` : `「${esc(contact?.name || 'TA')}」拍了拍你`}</div>`);
+      } else {
+        blocks.push(`<div class="mp-sys">${esc(message.text)}</div>`);
+      }
       continue;
     }
-    const startGroup = message.at - lastAt > 30 * 60 * 1000;
     if (startGroup) {
       blocks.push(`<div class="mp-time">${timeText(message.at)}</div>`);
       lastAt = message.at;
     }
     const me = message.from === 'me';
     const speaker = message.speaker ? contactById(state, message.speaker) : null;
+    const bubble = message.image
+      ? `<button class="mp-bubble mp-bubble-photo" data-act="view-photo" data-chat="${chat.id}" data-msg="${message.id}" type="button"><img src="${esc(message.image)}" alt="照片"></button>`
+      : message.emoji
+        ? `<div class="mp-bubble mp-bubble-emoji">${esc(message.emoji)}</div>`
+        : message.forward
+          ? `<div class="mp-bubble mp-bubble-forward"><div class="mp-forward-head">${icon('forward')}<span>转发的消息</span></div><div class="mp-forward-text">${esc(message.forward.text || '')}</div>${message.forward.from ? `<div class="mp-forward-src">来自 ${esc(message.forward.from)}</div>` : ''}</div>`
+          : `<div class="mp-bubble">${esc(message.text)}</div>`;
     blocks.push(`
       <div class="mp-msg${me ? ' me' : ''}" data-hold="message-menu" data-chat="${chat.id}" data-msg="${message.id}">
         ${me
@@ -271,7 +292,7 @@ function threadBody(ctx, chatId) {
           : `<button class="mp-avatar-btn" data-act="avatar-extra" data-chat="${chat.id}" data-msg="${message.id}" type="button" aria-label="看 TA 的小剧场">${avatarHtml(speaker?.name || contact?.name, speaker?.avatar || contact?.avatar)}</button>`}
         <div class="mp-msg-body">
           ${message.quote ? `<div class="mp-quote-line">${icon('reply')}<span>${esc(message.quote.text)}</span></div>` : ''}
-          <div class="mp-bubble">${esc(message.text)}</div>
+          ${bubble}
           <div class="mp-msg-meta">
             ${message.proactive ? '<span class="mp-tag-proactive">主动开口</span>' : ''}
             ${speaker ? `<span>${esc(speaker.name)}</span>` : ''}
@@ -312,6 +333,7 @@ function threadBody(ctx, chatId) {
           </div>
           <button class="mp-send" data-act="send" data-chat="${chat.id}" type="button" aria-label="发送">${icon('send')}</button>
         </div>
+        <input id="mpMsgPhoto" type="file" accept="image/*" data-chat="${chat.id}" style="position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0">
       </div>
     </div>`;
 }
@@ -715,29 +737,53 @@ export const threadApp = {
 
     if (act === 'composer-plus') {
       ctx.openSheet({
-        title: '发给谁 / 加点什么',
+        title: '加点什么',
         items: [
-          { label: '插入一个表情', value: 'emoji', icon: 'smile' },
+          { label: '照片', value: 'photo', icon: 'image', note: '从相册选一张，压小了再存进手机' },
+          { label: '表情', value: 'emoji', icon: 'smile', note: '发一个大表情，不是文字里的贴图' },
+          { label: '戳一戳', value: 'poke', icon: 'spark', note: '在聊天里留一行「你拍了拍 TA」' },
           { label: '引用最近一条', value: 'quote', icon: 'reply' },
           { label: '存成小剧场', value: 'extra', icon: 'theater' },
         ],
         onPick: (value) => {
           const chat = chatById(ctx.state, chatId);
           if (!chat) return;
+          if (value === 'photo') {
+            const picker = ctx.shell.root.querySelector('#mpMsgPhoto');
+            if (picker) {
+              try { picker.click(); } catch (error) { ctx.toast('相册打不开，换一张试试'); }
+            } else {
+              ctx.toast('相册没准备好，再点一次');
+            }
+            return;
+          }
           if (value === 'emoji') {
-            const emoji = ctx.state.emoji[Math.floor(Math.random() * ctx.state.emoji.length)];
-            ctx.shell.live.inputValue = `${ctx.shell.live.inputValue || ''}${emoji.char}`;
+            const list = Array.isArray(ctx.state.emoji) ? ctx.state.emoji : [];
+            ctx.openSheet({
+              title: '发哪个表情',
+              items: list.slice(0, 12).map(item => ({ label: `${item.char} ${item.name || ''}`.trim(), value: item.char, note: '点上就发出去' })),
+              onPick: (char) => {
+                if (!char) return;
+                pushMessage(ctx.state, chat.id, { from: 'me', kind: 'emoji', emoji: char, text: char });
+                chat.unread = 0;
+                ctx.save();
+                ctx.rerender();
+                scrollToBottom(ctx);
+                reply(ctx, chat, contactById(ctx.state, chat.contactId));
+              },
+            });
+          }
+          if (value === 'poke') {
+            pushMessage(ctx.state, chat.id, { from: 'me', kind: 'poke', text: '' });
+            ctx.save();
             ctx.rerender();
-            setTimeout(() => {
-              const input = ctx.shell.root.querySelector('.mp-compose-box input');
-              input?.focus();
-            }, 20);
+            scrollToBottom(ctx);
           }
           if (value === 'quote') {
             const last = lastMessage(chat);
             if (!last) { ctx.toast('还没有可引用的消息'); return; }
             ctx.shell.quote = ctx.shell.quote || {};
-            ctx.shell.quote[chatId] = { text: last.text, from: last.from };
+            ctx.shell.quote[chatId] = { text: messagePreview(last), from: last.from };
             ctx.rerender();
           }
           if (value === 'extra') {
@@ -797,11 +843,16 @@ export const threadApp = {
       const message = chat?.messages.find(item => item.id === data.msg);
       if (!chat || !message) return true;
       const contact = contactById(ctx.state, chat.contactId);
+      const mine = message.from === 'me';
+      const recallable = mine && message.kind !== 'recalled' && Date.now() - message.at < 2 * 60 * 1000;
       ctx.openSheet({
         title: '',
         items: [
           { label: '引用这条回复', value: 'quote', icon: 'reply' },
-          { label: '复制文字', value: 'copy', icon: 'copy' },
+          ...(message.text ? [{ label: '复制文字', value: 'copy', icon: 'copy' }] : []),
+          { label: '收藏这条', value: 'favorite', icon: 'bookmark', note: '存进「收藏」，删了聊天也还在' },
+          { label: '转发给…', value: 'forward', icon: 'forward' },
+          ...(recallable ? [{ label: '撤回这条', value: 'recall', icon: 'refresh', note: '两分钟内可以撤回' }] : []),
           { label: '存成小剧场', value: 'extra', icon: 'theater' },
           { label: '让 TA 重新说一次', value: 'regen', icon: 'refresh' },
           { label: '删除这条', value: 'delete', icon: 'trash', danger: true },
@@ -809,11 +860,55 @@ export const threadApp = {
         onPick: (value) => {
           if (value === 'quote') {
             ctx.shell.quote = ctx.shell.quote || {};
-            ctx.shell.quote[chat.id] = { text: message.text, from: message.from };
+            ctx.shell.quote[chat.id] = { text: messagePreview(message), from: message.from };
             ctx.rerender();
           }
           if (value === 'copy') {
             navigator.clipboard?.writeText(message.text).then(() => ctx.toast('已复制'), () => ctx.toast('复制失败'));
+          }
+          if (value === 'favorite') {
+            const favorites = (ctx.state.favorites = ctx.state.favorites || []);
+            favorites.unshift({
+              id: 'f' + Date.now().toString(36),
+              chatId: chat.id,
+              contactName: contact?.name || 'TA',
+              from: message.from,
+              text: messagePreview(message),
+              image: message.image || '',
+              at: message.at || Date.now(),
+            });
+            ctx.save();
+            ctx.toast('已收进收藏');
+          }
+          if (value === 'forward') {
+            const targets = contactsOf(ctx.state).filter(item => item.id !== chat.contactId);
+            ctx.openSheet({
+              title: '转发给谁',
+              items: targets.slice(0, 10).map(item => ({ label: item.name, value: item.id, icon: 'contacts' })),
+              onPick: (targetId) => {
+                const target = contactsOf(ctx.state).find(item => item.id === targetId);
+                if (!target) return;
+                const targetChat = chatFor(ctx.state, target.id);
+                pushMessage(ctx.state, targetChat.id, {
+                  from: 'me',
+                  kind: 'forwarded',
+                  text: '',
+                  forward: { text: messagePreview(message), from: contact?.name || 'TA' },
+                });
+                ctx.save();
+                ctx.toast(`已转发给「${target.name}」`);
+              },
+            });
+          }
+          if (value === 'recall') {
+            message.kind = 'recalled';
+            message.text = '';
+            message.image = '';
+            message.emoji = '';
+            message.forward = null;
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('已撤回');
           }
           if (value === 'extra') {
             saveMessageExtra(ctx, chat, contact, message);
@@ -837,6 +932,13 @@ export const threadApp = {
           }
         },
       });
+      return true;
+    }
+
+    if (act === 'view-photo') {
+      const chat = chatById(ctx.state, data.chat);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (message?.image) ctx.go('photo-view', { src: message.image });
       return true;
     }
 

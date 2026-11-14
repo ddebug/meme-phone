@@ -232,7 +232,6 @@ export const appearanceApp = {
   id: 'appearance', name: '外观', icon: 'brush',
 
   render(ctx) {
-    const theme = ctx.state.settings.theme;
     const wall = ctx.state.settings.wallpaper || 'none';
     const customWall = ctx.state.settings.customWall || '';
 
@@ -255,7 +254,7 @@ export const appearanceApp = {
     return `
       <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button><span style="flex:1"></span></div>
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">壁纸与主题：背景和明暗；字体、灵动岛与图标在「装扮」里</div>
+        <div class="mp-subtitle" style="margin-top:0">壁纸只负责背景；明暗、字体、灵动岛与图标都在「装扮」里</div>
 
         <div class="mp-group-label" style="margin-top:10px">背景</div>
         ${walls.map(item => row(item, 'pick-wall', 'wall')).join('')}
@@ -268,29 +267,12 @@ export const appearanceApp = {
         <input id="mpWallFile" type="file" accept="image/*" style="display:none">
         <div class="mp-subtitle" style="margin-top:6px;font-size: calc(11.5px * var(--font-scale))">图片会存进小手机存档，导出备份时一起带走；只铺在屏幕里。</div>
 
-        <div class="mp-group-label" style="margin-top:14px">主题</div>
-        <button class="mp-set-row" data-act="pick-theme" data-theme="${theme === 'night' ? 'day' : 'night'}" type="button">
-          <span class="mp-set-ico">${icon('moon')}</span>
-          <span class="mp-set-name">夜间玻璃<small>${theme === 'night' ? '现在是深色，晚上不刺眼' : '现在是日间浅色，打开后换成深色'}</small></span>
-          <span class="mp-switch${theme === 'night' ? ' on' : ''}"></span>
-        </button>
-
-        <button class="mp-dress-link" data-act="set-open-dress" type="button">${icon('brush')}字体、灵动岛和 App 图标去「装扮」换</button>
+        <button class="mp-dress-link" data-act="set-open-dress" type="button">${icon('brush')}换明暗、字体、灵动岛和 App 图标</button>
       </div>`;
   },
 
   handle(ctx, act, data) {
     if (act === 'set-open-dress') { ctx.go('app-dress'); return true; }
-    if (act === 'pick-theme') {
-      const next = data.theme === 'night' ? 'night' : 'day';
-      ctx.state.settings.theme = next;
-      /* 图片壁纸跟着明暗一起走，免得选了夜间还是一屏亮壁纸；自定义图不跟着换 */
-      if (!['none', 'custom'].includes(ctx.state.settings.wallpaper)) ctx.state.settings.wallpaper = next;
-      ctx.rerender();
-      ctx.save();
-      ctx.toast(next === 'night' ? '夜间玻璃已打开' : '换回日间玻璃');
-      return true;
-    }
     if (act === 'pick-wall') {
       if (data.wall === 'custom' && !ctx.state.settings.customWall) {
         document.getElementById('mpWallFile')?.click();

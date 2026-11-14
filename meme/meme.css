@@ -4893,7 +4893,7 @@
 .mp-root[data-mp-theme="night"] .mp-dress-choice { background: rgba(255, 255, 255, .06); }
 .mp-root[data-mp-theme="night"] .mp-dress-choice.is-on { background: rgba(167, 149, 255, .2); }
 
-.mp-dress-toggle
+.mp-dress-toggle,
 .mp-dress-link {
   width: 100%;
   display: flex;

@@ -290,7 +290,7 @@ export const dressApp = {
     ];
     return `
       <div class="mp-page-body">
-        ${head('装扮', '主题、字体、灵动岛和 App 图标')}
+        ${head('装扮', '主题与明暗、字体、灵动岛和 App 图标')}
         <div class="mp-dress-hero">
           <div class="mp-dress-aa">Aa</div>
           <div class="mp-dress-hero-text">
@@ -309,6 +309,13 @@ export const dressApp = {
             </button>`).join('')}
         </div>
         <div class="mp-dress-note">主题只换外观，不动聊天记录和 App 数据。</div>
+
+        <div class="mp-group-label" style="margin-top:14px">明暗</div>
+        <button class="mp-dress-toggle" data-act="dress-daynight" type="button">
+          <span class="mp-set-ico">${icon(settings.theme === 'night' ? 'moon' : 'sun')}</span>
+          <span class="mp-set-name">夜间模式<small>${settings.theme === 'night' ? '现在是深色，晚上不刺眼' : '现在是日间浅色，点右边换深色'}</small></span>
+          <span class="mp-switch${settings.theme === 'night' ? ' on' : ''}"></span>
+        </button>
 
         <div class="mp-group-label" style="margin-top:14px">字体</div>
         ${choiceRow('dress-font', FONT_CHOICES, dress.font || 'system')}
@@ -351,6 +358,16 @@ export const dressApp = {
     const settings = ctx.state.settings;
     const dress = dressOf(ctx.state);
 
+    if (act === 'dress-daynight') {
+      const next = settings.theme === 'night' ? 'day' : 'night';
+      settings.theme = next;
+      /* 图片壁纸跟着明暗一起走，免得夜里还铺一屏亮壁纸；自定义图不跟着换 */
+      if (!['none', 'custom'].includes(settings.wallpaper)) settings.wallpaper = next;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(next === 'night' ? '夜间玻璃已打开' : '换回日间玻璃');
+      return true;
+    }
     if (act === 'dress-theme') {
       const key = ['default', 'frost', 'pixel'].includes(data.key) ? data.key : 'default';
       dress.theme = key;

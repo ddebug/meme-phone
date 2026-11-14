@@ -1322,16 +1322,11 @@
   color: var(--accent-deep);
   font-variant-numeric: tabular-nums;
 }
-.mp-debug-count {
-  margin-left: auto;
-  flex: 0 0 auto;
-  font-size: calc(10px * var(--font-scale));
-  color: var(--text-4);
-}
 .mp-debug-caret {
   width: 16px;
   height: 16px;
   flex: 0 0 auto;
+  margin-left: auto;
   display: grid;
   place-items: center;
   color: var(--text-4);
@@ -1339,7 +1334,6 @@
 }
 .mp-debug-caret svg { width: 13px; height: 13px; }
 .mp-debug.is-open .mp-debug-caret { transform: rotate(90deg); }
-.mp-debug.is-open .mp-debug-count { display: none; }
 .mp-debug.is-loading .mp-debug-tk { color: var(--text-4); font-weight: 400; }
 .mp-debug.is-proactive .mp-debug-tk { color: var(--text-2); }
 

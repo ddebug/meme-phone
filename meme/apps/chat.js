@@ -140,14 +140,12 @@ function debugBarHtml(ctx, chat, contact) {
   const ready = cache?.chatId === chat.id && Array.isArray(cache.messages) && cache.key === debugKey(ctx, chat);
   const loading = !ready;
   let head = '统计中…';
-  let count = '';
   let mode = '';
   if (ready) {
     const built = debugMessages(ctx, chat, contact, cache, draft);
     const stats = requestStats(built.messages);
     mode = built.mode;
     head = mode === 'none' ? '输入后统计' : `≈ ${formatNumber(stats.total)} tk`;
-    count = `${stats.rows.length} 条`;
   } else if (cache?.chatId === chat.id && cache.error) {
     head = '统计失败';
   }
@@ -156,7 +154,6 @@ function debugBarHtml(ctx, chat, contact) {
       <button class="mp-debug-head" data-act="debug-toggle" data-chat="${chat.id}" type="button" aria-expanded="${open ? 'true' : 'false'}">
         <span class="mp-debug-title">${mode === 'proactive' ? '主动开口' : '请求预览'}</span>
         <span class="mp-debug-tk" data-debug-tk>${head}</span>
-        ${open ? '' : `<span class="mp-debug-count">${count}</span>`}
         <span class="mp-debug-caret">${icon('chevron')}</span>
       </button>
       ${open && ready ? debugPanelHtml(ctx, chat, contact, cache, draft) : ''}

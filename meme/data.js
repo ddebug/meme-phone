@@ -271,7 +271,7 @@ export function emptyState() {
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
-      chat: { showTime: true, enterToSend: false, remind: true, wake: true },
+      chat: { showTime: true, enterToSend: false, remind: true, wake: true, debugBar: true },
       /* 酒馆记忆方案：默认有酒馆总结就用总结，没有就取最近 10 层酒馆聊天 */
       memory: {
         activeId: 'mem_auto',
@@ -1038,6 +1038,8 @@ export function normalize(raw) {
       history: Array.isArray(raw.draw?.history) ? raw.draw.history : [],
     },
   };
+  /* 旧存档的 settings.chat 可能没有新字段，这里按默认补一次，避免被浅合并冲掉 */
+  merged.settings.chat = { ...base.settings.chat, ...(merged.settings.chat || {}) };
   delete merged.membership;
   delete merged.favorites;
   delete merged.wallet;

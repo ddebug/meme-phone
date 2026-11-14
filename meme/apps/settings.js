@@ -53,6 +53,7 @@ export const settingsApp = {
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'bell', title: '消息提醒', sub: '有新消息时在图标上显示红点', act: 'set-toggle-remind', toggle: state.settings.chat.remind !== false })}
             ${row(ctx, { iconName: 'chat', title: '空着发送 = 让 TA 主动开口', sub: '不写空消息，只触发一句主动的话', act: 'set-toggle-wake', toggle: state.settings.chat.wake !== false })}
+            ${row(ctx, { iconName: 'code', title: '请求调试栏', sub: '在输入框上方显示预计 token 与请求构成', act: 'set-toggle-debug', toggle: state.settings.chat.debugBar !== false })}
             ${row(ctx, { iconName: 'reply', title: '回复预设', sub: '告诉模型该怎么回消息，可多套切换', act: 'set-open', app: 'presets' })}
           </div>
         </div>
@@ -134,6 +135,14 @@ export const settingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(state.settings.chat.wake ? '空发送可以触发主动开口' : '空发送不再触发');
+      return true;
+    }
+
+    if (act === 'set-toggle-debug') {
+      state.settings.chat.debugBar = state.settings.chat.debugBar === false;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(state.settings.chat.debugBar ? '聊天输入栏上方会显示请求预览' : '请求调试栏已关掉');
       return true;
     }
 

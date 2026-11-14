@@ -1297,6 +1297,243 @@ body {
   margin-bottom: 6px;
 }
 
+/* ---- 请求调试栏：输入框上方的只读请求预览 ---- */
+.mp-debug {
+  margin: 0 0 6px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .42);
+  box-shadow: inset 0 0 0 1px rgba(74, 58, 110, .1);
+  overflow: hidden;
+  transition: background .18s ease;
+}
+.mp-debug.is-open {
+  background: rgba(255, 255, 255, .58);
+}
+.mp-debug-head {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text-2);
+  text-align: left;
+  cursor: pointer;
+}
+.mp-debug-title {
+  flex: 0 0 auto;
+  font-size: calc(10.5px * var(--font-scale));
+  color: var(--text-4);
+}
+.mp-debug-tk {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(11.5px * var(--font-scale));
+  font-weight: 600;
+  color: var(--accent-deep);
+  font-variant-numeric: tabular-nums;
+}
+.mp-debug-count {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: calc(10px * var(--font-scale));
+  color: var(--text-4);
+}
+.mp-debug-caret {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--text-4);
+  transition: transform .18s ease;
+}
+.mp-debug-caret svg { width: 13px; height: 13px; }
+.mp-debug.is-open .mp-debug-caret { transform: rotate(90deg); }
+.mp-debug.is-open .mp-debug-count { display: none; }
+.mp-debug.is-loading .mp-debug-tk { color: var(--text-4); font-weight: 400; }
+.mp-debug.is-proactive .mp-debug-tk { color: var(--text-2); }
+
+.mp-debug-panel {
+  max-height: min(34vh, 280px);
+  overflow-y: auto;
+  padding: 0 10px 9px;
+  overscroll-behavior: contain;
+}
+.mp-debug-panel::-webkit-scrollbar { width: 0; height: 0; }
+.mp-debug-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding: 1px 0 5px;
+  font-size: calc(10px * var(--font-scale));
+  color: var(--text-4);
+}
+.mp-debug-summary-main { color: var(--text-2); }
+.mp-debug-model {
+  flex: 1 1 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-debug-share {
+  display: flex;
+  height: 4px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(74, 58, 110, .08);
+  margin: 2px 0 5px;
+}
+.mp-debug-seg { display: block; height: 100%; }
+.mp-debug-seg-rule { background: var(--accent); }
+.mp-debug-seg-context { background: #7d9cd8; }
+.mp-debug-seg-history { background: #72b6a3; }
+.mp-debug-seg-turn { background: #d7a45b; }
+.mp-debug-seg-theater { background: #d984a8; }
+.mp-debug-seg-empty { background: rgba(74, 58, 110, .16); }
+
+.mp-debug-list { display: flex; flex-direction: column; }
+.mp-debug-row { border-top: 1px solid rgba(74, 58, 110, .08); }
+.mp-debug-row summary {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: start;
+  padding: 7px 0;
+  list-style: none;
+  cursor: pointer;
+}
+.mp-debug-row summary::-webkit-details-marker { display: none; }
+.mp-debug-dot {
+  width: 6px;
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 99px;
+  background: var(--accent);
+}
+.mp-debug-dot-context { background: #7d9cd8; }
+.mp-debug-dot-history { background: #72b6a3; }
+.mp-debug-dot-turn { background: #d7a45b; }
+.mp-debug-dot-theater { background: #d984a8; }
+.mp-debug-rowmain { min-width: 0; }
+.mp-debug-rowtop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.mp-debug-source {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text);
+}
+.mp-debug-role {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border-radius: 5px;
+  font-size: calc(8.5px * var(--font-scale));
+  line-height: 1.55;
+  color: var(--text-4);
+  background: rgba(74, 58, 110, .07);
+}
+.mp-debug-snippet {
+  display: block;
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(10px * var(--font-scale));
+  color: var(--text-3);
+}
+.mp-debug-num {
+  flex: 0 0 auto;
+  padding-top: 1px;
+  font-size: calc(10px * var(--font-scale));
+  color: var(--text-4);
+  font-variant-numeric: tabular-nums;
+}
+.mp-debug-content {
+  margin: 2px 0 7px 19px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .66);
+  box-shadow: inset 0 0 0 1px rgba(74, 58, 110, .08);
+  font-size: calc(10.5px * var(--font-scale));
+  line-height: 1.7;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 132px;
+  overflow-y: auto;
+}
+.mp-debug-rowmeta {
+  margin: 0 0 7px 19px;
+  font-size: calc(9px * var(--font-scale));
+  color: var(--text-4);
+}
+.mp-debug-more { border-top: 1px solid rgba(74, 58, 110, .08); }
+.mp-debug-more summary {
+  padding: 7px 0 3px;
+  list-style: none;
+  cursor: pointer;
+  font-size: calc(10px * var(--font-scale));
+  color: var(--text-4);
+}
+.mp-debug-more summary::-webkit-details-marker { display: none; }
+.mp-debug-skip {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: calc(9.5px * var(--font-scale));
+}
+.mp-debug-skip span {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+}
+.mp-debug-skip small {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  color: var(--text-4);
+}
+.mp-debug-foot {
+  padding-top: 6px;
+  font-size: calc(9px * var(--font-scale));
+  line-height: 1.5;
+  color: var(--text-4);
+}
+.mp-debug-empty {
+  padding: 8px 0 4px;
+  font-size: calc(10.5px * var(--font-scale));
+  color: var(--text-3);
+}
+.mp-debug-retry {
+  margin: 4px 0 2px;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(74, 58, 110, .08);
+  color: var(--text-2);
+  font: inherit;
+  font-size: calc(10px * var(--font-scale));
+  cursor: pointer;
+}
+
 .mp-composer-row {
   display: flex;
   align-items: flex-end;
@@ -6104,6 +6341,75 @@ body {
   background: linear-gradient(180deg, rgba(0, 0, 0, .22), transparent 42%, rgba(0, 0, 0, .48));
 }
 
+/* ---- 请求调试栏：主题适配 ---- */
+.mp-root[data-mp-theme="night"] .mp-debug {
+  background: rgba(255, 255, 255, .045);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .09);
+}
+.mp-root[data-mp-theme="night"] .mp-debug.is-open {
+  background: rgba(255, 255, 255, .07);
+}
+.mp-root[data-mp-theme="night"] .mp-debug-tk { color: #c3b5ff; }
+.mp-root[data-mp-theme="night"] .mp-debug-row { border-top-color: rgba(255, 255, 255, .08); }
+.mp-root[data-mp-theme="night"] .mp-debug-more { border-top-color: rgba(255, 255, 255, .08); }
+.mp-root[data-mp-theme="night"] .mp-debug-share { background: rgba(255, 255, 255, .1); }
+.mp-root[data-mp-theme="night"] .mp-debug-seg-empty { background: rgba(255, 255, 255, .16); }
+.mp-root[data-mp-theme="night"] .mp-debug-content {
+  background: rgba(255, 255, 255, .06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
+}
+.mp-root[data-mp-theme="night"] .mp-debug-role {
+  background: rgba(255, 255, 255, .08);
+}
+.mp-root[data-mp-theme="night"] .mp-debug-retry { background: rgba(255, 255, 255, .1); color: #ece9f7; }
+
+.mp-root[data-mp-skin="frost"] .mp-debug {
+  background: rgba(255, 255, 255, .62);
+  box-shadow: inset 0 0 0 1px rgba(60, 60, 67, .12);
+  backdrop-filter: blur(18px) saturate(.6);
+  -webkit-backdrop-filter: blur(18px) saturate(.6);
+}
+.mp-root[data-mp-skin="frost"] .mp-debug.is-open { background: rgba(255, 255, 255, .74); }
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-debug {
+  background: rgba(255, 255, 255, .05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
+}
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-debug.is-open { background: rgba(255, 255, 255, .075); }
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-debug-content { background: rgba(255, 255, 255, .06); }
+
+.mp-root[data-mp-art="pixel"] .mp-debug {
+  border-radius: 0;
+  border: 1px solid #14141a;
+  background: #fff;
+  box-shadow: 3px 3px 0 #14141a;
+}
+.mp-root[data-mp-art="pixel"] .mp-debug-head { font-weight: 600; }
+.mp-root[data-mp-art="pixel"] .mp-debug-row,
+.mp-root[data-mp-art="pixel"] .mp-debug-more { border-top-color: #14141a; }
+.mp-root[data-mp-art="pixel"] .mp-debug-content {
+  border-radius: 0;
+  background: #f5f3ee;
+  box-shadow: inset 0 0 0 1px #14141a;
+}
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug {
+  background: #111116;
+  border-color: #f4f1e8;
+  box-shadow: 3px 3px 0 #f4f1e8;
+}
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug-row,
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug-more { border-top-color: rgba(244, 241, 232, .45); }
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug-content {
+  background: #1c1c22;
+  box-shadow: inset 0 0 0 1px rgba(244, 241, 232, .55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mp-debug,
+  .mp-debug-caret {
+    transition: none;
+  }
+}
+
 
 
 
@@ -6396,7 +6702,7 @@ function emptyState() {
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
-      chat: { showTime: true, enterToSend: false, remind: true, wake: true },
+      chat: { showTime: true, enterToSend: false, remind: true, wake: true, debugBar: true },
       /* 酒馆记忆方案：默认有酒馆总结就用总结，没有就取最近 10 层酒馆聊天 */
       memory: {
         activeId: 'mem_auto',
@@ -7163,6 +7469,8 @@ function normalize(raw) {
       history: Array.isArray(raw.draw?.history) ? raw.draw.history : [],
     },
   };
+  /* 旧存档的 settings.chat 可能没有新字段，这里按默认补一次，避免被浅合并冲掉 */
+  merged.settings.chat = { ...base.settings.chat, ...(merged.settings.chat || {}) };
   delete merged.membership;
   delete merged.favorites;
   delete merged.wallet;
@@ -10263,6 +10571,7 @@ const {
   replyPresetsOf, replyPresetFor, normalizeReplyItems,
 } = __req("meme/data.js");
 const { memoryPresetSummary } = __req("meme/memory.js");
+const { requestStats, estimateTokens, proactiveLead } = __req("meme/reply-context.js");
 const { avatarHtml, esc, shortText, timeText } = __req("meme/shell.js");
 
 const REPLY_POOL = {
@@ -10277,6 +10586,166 @@ function poolFor(contact) {
 }
 
 function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+
+/* --------------------------------------------------------- 请求调试栏 */
+
+let activeThreadId = '';
+let debugPendingKey = '';
+let debugSeq = 0;
+
+function debugEnabled(ctx) {
+  return ctx.state.settings?.chat?.debugBar !== false;
+}
+
+function debugKey(ctx, chat) {
+  const last = chat.messages?.[chat.messages.length - 1];
+  return [
+    chat.id,
+    chat.messages?.length || 0,
+    last?.id || '',
+    (ctx.state.extrasOn || []).includes(String(chat.contactId)) ? 'theater' : 'plain',
+    ctx.state.settings?.api?.activeChat || '',
+    replyPresetFor(ctx.state, chat)?.id || '',
+    wakeAllowed(ctx.state, chat) ? 'wake' : 'nowake',
+  ].join('|');
+}
+
+function debugMode(ctx, chat, draft) {
+  if (String(draft || '').trim()) return 'reply';
+  return wakeAllowed(ctx.state, chat) ? 'proactive' : 'none';
+}
+
+/** 在缓存的 base 上补最后一条；输入变化时不用重新读记忆 / 世界书。 */
+function debugMessages(ctx, chat, contact, cache, draft) {
+  const mode = debugMode(ctx, chat, draft);
+  const messages = (cache.messages || []).map(message => ({ ...message }));
+  if (mode === 'proactive') {
+    const lead = proactiveLead(ctx.state, contact);
+    const index = messages.findIndex(message => message.source === '场景提示');
+    if (index >= 0) messages[index] = { ...messages[index], content: lead };
+    else messages.push({ role: 'system', content: lead, source: '场景提示' });
+    messages.push({ role: 'user', content: '（现在没有新消息，主动发一条。）', source: '主动消息占位' });
+  } else if (mode === 'reply') {
+    const who = ctx.state.settings?.user?.name || '我';
+    messages.push({ role: 'user', content: `${who}：${String(draft || '').trim()}`, source: '最后一条聊天' });
+  }
+  return { mode, messages };
+}
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString('zh-CN');
+}
+
+function roleLabel(role) {
+  return role === 'user' ? '用户' : role === 'assistant' ? '角色' : '系统';
+}
+
+function snippet(text, limit = 56) {
+  const line = String(text || '').replace(/\s+/g, ' ').trim();
+  return line.length > limit ? `${line.slice(0, limit)}…` : line;
+}
+
+function debugRowHtml(row) {
+  return `
+    <details class="mp-debug-row">
+      <summary>
+        <span class="mp-debug-dot mp-debug-dot-${row.group.key}"></span>
+        <span class="mp-debug-rowmain">
+          <span class="mp-debug-rowtop"><span class="mp-debug-source">${esc(row.source)}</span><span class="mp-debug-role">${roleLabel(row.role)}</span></span>
+          <span class="mp-debug-snippet">${esc(snippet(row.content) || '（空）')}</span>
+        </span>
+        <span class="mp-debug-num">${formatNumber(row.tokens)} tk</span>
+      </summary>
+      <div class="mp-debug-content">${esc(row.content || '（空）')}</div>
+      <div class="mp-debug-rowmeta">${formatNumber(row.chars)} 字 · ${roleLabel(row.role)}</div>
+    </details>`;
+}
+
+function debugPanelHtml(ctx, chat, contact, cache, draft) {
+  const { mode, messages } = debugMessages(ctx, chat, contact, cache, draft);
+  const stats = requestStats(messages);
+  const skipped = (cache.report?.items || []).filter(item => item.status !== 'injected');
+  const want = mode === 'proactive' ? '主动开口' : mode === 'reply' ? '这一轮' : '基础上下文';
+  const groups = stats.groups;
+  const total = stats.total || 1;
+  const bars = groups.map(group => `<span class="mp-debug-seg mp-debug-seg-${group.key}" style="width:${Math.max(2, Math.round(group.tokens / total * 100))}%"></span>`).join('');
+  const report = cache.report || {};
+  const budget = report.charBudget ? `${formatNumber(report.charUsed || 0)} / ${formatNumber(report.charBudget)} 字` : '';
+  const preset = cache.replyPreset?.name || '回复预设';
+  const model = cache.model;
+  const modelName = model ? `${model.name || model.model || '当前接口'}${model.model && model.name ? ` · ${model.model}` : ''}` : '酒馆 API';
+
+  return `
+    <div class="mp-debug-panel">
+      <div class="mp-debug-summary">
+        <div class="mp-debug-summary-main">${want} · ${formatNumber(stats.rows.length)} 条消息${budget ? ` · 上下文 ${budget}` : ''}</div>
+        <div class="mp-debug-model">${esc(modelName)} · ${esc(preset)}</div>
+      </div>
+      <div class="mp-debug-share" aria-hidden="true">${bars || '<span class="mp-debug-seg mp-debug-seg-empty" style="width:100%"></span>'}</div>
+      <div class="mp-debug-list">${stats.rows.map(debugRowHtml).join('') || '<div class="mp-debug-empty">这一轮没有可发送的消息。</div>'}</div>
+      ${skipped.length ? `
+      <details class="mp-debug-more">
+        <summary>未进入这一次 · ${skipped.length} 条</summary>
+        ${skipped.map(item => `<div class="mp-debug-skip"><span>${esc(item.label || '条目')}</span><small>${esc(item.reason || item.status || '')}</small></div>`).join('')}
+      </details>` : ''}
+      <div class="mp-debug-foot">按字符估算，实际 token 以模型分词为准。${mode === 'none' ? ' 空发送已关闭，这里只显示基础上下文。' : ''}</div>
+    </div>`;
+}
+
+function debugBarHtml(ctx, chat, contact) {
+  if (!debugEnabled(ctx)) return '';
+  const cache = ctx.shell.debugPreview;
+  const draft = String(ctx.shell.live.inputValue || chat.draft || '');
+  const open = Boolean(ctx.shell.debugOpen?.[chat.id]);
+  const ready = cache?.chatId === chat.id && Array.isArray(cache.messages) && cache.key === debugKey(ctx, chat);
+  const loading = !ready;
+  let head = '统计中…';
+  let count = '';
+  let mode = '';
+  if (ready) {
+    const built = debugMessages(ctx, chat, contact, cache, draft);
+    const stats = requestStats(built.messages);
+    mode = built.mode;
+    head = mode === 'none' ? '输入后统计' : `≈ ${formatNumber(stats.total)} tk`;
+    count = `${stats.rows.length} 条`;
+  } else if (cache?.chatId === chat.id && cache.error) {
+    head = '统计失败';
+  }
+  return `
+    <div class="mp-debug${open ? ' is-open' : ''}${loading ? ' is-loading' : ''}${mode === 'proactive' ? ' is-proactive' : ''}">
+      <button class="mp-debug-head" data-act="debug-toggle" data-chat="${chat.id}" type="button" aria-expanded="${open ? 'true' : 'false'}">
+        <span class="mp-debug-title">${mode === 'proactive' ? '主动开口' : '请求预览'}</span>
+        <span class="mp-debug-tk" data-debug-tk>${head}</span>
+        ${open ? '' : `<span class="mp-debug-count">${count}</span>`}
+        <span class="mp-debug-caret">${icon('chevron')}</span>
+      </button>
+      ${open && ready ? debugPanelHtml(ctx, chat, contact, cache, draft) : ''}
+      ${open && !ready ? `<div class="mp-debug-panel"><div class="mp-debug-empty">${cache?.error ? `统计失败：${esc(cache.error)}` : '正在读这一轮的上下文…'}</div>${cache?.error ? `<button class="mp-debug-retry" data-act="debug-refresh" data-chat="${chat.id}" type="button">重新统计</button>` : ''}</div>` : ''}
+    </div>`;
+}
+
+function ensureDebugPreview(ctx, chat, contact) {
+  if (!debugEnabled(ctx)) return;
+  const key = debugKey(ctx, chat);
+  const cache = ctx.shell.debugPreview;
+  if (cache?.chatId === chat.id && cache.key === key) return;
+  if (debugPendingKey === key) return;
+  debugPendingKey = key;
+  const seq = ++debugSeq;
+  setTimeout(async () => {
+    try {
+      const value = await ctx.ai.preview(chat, contact);
+      if (seq !== debugSeq || activeThreadId !== chat.id) return;
+      ctx.shell.debugPreview = { chatId: chat.id, ...value, key };
+    } catch (error) {
+      if (seq !== debugSeq || activeThreadId !== chat.id) return;
+      ctx.shell.debugPreview = { chatId: chat.id, key, error: String(error?.message || error || '统计失败') };
+    } finally {
+      if (debugPendingKey === key) debugPendingKey = '';
+      if (activeThreadId === chat.id && ctx.shell.root?.querySelector?.('.mp-thread')) ctx.rerender();
+    }
+  }, 180);
+}
 
 /* 聊天设置页：行样式沿用全局设置页，不另造一套 */
 function chatSetRow(chatId, { iconName, title, sub, act, toggle, value, danger }) {
@@ -10495,9 +10964,13 @@ function listBody(ctx) {
 /* --------------------------------------------------------- 会话页 */
 
 function threadBody(ctx, chatId) {
+  activeThreadId = chatId;
   const state = ctx.state;
   const chat = chatById(state, chatId);
-  if (!chat) return `${nav(ctx)}<div class="mp-page-body"><div class="mp-empty">这个会话已经不在了。</div></div>`;
+  if (!chat) {
+    activeThreadId = '';
+    return `${nav(ctx)}<div class="mp-page-body"><div class="mp-empty">这个会话已经不在了。</div></div>`;
+  }
   const contact = contactById(state, chat.contactId);
   const messages = chat.messages || [];
   const quote = ctx.shell.quote?.[chatId] || null;
@@ -10558,6 +11031,9 @@ function threadBody(ctx, chatId) {
     blocks.push(`<div class="mp-msg">${avatarHtml(contact?.name, contact?.avatar)}<div class="mp-msg-body"><div class="mp-typing"><i></i><i></i><i></i></div></div></div>`);
   }
 
+  ensureDebugPreview(ctx, chat, contact);
+  const debugBar = debugBarHtml(ctx, chat, contact);
+
   return `
     <div class="mp-thread">
       <div class="mp-thread-head">
@@ -10571,6 +11047,7 @@ function threadBody(ctx, chatId) {
       </div>
       <div class="mp-messages" id="mpMessages">${blocks.join('')}</div>
       <div class="mp-composer">
+        ${debugBar}
         <div class="mp-composer-tip">${wakeAllowed(ctx.state, chat) ? '空着发出去，TA 会主动开口' : '空发送已关掉，去聊天设置里打开'}</div>
         ${quote ? `
         <div class="mp-quote-chip">
@@ -10704,6 +11181,7 @@ const chatApp = {
   id: 'chat', name: '聊天', icon: 'chat',
 
   render(ctx) {
+    activeThreadId = '';
     return listBody(ctx);
   },
 
@@ -10777,6 +11255,7 @@ const threadSettingsApp = {
   id: 'thread-settings', name: '聊天设置', icon: 'settings',
 
   render(ctx, params) {
+    activeThreadId = '';
     return settingsBody(ctx, params.chatId);
   },
 
@@ -10988,6 +11467,20 @@ const threadApp = {
     }
 
     if (act === 'send') { doSend(ctx, chatId); return true; }
+
+    if (act === 'debug-toggle') {
+      ctx.shell.debugOpen = ctx.shell.debugOpen || {};
+      ctx.shell.debugOpen[chatId] = !ctx.shell.debugOpen[chatId];
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'debug-refresh') {
+      ctx.ai.clearPreview?.(chatId);
+      ctx.shell.debugPreview = null;
+      ctx.rerender();
+      return true;
+    }
 
     if (act === 'clear-quote') {
       if (ctx.shell.quote) delete ctx.shell.quote[chatId];
@@ -11863,6 +12356,7 @@ const settingsApp = {
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'bell', title: '消息提醒', sub: '有新消息时在图标上显示红点', act: 'set-toggle-remind', toggle: state.settings.chat.remind !== false })}
             ${row(ctx, { iconName: 'chat', title: '空着发送 = 让 TA 主动开口', sub: '不写空消息，只触发一句主动的话', act: 'set-toggle-wake', toggle: state.settings.chat.wake !== false })}
+            ${row(ctx, { iconName: 'code', title: '请求调试栏', sub: '在输入框上方显示预计 token 与请求构成', act: 'set-toggle-debug', toggle: state.settings.chat.debugBar !== false })}
             ${row(ctx, { iconName: 'reply', title: '回复预设', sub: '告诉模型该怎么回消息，可多套切换', act: 'set-open', app: 'presets' })}
           </div>
         </div>
@@ -11944,6 +12438,14 @@ const settingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(state.settings.chat.wake ? '空发送可以触发主动开口' : '空发送不再触发');
+      return true;
+    }
+
+    if (act === 'set-toggle-debug') {
+      state.settings.chat.debugBar = state.settings.chat.debugBar === false;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(state.settings.chat.debugBar ? '聊天输入栏上方会显示请求预览' : '请求调试栏已关掉');
       return true;
     }
 
@@ -18587,6 +19089,87 @@ const { replyContextFor, replyItemsFor, replyPresetFor, fillPromptTokens, charac
 const { readWorldBook } = __req("meme/host.js");
 const { buildMemoryContext } = __req("meme/memory.js");
 
+/* ------------------------------------------------------------ 请求统计 */
+
+const FULL_PUNCT = '，。！？；：“”‘’、（）《》【】〈〉…—·「」『』～';
+const CJK_RE = /[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/u;
+
+/** 普通回复的场景提示；预览与实际发送共用，避免两套文案。 */
+function replyLead(contact) {
+  return `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`;
+}
+
+/** 主动开口的场景提示；预览与实际发送共用。 */
+function proactiveLead(state, contact) {
+  const idle = state?.settings?.proactive?.idleMinutes;
+  return `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。距离上次说话已经过去 ${idle} 分钟，你要主动发一条消息。`;
+}
+
+/**
+ * 本地 token 估算：中文按 1 字 1 tk，其它字符按 4 字符 1 tk，emoji 按 2 tk。
+ * 不引依赖，不冒充精确分词；界面上统一带 ≈。
+ */
+function estimateTokens(input) {
+  const text = String(input || '');
+  let tokens = 0;
+  let asciiRun = 0;
+  const flushAscii = () => {
+    if (asciiRun) tokens += Math.ceil(asciiRun / 4);
+    asciiRun = 0;
+  };
+  for (const ch of text) {
+    if (ch.charCodeAt(0) <= 0x7f) {
+      asciiRun += 1;
+      continue;
+    }
+    flushAscii();
+    if (CJK_RE.test(ch) || FULL_PUNCT.includes(ch)) tokens += 1;
+    else if (/\p{Extended_Pictographic}/u.test(ch)) tokens += 2;
+    else tokens += 1;
+  }
+  flushAscii();
+  return tokens;
+}
+
+function requestGroup(message) {
+  const source = String(message?.source || '');
+  if (source === '小剧场') return { key: 'theater', label: '小剧场' };
+  if (source === '回复要求' || source === '场景提示') return { key: 'rule', label: '规则' };
+  if (source === '最后一条聊天' || source === '主动消息占位') return { key: 'turn', label: '本条' };
+  if (source.includes('聊天记录')) return { key: 'history', label: '记录' };
+  return { key: 'context', label: '设定' };
+}
+
+/** 把组装好的 messages 变成调试栏要展示的逐条统计。 */
+function requestStats(messages) {
+  const rows = (Array.isArray(messages) ? messages : []).map((message, index) => {
+    const content = String(message?.content || '');
+    const group = requestGroup(message);
+    return {
+      index,
+      role: message?.role || 'system',
+      source: String(message?.source || '消息'),
+      content,
+      chars: content.length,
+      tokens: estimateTokens(content) + 4,
+      group,
+    };
+  });
+  const order = ['rule', 'context', 'history', 'turn', 'theater'];
+  const groupMap = new Map();
+  rows.forEach(row => {
+    const item = groupMap.get(row.group.key) || { key: row.group.key, label: row.group.label, tokens: 0, count: 0 };
+    item.tokens += row.tokens;
+    item.count += 1;
+    groupMap.set(row.group.key, item);
+  });
+  return {
+    rows,
+    total: rows.reduce((sum, row) => sum + row.tokens, 0),
+    groups: [...groupMap.values()].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)),
+  };
+}
+
 function transcript(state, chat, limit = 10) {
   if (!chat) return '';
   const contact = state.contacts?.[chat.contactId];
@@ -18835,7 +19418,7 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
     reportItems.push({ ...base, status: 'injected', chars: content.length, reason: block.reason || '' });
   }
 
-  if (chat) {
+  if (chat && !options.omitLastUser) {
     const last = chat.messages?.[chat.messages.length - 1];
     if (last && !options.proactive) {
       const who = last.from === 'me' ? (state.settings.user.name || '我') : (contact?.name || '对方');
@@ -18861,6 +19444,10 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
   };
 }
 
+exports["replyLead"] = replyLead;
+exports["proactiveLead"] = proactiveLead;
+exports["estimateTokens"] = estimateTokens;
+exports["requestStats"] = requestStats;
 exports["transcript"] = transcript;
 exports["characterBlock"] = characterBlock;
 exports["sceneBlock"] = sceneBlock;
@@ -18875,14 +19462,14 @@ __mods["meme/index.js"] = function(module, exports, __req){
  */
 
 const { createStore } = __req("meme/store.js");
-const { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, pushMessage, extrasEnabledFor, theaterPrompt, splitTheaterBlocks } = __req("meme/data.js");
+const { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, splitTheaterBlocks } = __req("meme/data.js");
 const { createShell, applyWall, applyLook } = __req("meme/shell.js");
 const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } = __req("meme/host.js");
 const { chatApp, threadApp, threadSettingsApp } = __req("meme/apps/chat.js");
 const { favoritesApp } = __req("meme/apps/favorites.js");
 const { photoApp } = __req("meme/apps/photo.js");
 const { buildMemoryContext } = __req("meme/memory.js");
-const { buildReplyMessages, transcript } = __req("meme/reply-context.js");
+const { buildReplyMessages, transcript, replyLead, proactiveLead } = __req("meme/reply-context.js");
 const { diaryApp, threadDiaryApp } = __req("meme/apps/diary.js");
 const { contactsApp, contactApp } = __req("meme/apps/contacts.js");
 const { settingsApp, appearanceApp } = __req("meme/apps/settings.js");
@@ -18958,6 +19545,7 @@ let ctx = null;
 let rootEl = null;
 let initPromise = null;
 let followTimer = 0;
+let draftDebugTimer = 0;
 
 /* ------------------------------------------------------------ 模型调用 */
 
@@ -18967,30 +19555,78 @@ function makeAi(state) {
     return buildMemoryContext(state, chat, limit);
   }
 
+  const previewCache = new Map();
+
+  /** 真实回复与调试预览共用这一套组装，保证看到的就是要发出去的。 */
+  async function compose(chat, contact, options = {}) {
+    const ctxSettings = replyContextFor(state, chat);
+    const memoryLimit = options.proactive ? 900 : 1200;
+    const storyBlock = ctxSettings.memory ? await story(chat, memoryLimit) : { text: '' };
+    const wantsTheater = !options.proactive && extrasEnabledFor(state, contact?.id);
+    const built = await buildReplyMessages(state, chat, contact, {
+      memoryText: String(storyBlock?.text || ''),
+      lead: options.proactive ? proactiveLead(state, contact) : replyLead(contact),
+      extraPrompt: wantsTheater ? theaterPrompt(contact?.name) : '',
+      proactive: Boolean(options.proactive),
+      omitLastUser: Boolean(options.omitLastUser),
+    });
+    return { built, wantsTheater, ctxSettings };
+  }
+
   return {
     async reply(context, chat, contact, demoReply) {
-      const ctxSettings = replyContextFor(state, chat);
-      const storyBlock = ctxSettings.memory ? await story(chat, 1200) : { text: '' };
-      const wantsTheater = extrasEnabledFor(state, contact?.id);
-      const built = await buildReplyMessages(state, chat, contact, {
-        memoryText: String(storyBlock?.text || ''),
-        lead: `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`,
-        extraPrompt: wantsTheater ? theaterPrompt(contact?.name) : '',
-      });
+      const { built, wantsTheater } = await compose(chat, contact);
       const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
       if (!wantsTheater) return { text: result.text, sections: [] };
       const split = splitTheaterBlocks(result.text, contact?.name);
       return { text: split.text, sections: split.sections };
     },
 
+    /**
+     * 调试栏用：只组请求，不调用模型，也不写任何状态。
+     * 返回的 messages 故意不含最后一条用户消息，聊天页按当前草稿补上；
+     * 这样输入时只重算 token，不用重复读记忆和世界书。
+     */
+    async preview(chat, contact) {
+      const last = chat?.messages?.[chat.messages.length - 1];
+      const key = [
+        chat?.id || '',
+        chat?.messages?.length || 0,
+        last?.id || '',
+        extrasEnabledFor(state, contact?.id) ? 'theater' : 'plain',
+        replyContextFor(state, chat).memory ? 'memory' : 'nomemory',
+        state.settings?.memory?.activeId || '',
+        state.settings?.memory?.readMode || '',
+      ].join('|');
+      const hit = previewCache.get(key);
+      if (hit && Date.now() - hit.at < 30000) return hit.value;
+
+      const { built, wantsTheater } = await compose(chat, contact, { omitLastUser: true });
+      const value = {
+        key,
+        messages: built.messages,
+        report: built.report,
+        wantsTheater,
+        model: llmPresetFor(state, chat),
+        replyPreset: replyPresetFor(state, chat),
+        at: Date.now(),
+      };
+      previewCache.set(key, { at: Date.now(), value });
+      if (previewCache.size > 16) {
+        const oldest = [...previewCache.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+        if (oldest) previewCache.delete(oldest[0]);
+      }
+      return value;
+    },
+
+    clearPreview(chatId = '') {
+      for (const key of previewCache.keys()) {
+        if (!chatId || key.startsWith(`${chatId}|`)) previewCache.delete(key);
+      }
+    },
+
     async proactive(context, chat, contact, demoReply) {
-      const ctxSettings = replyContextFor(state, chat);
-      const storyBlock = ctxSettings.memory ? await story(chat, 900) : { text: '' };
-      const built = await buildReplyMessages(state, chat, contact, {
-        memoryText: String(storyBlock?.text || ''),
-        proactive: true,
-        lead: `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。距离上次说话已经过去 ${state.settings.proactive.idleMinutes} 分钟，你要主动发一条消息。`,
-      });
+      const { built } = await compose(chat, contact, { proactive: true });
       const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
       return result.text;
     },
@@ -19236,6 +19872,11 @@ async function openMemePhone(options = {}) {
       if (entry.view !== 'thread') return;
       const chat = state.chats[entry.params?.chatId];
       if (chat) chat.draft = value;
+      /* 调试栏要跟着草稿更新 token；输入停下后再重画，不逐键打断输入 */
+      if (state.settings.chat?.debugBar !== false) {
+        clearTimeout(draftDebugTimer);
+        draftDebugTimer = setTimeout(() => ctx.rerender?.(), 480);
+      }
     },
     onClose: () => closeMemePhone(),
   };

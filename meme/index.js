@@ -4,14 +4,14 @@
  */
 
 import { createStore } from './store.js';
-import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, pushMessage, extrasEnabledFor, theaterPrompt, splitTheaterBlocks } from './data.js';
+import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, splitTheaterBlocks } from './data.js';
 import { createShell, applyWall, applyLook } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { favoritesApp } from './apps/favorites.js';
 import { photoApp } from './apps/photo.js';
 import { buildMemoryContext } from './memory.js';
-import { buildReplyMessages, transcript } from './reply-context.js';
+import { buildReplyMessages, transcript, replyLead, proactiveLead } from './reply-context.js';
 import { diaryApp, threadDiaryApp } from './apps/diary.js';
 import { contactsApp, contactApp } from './apps/contacts.js';
 import { settingsApp, appearanceApp } from './apps/settings.js';
@@ -87,6 +87,7 @@ let ctx = null;
 let rootEl = null;
 let initPromise = null;
 let followTimer = 0;
+let draftDebugTimer = 0;
 
 /* ------------------------------------------------------------ 模型调用 */
 
@@ -96,30 +97,78 @@ function makeAi(state) {
     return buildMemoryContext(state, chat, limit);
   }
 
+  const previewCache = new Map();
+
+  /** 真实回复与调试预览共用这一套组装，保证看到的就是要发出去的。 */
+  async function compose(chat, contact, options = {}) {
+    const ctxSettings = replyContextFor(state, chat);
+    const memoryLimit = options.proactive ? 900 : 1200;
+    const storyBlock = ctxSettings.memory ? await story(chat, memoryLimit) : { text: '' };
+    const wantsTheater = !options.proactive && extrasEnabledFor(state, contact?.id);
+    const built = await buildReplyMessages(state, chat, contact, {
+      memoryText: String(storyBlock?.text || ''),
+      lead: options.proactive ? proactiveLead(state, contact) : replyLead(contact),
+      extraPrompt: wantsTheater ? theaterPrompt(contact?.name) : '',
+      proactive: Boolean(options.proactive),
+      omitLastUser: Boolean(options.omitLastUser),
+    });
+    return { built, wantsTheater, ctxSettings };
+  }
+
   return {
     async reply(context, chat, contact, demoReply) {
-      const ctxSettings = replyContextFor(state, chat);
-      const storyBlock = ctxSettings.memory ? await story(chat, 1200) : { text: '' };
-      const wantsTheater = extrasEnabledFor(state, contact?.id);
-      const built = await buildReplyMessages(state, chat, contact, {
-        memoryText: String(storyBlock?.text || ''),
-        lead: `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`,
-        extraPrompt: wantsTheater ? theaterPrompt(contact?.name) : '',
-      });
+      const { built, wantsTheater } = await compose(chat, contact);
       const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
       if (!wantsTheater) return { text: result.text, sections: [] };
       const split = splitTheaterBlocks(result.text, contact?.name);
       return { text: split.text, sections: split.sections };
     },
 
+    /**
+     * 调试栏用：只组请求，不调用模型，也不写任何状态。
+     * 返回的 messages 故意不含最后一条用户消息，聊天页按当前草稿补上；
+     * 这样输入时只重算 token，不用重复读记忆和世界书。
+     */
+    async preview(chat, contact) {
+      const last = chat?.messages?.[chat.messages.length - 1];
+      const key = [
+        chat?.id || '',
+        chat?.messages?.length || 0,
+        last?.id || '',
+        extrasEnabledFor(state, contact?.id) ? 'theater' : 'plain',
+        replyContextFor(state, chat).memory ? 'memory' : 'nomemory',
+        state.settings?.memory?.activeId || '',
+        state.settings?.memory?.readMode || '',
+      ].join('|');
+      const hit = previewCache.get(key);
+      if (hit && Date.now() - hit.at < 30000) return hit.value;
+
+      const { built, wantsTheater } = await compose(chat, contact, { omitLastUser: true });
+      const value = {
+        key,
+        messages: built.messages,
+        report: built.report,
+        wantsTheater,
+        model: llmPresetFor(state, chat),
+        replyPreset: replyPresetFor(state, chat),
+        at: Date.now(),
+      };
+      previewCache.set(key, { at: Date.now(), value });
+      if (previewCache.size > 16) {
+        const oldest = [...previewCache.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+        if (oldest) previewCache.delete(oldest[0]);
+      }
+      return value;
+    },
+
+    clearPreview(chatId = '') {
+      for (const key of previewCache.keys()) {
+        if (!chatId || key.startsWith(`${chatId}|`)) previewCache.delete(key);
+      }
+    },
+
     async proactive(context, chat, contact, demoReply) {
-      const ctxSettings = replyContextFor(state, chat);
-      const storyBlock = ctxSettings.memory ? await story(chat, 900) : { text: '' };
-      const built = await buildReplyMessages(state, chat, contact, {
-        memoryText: String(storyBlock?.text || ''),
-        proactive: true,
-        lead: `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。距离上次说话已经过去 ${state.settings.proactive.idleMinutes} 分钟，你要主动发一条消息。`,
-      });
+      const { built } = await compose(chat, contact, { proactive: true });
       const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
       return result.text;
     },
@@ -365,6 +414,11 @@ export async function openMemePhone(options = {}) {
       if (entry.view !== 'thread') return;
       const chat = state.chats[entry.params?.chatId];
       if (chat) chat.draft = value;
+      /* 调试栏要跟着草稿更新 token；输入停下后再重画，不逐键打断输入 */
+      if (state.settings.chat?.debugBar !== false) {
+        clearTimeout(draftDebugTimer);
+        draftDebugTimer = setTimeout(() => ctx.rerender?.(), 480);
+      }
     },
     onClose: () => closeMemePhone(),
   };

@@ -7,7 +7,7 @@ import {
   demoState, normalizeReplyContext, normalizeReplyItems, replyPresetFor, replyPresetsOf, chatsOf,
   extrasEnabledFor, theaterPrompt, splitTheaterBlocks, addExtrasEntry,
 } from '../meme/data.js';
-import { buildReplyMessages } from '../meme/reply-context.js';
+import { buildReplyMessages, estimateTokens, requestStats } from '../meme/reply-context.js';
 
 let passed = 0;
 function ok(condition, message) {
@@ -192,6 +192,31 @@ function findItem(items, id) {
   ok(state.extras[chat.contactId].length === before + 1, '条目数加一');
   ok(state.extras[chat.contactId][0].id === entry.id, '新条目排在最前');
   ok(entry.messageId === 'm_test' && entry.chatId === chat.id, '条目记住来源消息');
+}
+
+/* 13. token 估算：中文按字、英文按 4 字符 */
+{
+  ok(estimateTokens('你好') === 2, '中文两字约 2 tk');
+  ok(estimateTokens('abcd') === 1, '四个英文约 1 tk');
+  ok(estimateTokens('abcde') === 2, '英文超过四个向上取整');
+}
+
+/* 14. 请求构成统计：分组、总数、可排除最后一条 */
+{
+  const messages = [
+    { role: 'system', content: '你好', source: '回复要求' },
+    { role: 'user', content: 'hello world', source: '最后一条聊天' },
+  ];
+  const stats = requestStats(messages);
+  ok(stats.rows.length === 2, '逐条统计两条');
+  ok(stats.groups.some(group => group.key === 'rule') && stats.groups.some(group => group.key === 'turn'), '规则与本条分组都在');
+  ok(stats.total > 0 && stats.total === stats.rows.reduce((sum, row) => sum + row.tokens, 0), '总数等于逐条之和');
+
+  const { state, chat, contact } = stateWithPreset();
+  const omitted = await buildReplyMessages(state, chat, contact, { memoryText: '', omitLastUser: true });
+  ok(!omitted.messages.some(message => message.source === '最后一条聊天'), 'omitLastUser 后不带最后一条');
+  const normal = await buildReplyMessages(state, chat, contact, { memoryText: '' });
+  ok(normal.messages.some(message => message.source === '最后一条聊天'), '默认组装仍带最后一条');
 }
 
 console.log(`\n${passed} 项通过`);

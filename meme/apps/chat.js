@@ -11,6 +11,7 @@ import {
   replyPresetsOf, replyPresetFor, normalizeReplyItems,
 } from '../data.js';
 import { memoryPresetSummary } from '../memory.js';
+import { requestStats, estimateTokens, proactiveLead } from '../reply-context.js';
 import { avatarHtml, esc, shortText, timeText } from '../shell.js';
 
 const REPLY_POOL = {
@@ -25,6 +26,166 @@ function poolFor(contact) {
 }
 
 function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+
+/* --------------------------------------------------------- 请求调试栏 */
+
+let activeThreadId = '';
+let debugPendingKey = '';
+let debugSeq = 0;
+
+function debugEnabled(ctx) {
+  return ctx.state.settings?.chat?.debugBar !== false;
+}
+
+function debugKey(ctx, chat) {
+  const last = chat.messages?.[chat.messages.length - 1];
+  return [
+    chat.id,
+    chat.messages?.length || 0,
+    last?.id || '',
+    (ctx.state.extrasOn || []).includes(String(chat.contactId)) ? 'theater' : 'plain',
+    ctx.state.settings?.api?.activeChat || '',
+    replyPresetFor(ctx.state, chat)?.id || '',
+    wakeAllowed(ctx.state, chat) ? 'wake' : 'nowake',
+  ].join('|');
+}
+
+function debugMode(ctx, chat, draft) {
+  if (String(draft || '').trim()) return 'reply';
+  return wakeAllowed(ctx.state, chat) ? 'proactive' : 'none';
+}
+
+/** 在缓存的 base 上补最后一条；输入变化时不用重新读记忆 / 世界书。 */
+function debugMessages(ctx, chat, contact, cache, draft) {
+  const mode = debugMode(ctx, chat, draft);
+  const messages = (cache.messages || []).map(message => ({ ...message }));
+  if (mode === 'proactive') {
+    const lead = proactiveLead(ctx.state, contact);
+    const index = messages.findIndex(message => message.source === '场景提示');
+    if (index >= 0) messages[index] = { ...messages[index], content: lead };
+    else messages.push({ role: 'system', content: lead, source: '场景提示' });
+    messages.push({ role: 'user', content: '（现在没有新消息，主动发一条。）', source: '主动消息占位' });
+  } else if (mode === 'reply') {
+    const who = ctx.state.settings?.user?.name || '我';
+    messages.push({ role: 'user', content: `${who}：${String(draft || '').trim()}`, source: '最后一条聊天' });
+  }
+  return { mode, messages };
+}
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString('zh-CN');
+}
+
+function roleLabel(role) {
+  return role === 'user' ? '用户' : role === 'assistant' ? '角色' : '系统';
+}
+
+function snippet(text, limit = 56) {
+  const line = String(text || '').replace(/\s+/g, ' ').trim();
+  return line.length > limit ? `${line.slice(0, limit)}…` : line;
+}
+
+function debugRowHtml(row) {
+  return `
+    <details class="mp-debug-row">
+      <summary>
+        <span class="mp-debug-dot mp-debug-dot-${row.group.key}"></span>
+        <span class="mp-debug-rowmain">
+          <span class="mp-debug-rowtop"><span class="mp-debug-source">${esc(row.source)}</span><span class="mp-debug-role">${roleLabel(row.role)}</span></span>
+          <span class="mp-debug-snippet">${esc(snippet(row.content) || '（空）')}</span>
+        </span>
+        <span class="mp-debug-num">${formatNumber(row.tokens)} tk</span>
+      </summary>
+      <div class="mp-debug-content">${esc(row.content || '（空）')}</div>
+      <div class="mp-debug-rowmeta">${formatNumber(row.chars)} 字 · ${roleLabel(row.role)}</div>
+    </details>`;
+}
+
+function debugPanelHtml(ctx, chat, contact, cache, draft) {
+  const { mode, messages } = debugMessages(ctx, chat, contact, cache, draft);
+  const stats = requestStats(messages);
+  const skipped = (cache.report?.items || []).filter(item => item.status !== 'injected');
+  const want = mode === 'proactive' ? '主动开口' : mode === 'reply' ? '这一轮' : '基础上下文';
+  const groups = stats.groups;
+  const total = stats.total || 1;
+  const bars = groups.map(group => `<span class="mp-debug-seg mp-debug-seg-${group.key}" style="width:${Math.max(2, Math.round(group.tokens / total * 100))}%"></span>`).join('');
+  const report = cache.report || {};
+  const budget = report.charBudget ? `${formatNumber(report.charUsed || 0)} / ${formatNumber(report.charBudget)} 字` : '';
+  const preset = cache.replyPreset?.name || '回复预设';
+  const model = cache.model;
+  const modelName = model ? `${model.name || model.model || '当前接口'}${model.model && model.name ? ` · ${model.model}` : ''}` : '酒馆 API';
+
+  return `
+    <div class="mp-debug-panel">
+      <div class="mp-debug-summary">
+        <div class="mp-debug-summary-main">${want} · ${formatNumber(stats.rows.length)} 条消息${budget ? ` · 上下文 ${budget}` : ''}</div>
+        <div class="mp-debug-model">${esc(modelName)} · ${esc(preset)}</div>
+      </div>
+      <div class="mp-debug-share" aria-hidden="true">${bars || '<span class="mp-debug-seg mp-debug-seg-empty" style="width:100%"></span>'}</div>
+      <div class="mp-debug-list">${stats.rows.map(debugRowHtml).join('') || '<div class="mp-debug-empty">这一轮没有可发送的消息。</div>'}</div>
+      ${skipped.length ? `
+      <details class="mp-debug-more">
+        <summary>未进入这一次 · ${skipped.length} 条</summary>
+        ${skipped.map(item => `<div class="mp-debug-skip"><span>${esc(item.label || '条目')}</span><small>${esc(item.reason || item.status || '')}</small></div>`).join('')}
+      </details>` : ''}
+      <div class="mp-debug-foot">按字符估算，实际 token 以模型分词为准。${mode === 'none' ? ' 空发送已关闭，这里只显示基础上下文。' : ''}</div>
+    </div>`;
+}
+
+function debugBarHtml(ctx, chat, contact) {
+  if (!debugEnabled(ctx)) return '';
+  const cache = ctx.shell.debugPreview;
+  const draft = String(ctx.shell.live.inputValue || chat.draft || '');
+  const open = Boolean(ctx.shell.debugOpen?.[chat.id]);
+  const ready = cache?.chatId === chat.id && Array.isArray(cache.messages) && cache.key === debugKey(ctx, chat);
+  const loading = !ready;
+  let head = '统计中…';
+  let count = '';
+  let mode = '';
+  if (ready) {
+    const built = debugMessages(ctx, chat, contact, cache, draft);
+    const stats = requestStats(built.messages);
+    mode = built.mode;
+    head = mode === 'none' ? '输入后统计' : `≈ ${formatNumber(stats.total)} tk`;
+    count = `${stats.rows.length} 条`;
+  } else if (cache?.chatId === chat.id && cache.error) {
+    head = '统计失败';
+  }
+  return `
+    <div class="mp-debug${open ? ' is-open' : ''}${loading ? ' is-loading' : ''}${mode === 'proactive' ? ' is-proactive' : ''}">
+      <button class="mp-debug-head" data-act="debug-toggle" data-chat="${chat.id}" type="button" aria-expanded="${open ? 'true' : 'false'}">
+        <span class="mp-debug-title">${mode === 'proactive' ? '主动开口' : '请求预览'}</span>
+        <span class="mp-debug-tk" data-debug-tk>${head}</span>
+        ${open ? '' : `<span class="mp-debug-count">${count}</span>`}
+        <span class="mp-debug-caret">${icon('chevron')}</span>
+      </button>
+      ${open && ready ? debugPanelHtml(ctx, chat, contact, cache, draft) : ''}
+      ${open && !ready ? `<div class="mp-debug-panel"><div class="mp-debug-empty">${cache?.error ? `统计失败：${esc(cache.error)}` : '正在读这一轮的上下文…'}</div>${cache?.error ? `<button class="mp-debug-retry" data-act="debug-refresh" data-chat="${chat.id}" type="button">重新统计</button>` : ''}</div>` : ''}
+    </div>`;
+}
+
+function ensureDebugPreview(ctx, chat, contact) {
+  if (!debugEnabled(ctx)) return;
+  const key = debugKey(ctx, chat);
+  const cache = ctx.shell.debugPreview;
+  if (cache?.chatId === chat.id && cache.key === key) return;
+  if (debugPendingKey === key) return;
+  debugPendingKey = key;
+  const seq = ++debugSeq;
+  setTimeout(async () => {
+    try {
+      const value = await ctx.ai.preview(chat, contact);
+      if (seq !== debugSeq || activeThreadId !== chat.id) return;
+      ctx.shell.debugPreview = { chatId: chat.id, ...value, key };
+    } catch (error) {
+      if (seq !== debugSeq || activeThreadId !== chat.id) return;
+      ctx.shell.debugPreview = { chatId: chat.id, key, error: String(error?.message || error || '统计失败') };
+    } finally {
+      if (debugPendingKey === key) debugPendingKey = '';
+      if (activeThreadId === chat.id && ctx.shell.root?.querySelector?.('.mp-thread')) ctx.rerender();
+    }
+  }, 180);
+}
 
 /* 聊天设置页：行样式沿用全局设置页，不另造一套 */
 function chatSetRow(chatId, { iconName, title, sub, act, toggle, value, danger }) {
@@ -243,9 +404,13 @@ function listBody(ctx) {
 /* --------------------------------------------------------- 会话页 */
 
 function threadBody(ctx, chatId) {
+  activeThreadId = chatId;
   const state = ctx.state;
   const chat = chatById(state, chatId);
-  if (!chat) return `${nav(ctx)}<div class="mp-page-body"><div class="mp-empty">这个会话已经不在了。</div></div>`;
+  if (!chat) {
+    activeThreadId = '';
+    return `${nav(ctx)}<div class="mp-page-body"><div class="mp-empty">这个会话已经不在了。</div></div>`;
+  }
   const contact = contactById(state, chat.contactId);
   const messages = chat.messages || [];
   const quote = ctx.shell.quote?.[chatId] || null;
@@ -306,6 +471,9 @@ function threadBody(ctx, chatId) {
     blocks.push(`<div class="mp-msg">${avatarHtml(contact?.name, contact?.avatar)}<div class="mp-msg-body"><div class="mp-typing"><i></i><i></i><i></i></div></div></div>`);
   }
 
+  ensureDebugPreview(ctx, chat, contact);
+  const debugBar = debugBarHtml(ctx, chat, contact);
+
   return `
     <div class="mp-thread">
       <div class="mp-thread-head">
@@ -319,6 +487,7 @@ function threadBody(ctx, chatId) {
       </div>
       <div class="mp-messages" id="mpMessages">${blocks.join('')}</div>
       <div class="mp-composer">
+        ${debugBar}
         <div class="mp-composer-tip">${wakeAllowed(ctx.state, chat) ? '空着发出去，TA 会主动开口' : '空发送已关掉，去聊天设置里打开'}</div>
         ${quote ? `
         <div class="mp-quote-chip">
@@ -452,6 +621,7 @@ export const chatApp = {
   id: 'chat', name: '聊天', icon: 'chat',
 
   render(ctx) {
+    activeThreadId = '';
     return listBody(ctx);
   },
 
@@ -525,6 +695,7 @@ export const threadSettingsApp = {
   id: 'thread-settings', name: '聊天设置', icon: 'settings',
 
   render(ctx, params) {
+    activeThreadId = '';
     return settingsBody(ctx, params.chatId);
   },
 
@@ -736,6 +907,20 @@ export const threadApp = {
     }
 
     if (act === 'send') { doSend(ctx, chatId); return true; }
+
+    if (act === 'debug-toggle') {
+      ctx.shell.debugOpen = ctx.shell.debugOpen || {};
+      ctx.shell.debugOpen[chatId] = !ctx.shell.debugOpen[chatId];
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'debug-refresh') {
+      ctx.ai.clearPreview?.(chatId);
+      ctx.shell.debugPreview = null;
+      ctx.rerender();
+      return true;
+    }
 
     if (act === 'clear-quote') {
       if (ctx.shell.quote) delete ctx.shell.quote[chatId];

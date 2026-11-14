@@ -6,7 +6,7 @@
 import { icon } from '../icons.js';
 import {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
-  wakeAllowed, messagePreview,
+  wakeAllowed, messagePreview, addExtrasEntry,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, normalizeReplyItems,
 } from '../data.js';
@@ -387,20 +387,28 @@ function reply(ctx, chat, contact, replaceId = '') {
   const delay = 900 + Math.random() * 700;
   setTimeout(async () => {
     let text = '';
+    let sections = [];
     try {
-      text = await ctx.ai.reply(ctx, chat, contact, pick(poolFor(contact)));
+      const result = await ctx.ai.reply(ctx, chat, contact, pick(poolFor(contact)));
+      text = typeof result === 'string' ? result : String(result?.text || '');
+      sections = Array.isArray(result?.sections) ? result.sections : [];
     } catch {
       text = '';
     }
     chat.typing = false;
     if (text) {
       const index = replaceId ? chat.messages.findIndex(item => item.id === replaceId) : -1;
+      let saved = null;
       if (index >= 0) {
         /* 重新生成：新内容回来后才覆盖原来那条，生成失败时原消息还在 */
         chat.messages[index] = { ...chat.messages[index], text, at: Date.now() };
         chat.updatedAt = chat.messages[index].at;
       } else {
-        pushMessage(ctx.state, chat.id, { from: 'them', text });
+        saved = pushMessage(ctx.state, chat.id, { from: 'them', text });
+      }
+      if (saved && sections.length) {
+        addExtrasEntry(ctx.state, contact?.id || chat.contactId, sections, { chatId: chat.id, messageId: saved.id });
+        ctx.toast('这轮的小剧场收进 App 了');
       }
     } else if (replaceId) {
       ctx.toast('这次没生成出来，原来那条留着了');
@@ -742,7 +750,7 @@ export const threadApp = {
           { label: '照片', value: 'photo', icon: 'image', note: '从相册选一张，压小了再存进手机' },
           { label: '表情', value: 'emoji', icon: 'smile', note: '发一个大表情，不是文字里的贴图' },
           { label: '戳一戳', value: 'poke', icon: 'spark', note: '在聊天里留一行「你拍了拍 TA」' },
-          { label: '小剧场', value: 'extras-switch', icon: 'theater', note: '每个角色的开关；看片段去小剧场 App' },
+          { label: '小剧场', value: 'extras-switch', icon: 'theater', note: '开关这轮要不要 AI 带小剧场；看内容去小剧场 App' },
           { label: '引用最近一条', value: 'quote', icon: 'reply' },
           { label: '把这条存进小剧场', value: 'extra', icon: 'theater' },
         ],

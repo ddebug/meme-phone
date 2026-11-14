@@ -353,7 +353,7 @@ export function emptyState() {
       current: null,
     },
     extras: {},
-    extrasOff: [],
+    extrasOn: [],
     favorites: [],
     dress: { accent: '#8e7bf2' },
   };
@@ -682,6 +682,81 @@ export function latestDiary(state) {
 export function extrasOf(state, contactId) {
   state.extras[contactId] = state.extras[contactId] || [];
   return state.extras[contactId];
+}
+
+/** 这一轮要不要请模型附一段小剧场：按联系人单独开。 */
+export function extrasEnabledFor(state, contactId) {
+  return (state.extrasOn || []).includes(String(contactId));
+}
+
+/** 小剧场的返回协议：正常聊天在前，<phone-extras>JSON</phone-extras> 在后。 */
+export function theaterPrompt(contactName) {
+  const name = String(contactName || '对方').trim() || '对方';
+  const shape = JSON.stringify({
+    role: name,
+    sections: [
+      { title: '心理活动', content: '……' },
+      { title: '小彩蛋', content: '……' },
+    ],
+  });
+  return [
+    `这一轮正常聊天之外，再给「${name}」写一小段小剧场。`,
+    '先完整输出 TA 要发的聊天消息，然后在消息之后另起一行，追加且只追加一个块：',
+    `<phone-extras>${shape}</phone-extras>`,
+    '这个块不会显示在聊天里，只存进小剧场 App；不要写进聊天正文，不要用代码围栏，也不要为它另发一次请求。',
+    '每节 1–3 句，贴合人设和当下情境；可以写没说出口的小情绪或动作，不替用户决定言行。',
+  ].join('\n');
+}
+
+/**
+ * 从模型回复里摘掉小剧场块，聊天只留正文；块要能解析成 sections 才存。
+ * 标签写坏或没闭合时也从标签处截掉，保证聊天里永远看不到小剧场。
+ */
+export function splitTheaterBlocks(text, contactName = '') {
+  const raw = String(text || '');
+  const blocks = [];
+  let cleaned = raw.replace(/<phone-extras\b[^>]*>([\s\S]*?)<\/phone-extras>/gi, (_, body) => {
+    blocks.push(body);
+    return '';
+  });
+  cleaned = cleaned.replace(/<phone-extras\b[\s\S]*$/i, '');
+  cleaned = cleaned.replace(/```[a-zA-Z]*\s*```/g, '');
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
+
+  const wanted = String(contactName || '').trim();
+  const sections = [];
+  for (const body of blocks) {
+    let data;
+    try { data = JSON.parse(String(body).trim()); } catch { continue; }
+    const list = Array.isArray(data) ? data : (Array.isArray(data?.sections) ? data.sections : []);
+    const role = Array.isArray(data) ? '' : String(data?.role || '').trim();
+    if (wanted && role && role !== wanted) continue;
+    for (const section of list.slice(0, 6)) {
+      if (!section || typeof section !== 'object') continue;
+      const title = String(section.title || '').trim().slice(0, 80);
+      const content = String(section.content || '').trim().slice(0, 4000);
+      if (title && content) sections.push({ title, content });
+    }
+  }
+  return { text: cleaned, sections };
+}
+
+/** 把一段小剧场并进该联系人的 App 列表；不新增聊天气泡。 */
+export function addExtrasEntry(state, contactId, sections, meta = {}) {
+  if (!Array.isArray(sections) || !sections.length) return null;
+  const title = sections.map(section => section.title).filter(Boolean).slice(0, 2).join(' · ') || '小剧场';
+  const entry = {
+    id: newId('x'),
+    title,
+    date: dayKey(),
+    lines: sections.map(section => `${section.title}：${section.content}`),
+    messageId: meta.messageId || '',
+    chatId: meta.chatId || '',
+    at: Date.now(),
+  };
+  state.extras[contactId] = state.extras[contactId] || [];
+  state.extras[contactId].unshift(entry);
+  return entry;
 }
 
 /* ------------------------------------------------------------- 从酒馆同步 */
@@ -1164,7 +1239,7 @@ export function normalize(raw) {
     ? merged.music.current
     : null;
   merged.extras = merged.extras || {};
-  merged.extrasOff = Array.isArray(merged.extrasOff) ? merged.extrasOff.map(String) : [];
+  merged.extrasOn = Array.isArray(merged.extrasOn) ? merged.extrasOn.map(String) : [];
   merged.favorites = Array.isArray(merged.favorites) ? merged.favorites : [];
   merged.emoji = Array.isArray(merged.emoji) && merged.emoji.length ? merged.emoji : base.emoji;
   for (const [chatId, chat] of Object.entries(merged.chats)) {

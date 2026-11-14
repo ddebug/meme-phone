@@ -19,16 +19,12 @@ export const extrasApp = {
 
   render(ctx, params) {
     const filter = params.contactId;
-    const off = new Set(filter ? [] : (ctx.state.extrasOff || []));
-    const visible = contactsOf(ctx.state)
-      .filter(contact => (!filter || contact.id === filter) && !off.has(contact.id))
+    const groups = contactsOf(ctx.state)
+      .filter(contact => !filter || contact.id === filter)
       .map(contact => ({ contact, list: ctx.state.extras[contact.id] || [] }))
       .filter(group => group.list.length);
-    const hiddenCount = contactsOf(ctx.state)
-      .filter(contact => (!filter || contact.id === filter) && off.has(contact.id) && (ctx.state.extras[contact.id] || []).length)
-      .length;
 
-    const cards = visible.map(group => `
+    const cards = groups.map(group => `
       <div class="mp-group-label" style="margin-top:12px">${esc(group.contact.name)} · ${group.list.length} 段</div>
       ${group.list.map(item => `
         <button class="mp-card" data-act="open-extra" data-contact="${group.contact.id}" data-extra="${item.id}" type="button" style="display:block;width:100%;text-align:left;border:0;font:inherit;cursor:pointer">
@@ -39,11 +35,7 @@ export const extrasApp = {
           <div style="font-family:var(--font-serif);font-size: calc(12.5px * var(--font-scale));line-height: calc(1.7 * var(--line-scale));color:var(--text-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc((item.lines || []).join(' '))}</div>
         </button>`).join('')}`).join('');
 
-    const emptyNote = hiddenCount
-      ? `<div class="mp-empty">${hiddenCount} 个角色的小剧场被开关关掉了。<br>去加号菜单的「小剧场」里打开。</div>`
-      : '<div class="mp-empty">还没有片段。<br>在会话里长按一句话，可以存成小剧场。</div>';
-
-    return `<div class="mp-page-body">${head('小剧场', '聊天之外的那些片段')}${cards || emptyNote}</div>`;
+    return `<div class="mp-page-body">${head('小剧场', '聊天之外的那些片段')}${cards || '<div class="mp-empty">还没有片段。<br>在加号菜单的「小剧场」里打开某个角色的开关，之后聊完就会自动收到一段。</div>'}</div>`;
   },
 
   handle(ctx, act, data) {
@@ -80,31 +72,31 @@ export const extrasSwitchApp = {
 
   render(ctx) {
     const contacts = contactsOf(ctx.state);
-    const off = new Set(ctx.state.extrasOff || []);
-    const allOn = contacts.length ? contacts.every(contact => !off.has(contact.id)) : true;
+    const on = new Set(ctx.state.extrasOn || []);
+    const allOn = contacts.length > 0 && contacts.every(contact => on.has(contact.id));
 
     const rows = contacts.map(contact => {
       const count = (ctx.state.extras[contact.id] || []).length;
-      const on = !off.has(contact.id);
+      const enabled = on.has(contact.id);
       return `
         <button class="mp-row" data-act="extra-toggle" data-contact="${contact.id}" type="button" style="width:100%">
           ${chatAvatarHtml(contact)}
           <div class="mp-row-main">
             <div class="mp-row-name">${esc(contact.name)}</div>
-            <div class="mp-row-sub">${count ? `${count} 段` : '还没有片段'}${on ? '' : ' · 已隐藏'}</div>
+            <div class="mp-row-sub">${count ? `${count} 段 · ` : ''}${enabled ? '这轮会带小剧场' : '只聊天'}</div>
           </div>
-          <span class="mp-switch${on ? ' on' : ''}"></span>
+          <span class="mp-switch${enabled ? ' on' : ''}"></span>
         </button>`;
     }).join('');
 
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">小剧场 · 每个角色一个开关；关掉只是不在小剧场里显示，片段还留着</div>
+        <div class="mp-subtitle" style="margin-top:0">小剧场 · 打开后，这一轮回复会让 AI 附一段小剧场；内容只进小剧场 App，不在聊天里显示</div>
         <button class="mp-row" data-act="extras-toggle-all" type="button" style="width:100%;margin-top:10px">
           <span class="mp-set-ico">${icon('theater')}</span>
           <div class="mp-row-main">
-            <div class="mp-row-name">全部显示</div>
-            <div class="mp-row-sub">一次打开或收起所有角色</div>
+            <div class="mp-row-name">全部打开</div>
+            <div class="mp-row-sub">一次打开或关闭所有角色</div>
           </div>
           <span class="mp-switch${allOn ? ' on' : ''}"></span>
         </button>
@@ -114,19 +106,19 @@ export const extrasSwitchApp = {
   },
 
   handle(ctx, act, data) {
-    const off = (ctx.state.extrasOff = Array.isArray(ctx.state.extrasOff) ? ctx.state.extrasOff : []);
+    const on = (ctx.state.extrasOn = Array.isArray(ctx.state.extrasOn) ? ctx.state.extrasOn : []);
     const contacts = contactsOf(ctx.state);
 
     if (act === 'extra-toggle') {
       const contact = contactById(ctx.state, data.contact);
       if (!contact) return true;
-      const index = off.indexOf(contact.id);
+      const index = on.indexOf(contact.id);
       if (index >= 0) {
-        off.splice(index, 1);
-        ctx.toast(`「${contact.name}」的小剧场已显示`);
+        on.splice(index, 1);
+        ctx.toast(`「${contact.name}」只聊天，不带小剧场`);
       } else {
-        off.push(contact.id);
-        ctx.toast(`「${contact.name}」的小剧场已隐藏`);
+        on.push(contact.id);
+        ctx.toast(`「${contact.name}」这轮会带小剧场`);
       }
       ctx.save();
       ctx.rerender();
@@ -134,11 +126,11 @@ export const extrasSwitchApp = {
     }
 
     if (act === 'extras-toggle-all') {
-      const allOn = contacts.length ? contacts.every(contact => !off.includes(contact.id)) : true;
-      ctx.state.extrasOff = allOn ? contacts.map(contact => contact.id) : [];
+      const allOn = contacts.length > 0 && contacts.every(contact => on.includes(contact.id));
+      ctx.state.extrasOn = allOn ? [] : contacts.map(contact => contact.id);
       ctx.save();
       ctx.rerender();
-      ctx.toast(allOn ? '所有小剧场都收起来了' : '所有小剧场都显示了');
+      ctx.toast(allOn ? '所有角色都只聊天' : '所有角色这轮都会带小剧场');
       return true;
     }
 
@@ -586,7 +578,7 @@ export const helpApp = {
         <div class="mp-card" style="font-size: calc(12.5px * var(--font-scale));line-height: calc(1.95 * var(--line-scale));color:var(--text-2)">
           <b style="color:var(--text)">聊天</b><br>
           长按一句话：引用、复制、把这条存进小剧场、让 TA 重说、删除。<br>
-          加号里的「小剧场」：按角色开关小剧场 App 的显示，片段不会删。
+          加号里的「小剧场」：按角色开关这轮要不要带小剧场，内容只进小剧场 App。
           输入框空着点发送，不是发空消息，是让 TA 主动开口。
         </div>
         <div class="mp-card" style="font-size: calc(12.5px * var(--font-scale));line-height: calc(1.95 * var(--line-scale));color:var(--text-2)">

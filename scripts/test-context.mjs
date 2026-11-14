@@ -5,6 +5,7 @@
 
 import {
   demoState, normalizeReplyContext, normalizeReplyItems, replyPresetFor, replyPresetsOf, chatsOf,
+  extrasEnabledFor, theaterPrompt, splitTheaterBlocks, addExtrasEntry,
 } from '../meme/data.js';
 import { buildReplyMessages } from '../meme/reply-context.js';
 
@@ -154,6 +155,43 @@ function findItem(items, id) {
   findItem(normalizeReplyItems(second.items, second.context), 'reply_context_character').enabled = false;
   second.items = normalizeReplyItems(second.items, second.context);
   ok(findItem(normalizeReplyItems(first.items, first.context), 'reply_context_character').enabled === true, '改副本不影响原预设');
+}
+
+/* 10. 小剧场开关：默认不请，打开后提示词进上下文 */
+{
+  const { state, chat, contact } = stateWithPreset();
+  ok(extrasEnabledFor(state, contact.id) === false, '小剧场默认关闭');
+  state.extrasOn = [contact.id];
+  ok(extrasEnabledFor(state, contact.id) === true, '打开后按角色生效');
+  const prompt = theaterPrompt(contact.name);
+  const { messages } = await buildReplyMessages(state, chat, contact, { extraPrompt: prompt });
+  const theater = messages.find(message => message.source === '小剧场');
+  ok(!!theater, '打开后小剧场提示词进了上下文');
+  ok(theater.content.includes('<phone-extras>'), '提示词带返回协议');
+  ok(messages[messages.length - 1].role === 'user', '小剧场提示词在最后一条聊天之前');
+}
+
+/* 11. 返回解析：块要从聊天里摘掉，角色对不上不存 */
+{
+  const raw = '今晚有点冷。\n<phone-extras>{"role":"沈砚","sections":[{"title":"心理活动","content":"他把手插回口袋。"},{"title":"小彩蛋","content":"路灯下多等了两分钟。"}]}</phone-extras>';
+  const split = splitTheaterBlocks(raw, '沈砚');
+  ok(split.text === '今晚有点冷。', '聊天只留正文');
+  ok(split.sections.length === 2, '两节小剧场解析出来');
+  ok(splitTheaterBlocks(raw, '江迟').sections.length === 0, '角色对不上不存');
+  const broken = splitTheaterBlocks('好。<phone-extras>{"role":"沈砚"', '沈砚');
+  ok(!broken.text.includes('phone-extras'), '没闭合的块也不会留在聊天里');
+}
+
+/* 12. 存进 App：新条目在最前，带来源消息 */
+{
+  const state = demoState();
+  const chat = chatsOf(state)[0];
+  const before = (state.extras[chat.contactId] || []).length;
+  const entry = addExtrasEntry(state, chat.contactId, [{ title: '心理活动', content: '一句' }], { chatId: chat.id, messageId: 'm_test' });
+  ok(!!entry && entry.lines[0] === '心理活动：一句', '小剧场存成 App 条目');
+  ok(state.extras[chat.contactId].length === before + 1, '条目数加一');
+  ok(state.extras[chat.contactId][0].id === entry.id, '新条目排在最前');
+  ok(entry.messageId === 'm_test' && entry.chatId === chat.id, '条目记住来源消息');
 }
 
 console.log(`\n${passed} 项通过`);

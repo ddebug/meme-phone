@@ -6478,7 +6478,7 @@ function emptyState() {
       current: null,
     },
     extras: {},
-    extrasOff: [],
+    extrasOn: [],
     favorites: [],
     dress: { accent: '#8e7bf2' },
   };
@@ -6807,6 +6807,81 @@ function latestDiary(state) {
 function extrasOf(state, contactId) {
   state.extras[contactId] = state.extras[contactId] || [];
   return state.extras[contactId];
+}
+
+/** 这一轮要不要请模型附一段小剧场：按联系人单独开。 */
+function extrasEnabledFor(state, contactId) {
+  return (state.extrasOn || []).includes(String(contactId));
+}
+
+/** 小剧场的返回协议：正常聊天在前，<phone-extras>JSON</phone-extras> 在后。 */
+function theaterPrompt(contactName) {
+  const name = String(contactName || '对方').trim() || '对方';
+  const shape = JSON.stringify({
+    role: name,
+    sections: [
+      { title: '心理活动', content: '……' },
+      { title: '小彩蛋', content: '……' },
+    ],
+  });
+  return [
+    `这一轮正常聊天之外，再给「${name}」写一小段小剧场。`,
+    '先完整输出 TA 要发的聊天消息，然后在消息之后另起一行，追加且只追加一个块：',
+    `<phone-extras>${shape}</phone-extras>`,
+    '这个块不会显示在聊天里，只存进小剧场 App；不要写进聊天正文，不要用代码围栏，也不要为它另发一次请求。',
+    '每节 1–3 句，贴合人设和当下情境；可以写没说出口的小情绪或动作，不替用户决定言行。',
+  ].join('\n');
+}
+
+/**
+ * 从模型回复里摘掉小剧场块，聊天只留正文；块要能解析成 sections 才存。
+ * 标签写坏或没闭合时也从标签处截掉，保证聊天里永远看不到小剧场。
+ */
+function splitTheaterBlocks(text, contactName = '') {
+  const raw = String(text || '');
+  const blocks = [];
+  let cleaned = raw.replace(/<phone-extras\b[^>]*>([\s\S]*?)<\/phone-extras>/gi, (_, body) => {
+    blocks.push(body);
+    return '';
+  });
+  cleaned = cleaned.replace(/<phone-extras\b[\s\S]*$/i, '');
+  cleaned = cleaned.replace(/```[a-zA-Z]*\s*```/g, '');
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
+
+  const wanted = String(contactName || '').trim();
+  const sections = [];
+  for (const body of blocks) {
+    let data;
+    try { data = JSON.parse(String(body).trim()); } catch { continue; }
+    const list = Array.isArray(data) ? data : (Array.isArray(data?.sections) ? data.sections : []);
+    const role = Array.isArray(data) ? '' : String(data?.role || '').trim();
+    if (wanted && role && role !== wanted) continue;
+    for (const section of list.slice(0, 6)) {
+      if (!section || typeof section !== 'object') continue;
+      const title = String(section.title || '').trim().slice(0, 80);
+      const content = String(section.content || '').trim().slice(0, 4000);
+      if (title && content) sections.push({ title, content });
+    }
+  }
+  return { text: cleaned, sections };
+}
+
+/** 把一段小剧场并进该联系人的 App 列表；不新增聊天气泡。 */
+function addExtrasEntry(state, contactId, sections, meta = {}) {
+  if (!Array.isArray(sections) || !sections.length) return null;
+  const title = sections.map(section => section.title).filter(Boolean).slice(0, 2).join(' · ') || '小剧场';
+  const entry = {
+    id: newId('x'),
+    title,
+    date: dayKey(),
+    lines: sections.map(section => `${section.title}：${section.content}`),
+    messageId: meta.messageId || '',
+    chatId: meta.chatId || '',
+    at: Date.now(),
+  };
+  state.extras[contactId] = state.extras[contactId] || [];
+  state.extras[contactId].unshift(entry);
+  return entry;
 }
 
 /* ------------------------------------------------------------- 从酒馆同步 */
@@ -7289,7 +7364,7 @@ function normalize(raw) {
     ? merged.music.current
     : null;
   merged.extras = merged.extras || {};
-  merged.extrasOff = Array.isArray(merged.extrasOff) ? merged.extrasOff.map(String) : [];
+  merged.extrasOn = Array.isArray(merged.extrasOn) ? merged.extrasOn.map(String) : [];
   merged.favorites = Array.isArray(merged.favorites) ? merged.favorites : [];
   merged.emoji = Array.isArray(merged.emoji) && merged.emoji.length ? merged.emoji : base.emoji;
   for (const [chatId, chat] of Object.entries(merged.chats)) {
@@ -7347,6 +7422,10 @@ exports["diaryEntry"] = diaryEntry;
 exports["writeDiary"] = writeDiary;
 exports["latestDiary"] = latestDiary;
 exports["extrasOf"] = extrasOf;
+exports["extrasEnabledFor"] = extrasEnabledFor;
+exports["theaterPrompt"] = theaterPrompt;
+exports["splitTheaterBlocks"] = splitTheaterBlocks;
+exports["addExtrasEntry"] = addExtrasEntry;
 exports["syncTavernContacts"] = syncTavernContacts;
 exports["demoState"] = demoState;
 exports["normalize"] = normalize;
@@ -10179,7 +10258,7 @@ __mods["meme/apps/chat.js"] = function(module, exports, __req){
 const { icon } = __req("meme/icons.js");
 const {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
-  wakeAllowed, messagePreview,
+  wakeAllowed, messagePreview, addExtrasEntry,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, normalizeReplyItems,
 } = __req("meme/data.js");
@@ -10560,20 +10639,28 @@ function reply(ctx, chat, contact, replaceId = '') {
   const delay = 900 + Math.random() * 700;
   setTimeout(async () => {
     let text = '';
+    let sections = [];
     try {
-      text = await ctx.ai.reply(ctx, chat, contact, pick(poolFor(contact)));
+      const result = await ctx.ai.reply(ctx, chat, contact, pick(poolFor(contact)));
+      text = typeof result === 'string' ? result : String(result?.text || '');
+      sections = Array.isArray(result?.sections) ? result.sections : [];
     } catch {
       text = '';
     }
     chat.typing = false;
     if (text) {
       const index = replaceId ? chat.messages.findIndex(item => item.id === replaceId) : -1;
+      let saved = null;
       if (index >= 0) {
         /* 重新生成：新内容回来后才覆盖原来那条，生成失败时原消息还在 */
         chat.messages[index] = { ...chat.messages[index], text, at: Date.now() };
         chat.updatedAt = chat.messages[index].at;
       } else {
-        pushMessage(ctx.state, chat.id, { from: 'them', text });
+        saved = pushMessage(ctx.state, chat.id, { from: 'them', text });
+      }
+      if (saved && sections.length) {
+        addExtrasEntry(ctx.state, contact?.id || chat.contactId, sections, { chatId: chat.id, messageId: saved.id });
+        ctx.toast('这轮的小剧场收进 App 了');
       }
     } else if (replaceId) {
       ctx.toast('这次没生成出来，原来那条留着了');
@@ -10915,7 +11002,7 @@ const threadApp = {
           { label: '照片', value: 'photo', icon: 'image', note: '从相册选一张，压小了再存进手机' },
           { label: '表情', value: 'emoji', icon: 'smile', note: '发一个大表情，不是文字里的贴图' },
           { label: '戳一戳', value: 'poke', icon: 'spark', note: '在聊天里留一行「你拍了拍 TA」' },
-          { label: '小剧场', value: 'extras-switch', icon: 'theater', note: '每个角色的开关；看片段去小剧场 App' },
+          { label: '小剧场', value: 'extras-switch', icon: 'theater', note: '开关这轮要不要 AI 带小剧场；看内容去小剧场 App' },
           { label: '引用最近一条', value: 'quote', icon: 'reply' },
           { label: '把这条存进小剧场', value: 'extra', icon: 'theater' },
         ],
@@ -12055,16 +12142,12 @@ const extrasApp = {
 
   render(ctx, params) {
     const filter = params.contactId;
-    const off = new Set(filter ? [] : (ctx.state.extrasOff || []));
-    const visible = contactsOf(ctx.state)
-      .filter(contact => (!filter || contact.id === filter) && !off.has(contact.id))
+    const groups = contactsOf(ctx.state)
+      .filter(contact => !filter || contact.id === filter)
       .map(contact => ({ contact, list: ctx.state.extras[contact.id] || [] }))
       .filter(group => group.list.length);
-    const hiddenCount = contactsOf(ctx.state)
-      .filter(contact => (!filter || contact.id === filter) && off.has(contact.id) && (ctx.state.extras[contact.id] || []).length)
-      .length;
 
-    const cards = visible.map(group => `
+    const cards = groups.map(group => `
       <div class="mp-group-label" style="margin-top:12px">${esc(group.contact.name)} · ${group.list.length} 段</div>
       ${group.list.map(item => `
         <button class="mp-card" data-act="open-extra" data-contact="${group.contact.id}" data-extra="${item.id}" type="button" style="display:block;width:100%;text-align:left;border:0;font:inherit;cursor:pointer">
@@ -12075,11 +12158,7 @@ const extrasApp = {
           <div style="font-family:var(--font-serif);font-size: calc(12.5px * var(--font-scale));line-height: calc(1.7 * var(--line-scale));color:var(--text-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc((item.lines || []).join(' '))}</div>
         </button>`).join('')}`).join('');
 
-    const emptyNote = hiddenCount
-      ? `<div class="mp-empty">${hiddenCount} 个角色的小剧场被开关关掉了。<br>去加号菜单的「小剧场」里打开。</div>`
-      : '<div class="mp-empty">还没有片段。<br>在会话里长按一句话，可以存成小剧场。</div>';
-
-    return `<div class="mp-page-body">${head('小剧场', '聊天之外的那些片段')}${cards || emptyNote}</div>`;
+    return `<div class="mp-page-body">${head('小剧场', '聊天之外的那些片段')}${cards || '<div class="mp-empty">还没有片段。<br>在加号菜单的「小剧场」里打开某个角色的开关，之后聊完就会自动收到一段。</div>'}</div>`;
   },
 
   handle(ctx, act, data) {
@@ -12116,31 +12195,31 @@ const extrasSwitchApp = {
 
   render(ctx) {
     const contacts = contactsOf(ctx.state);
-    const off = new Set(ctx.state.extrasOff || []);
-    const allOn = contacts.length ? contacts.every(contact => !off.has(contact.id)) : true;
+    const on = new Set(ctx.state.extrasOn || []);
+    const allOn = contacts.length > 0 && contacts.every(contact => on.has(contact.id));
 
     const rows = contacts.map(contact => {
       const count = (ctx.state.extras[contact.id] || []).length;
-      const on = !off.has(contact.id);
+      const enabled = on.has(contact.id);
       return `
         <button class="mp-row" data-act="extra-toggle" data-contact="${contact.id}" type="button" style="width:100%">
           ${chatAvatarHtml(contact)}
           <div class="mp-row-main">
             <div class="mp-row-name">${esc(contact.name)}</div>
-            <div class="mp-row-sub">${count ? `${count} 段` : '还没有片段'}${on ? '' : ' · 已隐藏'}</div>
+            <div class="mp-row-sub">${count ? `${count} 段 · ` : ''}${enabled ? '这轮会带小剧场' : '只聊天'}</div>
           </div>
-          <span class="mp-switch${on ? ' on' : ''}"></span>
+          <span class="mp-switch${enabled ? ' on' : ''}"></span>
         </button>`;
     }).join('');
 
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">小剧场 · 每个角色一个开关；关掉只是不在小剧场里显示，片段还留着</div>
+        <div class="mp-subtitle" style="margin-top:0">小剧场 · 打开后，这一轮回复会让 AI 附一段小剧场；内容只进小剧场 App，不在聊天里显示</div>
         <button class="mp-row" data-act="extras-toggle-all" type="button" style="width:100%;margin-top:10px">
           <span class="mp-set-ico">${icon('theater')}</span>
           <div class="mp-row-main">
-            <div class="mp-row-name">全部显示</div>
-            <div class="mp-row-sub">一次打开或收起所有角色</div>
+            <div class="mp-row-name">全部打开</div>
+            <div class="mp-row-sub">一次打开或关闭所有角色</div>
           </div>
           <span class="mp-switch${allOn ? ' on' : ''}"></span>
         </button>
@@ -12150,19 +12229,19 @@ const extrasSwitchApp = {
   },
 
   handle(ctx, act, data) {
-    const off = (ctx.state.extrasOff = Array.isArray(ctx.state.extrasOff) ? ctx.state.extrasOff : []);
+    const on = (ctx.state.extrasOn = Array.isArray(ctx.state.extrasOn) ? ctx.state.extrasOn : []);
     const contacts = contactsOf(ctx.state);
 
     if (act === 'extra-toggle') {
       const contact = contactById(ctx.state, data.contact);
       if (!contact) return true;
-      const index = off.indexOf(contact.id);
+      const index = on.indexOf(contact.id);
       if (index >= 0) {
-        off.splice(index, 1);
-        ctx.toast(`「${contact.name}」的小剧场已显示`);
+        on.splice(index, 1);
+        ctx.toast(`「${contact.name}」只聊天，不带小剧场`);
       } else {
-        off.push(contact.id);
-        ctx.toast(`「${contact.name}」的小剧场已隐藏`);
+        on.push(contact.id);
+        ctx.toast(`「${contact.name}」这轮会带小剧场`);
       }
       ctx.save();
       ctx.rerender();
@@ -12170,11 +12249,11 @@ const extrasSwitchApp = {
     }
 
     if (act === 'extras-toggle-all') {
-      const allOn = contacts.length ? contacts.every(contact => !off.includes(contact.id)) : true;
-      ctx.state.extrasOff = allOn ? contacts.map(contact => contact.id) : [];
+      const allOn = contacts.length > 0 && contacts.every(contact => on.includes(contact.id));
+      ctx.state.extrasOn = allOn ? [] : contacts.map(contact => contact.id);
       ctx.save();
       ctx.rerender();
-      ctx.toast(allOn ? '所有小剧场都收起来了' : '所有小剧场都显示了');
+      ctx.toast(allOn ? '所有角色都只聊天' : '所有角色这轮都会带小剧场');
       return true;
     }
 
@@ -12622,7 +12701,7 @@ const helpApp = {
         <div class="mp-card" style="font-size: calc(12.5px * var(--font-scale));line-height: calc(1.95 * var(--line-scale));color:var(--text-2)">
           <b style="color:var(--text)">聊天</b><br>
           长按一句话：引用、复制、把这条存进小剧场、让 TA 重说、删除。<br>
-          加号里的「小剧场」：按角色开关小剧场 App 的显示，片段不会删。
+          加号里的「小剧场」：按角色开关这轮要不要带小剧场，内容只进小剧场 App。
           输入框空着点发送，不是发空消息，是让 TA 主动开口。
         </div>
         <div class="mp-card" style="font-size: calc(12.5px * var(--font-scale));line-height: calc(1.95 * var(--line-scale));color:var(--text-2)">
@@ -18706,6 +18785,7 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
   const mainText = fillPromptTokens(main, state, chat);
   if (mainText) messages.push({ role: 'system', content: mainText, source: '回复要求' });
   if (options.lead) messages.push({ role: 'system', content: options.lead, source: '场景提示' });
+  if (options.extraPrompt) messages.push({ role: 'system', content: String(options.extraPrompt), source: '小剧场' });
 
   const seen = new Set();
   let used = 0;
@@ -18795,7 +18875,7 @@ __mods["meme/index.js"] = function(module, exports, __req){
  */
 
 const { createStore } = __req("meme/store.js");
-const { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, pushMessage } = __req("meme/data.js");
+const { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, pushMessage, extrasEnabledFor, theaterPrompt, splitTheaterBlocks } = __req("meme/data.js");
 const { createShell, applyWall, applyLook } = __req("meme/shell.js");
 const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } = __req("meme/host.js");
 const { chatApp, threadApp, threadSettingsApp } = __req("meme/apps/chat.js");
@@ -18891,12 +18971,16 @@ function makeAi(state) {
     async reply(context, chat, contact, demoReply) {
       const ctxSettings = replyContextFor(state, chat);
       const storyBlock = ctxSettings.memory ? await story(chat, 1200) : { text: '' };
+      const wantsTheater = extrasEnabledFor(state, contact?.id);
       const built = await buildReplyMessages(state, chat, contact, {
         memoryText: String(storyBlock?.text || ''),
         lead: `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`,
+        extraPrompt: wantsTheater ? theaterPrompt(contact?.name) : '',
       });
       const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
-      return result.text;
+      if (!wantsTheater) return { text: result.text, sections: [] };
+      const split = splitTheaterBlocks(result.text, contact?.name);
+      return { text: split.text, sections: split.sections };
     },
 
     async proactive(context, chat, contact, demoReply) {

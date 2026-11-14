@@ -4,7 +4,7 @@
  */
 
 import { createStore } from './store.js';
-import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, pushMessage } from './data.js';
+import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, pushMessage, extrasEnabledFor, theaterPrompt, splitTheaterBlocks } from './data.js';
 import { createShell, applyWall, applyLook } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
@@ -100,12 +100,16 @@ function makeAi(state) {
     async reply(context, chat, contact, demoReply) {
       const ctxSettings = replyContextFor(state, chat);
       const storyBlock = ctxSettings.memory ? await story(chat, 1200) : { text: '' };
+      const wantsTheater = extrasEnabledFor(state, contact?.id);
       const built = await buildReplyMessages(state, chat, contact, {
         memoryText: String(storyBlock?.text || ''),
         lead: `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`,
+        extraPrompt: wantsTheater ? theaterPrompt(contact?.name) : '',
       });
       const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
-      return result.text;
+      if (!wantsTheater) return { text: result.text, sections: [] };
+      const split = splitTheaterBlocks(result.text, contact?.name);
+      return { text: split.text, sections: split.sections };
     },
 
     async proactive(context, chat, contact, demoReply) {

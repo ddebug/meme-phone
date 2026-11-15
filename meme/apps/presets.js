@@ -461,7 +461,7 @@ export const replyPresetApp = {
     const itemRows = items.map(itemRow).join('');
 
     return `
-      <div class="mp-nav">
+      <div class="mp-nav mp-preset-nav">
         <button class="mp-back" data-act="back" type="button">${icon('back')}</button>
         <span style="flex:1"></span>
         <button class="mp-icon-btn" data-act="reply-item-reset" type="button" title="恢复默认条目">${icon('refresh')}</button>

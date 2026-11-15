@@ -807,6 +807,13 @@
   position: relative;
 }
 
+/* 预设详情：操作按钮落到状态栏下方，避开右上角时钟 */
+.mp-root .mp-nav.mp-preset-nav {
+  height: 34px;
+  margin-top: 54px;
+  margin-bottom: 10px;
+}
+
 .mp-page-body {
   padding-bottom: 14px;
   flex: 1;
@@ -3543,7 +3550,7 @@
 .mp-root .mp-item-switch {
   flex: 0 0 auto;
   width: 38px;
-  height: 28px;
+  height: 27px;
   display: grid;
   place-items: center;
   padding: 0;

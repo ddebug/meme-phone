@@ -130,7 +130,37 @@ export function clockBlock(now = new Date()) {
   const text = now.toLocaleString('zh-CN', {
     month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
   });
-  return `【当前时间】\n${text}`;
+  return [
+    '【时间信息】',
+    `当前时间：${text}`,
+    '角色的手机能看到当前时间，可以据此判断时段、对方状态和聊天间隔。',
+  ].join('\n');
+}
+
+/** 当前用户签名；meme 没有签名历史，只能读现在的资料。 */
+export function signatureBlock(state) {
+  const bio = String(state?.settings?.profile?.bio || '').trim();
+  if (!bio) return '';
+  return `【我的个性签名】\n${bio}`;
+}
+
+/** 表情包库：给模型一份当前表情名称，避免它编不存在的表情。 */
+export function emojiBlock(state) {
+  const list = (Array.isArray(state?.emoji) ? state.emoji : [])
+    .map(item => {
+      const name = String(item?.name || '').trim();
+      const char = String(item?.char || '').trim();
+      if (!name) return '';
+      return char ? `${name}（${char}）` : name;
+    })
+    .filter(Boolean);
+  if (!list.length) return '';
+  return [
+    '【表情包库】',
+    list.join('\n'),
+    '[/表情包库]',
+    '角色回复时可以使用这些表情，但不要编造表情库里没有的表情。',
+  ].join('\n');
 }
 
 /** 当前选中的酒馆人设；预览环境没有酒馆时退回第一条。 */
@@ -241,6 +271,14 @@ async function contextBlockFor(item, state, chat, contact, context, memoryText) 
   if (key === 'scene') {
     const text = sceneBlock(state, contact);
     return { text, status: text ? 'injected' : 'empty', reason: text ? '' : '角色卡没有填场景' };
+  }
+  if (key === 'signature') {
+    const text = signatureBlock(state);
+    return { text, status: text ? 'injected' : 'empty', reason: text ? '' : '我还没有写个性签名' };
+  }
+  if (key === 'emoji') {
+    const text = emojiBlock(state);
+    return { text, status: text ? 'injected' : 'empty', reason: text ? '' : '表情面板还是空的' };
   }
   if (key === 'lorebook') return lorebookBlock(state, chat, contact, context);
   if (key === 'memory') {

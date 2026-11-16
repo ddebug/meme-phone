@@ -41,6 +41,9 @@ const P = {
   play: '<path d="M8.4 5.8 18 12l-9.6 6.2z"/>',
   pause: '<path d="M9 6.4v11.2M15 6.4v11.2"/>',
   next: '<path d="M7 5.8 15.2 12 7 18.2z"/><path d="M18 5.6v12.8"/>',
+  download: '<path d="M12 4.8v9.8"/><path d="M8.2 10.8 12 14.6l3.8-3.8"/><path d="M5.4 18.4h13.2"/>',
+  upload: '<path d="M12 19.2V9.4"/><path d="M8.2 13.2 12 9.4l3.8 3.8"/><path d="M5.4 5.6h13.2"/>',
+  grip: '<circle cx="9" cy="7" r=".9"/><circle cx="15" cy="7" r=".9"/><circle cx="9" cy="12" r=".9"/><circle cx="15" cy="12" r=".9"/><circle cx="9" cy="17" r=".9"/><circle cx="15" cy="17" r=".9"/>',
 };
 
 export function icon(name, className = '') {
@@ -86,6 +89,7 @@ export const ICON_LABELS = {
   clock: '时钟', moon: '月亮', sun: '太阳', image: '图片',
   pin: '定位', bell: '铃铛', code: '代码', book: '书本',
   music: '音符', play: '播放', pause: '暂停', next: '下一首',
+  download: '下载', upload: '上传', grip: '拖动排序',
 };
 
 /** 桌面与 Dock 上所有可换图标的 App。 */

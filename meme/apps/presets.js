@@ -14,7 +14,40 @@ let editingId = '';
 let creating = false;
 let renaming = false;
 let deleting = false;
+let importing = null;
 let preview = { presetId: '', tab: 'messages', chatId: '', loading: false, error: '', data: null, flat: '' };
+
+const EXTERNAL_CONTEXT_IDS = {
+  'user-persona': 'user',
+  'signature-history': 'signature',
+  'char-info': 'character',
+  'emoji-library': 'emoji',
+  'chat-history': 'history',
+  'custom-1761560957639': 'time',
+};
+
+const EXTERNAL_CONTEXT_TOKENS = {
+  __AUTO_USER_PERSONA__: 'user',
+  __AUTO_SIGNATURE_HISTORY__: 'signature',
+  __AUTO_CHARACTERS__: 'character',
+  __AUTO_EMOJI_LIBRARY__: 'emoji',
+  __AUTO_CHAT_HISTORY__: 'history',
+  __AUTO_TIME__: 'time',
+};
+
+/** 导入外部单套预设：把 acsus 的固定 id 映射成 meme 的上下文条目。 */
+function prepareExternalItems(rawItems) {
+  if (!Array.isArray(rawItems)) return [];
+  return rawItems.map((item, index) => {
+    if (!item || typeof item !== 'object') return item;
+    const content = String(item.content || '');
+    const auto = EXTERNAL_CONTEXT_IDS[String(item.id || '')]
+      || Object.entries(EXTERNAL_CONTEXT_TOKENS).find(([token]) => content.includes(token))?.[1]
+      || '';
+    if (!auto) return { ...item, order: index };
+    return { ...item, kind: 'context', auto, order: index };
+  });
+}
 
 function resetPreview() {
   preview = { presetId: '', tab: preview.tab || 'messages', chatId: preview.chatId || '', loading: false, error: '', data: null, flat: '' };
@@ -230,6 +263,18 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
   });
 }
 
+function downloadJson(payload, filename) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function exportPresets(ctx) {
   const payload = {
     version: 1,
@@ -243,61 +288,184 @@ function exportPresets(ctx) {
       items: promptItems(preset),
     })),
   };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `meme-phone-presets-${Date.now()}.json`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadJson(payload, `meme-phone-presets-${Date.now()}.json`);
   ctx.toast('预设已导出');
 }
 
-function importPresets(ctx) {
+/** 单套导出：保留参考项目能直接读取的 items 字段。 */
+function exportCurrentPreset(ctx, preset) {
+  const payload = {
+    name: preset.name,
+    text: String(preset.text || ''),
+    context: normalizeReplyContext(preset.context),
+    items: promptItems(preset).map(item => ({
+      id: item.id,
+      label: item.label,
+      role: item.role,
+      content: item.content,
+      enabled: item.enabled,
+      editable: item.editable,
+      deletable: item.deletable,
+      order: item.order,
+      ...(item.kind === 'context' ? { kind: 'context', auto: item.auto } : {}),
+      ...(item.note ? { note: item.note } : {}),
+    })),
+  };
+  downloadJson(payload, `meme-phone-preset-${preset.id || Date.now()}.json`);
+  ctx.toast(`已导出「${preset.name || '当前预设'}」`);
+}
+
+function normalizeImportedPreset(item, index, seen) {
+  let id = String(item?.id || newId('reply'));
+  if (seen.has(id)) id = `${id}_${index}`;
+  seen.add(id);
+  const rawItems = prepareExternalItems(item?.items);
+  return {
+    id,
+    name: String(item?.name || '').trim().slice(0, 20) || `导入预设 ${index + 1}`,
+    text: String(item?.text || '').trim().slice(0, 3000),
+    context: normalizeReplyContext(item?.context),
+    items: rawItems.length ? normalizeReplyItems(rawItems, item?.context) : [],
+  };
+}
+
+function pickPresetFile(ctx) {
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.json';
+  input.accept = '.json,application/json';
   input.onchange = async () => {
     const file = input.files?.[0];
     if (!file) return;
     try {
       const raw = JSON.parse(await file.text());
+      const single = !Array.isArray(raw) && Array.isArray(raw?.items) ? raw : null;
+      if (single) {
+        const preset = normalizeImportedPreset(single, 0, new Set());
+        if (!preset.items.length) throw new Error('items 里没有条目');
+        importing = { mode: 'single', presets: [preset], fileName: file.name };
+        ctx.rerender();
+        return;
+      }
       const list = Array.isArray(raw) ? raw : (raw?.presets || raw?.reply?.presets || []);
       if (!Array.isArray(list) || !list.length) throw new Error('没有找到预设列表');
       const seen = new Set();
-      const next = list.slice(0, 20).map((item, index) => {
-        let id = String(item.id || newId('reply'));
-        if (seen.has(id)) id = `${id}_${index}`;
-        seen.add(id);
-        return {
-          id,
-          name: String(item.name || '').trim().slice(0, 20) || `导入预设 ${index + 1}`,
-          text: String(item.text || '').trim().slice(0, 3000),
-          context: normalizeReplyContext(item.context),
-          items: normalizeReplyItems(item.items, item.context),
-        };
-      });
-      ctx.openSheet({
-        kind: 'pick',
-        title: '导入回复预设',
-        note: `导入 ${next.length} 套会覆盖手机现有的 ${replyPresetsOf(ctx.state).length} 套`,
-        items: [{ label: '覆盖导入', value: 'import', icon: 'refresh', danger: true }],
-        onPick: value => {
-          if (value !== 'import') return;
-          ctx.state.settings.reply.presets = next;
-          ctx.state.settings.reply.activeId = next[0].id;
-          ctx.save();
-          ctx.go('app-presets');
-          ctx.toast(`已导入 ${next.length} 套预设`);
-        },
-      });
+      const presets = list.slice(0, 20)
+        .map((item, index) => normalizeImportedPreset(item, index, seen))
+        .filter(preset => preset.items.length);
+      if (!presets.length) throw new Error('没有可用条目');
+      importing = { mode: 'library', presets, fileName: file.name };
+      ctx.rerender();
     } catch (error) {
       ctx.toast(`导入失败：${error?.message || '文件格式不对'}`);
     }
   };
   input.click();
+}
+
+function importConfirm(ctx) {
+  if (!importing?.presets?.length) return;
+  const next = importing.presets;
+  if (importing.mode === 'single') {
+    ctx.state.settings.reply.presets.push(next[0]);
+    importing = null;
+    editingId = next[0].id;
+    resetPreview();
+    ctx.save();
+    ctx.go('reply-item', { id: next[0].id });
+    ctx.toast(`已导入「${next[0].name}」`);
+    return;
+  }
+  ctx.state.settings.reply.presets = next;
+  ctx.state.settings.reply.activeId = next[0].id;
+  importing = null;
+  resetPreview();
+  ctx.save();
+  ctx.go('app-presets');
+  ctx.toast(`已导入 ${next.length} 套预设`);
+}
+
+const dragBoundRoots = new WeakSet();
+let dragState = null;
+
+/** 条目拖拽排序：不引依赖，用指针事件 + DOM 插入。 */
+function bindPresetDrag(ctx) {
+  const root = ctx.shell?.root;
+  if (!root || dragBoundRoots.has(root)) return;
+  dragBoundRoots.add(root);
+
+  root.addEventListener('pointerdown', event => {
+    const grip = event.target?.closest?.('.mp-preset-grip');
+    if (!grip || (event.button !== undefined && event.button !== 0)) return;
+    const row = grip.closest('.mp-preset-item');
+    const list = grip.closest('.mp-preset-list');
+    if (!row || !list) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragState = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      moved: false,
+      row,
+      list,
+      grip,
+      body: list.closest('.mp-page-body'),
+      presetId: editingId,
+    };
+    row.classList.add('is-dragging');
+    document.body.style.cursor = 'grabbing';
+    grip.setPointerCapture?.(event.pointerId);
+  }, true);
+
+  window.addEventListener('pointermove', event => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    event.preventDefault();
+    if (Math.abs(event.clientY - dragState.startY) > 4) dragState.moved = true;
+
+    const rows = [...dragState.list.querySelectorAll('.mp-preset-item')]
+      .filter(row => row !== dragState.row);
+    const before = rows.find(row => {
+      const rect = row.getBoundingClientRect();
+      return event.clientY < rect.top + rect.height / 2;
+    });
+    if (before) dragState.list.insertBefore(dragState.row, before);
+    else dragState.list.appendChild(dragState.row);
+
+    const body = dragState.body;
+    if (body) {
+      const rect = body.getBoundingClientRect();
+      if (event.clientY < rect.top + 54) body.scrollTop -= 14;
+      else if (event.clientY > rect.bottom - 54) body.scrollTop += 14;
+    }
+  }, { passive: false });
+
+  const endDrag = event => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    const state = dragState;
+    dragState = null;
+    state.row.classList.remove('is-dragging');
+    document.body.style.cursor = '';
+    state.grip.releasePointerCapture?.(event.pointerId);
+    if (!state.moved) return;
+
+    const preset = findPreset(ctx.state, state.presetId);
+    if (!preset) return;
+    const items = promptItems(preset);
+    if (!items.length) return;
+    const ids = [...state.list.querySelectorAll('.mp-preset-item')].map(row => row.dataset.id);
+    const byId = new Map(items.map(item => [item.id, item]));
+    const next = ids.map(id => byId.get(id)).filter(Boolean);
+    items.forEach(item => {
+      if (!ids.includes(item.id)) next.push(item);
+    });
+    next.forEach((item, index) => { item.order = index; });
+    preset.items = next;
+    resetPreview();
+    ctx.save();
+    ctx.rerender();
+    ctx.toast('条目顺序已调整');
+  };
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
 }
 
 function findPreset(state, id) {
@@ -324,12 +492,14 @@ export const presetsApp = {
       </button>`).join('');
 
     return `
+      <div class="mp-nav mp-preset-nav">
+        <button class="mp-back" data-act="back" type="button">${icon('back')}<span>预设</span></button>
+        <span style="flex:1"></span>
+        <button class="mp-icon-btn" data-act="reply-import" type="button" aria-label="导入预设" title="导入预设">${icon('download')}</button>
+        <button class="mp-icon-btn" data-act="reply-export" type="button" aria-label="导出预设" title="导出预设">${icon('upload')}</button>
+        <button class="mp-icon-btn" data-act="reply-new" type="button" aria-label="新建预设" title="新建预设">${icon('plus')}</button>
+      </div>
       <div class="mp-page-body">
-        <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <span style="flex:1"></span>
-          <button class="mp-icon-btn" data-act="reply-more" type="button" aria-label="导入导出">${icon('more')}</button>
-          <button class="mp-icon-btn" data-act="reply-new" type="button" aria-label="新建预设">${icon('plus')}</button>
-        </div>
         <div class="mp-subtitle">回复预设：一套预设就是一条条提示词：回复指令、聊天行为、其他软件、上下文注入都在同一个列表里，能开关能排序</div>
 
         ${creating ? `
@@ -337,6 +507,15 @@ export const presetsApp = {
           <input id="mpReplyNewName" class="mp-api-input" type="text" maxlength="20" value="${esc(`${active?.name || '预设'} 副本`)}" placeholder="新预设叫什么">
           <button class="mp-draw-side is-primary" data-act="reply-new-save" type="button">创建</button>
           <button class="mp-draw-side" data-act="reply-new-cancel" type="button">取消</button>
+        </div>` : ''}
+
+        ${importing ? `
+        <div class="mp-group mp-api-inline${importing.mode === 'library' ? ' is-danger' : ''}" style="margin-top:12px">
+          <span class="mp-row-name" style="flex:1">${importing.mode === 'single'
+            ? `导入「${esc(importing.presets[0].name)}」为一套新预设？现有预设不会被覆盖。`
+            : `导入 ${importing.presets.length} 套会覆盖现有 ${list.length} 套预设。`}</span>
+          <button class="mp-draw-side ${importing.mode === 'library' ? 'is-danger' : 'is-primary'}" data-act="reply-import-confirm" type="button">${importing.mode === 'single' ? '导入' : '覆盖'}</button>
+          <button class="mp-draw-side" data-act="reply-import-cancel" type="button">取消</button>
         </div>` : ''}
 
         <div class="mp-group-label" style="margin-top:14px">手机默认 · ${list.length} 套</div>
@@ -351,25 +530,30 @@ export const presetsApp = {
   },
 
   handle(ctx, act, data) {
-    if (act === 'reply-more') {
-      ctx.openSheet({
-        kind: 'pick',
-        title: '预设管理',
-        note: '导入导出的是整套预设，包含回复指令、条目和上下文开关',
-        items: [
-          { label: '导出预设', value: 'export', icon: 'book' },
-          { label: '导入预设', value: 'import', icon: 'refresh' },
-        ],
-        onPick: value => {
-          if (value === 'export') exportPresets(ctx);
-          if (value === 'import') importPresets(ctx);
-        },
-      });
+    if (act === 'reply-import') {
+      pickPresetFile(ctx);
+      return true;
+    }
+
+    if (act === 'reply-export') {
+      exportPresets(ctx);
+      return true;
+    }
+
+    if (act === 'reply-import-confirm') {
+      importConfirm(ctx);
+      return true;
+    }
+
+    if (act === 'reply-import-cancel') {
+      importing = null;
+      ctx.rerender();
       return true;
     }
 
     if (act === 'reply-new') {
       creating = true;
+      importing = null;
       ctx.rerender();
       return true;
     }
@@ -395,6 +579,7 @@ export const presetsApp = {
       ctx.state.settings.reply.activeId = preset.id;
       editingId = preset.id;
       creating = false;
+      importing = null;
       resetPreview();
       ctx.save();
       ctx.go('reply-item', { id: preset.id });
@@ -405,6 +590,7 @@ export const presetsApp = {
     if (act === 'reply-open') {
       editingId = String(data.id || '');
       creating = false;
+      importing = null;
       resetPreview();
       ctx.go('reply-item', { id: editingId });
       return true;
@@ -418,7 +604,9 @@ export const replyPresetApp = {
   id: 'reply-item', name: '回复预设', icon: 'reply',
 
   render(ctx, params = {}) {
+    bindPresetDrag(ctx);
     const id = String(params.id || editingId || '');
+    editingId = id;
     const preset = findPreset(ctx.state, id);
     if (!preset) return '<div class="mp-page-body"><div class="mp-empty">这套预设不在了。</div></div>';
     if (editingId !== preset.id) {
@@ -435,23 +623,22 @@ export const replyPresetApp = {
     const items = promptItems(preset);
     const contextCount = items.filter(item => item.kind === 'context').length;
     const itemRow = (item) => {
-      const index = items.indexOf(item);
       const isContext = item.kind === 'context';
       const openAct = isContext ? 'reply-context-open' : 'reply-item-open';
       const chars = charactersLabel(item);
+      const note = item.note ? ` · ${item.note}` : '';
       const sub = isContext
         ? `${roleLabel(item.role)} · ${item.enabled ? '已启用' : '已关闭'} · ${contextItemNote(item, context)}${chars ? ` · ${chars}` : ''}`
-        : `${roleLabel(item.role)} · ${item.enabled ? '已启用' : '已关闭'} · ${item.content.length} 字${chars ? ` · ${chars}` : ''}`;
+        : `${roleLabel(item.role)} · ${item.enabled ? '已启用' : '已关闭'} · ${item.content.length} 字${chars ? ` · ${chars}` : ''}${note}`;
       return `
-      <div class="mp-preset-item${isContext ? ' is-context' : ''}">
+      <div class="mp-preset-item${isContext ? ' is-context' : ''}" data-id="${esc(item.id)}">
+        <span class="mp-preset-grip" data-preset-grip title="按住拖动排序" aria-hidden="true">${icon('grip')}</span>
         <button class="mp-preset-item-main" data-act="${openAct}" data-id="${esc(item.id)}" type="button">
           <span class="mp-preset-item-label"><span class="mp-preset-name">${esc(item.label)}</span><span class="mp-preset-tag${isContext ? ' is-context' : item.kind === 'app' ? ' is-app' : ''}">${esc(itemKindLabel(item))}</span></span>
           <span class="mp-preset-item-sub">${esc(sub)}</span>
         </button>
         <div class="mp-preset-item-actions">
           <div class="mp-preset-item-tools">
-            <button class="mp-item-mini is-up" data-act="reply-item-up" data-id="${esc(item.id)}" type="button" title="上移"${index === 0 ? ' disabled' : ''}>${icon('chevron')}</button>
-            <button class="mp-item-mini" data-act="reply-item-down" data-id="${esc(item.id)}" type="button" title="下移"${index === items.length - 1 ? ' disabled' : ''}>${icon('chevron')}</button>
             ${item.deletable ? `<button class="mp-item-mini" data-act="reply-item-del" data-id="${esc(item.id)}" type="button" title="删除">${icon('trash')}</button>` : '<span class="mp-item-mini is-placeholder" aria-hidden="true"></span>'}
           </div>
           <button class="mp-item-switch" data-act="reply-item-toggle" data-id="${esc(item.id)}" type="button" title="${item.enabled ? '关闭' : '启用'}" role="switch" aria-label="${item.enabled ? '关闭' : '启用'}「${esc(item.label)}」" aria-checked="${item.enabled ? 'true' : 'false'}"><span class="mp-switch${item.enabled ? ' on' : ''}"></span></button>
@@ -464,6 +651,7 @@ export const replyPresetApp = {
       <div class="mp-nav mp-preset-nav">
         <button class="mp-back" data-act="back" type="button">${icon('back')}</button>
         <span style="flex:1"></span>
+        <button class="mp-icon-btn" data-act="reply-export-one" type="button" title="导出当前预设">${icon('upload')}</button>
         <button class="mp-icon-btn" data-act="reply-item-reset" type="button" title="恢复默认条目">${icon('refresh')}</button>
         <button class="mp-icon-btn" data-act="reply-del" type="button" title="删除">${icon('trash')}</button>
       </div>
@@ -595,14 +783,16 @@ export const replyPresetApp = {
     }
 
     if (act === 'reply-item-reset') {
+      const defaults = defaultReplyItems();
+      const contextCount = defaults.filter(item => item.kind === 'context').length;
       ctx.openSheet({
         kind: 'pick',
         title: '恢复默认条目',
-        note: '会恢复整套默认条目，包括 7 条上下文注入；主回复指令不动',
+        note: `会恢复 ${defaults.length} 条完整默认条目（含 ${contextCount} 条上下文注入）；主回复指令不动`,
         items: [{ label: '恢复默认条目', value: 'reset', icon: 'refresh', danger: true }],
         onPick: value => {
           if (value !== 'reset') return;
-          preset.items = defaultReplyItems();
+          preset.items = defaults;
           preset.context = normalizeReplyContext({});
           resetPreview();
           ctx.save();
@@ -810,6 +1000,11 @@ export const replyPresetApp = {
       return true;
     }
 
+    if (act === 'reply-export-one') {
+      exportCurrentPreset(ctx, preset);
+      return true;
+    }
+
     if (act === 'reply-del') {
       deleting = true;
       ctx.rerender();
@@ -855,21 +1050,6 @@ export const replyPresetApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(`${next.label}已${next.enabled ? '启用' : '关闭'}`);
-      return true;
-    }
-
-    if (act === 'reply-item-up' || act === 'reply-item-down') {
-      const items = promptItems(preset);
-      const index = items.findIndex(item => item.id === data.id);
-      const target = act === 'reply-item-up' ? index - 1 : index + 1;
-      if (index < 0 || target < 0 || target >= items.length) return true;
-      [items[index], items[target]] = [items[target], items[index]];
-      items.forEach((item, order) => { item.order = order; });
-      preset.items = items;
-      resetPreview();
-      ctx.save();
-      ctx.rerender();
-      ctx.toast('条目顺序已调整');
       return true;
     }
 

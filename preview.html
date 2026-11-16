@@ -3490,11 +3490,33 @@ body {
 .mp-root .mp-preset-item {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 0;
   min-height: 48px;
-  padding: 5px 6px 5px 12px;
+  padding: 5px 6px 5px 4px;
 }
 .mp-root .mp-preset-item:not(:last-child) { border-bottom: 1px solid var(--line); }
+.mp-root .mp-preset-grip {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-4);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.mp-root .mp-preset-grip .mp-i { width: 15px; height: 15px; }
+.mp-root .mp-preset-grip:active { cursor: grabbing; color: var(--accent); }
+.mp-root .mp-preset-item.is-dragging {
+  position: relative;
+  z-index: 2;
+  border-radius: 10px;
+  background: rgba(142, 123, 242, .07);
+  box-shadow: 0 6px 18px rgba(58, 45, 105, .12);
+  opacity: .9;
+}
 .mp-root .mp-preset-item-main {
   flex: 1;
   min-width: 0;
@@ -5565,6 +5587,24 @@ body {
   border-radius: 22px;
 }
 
+/* 列表组自己是一张玻璃卡，行只做分隔；嵌套 backdrop-filter 在部分浏览器会把行文字吃掉 */
+.mp-root[data-mp-skin="frost"] .mp-group-box {
+  background: rgba(251, 251, 252, .93);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.mp-root[data-mp-skin="frost"] .mp-group-box .mp-row {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.mp-root[data-mp-skin="frost"] .mp-group-box .mp-row + .mp-row {
+  margin-top: 0;
+  border-top: 1px solid rgba(60, 60, 67, .09);
+}
+
 .mp-root[data-mp-skin="frost"] :is(
   .mp-btn, .mp-btn.ghost, .mp-quick-btn, .mp-action-btn, .mp-chip-btn,
   .mp-sq-btn, .mp-draw-action, .mp-draw-side, .mp-ios-add, .mp-ios-memory-row,
@@ -6456,6 +6496,212 @@ body {
     __mods[id](module, module.exports, __req);
     return module.exports;
   }
+__mods["meme/preset-defaults.js"] = function(module, exports, __req){
+/**
+ * meme-phone · 默认聊天预设条目
+ *
+ * 来源：acsus-phone-standalone 的 getDefaultPresets()。
+ * 24 条原版内容全部保留；用户/角色/个签/表情/聊天记录/时间改成 meme 的上下文条目，
+ * 依赖 acsus 消息协议或当前手机尚未接入的条目默认关闭，但内容仍原样保留。
+ * 这里的 id 是稳定 id：导入、迁移和恢复默认都靠它对齐。
+ */
+
+const FULL_REPLY_ITEM_DEFS = [
+  {
+    "id": "reply_item_header",
+    "label": "头部",
+    "role": "system",
+    "enabled": true,
+    "content": "[任务:当前正在使用QQ]\n\n核心需求：用户与角色正在使用QQ交流，在保持角色设定的基础上，用线上聊天的状态回复\n\n## 执行优先级\n1. 首要：保持角色性格一致性\n2. 次要：执行QQ聊天格式要求\n3. 可选：根据情境执行主动行为\n4. 详细说明请查看:[QQ聊天任务]以及[QQ聊天行为要求]\n\n[/任务:当前正在使用QQ]"
+  },
+  {
+    "id": "reply_item_phone_task",
+    "label": "QQ聊天任务",
+    "role": "system",
+    "enabled": true,
+    "content": "[QQ聊天任务]\n还原:碎片化/随意的交流氛围/即时与非即时性\n分多个气泡回复，营造打字间隔感\n对话呈现未完成的、可继续延伸的状态\n由文字内容、表情符号、图片语音、标点语气、在线状态、回复速度多种元素构成，并叠加角色的独特个性创造线上互动情节\n\n特点:\n  - 频繁的互动反馈\n  - 非正式用语\n  - 表情包\n  - 标点符号的情感化\n  - 颜文字/emoji\n  - 语气词/叠词\n  - 话题跳跃性\n  - 聊天的随意性\n  - 网络用语和缩写\n  - 情景的即时分享\n  - 网状而非线性话题\n  ...\n[/QQ聊天任务]"
+  },
+  {
+    "id": "reply_item_behavior",
+    "label": "QQ聊天行为要求",
+    "role": "system",
+    "enabled": true,
+    "content": "[QQ聊天行为要求]\n在符合角色性格的前提下，每次回复时适当选择执行以下1-2项（避免超过3项）：\n  1. 主动分享：今天遇到的事/看到的东西/突然想起的事\n  2. 主动提问：关心用户状态/询问用户想法/发起新话题\n  3. 情绪表达：发送戳一戳/修改个签/单独发表情包\n  4. 闲聊引子：吐槽天气/无聊找人聊/分享图片或见闻\n  ...\n\n执行方式：\n  - 不要只回答用户问题后结束\n  - 在回答后自然延伸1-2条新内容\n  - 根据角色性格选择合适的行为\n  - 不必每次都执行，简单回复后等待也是正常的\n\n禁止：\n  - 不要在不符合角色性格时强行主动\n  - 不要每次都追问或每次都主动分享\n[/QQ聊天行为要求]"
+  },
+  {
+    "context": "user",
+    "label": "用户角色设定",
+    "enabled": true
+  },
+  {
+    "context": "signature",
+    "label": "个签历史 - 用户个性签名",
+    "enabled": true
+  },
+  {
+    "context": "character",
+    "label": "角色档案 - 人设、历史记录、线下剧情等",
+    "enabled": true
+  },
+  {
+    "id": "reply_item_phone_records",
+    "label": "手机相关记录 - 占位符",
+    "role": "system",
+    "enabled": false,
+    "content": "空间动态、转账记录等",
+    "note": "占位条目 · 原版默认关闭"
+  },
+  {
+    "context": "emoji",
+    "label": "表情包库",
+    "enabled": true
+  },
+  {
+    "context": "history",
+    "label": "QQ聊天记录 - 最新消息",
+    "enabled": true
+  },
+  {
+    "id": "reply_item_favorites",
+    "label": "收藏夹消息",
+    "role": "system",
+    "enabled": true,
+    "content": "[收藏夹消息]\n收藏夹是QQ软件的一个功能，用户可以把喜欢的对话消息加入收藏\n用户可以在对话过程中发送自己收藏夹内的收藏消息给角色\n收藏的消息可能是自己的、也可能是和某个角色的。\n[/收藏夹消息]"
+  },
+  {
+    "id": "reply_item_plans",
+    "label": "约定计划",
+    "role": "system",
+    "enabled": false,
+    "content": "[约定计划]\n\n## 角色发起计划\n当角色想和用户约定\"线下一起做某事\"时，可以发起计划\n\n格式：[约定计划]计划内容概括\n\n发起后：\n  - 用户会看到计划邀请，可以接受或拒绝\n  - 接受后会执行计划，系统会告知结果\n  - 角色根据结果继续聊天\n\n注意：\n  - 计划标题简洁明确\n  - 一次聊天不要发起太多计划\n\n---\n\n## 用户发起计划时，角色如何回应\n当用户发起约定计划（格式：[约定计划]xxx）时：\n\n角色可以接受或拒绝该计划，必须使用以下格式：\n- 接受：[引用]#编号[回复][约定计划]{{char}}接受了约定计划\n- 拒绝：[引用]#编号[回复][约定计划]{{char}}拒绝了约定计划\n\n注意：\n  - 接受后系统会自动掷骰子生成剧情结果\n  - 不需要自己编造剧情过程，系统会处理\n\n[/约定计划]",
+    "note": "原版约定计划协议 · 当前手机未接入"
+  },
+  {
+    "id": "reply_item_signature_edit",
+    "label": "修改个性签名",
+    "role": "system",
+    "enabled": false,
+    "content": "[修改个性签名]\n角色可以随时修改自己的个性签名\n\n格式：[改个签]新个签内容\n\n注意：\n  - 字数限制80字符以内\n  - 单独一个气泡，不能和文字同气泡\n  - 会保留历史记录，用户可查看签名墙\n  - 用户可以对角色历史个签点赞、评论\n[/修改个性签名]",
+    "note": "原版改个签协议 · 当前手机未接入"
+  },
+  {
+    "id": "reply_item_poke",
+    "label": "戳一戳消息",
+    "role": "system",
+    "enabled": false,
+    "content": "[戳一戳消息]\n角色可以发送戳一戳（QQ特有的交互方式，会震动手机）\n\n格式：[戳一戳]\n\n注意：\n  - 戳一戳是独立的一个气泡，不能和文字同气泡，必须换行使用\n[/戳一戳消息]",
+    "note": "原版戳一戳协议 · 当前手机未接入"
+  },
+  {
+    "id": "reply_item_recall",
+    "label": "撤回消息",
+    "role": "system",
+    "enabled": false,
+    "content": "[撤回消息]\n角色可以在发送消息后立即撤回（显示\"撤回了一条消息\"）\n\n格式：[撤回]原消息内容\n\n使用场景：\n  - 说错话/发错人/打错字后更改\n  - 欲言又止/试探/制造悬念/故意(故意让对方看到一眼又撤回)\n  - 信息泄露\n  - 冲动后后悔/情绪失控后收回\n  ...\n\n注意：\n  - 撤回本身也能传递信息和表达情感（\"为什么撤回？\"）\n  - 需要撤回的消息前加[撤回]即可，无需重复发送两次\n\n[/撤回消息]",
+    "note": "原版撤回协议 · 当前手机未接入"
+  },
+  {
+    "id": "reply_item_quote",
+    "label": "引用消息",
+    "role": "system",
+    "enabled": false,
+    "content": "[引用消息]\n在聊天记录中，每条消息都有临时编号前缀（如 #1、#2、#3）\n角色可以使用编号前缀来引用某条的消息\n\n格式：[引用]#编号[回复]回复内容\n示例：[引用]#3[回复]有空啊，一起出去玩吧！\n\n使用场景：\n  - 回应特定的某条消息\n  - 澄清指代关系\n  - 强调或重提之前的话题\n  - 可以引用对方的消息，也可以引用自己之前说的\n  ...\n\n注意：\n  - [回复]后面必须有实际内容，不能为空\n  - 如果不知道回复什么，就不要用引用格式\n\n[重要格式修正]\n检测到历史聊天记录中存在因软件抓取导致的格式错误（表现为：`[引用]原文内容` 或 `[引用][不支持的类型]`）。\n> 请务必忽略上述历史错误示范！\n> 在生成新回复时，必须强制纠正为标准格式：`[引用]#编号[回复]`。\n> 严禁模仿历史记录中的错误引用格式。\n[/重要格式修正]\n\n[/引用消息]",
+    "note": "原版引用协议 · 当前手机未接入"
+  },
+  {
+    "id": "reply_item_transfer",
+    "label": "转账",
+    "role": "system",
+    "enabled": false,
+    "content": "[转账]\n角色可以在聊天中向用户转账\n**格式作用：角色给用户转钱（角色付 → 用户收）**\n\n格式：[转账]金额|留言\n示例：[转账]100|生日快乐！\n\n注意：\n  - 当角色发送此格式时，是角色花自己的钱给用户\n  - 如果是\"角色需要用户付钱给自己\"，**不发此格式**\n  - 转账金额根据角色经济情况合理判断\n  - 转账留言可以体现角色性格\n[/转账]",
+    "note": "原版转账协议 · 当前手机未接入"
+  },
+  {
+    "id": "reply_item_membership",
+    "label": "会员",
+    "role": "system",
+    "enabled": false,
+    "content": "[会员]\n角色可以给用户送会员，或给自己开会员\n\n送会员（角色花钱给用户开会员）\n格式：[送会员]VIP/1个月 或 [送会员]SVIP/12个月\n说明：\n  - VIP月付18元，年付108元\n  - SVIP月付36元，年付216元\n  - 用 `/` 或 `|` 分隔都可以\n  - 这会花费角色的钱，给用户开通会员\n\n开会员（角色给自己开会员）\n格式：[开会员]VIP/1个月 或 [开会员]SVIP/12个月\n说明：\n  - 角色可以给自己开会员\n  - 会显示在聊天页中\n  ...\n[/会员]",
+    "note": "原版会员协议 · 当前手机未接入"
+  },
+  {
+    "id": "reply_item_detail",
+    "label": "关注用户的消息细节",
+    "role": "system",
+    "enabled": true,
+    "content": "[关注用户的消息细节]\n关注:发送间隔/标点符号/表情包频率 的变化\n\n信号:\n  - 回复间隔变长\n  - 突然加句号`。`\n  - 表情包减少/增多\n  - 短句变多/变少\n  ...\n\n根据这些调整角色回应的语气和关心程度\n\n角色是否察觉？\n察觉后如何反应：直接询问？试探？沉默？转移话题？还是无声调整语气？\n还是保持边界感，等用户主动说？\n\n反应取决于：角色性格/关系亲疏/当前氛围\n[/关注用户的消息细节]"
+  },
+  {
+    "context": "time",
+    "label": "时间信息",
+    "enabled": true
+  },
+  {
+    "id": "reply_item_pending_ops",
+    "label": "用户当前操作提醒",
+    "role": "user",
+    "enabled": false,
+    "content": "",
+    "note": "原版内容为空 · 默认关闭"
+  },
+  {
+    "id": "reply_item_tasklist",
+    "label": "用户操作 - 本轮任务清单",
+    "role": "system",
+    "enabled": false,
+    "content": "[本轮任务清单]\n[{{user}}本轮操作]：此处动态显示用户本轮给哪些联系人发送了什么消息\n\n重要：\n- 根据清单生成每个角色的回复\n[/本轮任务清单]",
+    "note": "原版多会话任务清单 · 当前手机未接入"
+  },
+  {
+    "id": "reply_item_chinese",
+    "label": "中文回复",
+    "role": "system",
+    "enabled": true,
+    "content": "角色必须中文回复"
+  },
+  {
+    "id": "reply_item_format",
+    "label": "回复格式要求",
+    "role": "system",
+    "enabled": true,
+    "content": "[回复格式要求]\n只输出角色要发的那一条消息。不要加角色名、时间、序号、冒号，也不要写旁白、括号动作或场景描写。\n[/回复格式要求]",
+    "deletable": false
+  },
+  {
+    "context": "lorebook",
+    "label": "人设世界书",
+    "enabled": true
+  },
+  {
+    "context": "memory",
+    "label": "酒馆记忆",
+    "enabled": true
+  },
+  {
+    "context": "scene",
+    "label": "场景信息",
+    "enabled": true
+  },
+  {
+    "id": "reply_item_qq_format",
+    "label": "QQ 回复格式（原版）",
+    "role": "system",
+    "enabled": false,
+    "content": "##回复格式示例：\n\n单个角色回复：\n[角色-角色名]\n[消息]\n第一条消息（一行 = 一个气泡）\n第二条消息\n[图片]图片描述（如需发送图片）\n\n多个角色回复（同时给多个角色发送消息时）：\n[角色-角色A]\n[消息]\n回复内容\n\n[角色-角色B]\n[消息]\n回复内容\n\n#格式规则：\n- 必须用 [角色-角色名] 标记角色身份\n- 必须用 [消息] 标记消息内容开始\n- 每行一个气泡，空行会被忽略\n- 遇到下一个 [角色-] 或文本结束时自动结束当前消息块\n- 无需添加前缀、时间戳、序号\n\n#说明：\n每个角色只看到自己对话窗口的内容\n内容仿照即时通讯APP，例如QQ 微信的互动模式，无需描述现实场景\n\n**重要：格式错误会导致手机无法显示！**",
+    "note": "原版多角色格式 · 当前手机未接入"
+  },
+  {
+    "id": "reply_item_footer",
+    "label": "尾部",
+    "role": "user",
+    "enabled": true,
+    "content": "请保持QQ线上交流风格，并使用正确格式进行回复。",
+    "deletable": false
+  }
+];
+
+exports["FULL_REPLY_ITEM_DEFS"] = FULL_REPLY_ITEM_DEFS;
+};
 __mods["meme/data.js"] = function(module, exports, __req){
 /**
  * meme-phone · 数据模型
@@ -6464,6 +6710,8 @@ __mods["meme/data.js"] = function(module, exports, __req){
  * 数据结构刻意保持扁平，避免旧版那种「十个模块共享一个巨型对象、谁都改它」的局面。
  */
 
+const { FULL_REPLY_ITEM_DEFS } = __req("meme/preset-defaults.js");
+
 const SCHEMA_VERSION = 1;
 
 /* 回复预设除了「怎么说」，还要决定「给模型看哪些上下文」。
@@ -6471,6 +6719,8 @@ const SCHEMA_VERSION = 1;
 const DEFAULT_REPLY_CONTEXT = {
   character: true,
   user: true,
+  signature: true,
+  emoji: true,
   lorebook: true,
   memory: true,
   scene: true,
@@ -6494,6 +6744,8 @@ function normalizeReplyContext(raw) {
   return {
     character: source.character !== false,
     user: source.user !== false,
+    signature: source.signature !== false,
+    emoji: source.emoji !== false,
     lorebook: source.lorebook !== false,
     memory: source.memory !== false,
     scene: source.scene !== false,
@@ -6509,7 +6761,7 @@ function normalizeReplyContext(raw) {
 /* 旧 QQ 预设把上下文注入也做成列表里的条目，而不是列表下面的一组开关：
  * 用户设定、角色档案、聊天记录、时间信息各自有 role 和顺序，能单独开关、能排序。
  * 这里沿用同一套做法，新增 kind:'context' + auto 字段；内容是运行时从手机/酒馆读取的。 */
-const REPLY_CONTEXT_KEYS = ['user', 'character', 'lorebook', 'memory', 'scene', 'history', 'time'];
+const REPLY_CONTEXT_KEYS = ['user', 'signature', 'character', 'lorebook', 'memory', 'scene', 'emoji', 'history', 'time'];
 
 const REPLY_CONTEXT_SPECS = {
   user: {
@@ -6520,12 +6772,20 @@ const REPLY_CONTEXT_SPECS = {
     note: '我的名字和设定',
     hintOrder: 1.51,
   },
+  signature: {
+    id: 'reply_context_signature',
+    label: '个签历史 - 用户个性签名',
+    role: 'system',
+    content: '__AUTO_SIGNATURE_HISTORY__',
+    note: '当前签名；没有历史回退',
+    hintOrder: 1.515,
+  },
   character: {
     id: 'reply_context_character',
     label: '角色档案',
     role: 'system',
     content: '__AUTO_CHARACTERS__',
-    note: '人设、性格和场景',
+    note: '角色卡的人设和性格',
     hintOrder: 1.52,
   },
   lorebook: {
@@ -6552,6 +6812,14 @@ const REPLY_CONTEXT_SPECS = {
     note: '角色卡里的场景',
     hintOrder: 1.55,
   },
+  emoji: {
+    id: 'reply_context_emoji',
+    label: '表情包库',
+    role: 'system',
+    content: '__AUTO_EMOJI_LIBRARY__',
+    note: '当前表情面板里的表情',
+    hintOrder: 1.565,
+  },
   history: {
     id: 'reply_context_history',
     label: '手机聊天记录',
@@ -6565,7 +6833,7 @@ const REPLY_CONTEXT_SPECS = {
     label: '时间信息',
     role: 'system',
     content: '__AUTO_TIME__',
-    note: '日期、星期和时间',
+    note: '日期、星期和时间（天气未接入）',
     hintOrder: 1.57,
   },
 };
@@ -6589,59 +6857,55 @@ function contextItem(key, overrides = {}) {
   };
 }
 
-/** 旧 QQ 预设里的固定提示词条目；这些是「怎么说」的补充，不替代聊天气泡本身。 */
+/** 完整默认条目：acsus 24 条 + meme 的世界书/记忆/场景 + 一条本机格式兜底。 */
 function defaultReplyItems() {
-  return [
-    {
-      id: 'reply_item_phone_task',
-      label: '手机聊天任务',
-      role: 'system',
-      content: '[手机聊天任务]\n这是手机上的即时聊天，不是小说。消息要短，像随手打出来的，可以分成几条。\n不要描写动作、场景和心理活动，也不要用括号、旁白或角色名前缀。\n[/手机聊天任务]',
-      enabled: true, editable: true, deletable: true, order: 0,
-    },
-    {
-      id: 'reply_item_behavior',
-      label: '聊天行为要求',
-      role: 'system',
-      content: '[聊天行为要求]\n在符合角色性格的前提下，回复后可以自然延伸一点：追问一句、分享一件小事，或者停一下等对方。\n不要每次都追问，也不要在不合适的时候强行主动。\n[/聊天行为要求]',
-      enabled: true, editable: true, deletable: true, order: 1,
-    },
-    contextItem('user', { order: 2 }),
-    contextItem('character', { order: 3 }),
-    contextItem('lorebook', { order: 4 }),
-    contextItem('memory', { order: 5 }),
-    contextItem('scene', { order: 6 }),
-    contextItem('history', { order: 7 }),
-    contextItem('time', { order: 8 }),
-    {
-      id: 'reply_item_detail',
-      label: '关注消息细节',
-      role: 'system',
-      content: '[关注消息细节]\n留意对方消息里的停顿、标点和长短变化，判断对方的状态。\n不要直接点破，用语气和关心程度自然回应。\n[/关注消息细节]',
-      enabled: true, editable: true, deletable: true, order: 9,
-    },
-    {
-      id: 'reply_item_chinese',
-      label: '中文回复',
-      role: 'system',
-      content: '角色必须用中文回复。',
-      enabled: true, editable: true, deletable: true, order: 10,
-    },
-    {
-      id: 'reply_item_format',
-      label: '回复格式要求',
-      role: 'system',
-      content: '[回复格式要求]\n只输出角色要发的那一条消息。不要加角色名、时间、序号、冒号，也不要写旁白、括号动作或场景描写。\n[/回复格式要求]',
-      enabled: true, editable: true, deletable: false, order: 11,
-    },
-    {
-      id: 'reply_item_footer',
-      label: '尾部',
-      role: 'user',
-      content: '请保持手机上的聊天语气，只输出一条回复。',
-      enabled: true, editable: true, deletable: false, order: 12,
-    },
-  ];
+  return FULL_REPLY_ITEM_DEFS.map((def, index) => {
+    if (def.context) {
+      return contextItem(def.context, {
+        label: def.label,
+        enabled: def.enabled !== false,
+        order: index,
+      });
+    }
+    return {
+      id: def.id,
+      label: def.label,
+      role: def.role,
+      kind: 'chat',
+      auto: '',
+      app: '',
+      characters: [],
+      content: String(def.content || ''),
+      enabled: def.enabled !== false,
+      editable: true,
+      deletable: def.deletable !== false,
+      note: String(def.note || ''),
+      order: index,
+    };
+  });
+}
+
+/** 旧版三套内置预设的 13 条默认条目；只用于一次性升级，用户自建预设不动。 */
+const LEGACY_DEFAULT_ITEM_IDS = [
+  'reply_item_phone_task',
+  'reply_item_behavior',
+  'reply_context_user',
+  'reply_context_character',
+  'reply_context_lorebook',
+  'reply_context_memory',
+  'reply_context_scene',
+  'reply_context_history',
+  'reply_context_time',
+  'reply_item_detail',
+  'reply_item_chinese',
+  'reply_item_format',
+  'reply_item_footer',
+];
+
+function isLegacyDefaultReplyItems(items) {
+  if (!Array.isArray(items) || items.length !== LEGACY_DEFAULT_ITEM_IDS.length) return false;
+  const ids = items.map(item => String(item?.id || ''));
+  return ids.every(id => LEGACY_DEFAULT_ITEM_IDS.includes(id));
 }
 
 /** 条目适用的角色卡：空数组 = 全部角色；最多 12 个，去重。 */
@@ -6669,6 +6933,7 @@ function normalizeReplyItems(raw, rawContext) {
       return {
         ...contextItem(auto),
         id: spec.id,
+        label: String(item?.label || '').trim().slice(0, 30) || spec.label,
         enabled: item?.enabled !== undefined ? item.enabled !== false : context[auto] !== false,
         characters: normalizeCharacters(item?.characters),
         order: Number.isFinite(order) ? order : spec.hintOrder,
@@ -6688,6 +6953,7 @@ function normalizeReplyItems(raw, rawContext) {
       enabled: item?.enabled !== false,
       editable: item?.editable !== false,
       deletable: item?.deletable !== false,
+      note: String(item?.note || '').trim().slice(0, 60),
       order: Number.isFinite(order) ? order : index,
     };
   }).filter(Boolean);
@@ -7554,12 +7820,14 @@ function normalize(raw) {
     let id = String(item.id || `reply_${index + 1}`).trim().slice(0, 40);
     if (!id || seenReplyIds.has(id)) id = `reply_${index + 1}_${seenReplyIds.size}`;
     seenReplyIds.add(id);
+    const builtInId = ['reply_natural', 'reply_short', 'reply_soft'].includes(id);
+    const upgrade = builtInId && isLegacyDefaultReplyItems(item.items);
     replyPresets.push({
       id,
       name: String(item.name || '').trim().slice(0, 20) || `预设 ${index + 1}`,
       text: String(item.text || '').trim().slice(0, 3000),
       context: normalizeReplyContext(item.context),
-      items: normalizeReplyItems(item.items, item.context),
+      items: upgrade ? defaultReplyItems() : normalizeReplyItems(item.items, item.context),
     });
   });
   merged.settings.reply = {
@@ -9196,6 +9464,9 @@ const P = {
   play: '<path d="M8.4 5.8 18 12l-9.6 6.2z"/>',
   pause: '<path d="M9 6.4v11.2M15 6.4v11.2"/>',
   next: '<path d="M7 5.8 15.2 12 7 18.2z"/><path d="M18 5.6v12.8"/>',
+  download: '<path d="M12 4.8v9.8"/><path d="M8.2 10.8 12 14.6l3.8-3.8"/><path d="M5.4 18.4h13.2"/>',
+  upload: '<path d="M12 19.2V9.4"/><path d="M8.2 13.2 12 9.4l3.8 3.8"/><path d="M5.4 5.6h13.2"/>',
+  grip: '<circle cx="9" cy="7" r=".9"/><circle cx="15" cy="7" r=".9"/><circle cx="9" cy="12" r=".9"/><circle cx="15" cy="12" r=".9"/><circle cx="9" cy="17" r=".9"/><circle cx="15" cy="17" r=".9"/>',
 };
 
 function icon(name, className = '') {
@@ -9241,6 +9512,7 @@ const ICON_LABELS = {
   clock: '时钟', moon: '月亮', sun: '太阳', image: '图片',
   pin: '定位', bell: '铃铛', code: '代码', book: '书本',
   music: '音符', play: '播放', pause: '暂停', next: '下一首',
+  download: '下载', upload: '上传', grip: '拖动排序',
 };
 
 /** 桌面与 Dock 上所有可换图标的 App。 */
@@ -18205,7 +18477,40 @@ let editingId = '';
 let creating = false;
 let renaming = false;
 let deleting = false;
+let importing = null;
 let preview = { presetId: '', tab: 'messages', chatId: '', loading: false, error: '', data: null, flat: '' };
+
+const EXTERNAL_CONTEXT_IDS = {
+  'user-persona': 'user',
+  'signature-history': 'signature',
+  'char-info': 'character',
+  'emoji-library': 'emoji',
+  'chat-history': 'history',
+  'custom-1761560957639': 'time',
+};
+
+const EXTERNAL_CONTEXT_TOKENS = {
+  __AUTO_USER_PERSONA__: 'user',
+  __AUTO_SIGNATURE_HISTORY__: 'signature',
+  __AUTO_CHARACTERS__: 'character',
+  __AUTO_EMOJI_LIBRARY__: 'emoji',
+  __AUTO_CHAT_HISTORY__: 'history',
+  __AUTO_TIME__: 'time',
+};
+
+/** 导入外部单套预设：把 acsus 的固定 id 映射成 meme 的上下文条目。 */
+function prepareExternalItems(rawItems) {
+  if (!Array.isArray(rawItems)) return [];
+  return rawItems.map((item, index) => {
+    if (!item || typeof item !== 'object') return item;
+    const content = String(item.content || '');
+    const auto = EXTERNAL_CONTEXT_IDS[String(item.id || '')]
+      || Object.entries(EXTERNAL_CONTEXT_TOKENS).find(([token]) => content.includes(token))?.[1]
+      || '';
+    if (!auto) return { ...item, order: index };
+    return { ...item, kind: 'context', auto, order: index };
+  });
+}
 
 function resetPreview() {
   preview = { presetId: '', tab: preview.tab || 'messages', chatId: preview.chatId || '', loading: false, error: '', data: null, flat: '' };
@@ -18421,6 +18726,18 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
   });
 }
 
+function downloadJson(payload, filename) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function exportPresets(ctx) {
   const payload = {
     version: 1,
@@ -18434,61 +18751,184 @@ function exportPresets(ctx) {
       items: promptItems(preset),
     })),
   };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `meme-phone-presets-${Date.now()}.json`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadJson(payload, `meme-phone-presets-${Date.now()}.json`);
   ctx.toast('预设已导出');
 }
 
-function importPresets(ctx) {
+/** 单套导出：保留参考项目能直接读取的 items 字段。 */
+function exportCurrentPreset(ctx, preset) {
+  const payload = {
+    name: preset.name,
+    text: String(preset.text || ''),
+    context: normalizeReplyContext(preset.context),
+    items: promptItems(preset).map(item => ({
+      id: item.id,
+      label: item.label,
+      role: item.role,
+      content: item.content,
+      enabled: item.enabled,
+      editable: item.editable,
+      deletable: item.deletable,
+      order: item.order,
+      ...(item.kind === 'context' ? { kind: 'context', auto: item.auto } : {}),
+      ...(item.note ? { note: item.note } : {}),
+    })),
+  };
+  downloadJson(payload, `meme-phone-preset-${preset.id || Date.now()}.json`);
+  ctx.toast(`已导出「${preset.name || '当前预设'}」`);
+}
+
+function normalizeImportedPreset(item, index, seen) {
+  let id = String(item?.id || newId('reply'));
+  if (seen.has(id)) id = `${id}_${index}`;
+  seen.add(id);
+  const rawItems = prepareExternalItems(item?.items);
+  return {
+    id,
+    name: String(item?.name || '').trim().slice(0, 20) || `导入预设 ${index + 1}`,
+    text: String(item?.text || '').trim().slice(0, 3000),
+    context: normalizeReplyContext(item?.context),
+    items: rawItems.length ? normalizeReplyItems(rawItems, item?.context) : [],
+  };
+}
+
+function pickPresetFile(ctx) {
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.json';
+  input.accept = '.json,application/json';
   input.onchange = async () => {
     const file = input.files?.[0];
     if (!file) return;
     try {
       const raw = JSON.parse(await file.text());
+      const single = !Array.isArray(raw) && Array.isArray(raw?.items) ? raw : null;
+      if (single) {
+        const preset = normalizeImportedPreset(single, 0, new Set());
+        if (!preset.items.length) throw new Error('items 里没有条目');
+        importing = { mode: 'single', presets: [preset], fileName: file.name };
+        ctx.rerender();
+        return;
+      }
       const list = Array.isArray(raw) ? raw : (raw?.presets || raw?.reply?.presets || []);
       if (!Array.isArray(list) || !list.length) throw new Error('没有找到预设列表');
       const seen = new Set();
-      const next = list.slice(0, 20).map((item, index) => {
-        let id = String(item.id || newId('reply'));
-        if (seen.has(id)) id = `${id}_${index}`;
-        seen.add(id);
-        return {
-          id,
-          name: String(item.name || '').trim().slice(0, 20) || `导入预设 ${index + 1}`,
-          text: String(item.text || '').trim().slice(0, 3000),
-          context: normalizeReplyContext(item.context),
-          items: normalizeReplyItems(item.items, item.context),
-        };
-      });
-      ctx.openSheet({
-        kind: 'pick',
-        title: '导入回复预设',
-        note: `导入 ${next.length} 套会覆盖手机现有的 ${replyPresetsOf(ctx.state).length} 套`,
-        items: [{ label: '覆盖导入', value: 'import', icon: 'refresh', danger: true }],
-        onPick: value => {
-          if (value !== 'import') return;
-          ctx.state.settings.reply.presets = next;
-          ctx.state.settings.reply.activeId = next[0].id;
-          ctx.save();
-          ctx.go('app-presets');
-          ctx.toast(`已导入 ${next.length} 套预设`);
-        },
-      });
+      const presets = list.slice(0, 20)
+        .map((item, index) => normalizeImportedPreset(item, index, seen))
+        .filter(preset => preset.items.length);
+      if (!presets.length) throw new Error('没有可用条目');
+      importing = { mode: 'library', presets, fileName: file.name };
+      ctx.rerender();
     } catch (error) {
       ctx.toast(`导入失败：${error?.message || '文件格式不对'}`);
     }
   };
   input.click();
+}
+
+function importConfirm(ctx) {
+  if (!importing?.presets?.length) return;
+  const next = importing.presets;
+  if (importing.mode === 'single') {
+    ctx.state.settings.reply.presets.push(next[0]);
+    importing = null;
+    editingId = next[0].id;
+    resetPreview();
+    ctx.save();
+    ctx.go('reply-item', { id: next[0].id });
+    ctx.toast(`已导入「${next[0].name}」`);
+    return;
+  }
+  ctx.state.settings.reply.presets = next;
+  ctx.state.settings.reply.activeId = next[0].id;
+  importing = null;
+  resetPreview();
+  ctx.save();
+  ctx.go('app-presets');
+  ctx.toast(`已导入 ${next.length} 套预设`);
+}
+
+const dragBoundRoots = new WeakSet();
+let dragState = null;
+
+/** 条目拖拽排序：不引依赖，用指针事件 + DOM 插入。 */
+function bindPresetDrag(ctx) {
+  const root = ctx.shell?.root;
+  if (!root || dragBoundRoots.has(root)) return;
+  dragBoundRoots.add(root);
+
+  root.addEventListener('pointerdown', event => {
+    const grip = event.target?.closest?.('.mp-preset-grip');
+    if (!grip || (event.button !== undefined && event.button !== 0)) return;
+    const row = grip.closest('.mp-preset-item');
+    const list = grip.closest('.mp-preset-list');
+    if (!row || !list) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragState = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      moved: false,
+      row,
+      list,
+      grip,
+      body: list.closest('.mp-page-body'),
+      presetId: editingId,
+    };
+    row.classList.add('is-dragging');
+    document.body.style.cursor = 'grabbing';
+    grip.setPointerCapture?.(event.pointerId);
+  }, true);
+
+  window.addEventListener('pointermove', event => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    event.preventDefault();
+    if (Math.abs(event.clientY - dragState.startY) > 4) dragState.moved = true;
+
+    const rows = [...dragState.list.querySelectorAll('.mp-preset-item')]
+      .filter(row => row !== dragState.row);
+    const before = rows.find(row => {
+      const rect = row.getBoundingClientRect();
+      return event.clientY < rect.top + rect.height / 2;
+    });
+    if (before) dragState.list.insertBefore(dragState.row, before);
+    else dragState.list.appendChild(dragState.row);
+
+    const body = dragState.body;
+    if (body) {
+      const rect = body.getBoundingClientRect();
+      if (event.clientY < rect.top + 54) body.scrollTop -= 14;
+      else if (event.clientY > rect.bottom - 54) body.scrollTop += 14;
+    }
+  }, { passive: false });
+
+  const endDrag = event => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    const state = dragState;
+    dragState = null;
+    state.row.classList.remove('is-dragging');
+    document.body.style.cursor = '';
+    state.grip.releasePointerCapture?.(event.pointerId);
+    if (!state.moved) return;
+
+    const preset = findPreset(ctx.state, state.presetId);
+    if (!preset) return;
+    const items = promptItems(preset);
+    if (!items.length) return;
+    const ids = [...state.list.querySelectorAll('.mp-preset-item')].map(row => row.dataset.id);
+    const byId = new Map(items.map(item => [item.id, item]));
+    const next = ids.map(id => byId.get(id)).filter(Boolean);
+    items.forEach(item => {
+      if (!ids.includes(item.id)) next.push(item);
+    });
+    next.forEach((item, index) => { item.order = index; });
+    preset.items = next;
+    resetPreview();
+    ctx.save();
+    ctx.rerender();
+    ctx.toast('条目顺序已调整');
+  };
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
 }
 
 function findPreset(state, id) {
@@ -18515,12 +18955,14 @@ const presetsApp = {
       </button>`).join('');
 
     return `
+      <div class="mp-nav mp-preset-nav">
+        <button class="mp-back" data-act="back" type="button">${icon('back')}<span>预设</span></button>
+        <span style="flex:1"></span>
+        <button class="mp-icon-btn" data-act="reply-import" type="button" aria-label="导入预设" title="导入预设">${icon('download')}</button>
+        <button class="mp-icon-btn" data-act="reply-export" type="button" aria-label="导出预设" title="导出预设">${icon('upload')}</button>
+        <button class="mp-icon-btn" data-act="reply-new" type="button" aria-label="新建预设" title="新建预设">${icon('plus')}</button>
+      </div>
       <div class="mp-page-body">
-        <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <span style="flex:1"></span>
-          <button class="mp-icon-btn" data-act="reply-more" type="button" aria-label="导入导出">${icon('more')}</button>
-          <button class="mp-icon-btn" data-act="reply-new" type="button" aria-label="新建预设">${icon('plus')}</button>
-        </div>
         <div class="mp-subtitle">回复预设：一套预设就是一条条提示词：回复指令、聊天行为、其他软件、上下文注入都在同一个列表里，能开关能排序</div>
 
         ${creating ? `
@@ -18528,6 +18970,15 @@ const presetsApp = {
           <input id="mpReplyNewName" class="mp-api-input" type="text" maxlength="20" value="${esc(`${active?.name || '预设'} 副本`)}" placeholder="新预设叫什么">
           <button class="mp-draw-side is-primary" data-act="reply-new-save" type="button">创建</button>
           <button class="mp-draw-side" data-act="reply-new-cancel" type="button">取消</button>
+        </div>` : ''}
+
+        ${importing ? `
+        <div class="mp-group mp-api-inline${importing.mode === 'library' ? ' is-danger' : ''}" style="margin-top:12px">
+          <span class="mp-row-name" style="flex:1">${importing.mode === 'single'
+            ? `导入「${esc(importing.presets[0].name)}」为一套新预设？现有预设不会被覆盖。`
+            : `导入 ${importing.presets.length} 套会覆盖现有 ${list.length} 套预设。`}</span>
+          <button class="mp-draw-side ${importing.mode === 'library' ? 'is-danger' : 'is-primary'}" data-act="reply-import-confirm" type="button">${importing.mode === 'single' ? '导入' : '覆盖'}</button>
+          <button class="mp-draw-side" data-act="reply-import-cancel" type="button">取消</button>
         </div>` : ''}
 
         <div class="mp-group-label" style="margin-top:14px">手机默认 · ${list.length} 套</div>
@@ -18542,25 +18993,30 @@ const presetsApp = {
   },
 
   handle(ctx, act, data) {
-    if (act === 'reply-more') {
-      ctx.openSheet({
-        kind: 'pick',
-        title: '预设管理',
-        note: '导入导出的是整套预设，包含回复指令、条目和上下文开关',
-        items: [
-          { label: '导出预设', value: 'export', icon: 'book' },
-          { label: '导入预设', value: 'import', icon: 'refresh' },
-        ],
-        onPick: value => {
-          if (value === 'export') exportPresets(ctx);
-          if (value === 'import') importPresets(ctx);
-        },
-      });
+    if (act === 'reply-import') {
+      pickPresetFile(ctx);
+      return true;
+    }
+
+    if (act === 'reply-export') {
+      exportPresets(ctx);
+      return true;
+    }
+
+    if (act === 'reply-import-confirm') {
+      importConfirm(ctx);
+      return true;
+    }
+
+    if (act === 'reply-import-cancel') {
+      importing = null;
+      ctx.rerender();
       return true;
     }
 
     if (act === 'reply-new') {
       creating = true;
+      importing = null;
       ctx.rerender();
       return true;
     }
@@ -18586,6 +19042,7 @@ const presetsApp = {
       ctx.state.settings.reply.activeId = preset.id;
       editingId = preset.id;
       creating = false;
+      importing = null;
       resetPreview();
       ctx.save();
       ctx.go('reply-item', { id: preset.id });
@@ -18596,6 +19053,7 @@ const presetsApp = {
     if (act === 'reply-open') {
       editingId = String(data.id || '');
       creating = false;
+      importing = null;
       resetPreview();
       ctx.go('reply-item', { id: editingId });
       return true;
@@ -18609,7 +19067,9 @@ const replyPresetApp = {
   id: 'reply-item', name: '回复预设', icon: 'reply',
 
   render(ctx, params = {}) {
+    bindPresetDrag(ctx);
     const id = String(params.id || editingId || '');
+    editingId = id;
     const preset = findPreset(ctx.state, id);
     if (!preset) return '<div class="mp-page-body"><div class="mp-empty">这套预设不在了。</div></div>';
     if (editingId !== preset.id) {
@@ -18626,23 +19086,22 @@ const replyPresetApp = {
     const items = promptItems(preset);
     const contextCount = items.filter(item => item.kind === 'context').length;
     const itemRow = (item) => {
-      const index = items.indexOf(item);
       const isContext = item.kind === 'context';
       const openAct = isContext ? 'reply-context-open' : 'reply-item-open';
       const chars = charactersLabel(item);
+      const note = item.note ? ` · ${item.note}` : '';
       const sub = isContext
         ? `${roleLabel(item.role)} · ${item.enabled ? '已启用' : '已关闭'} · ${contextItemNote(item, context)}${chars ? ` · ${chars}` : ''}`
-        : `${roleLabel(item.role)} · ${item.enabled ? '已启用' : '已关闭'} · ${item.content.length} 字${chars ? ` · ${chars}` : ''}`;
+        : `${roleLabel(item.role)} · ${item.enabled ? '已启用' : '已关闭'} · ${item.content.length} 字${chars ? ` · ${chars}` : ''}${note}`;
       return `
-      <div class="mp-preset-item${isContext ? ' is-context' : ''}">
+      <div class="mp-preset-item${isContext ? ' is-context' : ''}" data-id="${esc(item.id)}">
+        <span class="mp-preset-grip" data-preset-grip title="按住拖动排序" aria-hidden="true">${icon('grip')}</span>
         <button class="mp-preset-item-main" data-act="${openAct}" data-id="${esc(item.id)}" type="button">
           <span class="mp-preset-item-label"><span class="mp-preset-name">${esc(item.label)}</span><span class="mp-preset-tag${isContext ? ' is-context' : item.kind === 'app' ? ' is-app' : ''}">${esc(itemKindLabel(item))}</span></span>
           <span class="mp-preset-item-sub">${esc(sub)}</span>
         </button>
         <div class="mp-preset-item-actions">
           <div class="mp-preset-item-tools">
-            <button class="mp-item-mini is-up" data-act="reply-item-up" data-id="${esc(item.id)}" type="button" title="上移"${index === 0 ? ' disabled' : ''}>${icon('chevron')}</button>
-            <button class="mp-item-mini" data-act="reply-item-down" data-id="${esc(item.id)}" type="button" title="下移"${index === items.length - 1 ? ' disabled' : ''}>${icon('chevron')}</button>
             ${item.deletable ? `<button class="mp-item-mini" data-act="reply-item-del" data-id="${esc(item.id)}" type="button" title="删除">${icon('trash')}</button>` : '<span class="mp-item-mini is-placeholder" aria-hidden="true"></span>'}
           </div>
           <button class="mp-item-switch" data-act="reply-item-toggle" data-id="${esc(item.id)}" type="button" title="${item.enabled ? '关闭' : '启用'}" role="switch" aria-label="${item.enabled ? '关闭' : '启用'}「${esc(item.label)}」" aria-checked="${item.enabled ? 'true' : 'false'}"><span class="mp-switch${item.enabled ? ' on' : ''}"></span></button>
@@ -18655,6 +19114,7 @@ const replyPresetApp = {
       <div class="mp-nav mp-preset-nav">
         <button class="mp-back" data-act="back" type="button">${icon('back')}</button>
         <span style="flex:1"></span>
+        <button class="mp-icon-btn" data-act="reply-export-one" type="button" title="导出当前预设">${icon('upload')}</button>
         <button class="mp-icon-btn" data-act="reply-item-reset" type="button" title="恢复默认条目">${icon('refresh')}</button>
         <button class="mp-icon-btn" data-act="reply-del" type="button" title="删除">${icon('trash')}</button>
       </div>
@@ -18786,14 +19246,16 @@ const replyPresetApp = {
     }
 
     if (act === 'reply-item-reset') {
+      const defaults = defaultReplyItems();
+      const contextCount = defaults.filter(item => item.kind === 'context').length;
       ctx.openSheet({
         kind: 'pick',
         title: '恢复默认条目',
-        note: '会恢复整套默认条目，包括 7 条上下文注入；主回复指令不动',
+        note: `会恢复 ${defaults.length} 条完整默认条目（含 ${contextCount} 条上下文注入）；主回复指令不动`,
         items: [{ label: '恢复默认条目', value: 'reset', icon: 'refresh', danger: true }],
         onPick: value => {
           if (value !== 'reset') return;
-          preset.items = defaultReplyItems();
+          preset.items = defaults;
           preset.context = normalizeReplyContext({});
           resetPreview();
           ctx.save();
@@ -19001,6 +19463,11 @@ const replyPresetApp = {
       return true;
     }
 
+    if (act === 'reply-export-one') {
+      exportCurrentPreset(ctx, preset);
+      return true;
+    }
+
     if (act === 'reply-del') {
       deleting = true;
       ctx.rerender();
@@ -19046,21 +19513,6 @@ const replyPresetApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(`${next.label}已${next.enabled ? '启用' : '关闭'}`);
-      return true;
-    }
-
-    if (act === 'reply-item-up' || act === 'reply-item-down') {
-      const items = promptItems(preset);
-      const index = items.findIndex(item => item.id === data.id);
-      const target = act === 'reply-item-up' ? index - 1 : index + 1;
-      if (index < 0 || target < 0 || target >= items.length) return true;
-      [items[index], items[target]] = [items[target], items[index]];
-      items.forEach((item, order) => { item.order = order; });
-      preset.items = items;
-      resetPreview();
-      ctx.save();
-      ctx.rerender();
-      ctx.toast('条目顺序已调整');
       return true;
     }
 
@@ -19238,7 +19690,37 @@ function clockBlock(now = new Date()) {
   const text = now.toLocaleString('zh-CN', {
     month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
   });
-  return `【当前时间】\n${text}`;
+  return [
+    '【时间信息】',
+    `当前时间：${text}`,
+    '角色的手机能看到当前时间，可以据此判断时段、对方状态和聊天间隔。',
+  ].join('\n');
+}
+
+/** 当前用户签名；meme 没有签名历史，只能读现在的资料。 */
+function signatureBlock(state) {
+  const bio = String(state?.settings?.profile?.bio || '').trim();
+  if (!bio) return '';
+  return `【我的个性签名】\n${bio}`;
+}
+
+/** 表情包库：给模型一份当前表情名称，避免它编不存在的表情。 */
+function emojiBlock(state) {
+  const list = (Array.isArray(state?.emoji) ? state.emoji : [])
+    .map(item => {
+      const name = String(item?.name || '').trim();
+      const char = String(item?.char || '').trim();
+      if (!name) return '';
+      return char ? `${name}（${char}）` : name;
+    })
+    .filter(Boolean);
+  if (!list.length) return '';
+  return [
+    '【表情包库】',
+    list.join('\n'),
+    '[/表情包库]',
+    '角色回复时可以使用这些表情，但不要编造表情库里没有的表情。',
+  ].join('\n');
 }
 
 /** 当前选中的酒馆人设；预览环境没有酒馆时退回第一条。 */
@@ -19349,6 +19831,14 @@ async function contextBlockFor(item, state, chat, contact, context, memoryText) 
   if (key === 'scene') {
     const text = sceneBlock(state, contact);
     return { text, status: text ? 'injected' : 'empty', reason: text ? '' : '角色卡没有填场景' };
+  }
+  if (key === 'signature') {
+    const text = signatureBlock(state);
+    return { text, status: text ? 'injected' : 'empty', reason: text ? '' : '我还没有写个性签名' };
+  }
+  if (key === 'emoji') {
+    const text = emojiBlock(state);
+    return { text, status: text ? 'injected' : 'empty', reason: text ? '' : '表情面板还是空的' };
   }
   if (key === 'lorebook') return lorebookBlock(state, chat, contact, context);
   if (key === 'memory') {
@@ -19480,6 +19970,8 @@ exports["characterBlock"] = characterBlock;
 exports["sceneBlock"] = sceneBlock;
 exports["userBlock"] = userBlock;
 exports["clockBlock"] = clockBlock;
+exports["signatureBlock"] = signatureBlock;
+exports["emojiBlock"] = emojiBlock;
 exports["buildReplyMessages"] = buildReplyMessages;
 };
 __mods["meme/index.js"] = function(module, exports, __req){

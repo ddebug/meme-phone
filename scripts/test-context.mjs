@@ -5,7 +5,7 @@
 
 import {
   demoState, normalizeReplyContext, normalizeReplyItems, replyPresetFor, replyPresetsOf, chatsOf,
-  extrasEnabledFor, theaterPrompt, splitTheaterBlocks, addExtrasEntry,
+  extrasEnabledFor, theaterPrompt, splitTheaterBlocks, addExtrasEntry, defaultReplyItems,
 } from '../meme/data.js';
 import { buildReplyMessages, estimateTokens, requestStats } from '../meme/reply-context.js';
 
@@ -30,9 +30,30 @@ function findItem(items, id) {
   return items.find(item => item.id === id);
 }
 
-/* 1. 默认预设：七类上下文都在，世界书常驻 + 关键词命中 */
+/* 1. 默认预设：完整 24 条 + meme 三条上下文 + 单条格式兜底 */
+{
+  const items = defaultReplyItems();
+  ok(items.length === 28, '默认条目共 28 条');
+  ok(items.filter(item => item.kind === 'context').length === 9, '九类上下文都在');
+  const labels = items.map(item => item.label);
+  ['头部', 'QQ聊天任务', 'QQ聊天行为要求', '用户角色设定', '个签历史 - 用户个性签名',
+    '角色档案 - 人设、历史记录、线下剧情等', '手机相关记录 - 占位符', '表情包库',
+    'QQ聊天记录 - 最新消息', '收藏夹消息', '约定计划', '修改个性签名', '戳一戳消息',
+    '撤回消息', '引用消息', '转账', '会员', '关注用户的消息细节', '时间信息',
+    '用户当前操作提醒', '用户操作 - 本轮任务清单', '中文回复', '回复格式要求',
+    'QQ 回复格式（原版）', '尾部'].forEach(label => {
+    ok(labels.includes(label), `参考条目「${label}」已迁入`);
+  });
+  ok(items.find(item => item.id === 'reply_context_signature')?.enabled === true, '个签上下文默认开启');
+  ok(items.find(item => item.id === 'reply_context_emoji')?.enabled === true, '表情包上下文默认开启');
+  ok(items.find(item => item.id === 'reply_item_quote')?.enabled === false, '未接入的原版协议默认关闭');
+}
+
+/* 2. 默认预设：九类上下文都在，世界书常驻 + 关键词命中 */
 {
   const { state, chat, contact } = stateWithPreset();
+  state.settings.profile.bio = '夜里也要好好吃饭';
+  state.emoji = [{ id: 'e1', name: '抱抱', char: '🫂' }];
   const { messages, report } = await buildReplyMessages(state, chat, contact);
   const text = contents(messages);
   ok(report.items.some(item => item.id === 'reply_context_lorebook' && item.status === 'injected'), '人设世界书条目已注入');
@@ -43,6 +64,8 @@ function findItem(items, id) {
   ok(text.includes('【角色档案 · 沈砚】'), '角色档案按角色卡读取');
   ok(text.includes('【场景信息】'), '场景信息单独成条');
   ok(text.includes('【手机聊天记录】'), '聊天记录按条数注入');
+  ok(text.includes('【我的个性签名】') && text.includes('夜里也要好好吃饭'), '个签按当前资料注入');
+  ok(text.includes('【表情包库】') && text.includes('抱抱（🫂）'), '表情包库按当前面板注入');
   ok(messages[messages.length - 1].role === 'user', '最后一条聊天作为 user 消息');
 }
 
@@ -93,7 +116,7 @@ function findItem(items, id) {
   items.push({ ...chinese, id: 'item_dup', label: '重复中文', order: chinese.order + 0.1 });
   preset.items = items;
   const { messages, report } = await buildReplyMessages(state, chat, contact);
-  const count = contents(messages).split('角色必须用中文回复。').length - 1;
+  const count = contents(messages).split(chinese.content).length - 1;
   ok(count === 1, '相同内容不重复注入');
   ok(report.items.some(item => item.id === 'item_dup' && item.status === 'duplicate'), '报告标记重复');
 }

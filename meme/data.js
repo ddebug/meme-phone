@@ -5,6 +5,8 @@
  * 数据结构刻意保持扁平，避免旧版那种「十个模块共享一个巨型对象、谁都改它」的局面。
  */
 
+import { FULL_REPLY_ITEM_DEFS } from './preset-defaults.js';
+
 export const SCHEMA_VERSION = 1;
 
 /* 回复预设除了「怎么说」，还要决定「给模型看哪些上下文」。
@@ -12,6 +14,8 @@ export const SCHEMA_VERSION = 1;
 export const DEFAULT_REPLY_CONTEXT = {
   character: true,
   user: true,
+  signature: true,
+  emoji: true,
   lorebook: true,
   memory: true,
   scene: true,
@@ -35,6 +39,8 @@ export function normalizeReplyContext(raw) {
   return {
     character: source.character !== false,
     user: source.user !== false,
+    signature: source.signature !== false,
+    emoji: source.emoji !== false,
     lorebook: source.lorebook !== false,
     memory: source.memory !== false,
     scene: source.scene !== false,
@@ -50,7 +56,7 @@ export function normalizeReplyContext(raw) {
 /* 旧 QQ 预设把上下文注入也做成列表里的条目，而不是列表下面的一组开关：
  * 用户设定、角色档案、聊天记录、时间信息各自有 role 和顺序，能单独开关、能排序。
  * 这里沿用同一套做法，新增 kind:'context' + auto 字段；内容是运行时从手机/酒馆读取的。 */
-export const REPLY_CONTEXT_KEYS = ['user', 'character', 'lorebook', 'memory', 'scene', 'history', 'time'];
+export const REPLY_CONTEXT_KEYS = ['user', 'signature', 'character', 'lorebook', 'memory', 'scene', 'emoji', 'history', 'time'];
 
 export const REPLY_CONTEXT_SPECS = {
   user: {
@@ -61,12 +67,20 @@ export const REPLY_CONTEXT_SPECS = {
     note: '我的名字和设定',
     hintOrder: 1.51,
   },
+  signature: {
+    id: 'reply_context_signature',
+    label: '个签历史 - 用户个性签名',
+    role: 'system',
+    content: '__AUTO_SIGNATURE_HISTORY__',
+    note: '当前签名；没有历史回退',
+    hintOrder: 1.515,
+  },
   character: {
     id: 'reply_context_character',
     label: '角色档案',
     role: 'system',
     content: '__AUTO_CHARACTERS__',
-    note: '人设、性格和场景',
+    note: '角色卡的人设和性格',
     hintOrder: 1.52,
   },
   lorebook: {
@@ -93,6 +107,14 @@ export const REPLY_CONTEXT_SPECS = {
     note: '角色卡里的场景',
     hintOrder: 1.55,
   },
+  emoji: {
+    id: 'reply_context_emoji',
+    label: '表情包库',
+    role: 'system',
+    content: '__AUTO_EMOJI_LIBRARY__',
+    note: '当前表情面板里的表情',
+    hintOrder: 1.565,
+  },
   history: {
     id: 'reply_context_history',
     label: '手机聊天记录',
@@ -106,7 +128,7 @@ export const REPLY_CONTEXT_SPECS = {
     label: '时间信息',
     role: 'system',
     content: '__AUTO_TIME__',
-    note: '日期、星期和时间',
+    note: '日期、星期和时间（天气未接入）',
     hintOrder: 1.57,
   },
 };
@@ -130,59 +152,55 @@ function contextItem(key, overrides = {}) {
   };
 }
 
-/** 旧 QQ 预设里的固定提示词条目；这些是「怎么说」的补充，不替代聊天气泡本身。 */
+/** 完整默认条目：acsus 24 条 + meme 的世界书/记忆/场景 + 一条本机格式兜底。 */
 export function defaultReplyItems() {
-  return [
-    {
-      id: 'reply_item_phone_task',
-      label: '手机聊天任务',
-      role: 'system',
-      content: '[手机聊天任务]\n这是手机上的即时聊天，不是小说。消息要短，像随手打出来的，可以分成几条。\n不要描写动作、场景和心理活动，也不要用括号、旁白或角色名前缀。\n[/手机聊天任务]',
-      enabled: true, editable: true, deletable: true, order: 0,
-    },
-    {
-      id: 'reply_item_behavior',
-      label: '聊天行为要求',
-      role: 'system',
-      content: '[聊天行为要求]\n在符合角色性格的前提下，回复后可以自然延伸一点：追问一句、分享一件小事，或者停一下等对方。\n不要每次都追问，也不要在不合适的时候强行主动。\n[/聊天行为要求]',
-      enabled: true, editable: true, deletable: true, order: 1,
-    },
-    contextItem('user', { order: 2 }),
-    contextItem('character', { order: 3 }),
-    contextItem('lorebook', { order: 4 }),
-    contextItem('memory', { order: 5 }),
-    contextItem('scene', { order: 6 }),
-    contextItem('history', { order: 7 }),
-    contextItem('time', { order: 8 }),
-    {
-      id: 'reply_item_detail',
-      label: '关注消息细节',
-      role: 'system',
-      content: '[关注消息细节]\n留意对方消息里的停顿、标点和长短变化，判断对方的状态。\n不要直接点破，用语气和关心程度自然回应。\n[/关注消息细节]',
-      enabled: true, editable: true, deletable: true, order: 9,
-    },
-    {
-      id: 'reply_item_chinese',
-      label: '中文回复',
-      role: 'system',
-      content: '角色必须用中文回复。',
-      enabled: true, editable: true, deletable: true, order: 10,
-    },
-    {
-      id: 'reply_item_format',
-      label: '回复格式要求',
-      role: 'system',
-      content: '[回复格式要求]\n只输出角色要发的那一条消息。不要加角色名、时间、序号、冒号，也不要写旁白、括号动作或场景描写。\n[/回复格式要求]',
-      enabled: true, editable: true, deletable: false, order: 11,
-    },
-    {
-      id: 'reply_item_footer',
-      label: '尾部',
-      role: 'user',
-      content: '请保持手机上的聊天语气，只输出一条回复。',
-      enabled: true, editable: true, deletable: false, order: 12,
-    },
-  ];
+  return FULL_REPLY_ITEM_DEFS.map((def, index) => {
+    if (def.context) {
+      return contextItem(def.context, {
+        label: def.label,
+        enabled: def.enabled !== false,
+        order: index,
+      });
+    }
+    return {
+      id: def.id,
+      label: def.label,
+      role: def.role,
+      kind: 'chat',
+      auto: '',
+      app: '',
+      characters: [],
+      content: String(def.content || ''),
+      enabled: def.enabled !== false,
+      editable: true,
+      deletable: def.deletable !== false,
+      note: String(def.note || ''),
+      order: index,
+    };
+  });
+}
+
+/** 旧版三套内置预设的 13 条默认条目；只用于一次性升级，用户自建预设不动。 */
+const LEGACY_DEFAULT_ITEM_IDS = [
+  'reply_item_phone_task',
+  'reply_item_behavior',
+  'reply_context_user',
+  'reply_context_character',
+  'reply_context_lorebook',
+  'reply_context_memory',
+  'reply_context_scene',
+  'reply_context_history',
+  'reply_context_time',
+  'reply_item_detail',
+  'reply_item_chinese',
+  'reply_item_format',
+  'reply_item_footer',
+];
+
+function isLegacyDefaultReplyItems(items) {
+  if (!Array.isArray(items) || items.length !== LEGACY_DEFAULT_ITEM_IDS.length) return false;
+  const ids = items.map(item => String(item?.id || ''));
+  return ids.every(id => LEGACY_DEFAULT_ITEM_IDS.includes(id));
 }
 
 /** 条目适用的角色卡：空数组 = 全部角色；最多 12 个，去重。 */
@@ -210,6 +228,7 @@ export function normalizeReplyItems(raw, rawContext) {
       return {
         ...contextItem(auto),
         id: spec.id,
+        label: String(item?.label || '').trim().slice(0, 30) || spec.label,
         enabled: item?.enabled !== undefined ? item.enabled !== false : context[auto] !== false,
         characters: normalizeCharacters(item?.characters),
         order: Number.isFinite(order) ? order : spec.hintOrder,
@@ -229,6 +248,7 @@ export function normalizeReplyItems(raw, rawContext) {
       enabled: item?.enabled !== false,
       editable: item?.editable !== false,
       deletable: item?.deletable !== false,
+      note: String(item?.note || '').trim().slice(0, 60),
       order: Number.isFinite(order) ? order : index,
     };
   }).filter(Boolean);
@@ -1095,12 +1115,14 @@ export function normalize(raw) {
     let id = String(item.id || `reply_${index + 1}`).trim().slice(0, 40);
     if (!id || seenReplyIds.has(id)) id = `reply_${index + 1}_${seenReplyIds.size}`;
     seenReplyIds.add(id);
+    const builtInId = ['reply_natural', 'reply_short', 'reply_soft'].includes(id);
+    const upgrade = builtInId && isLegacyDefaultReplyItems(item.items);
     replyPresets.push({
       id,
       name: String(item.name || '').trim().slice(0, 20) || `预设 ${index + 1}`,
       text: String(item.text || '').trim().slice(0, 3000),
       context: normalizeReplyContext(item.context),
-      items: normalizeReplyItems(item.items, item.context),
+      items: upgrade ? defaultReplyItems() : normalizeReplyItems(item.items, item.context),
     });
   });
   merged.settings.reply = {

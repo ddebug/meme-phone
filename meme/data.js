@@ -28,6 +28,38 @@ export const DEFAULT_REPLY_CONTEXT = {
   charBudget: 8000,
 };
 
+/** 回复指令在条目列表里的固定 id：它是普通条目，不再单独置顶。 */
+export const REPLY_INSTRUCTION_ID = 'reply_item_main';
+
+export function replyInstructionItem(content, order = 2.5) {
+  return {
+    id: REPLY_INSTRUCTION_ID,
+    label: '回复指令',
+    role: 'system',
+    kind: 'chat',
+    auto: '',
+    app: '',
+    characters: [],
+    content: String(content || '').trim().slice(0, 4000),
+    enabled: true,
+    editable: true,
+    deletable: true,
+    note: '',
+    order: Number.isFinite(Number(order)) ? Number(order) : 2.5,
+  };
+}
+
+/** 把回复指令放进条目列表；已有同 id 条目时不重复。 */
+export function withReplyInstruction(items, content, order = 2.5) {
+  const text = String(content || '').trim().slice(0, 4000);
+  const list = (Array.isArray(items) ? items : []).filter(item => item?.id !== REPLY_INSTRUCTION_ID).map(item => ({ ...item }));
+  if (!text) return list;
+  list.push(replyInstructionItem(text, order));
+  return list
+    .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+    .map((item, index) => ({ ...item, order: index }));
+}
+
 function clampNumber(value, min, max, fallback) {
   const num = Number(value);
   if (!Number.isFinite(num)) return fallback;
@@ -310,21 +342,21 @@ export function emptyState() {
         presets: [
           {
             id: 'reply_natural', name: '自然发消息',
-            text: '像平时发微信一样回消息：口语、短句，一次只回一两句。不要写旁白、括号里的动作，也不要写成小说段落。',
+            text: '',
             context: { ...DEFAULT_REPLY_CONTEXT },
-            items: defaultReplyItems(),
+            items: withReplyInstruction(defaultReplyItems(), '像平时发微信一样回消息：口语、短句，一次只回一两句。不要写旁白、括号里的动作，也不要写成小说段落。', 2.5),
           },
           {
             id: 'reply_short', name: '再短一点',
-            text: '回复尽量短，通常不超过 20 个字，像随手回一条消息。不要解释、不要总结、不要用括号写动作。',
+            text: '',
             context: { ...DEFAULT_REPLY_CONTEXT },
-            items: defaultReplyItems(),
+            items: withReplyInstruction(defaultReplyItems(), '回复尽量短，通常不超过 20 个字，像随手回一条消息。不要解释、不要总结、不要用括号写动作。', 2.5),
           },
           {
             id: 'reply_soft', name: '带点情绪',
-            text: '像平时发微信一样回消息，口语、短句，可以带一点情绪和停顿，但不要写成小说，也不要用括号写旁白动作。',
+            text: '',
             context: { ...DEFAULT_REPLY_CONTEXT },
-            items: defaultReplyItems(),
+            items: withReplyInstruction(defaultReplyItems(), '像平时发微信一样回消息，口语、短句，可以带一点情绪和停顿，但不要写成小说，也不要用括号写旁白动作。', 2.5),
           },
         ],
       },
@@ -520,7 +552,17 @@ export function replyPresetFor(state, chat) {
 /** 注入模型的回复要求；预设没写内容时返回空，不额外加约束。 */
 export function replyPromptFor(state, chat) {
   const preset = replyPresetFor(state, chat);
-  return String(preset?.text || '').trim();
+  const main = normalizeReplyItems(preset?.items, recomputeContext(preset)).find(item => item.id === REPLY_INSTRUCTION_ID);
+  return String(main?.content || preset?.text || '').trim();
+}
+
+/** 配置页更新条目后，算上下文开关时用最新条目状态。 */
+function recomputeContext(preset) {
+  const context = normalizeReplyContext(preset?.context);
+  normalizeReplyItems(preset?.items, context).forEach(item => {
+    if (item.kind === 'context' && item.auto) context[item.auto] = item.enabled !== false;
+  });
+  return context;
 }
 
 /** 这套回复预设要注入哪些上下文：以列表里的固定上下文条目为准，historyLimit 仍存在 context。 */
@@ -1117,12 +1159,24 @@ export function normalize(raw) {
     seenReplyIds.add(id);
     const builtInId = ['reply_natural', 'reply_short', 'reply_soft'].includes(id);
     const upgrade = builtInId && isLegacyDefaultReplyItems(item.items);
+    let presetItems = upgrade ? defaultReplyItems() : normalizeReplyItems(item.items, item.context);
+    const mainText = String(item.text || '').trim().slice(0, 4000);
+    if (mainText) {
+      const mainItem = presetItems.find(entry => entry.id === REPLY_INSTRUCTION_ID);
+      if (mainItem) {
+        if (!mainItem.content) mainItem.content = mainText;
+      } else {
+        const behavior = presetItems.find(entry => entry.id === 'reply_item_behavior');
+        const anchor = Number.isFinite(Number(behavior?.order)) ? Number(behavior.order) : 2;
+        presetItems = withReplyInstruction(presetItems, mainText, anchor + 0.5);
+      }
+    }
     replyPresets.push({
       id,
       name: String(item.name || '').trim().slice(0, 20) || `预设 ${index + 1}`,
-      text: String(item.text || '').trim().slice(0, 3000),
+      text: '',
       context: normalizeReplyContext(item.context),
-      items: upgrade ? defaultReplyItems() : normalizeReplyItems(item.items, item.context),
+      items: presetItems,
     });
   });
   merged.settings.reply = {

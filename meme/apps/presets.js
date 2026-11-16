@@ -6,7 +6,7 @@
 
 import { icon } from '../icons.js';
 import { esc } from '../shell.js';
-import { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext, normalizeReplyItems, normalizeCharacters, defaultReplyItems, REPLY_CONTEXT_SPECS, chatsOf } from '../data.js';
+import { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext, normalizeReplyItems, normalizeCharacters, defaultReplyItems, REPLY_CONTEXT_SPECS, chatsOf, REPLY_INSTRUCTION_ID, withReplyInstruction } from '../data.js';
 import { buildReplyMessages } from '../reply-context.js';
 import { tavernQuietPrompt } from '../host.js';
 
@@ -320,12 +320,17 @@ function normalizeImportedPreset(item, index, seen) {
   if (seen.has(id)) id = `${id}_${index}`;
   seen.add(id);
   const rawItems = prepareExternalItems(item?.items);
+  let items = rawItems.length ? normalizeReplyItems(rawItems, item?.context) : [];
+  const text = String(item?.text || '').trim().slice(0, 4000);
+  if (text && !items.some(entry => entry.id === REPLY_INSTRUCTION_ID)) {
+    items = withReplyInstruction(items, text, 2.5);
+  }
   return {
     id,
     name: String(item?.name || '').trim().slice(0, 20) || `导入预设 ${index + 1}`,
-    text: String(item?.text || '').trim().slice(0, 3000),
+    text: '',
     context: normalizeReplyContext(item?.context),
-    items: rawItems.length ? normalizeReplyItems(rawItems, item?.context) : [],
+    items,
   };
 }
 
@@ -486,7 +491,7 @@ export const presetsApp = {
       <button class="mp-row" data-act="reply-open" data-id="${esc(preset.id)}" type="button">
         <span class="mp-row-main">
           <span class="mp-row-name">${esc(preset.name || `预设 ${index + 1}`)}${preset.id === active?.id ? '<span class="mp-api-tag">手机</span>' : ''}</span>
-          <span class="mp-row-sub">${esc(clip(preset.text || '还没写指令'))} · ${esc(itemNote(preset))} · ${esc(contextNote(preset))}</span>
+          <span class="mp-row-sub">${esc(itemNote(preset))} · ${esc(contextNote(preset))}</span>
         </span>
         ${icon('chevron')}
       </button>`).join('');
@@ -571,7 +576,7 @@ export const presetsApp = {
       const preset = {
         id: newId('reply'),
         name,
-        text: source?.text || '',
+        text: '',
         context: normalizeReplyContext(source?.context),
         items: promptItems(source).map(item => ({ ...item })),
       };
@@ -618,7 +623,6 @@ export const replyPresetApp = {
     const previewChat = chats.find(chat => chat.id === preview.chatId) || chats[0] || null;
     const active = replyPresetFor(ctx.state, null);
     const isActive = active?.id === preset.id;
-    const text = String(preset.text || '');
     const context = normalizeReplyContext(preset.context);
     const items = promptItems(preset);
     const contextCount = items.filter(item => item.kind === 'context').length;
@@ -665,8 +669,7 @@ export const replyPresetApp = {
           <button class="mp-draw-side" data-act="reply-del-cancel" type="button">取消</button>
         </div>` : ''}
 
-        <div class="mp-group-label" style="margin-top:14px">基本信息</div>
-        <div class="mp-group">
+        <div class="mp-group" style="margin-top:14px">
           ${renaming ? `
           <div class="mp-api-inline">
             <input id="mpReplyName" class="mp-api-input" type="text" maxlength="20" value="${esc(preset.name || '')}" placeholder="预设名字">
@@ -678,13 +681,6 @@ export const replyPresetApp = {
             <span class="mp-api-value">${esc(preset.name || '没填')}</span>
             ${icon('chevron')}
           </button>`}
-          <button class="mp-row" data-act="reply-field" data-key="text" type="button">
-            <span class="mp-row-main">
-              <span class="mp-row-name">回复指令</span>
-              <span class="mp-row-sub mp-reply-preview">${esc(text || '还没写，模型会按默认方式回')}</span>
-            </span>
-            ${icon('chevron')}
-          </button>
         </div>
 
         <div class="mp-group-head" style="margin-top:16px">
@@ -732,7 +728,7 @@ export const replyPresetApp = {
         </div>
 
         <div class="mp-api-note" style="margin-top:14px">
-          点「回复指令」改主指令；聊天行为条目会按角色接在它后面，其他软件条目单独存着，不会混进聊天回复。单个聊天可以在聊天设置里单独选一套。
+          「回复指令」是列表里的普通条目，可以像其他条目一样编辑、开关、拖动排序；聊天行为会按列表顺序接在它后面，其他软件条目单独存着，不会混进聊天回复。单个聊天可以在聊天设置里单独选一套。
         </div>
       </div>`;
   },
@@ -766,33 +762,33 @@ export const replyPresetApp = {
         ctx.rerender();
         return true;
       }
-      if (key === 'text') {
-        ctx.openSheet({
-          kind: 'text', title: '告诉模型怎么回消息', value: preset.text || '',
-          placeholder: '比如：像平时发微信一样，口语、短句，一次只回一两句，不要旁白和括号动作。',
-          onText: text => {
-            preset.text = String(text || '').trim().slice(0, 3000);
-            resetPreview();
-            ctx.save();
-            ctx.rerender();
-            ctx.toast('回复指令已更新');
-          },
-        });
-        return true;
-      }
+      return false;
     }
 
     if (act === 'reply-item-reset') {
       const defaults = defaultReplyItems();
+      const currentMain = promptItems(preset).find(item => item.id === REPLY_INSTRUCTION_ID);
+      const currentText = currentMain?.content || String(preset.text || '').trim();
       const contextCount = defaults.filter(item => item.kind === 'context').length;
+      const nextItems = currentText
+        ? withReplyInstruction(defaults, currentText, currentMain?.order ?? 2.5)
+        : defaults;
+      if (currentMain) {
+        const nextMain = nextItems.find(item => item.id === REPLY_INSTRUCTION_ID);
+        if (nextMain) {
+          nextMain.enabled = currentMain.enabled;
+          nextMain.characters = currentMain.characters;
+        }
+      }
       ctx.openSheet({
         kind: 'pick',
         title: '恢复默认条目',
-        note: `会恢复 ${defaults.length} 条完整默认条目（含 ${contextCount} 条上下文注入）；主回复指令不动`,
+        note: `会恢复 ${defaults.length} 条完整默认条目（含 ${contextCount} 条上下文注入）；回复指令作为普通条目保留`,
         items: [{ label: '恢复默认条目', value: 'reset', icon: 'refresh', danger: true }],
         onPick: value => {
           if (value !== 'reset') return;
-          preset.items = defaults;
+          preset.items = nextItems;
+          preset.text = '';
           preset.context = normalizeReplyContext({});
           resetPreview();
           ctx.save();

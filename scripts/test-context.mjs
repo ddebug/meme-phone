@@ -5,7 +5,7 @@
 
 import {
   demoState, normalize, normalizeReplyContext, normalizeReplyItems, replyPresetFor, replyPresetsOf, chatsOf,
-  extrasEnabledFor, theaterPrompt, splitTheaterBlocks, addExtrasEntry, defaultReplyItems,
+  extrasEnabledFor, theaterPrompt, splitTheaterBlocks, addExtrasEntry, defaultReplyItems, REPLY_INSTRUCTION_ID,
 } from '../meme/data.js';
 import { buildReplyMessages, estimateTokens, requestStats } from '../meme/reply-context.js';
 
@@ -47,6 +47,15 @@ function findItem(items, id) {
   ok(items.find(item => item.id === 'reply_context_signature')?.enabled === true, '个签上下文默认开启');
   ok(items.find(item => item.id === 'reply_context_emoji')?.enabled === true, '表情包上下文默认开启');
   ok(items.find(item => item.id === 'reply_item_quote')?.enabled === false, '未接入的原版协议默认关闭');
+}
+
+/* 1.5 内置预设：回复指令是普通条目，不再单独存 text */
+{
+  const state = demoState();
+  state.settings.reply.presets.forEach(preset => {
+    ok(preset.items.some(item => item.id === REPLY_INSTRUCTION_ID), `「${preset.name}」的回复指令在条目列表里`);
+    ok(!preset.text, `「${preset.name}」不再单独保存回复指令`);
+  });
 }
 
 /* 2. 默认预设：九类上下文都在，世界书常驻 + 关键词命中 */
@@ -227,15 +236,20 @@ function findItem(items, id) {
   ];
   const state = demoState();
   state.settings.reply.presets = [
-    { id: 'reply_natural', name: '自然', text: '', context: {}, items: legacyIds.map((id, index) => ({ id, order: index })) },
-    { id: 'reply_mine', name: '自建', text: '', context: {}, items: [{ id: 'reply_item_custom', label: '自定义', content: '保留我', order: 0 }] },
+    { id: 'reply_natural', name: '自然', text: '旧回复指令', context: {}, items: legacyIds.map((id, index) => ({ id, order: index })) },
+    { id: 'reply_mine', name: '自建', text: '自建指令', context: {}, items: [{ id: 'reply_item_custom', label: '自定义', content: '保留我', order: 0 }] },
   ];
   state.settings.reply.activeId = 'reply_natural';
   const merged = normalize(state);
   const builtIn = merged.settings.reply.presets.find(preset => preset.id === 'reply_natural');
   const mine = merged.settings.reply.presets.find(preset => preset.id === 'reply_mine');
-  ok(builtIn.items.length === 28, '旧内置预设升级为 28 条');
+  const builtInMain = builtIn.items.find(item => item.id === REPLY_INSTRUCTION_ID);
+  const mineMain = mine.items.find(item => item.id === REPLY_INSTRUCTION_ID);
+  ok(builtIn.items.length === 29, '旧内置预设升级为 29 条');
+  ok(builtInMain?.content === '旧回复指令', '旧回复指令迁进普通条目');
+  ok(!builtIn.text, '旧内置预设不再单独存回复指令');
   ok(mine.items.some(item => item.id === 'reply_item_custom'), '用户自建预设不被覆盖');
+  ok(mineMain?.content === '自建指令', '用户自建预设的回复指令也迁进条目');
 }
 
 /* 13. token 估算：中文按字、英文按 4 字符 */

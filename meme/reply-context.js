@@ -321,9 +321,6 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
   }
   const memoryText = String(options.memoryText || '');
 
-  const main = String(preset?.text || '').trim();
-  const mainText = fillPromptTokens(main, state, chat);
-  if (mainText) messages.push({ role: 'system', content: mainText, source: '回复要求' });
   if (options.lead) messages.push({ role: 'system', content: options.lead, source: '场景提示' });
   if (options.extraPrompt) messages.push({ role: 'system', content: String(options.extraPrompt), source: '小剧场' });
 

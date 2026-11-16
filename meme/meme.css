@@ -3455,14 +3455,6 @@
 .mp-root .mp-set-row.is-off .mp-switch { background: #e9e9ea; }
 .mp-root[data-mp-theme="night"] .mp-set-row.is-off .mp-switch { background: #3a3a40; }
 
-.mp-root .mp-reply-preview {
-  display: -webkit-box;
-  white-space: pre-wrap;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
-  line-height: calc(1.55 * var(--line-scale));
-}
 .mp-root .mp-group-head {
   display: flex;
   align-items: center;

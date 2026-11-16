@@ -4,7 +4,7 @@
  */
 
 import {
-  demoState, normalizeReplyContext, normalizeReplyItems, replyPresetFor, replyPresetsOf, chatsOf,
+  demoState, normalize, normalizeReplyContext, normalizeReplyItems, replyPresetFor, replyPresetsOf, chatsOf,
   extrasEnabledFor, theaterPrompt, splitTheaterBlocks, addExtrasEntry, defaultReplyItems,
 } from '../meme/data.js';
 import { buildReplyMessages, estimateTokens, requestStats } from '../meme/reply-context.js';
@@ -215,6 +215,27 @@ function findItem(items, id) {
   ok(state.extras[chat.contactId].length === before + 1, '条目数加一');
   ok(state.extras[chat.contactId][0].id === entry.id, '新条目排在最前');
   ok(entry.messageId === 'm_test' && entry.chatId === chat.id, '条目记住来源消息');
+}
+
+/* 内置三套预设仍是旧 13 条时，首次读取升级为完整默认；自建预设不动 */
+{
+  const legacyIds = [
+    'reply_item_phone_task', 'reply_item_behavior', 'reply_context_user',
+    'reply_context_character', 'reply_context_lorebook', 'reply_context_memory',
+    'reply_context_scene', 'reply_context_history', 'reply_context_time',
+    'reply_item_detail', 'reply_item_chinese', 'reply_item_format', 'reply_item_footer',
+  ];
+  const state = demoState();
+  state.settings.reply.presets = [
+    { id: 'reply_natural', name: '自然', text: '', context: {}, items: legacyIds.map((id, index) => ({ id, order: index })) },
+    { id: 'reply_mine', name: '自建', text: '', context: {}, items: [{ id: 'reply_item_custom', label: '自定义', content: '保留我', order: 0 }] },
+  ];
+  state.settings.reply.activeId = 'reply_natural';
+  const merged = normalize(state);
+  const builtIn = merged.settings.reply.presets.find(preset => preset.id === 'reply_natural');
+  const mine = merged.settings.reply.presets.find(preset => preset.id === 'reply_mine');
+  ok(builtIn.items.length === 28, '旧内置预设升级为 28 条');
+  ok(mine.items.some(item => item.id === 'reply_item_custom'), '用户自建预设不被覆盖');
 }
 
 /* 13. token 估算：中文按字、英文按 4 字符 */

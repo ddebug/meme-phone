@@ -320,6 +320,8 @@ export function emptyState() {
       user: { name: '我', avatar: '', key: '' },
       /* 主界面顶栏：签名自己写，横幅图自己挑；空着就用酒馆里那份 */
       profile: { bio: '', banner: '' },
+      /* 小剧场：类型影响这一轮写什么；按角色开关仍走 extrasOn */
+      theater: { kind: 'daily' },
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
@@ -741,6 +743,68 @@ export function latestDiary(state) {
 
 /* ---------------------------------------------------------- 小剧场等 */
 
+/**
+ * 小剧场类型：决定这一轮请模型写什么，以及详情页用哪套美化模板。
+ * 当前先内置四种；后续类型只需要在这里加一项，页面和存储不用复制。
+ */
+export const THEATER_KINDS = [
+  {
+    id: 'daily',
+    label: '日常',
+    badge: '日常',
+    sub: '聊天之外的小片段',
+    icon: 'theater',
+    page: 'paper',
+    titles: ['心理活动', '小彩蛋'],
+    prompt: '写一小段贴合角色和当下情境的小剧场：可以写没说出口的情绪、动作或一个生活切片；不替用户决定言行。',
+  },
+  {
+    id: 'meta',
+    label: 'Meta',
+    badge: 'META',
+    sub: '跳出剧情吐个槽',
+    icon: 'code',
+    page: 'console',
+    titles: ['吐槽', '幕后注'],
+    prompt: '写一段 Meta 小剧场：角色可以跳出剧情，吐槽叙事、设定或和“作者/读者”对话；不要把模型的真实推理说成角色的想法，也不要冒充系统提示。',
+  },
+  {
+    id: 'dream',
+    label: '幻想',
+    badge: '梦境',
+    sub: '另一种可能',
+    icon: 'spark',
+    page: 'dream',
+    titles: ['梦境', '醒来'],
+    prompt: '写一段幻想或梦境小剧场：允许意象跳跃、场景变形，但保持角色性格和关系；不替用户决定言行。',
+  },
+  {
+    id: 'nsfw',
+    label: 'NSFW',
+    badge: '18+',
+    sub: '克制的私密片段',
+    icon: 'heart',
+    page: 'velvet',
+    gate: true,
+    titles: ['靠近', '余温'],
+    prompt: '写一段成年角色之间克制的私密小剧场：只写情绪、气氛、关系张力和留白，不写露骨性行为、身体细节或具体动作，也不替用户决定言行。',
+  },
+];
+
+export function normalizeTheaterKind(value) {
+  return THEATER_KINDS.some(kind => kind.id === value) ? value : 'daily';
+}
+
+export function theaterKindById(value) {
+  const id = normalizeTheaterKind(value);
+  return THEATER_KINDS.find(kind => kind.id === id) || THEATER_KINDS[0];
+}
+
+/** 当前手机选中的小剧场类型；页面和请求共用这一处。 */
+export function theaterKindFor(state) {
+  return normalizeTheaterKind(state?.settings?.theater?.kind);
+}
+
 export function extrasOf(state, contactId) {
   state.extras[contactId] = state.extras[contactId] || [];
   return state.extras[contactId];
@@ -752,21 +816,20 @@ export function extrasEnabledFor(state, contactId) {
 }
 
 /** 小剧场的返回协议：正常聊天在前，<phone-extras>JSON</phone-extras> 在后。 */
-export function theaterPrompt(contactName) {
+export function theaterPrompt(contactName, kind = 'daily') {
   const name = String(contactName || '对方').trim() || '对方';
+  const genre = theaterKindById(kind);
   const shape = JSON.stringify({
     role: name,
-    sections: [
-      { title: '心理活动', content: '……' },
-      { title: '小彩蛋', content: '……' },
-    ],
+    sections: genre.titles.map(title => ({ title, content: '……' })),
   });
   return [
-    `这一轮正常聊天之外，再给「${name}」写一小段小剧场。`,
+    `这一轮正常聊天之外，再给「${name}」写一小段「${genre.label}」小剧场。`,
+    genre.prompt,
     '先完整输出 TA 要发的聊天消息，然后在消息之后另起一行，追加且只追加一个块：',
     `<phone-extras>${shape}</phone-extras>`,
     '这个块不会显示在聊天里，只存进小剧场 App；不要写进聊天正文，不要用代码围栏，也不要为它另发一次请求。',
-    '每节 1–3 句，贴合人设和当下情境；可以写没说出口的小情绪或动作，不替用户决定言行。',
+    '每节 1–3 句，贴合人设和当下情境；不要为小剧场写 HTML，也不要在字符串里再放 <phone-extras> 标签。',
   ].join('\n');
 }
 
@@ -806,12 +869,22 @@ export function splitTheaterBlocks(text, contactName = '') {
 /** 把一段小剧场并进该联系人的 App 列表；不新增聊天气泡。 */
 export function addExtrasEntry(state, contactId, sections, meta = {}) {
   if (!Array.isArray(sections) || !sections.length) return null;
-  const title = sections.map(section => section.title).filter(Boolean).slice(0, 2).join(' · ') || '小剧场';
+  const cleanSections = sections
+    .map(section => ({
+      title: String(section?.title || '').trim().slice(0, 80),
+      content: String(section?.content || '').trim().slice(0, 4000),
+    }))
+    .filter(section => section.title && section.content);
+  if (!cleanSections.length) return null;
+  const kind = normalizeTheaterKind(meta.kind);
+  const title = cleanSections.map(section => section.title).slice(0, 2).join(' · ') || '小剧场';
   const entry = {
     id: newId('x'),
     title,
+    kind,
+    sections: cleanSections,
     date: dayKey(),
-    lines: sections.map(section => `${section.title}：${section.content}`),
+    lines: cleanSections.map(section => `${section.title}：${section.content}`),
     messageId: meta.messageId || '',
     chatId: meta.chatId || '',
     at: Date.now(),
@@ -1059,11 +1132,32 @@ export function demoState() {
 
 
   state.extras[shen.id] = [
-    { id: 'x1', title: '楼下的便利店', date: '2026-11-10', messageId: 'ch_demo_shen_m0', chatId: 'ch_demo_shen', lines: ['他把外套领子立起来，靠在电动车上抬头看我的窗户。', '灯管太白，照得人有点狼狈。'] },
-    { id: 'x2', title: '第 41 分钟', date: '2026-11-06', lines: ['他说等 41 分钟就走。', '结果等到第 58 分钟。'] },
+    {
+      id: 'x1', title: '楼下的便利店', kind: 'daily', date: '2026-11-10', messageId: 'ch_demo_shen_m0', chatId: 'ch_demo_shen',
+      sections: [
+        { title: '心理活动', content: '他把外套领子立起来，靠在电动车上抬头看我的窗户。灯管太白，照得人有点狼狈。' },
+        { title: '小彩蛋', content: '他把剩下半个饭团吃掉了，说味道还行。' },
+      ],
+      lines: ['他把外套领子立起来，靠在电动车上抬头看我的窗户。', '灯管太白，照得人有点狼狈。'],
+    },
+    {
+      id: 'x2', title: '第 41 分钟', kind: 'meta', date: '2026-11-06',
+      sections: [
+        { title: '吐槽', content: '他说等 41 分钟就走。这个数字后来被反复引用，像某种只有我们知道的暗号。' },
+        { title: '幕后注', content: '叙事到这里其实已经偏心了，但当事人显然不打算承认。' },
+      ],
+      lines: ['他说等 41 分钟就走。', '结果等到第 58 分钟。'],
+    },
   ];
   state.extras[jiang.id] = [
-    { id: 'x3', title: '车里那首歌', date: '2026-11-02', lines: ['副歌进来的时候他跟着哼了一句。'] },
+    {
+      id: 'x3', title: '车里那首歌', kind: 'dream', date: '2026-11-02',
+      sections: [
+        { title: '梦境', content: '车窗外是一条没有尽头的路，副歌进来的时候他跟着哼了一句。' },
+        { title: '醒来', content: '醒来以后旋律还在，但已经不记得他哼的是哪一句。' },
+      ],
+      lines: ['副歌进来的时候他跟着哼了一句。'],
+    },
   ];
 
   state.plans = [
@@ -1197,6 +1291,10 @@ export function normalize(raw) {
       ? profileRaw.banner
       : '',
   };
+  merged.settings.theater = {
+    ...(merged.settings.theater && typeof merged.settings.theater === 'object' ? merged.settings.theater : {}),
+    kind: normalizeTheaterKind(raw.settings?.theater?.kind ?? raw.settings?.theaterKind),
+  };
   const dressRaw = raw.settings?.dress && typeof raw.settings.dress === 'object' && !Array.isArray(raw.settings.dress)
     ? raw.settings.dress
     : {};
@@ -1316,7 +1414,37 @@ export function normalize(raw) {
   merged.music.current = merged.music.current && typeof merged.music.current === 'object'
     ? merged.music.current
     : null;
-  merged.extras = merged.extras || {};
+  merged.extras = merged.extras && typeof merged.extras === 'object' && !Array.isArray(merged.extras)
+    ? Object.fromEntries(Object.entries(merged.extras).map(([contactId, list]) => [
+      contactId,
+      (Array.isArray(list) ? list : []).slice(0, 1000).map((entry, index) => {
+        const lines = Array.isArray(entry?.lines)
+          ? entry.lines.map(line => String(line || '').trim()).filter(Boolean).slice(0, 12)
+          : [];
+        const sections = Array.isArray(entry?.sections)
+          ? entry.sections.map(section => ({
+            title: String(section?.title || '').trim().slice(0, 80),
+            content: String(section?.content || '').trim().slice(0, 4000),
+          })).filter(section => section.title && section.content).slice(0, 6)
+          : [];
+        if (!sections.length) {
+          lines.forEach(line => {
+            const at = line.indexOf('：');
+            const title = at > 0 ? line.slice(0, at).trim().slice(0, 80) : '片段';
+            const content = (at > 0 ? line.slice(at + 1) : line).trim().slice(0, 4000);
+            if (title && content) sections.push({ title, content });
+          });
+        }
+        return {
+          ...entry,
+          id: String(entry?.id || `x_${contactId}_${index}`),
+          kind: normalizeTheaterKind(entry?.kind),
+          lines,
+          sections: sections.slice(0, 6),
+        };
+      }).filter(entry => entry.id),
+    ]))
+    : {};
   merged.extrasOn = Array.isArray(merged.extrasOn) ? merged.extrasOn.map(String) : [];
   merged.favorites = Array.isArray(merged.favorites) ? merged.favorites : [];
   merged.emoji = Array.isArray(merged.emoji) && merged.emoji.length ? merged.emoji : base.emoji;

@@ -6470,6 +6470,541 @@ body {
   }
 }
 
+/* ------------------------------------------------------- 小剧场类型与美化页 */
+.mp-extra-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 2px;
+}
+.mp-extra-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+  color: var(--text-3);
+  font: inherit;
+  font-size: calc(11px * var(--font-scale));
+  line-height: 1.2;
+  cursor: pointer;
+}
+.mp-extra-filter.on {
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px rgba(90, 74, 110, .18), var(--shadow-s);
+  font-weight: 600;
+}
+.mp-extra-filter-badge {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(105, 80, 138, .1);
+  color: var(--text-2);
+  font-size: 9px;
+  letter-spacing: .03em;
+}
+.mp-root[data-mp-theme="night"] .mp-extra-filter {
+  background: rgba(255, 255, 255, .06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
+}
+.mp-root[data-mp-theme="night"] .mp-extra-filter.on {
+  background: rgba(255, 255, 255, .14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16);
+}
+
+.mp-extra-kind-panel {
+  margin-top: 12px;
+  padding: 12px 12px 11px;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+}
+.mp-extra-kind-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mp-extra-kind-title {
+  font-size: calc(12.5px * var(--font-scale));
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.mp-extra-kind-sub {
+  min-width: 0;
+  text-align: right;
+  font-size: calc(10px * var(--font-scale));
+  line-height: 1.4;
+  color: var(--text-3);
+}
+.mp-extra-kinds {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 10px;
+}
+.mp-extra-kind {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mp-extra-kind.on {
+  border-color: var(--kind);
+  background: var(--kind-soft);
+  color: var(--text);
+}
+.mp-extra-kind-badge {
+  flex: none;
+  min-width: 24px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: var(--kind-soft);
+  color: var(--kind);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: .03em;
+}
+.mp-extra-kind-label {
+  overflow: hidden;
+  font-size: calc(11.5px * var(--font-scale));
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-extra-card.is-daily, .mp-extra-kind.is-daily { --kind: #a9784e; --kind-soft: rgba(169, 120, 78, .12); }
+.mp-extra-card.is-meta, .mp-extra-kind.is-meta { --kind: #4d8f79; --kind-soft: rgba(77, 143, 121, .13); }
+.mp-extra-card.is-dream, .mp-extra-kind.is-dream { --kind: #8d78c8; --kind-soft: rgba(141, 120, 200, .13); }
+.mp-extra-card.is-nsfw, .mp-extra-kind.is-nsfw { --kind: #b34d65; --kind-soft: rgba(179, 77, 101, .12); }
+
+.mp-extra-card {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 10px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mp-extra-card-bar {
+  flex: none;
+  width: 4px;
+  background: var(--kind);
+  opacity: .72;
+}
+.mp-extra-card-main {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 2px 12px 12px;
+}
+.mp-extra-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+.mp-extra-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--kind-soft);
+  color: var(--kind);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: .03em;
+}
+.mp-extra-card-title {
+  overflow: hidden;
+  color: var(--text);
+  font-size: calc(14px * var(--font-scale));
+  font-weight: 600;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-extra-card-text {
+  display: -webkit-box;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--text-3);
+  font-family: var(--font-serif);
+  font-size: calc(12px * var(--font-scale));
+  line-height: calc(1.65 * var(--line-scale));
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.mp-extra-card-chevron {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 0 10px 0 4px;
+  color: var(--text-4);
+}
+.mp-extra-card-chevron .mp-i { width: 15px; height: 15px; }
+
+.mp-extra-detail {
+  --ex-text: #3e3429;
+  --ex-muted: rgba(62, 52, 41, .6);
+  --ex-line: rgba(94, 70, 45, .16);
+  --ex-soft: rgba(255, 255, 255, .58);
+  position: relative;
+  min-width: 0;
+  margin-bottom: 10px;
+  padding: 18px 17px 15px;
+  overflow: hidden;
+  border-radius: 22px;
+  background: var(--ex-bg);
+  box-shadow: 0 14px 30px rgba(38, 27, 20, .16);
+  color: var(--ex-text);
+}
+.mp-extra-detail.is-paper {
+  --ex-bg: linear-gradient(145deg, #fffaf0 0%, #f8ecd9 58%, #f2e0c6 100%);
+  --ex-text: #3e3429;
+  --ex-muted: rgba(62, 52, 41, .58);
+  --ex-line: rgba(112, 83, 51, .18);
+  --ex-soft: rgba(255, 255, 255, .52);
+}
+.mp-extra-detail.is-console {
+  --ex-bg: linear-gradient(155deg, #0e1b16, #08110e 70%);
+  --ex-text: #d9efe4;
+  --ex-muted: rgba(185, 220, 203, .56);
+  --ex-line: rgba(123, 188, 159, .2);
+  --ex-soft: rgba(130, 200, 168, .08);
+}
+.mp-extra-detail.is-dream {
+  --ex-bg: linear-gradient(150deg, #1b1b3a 0%, #2b2451 54%, #47345f 100%);
+  --ex-text: #f4edff;
+  --ex-muted: rgba(232, 222, 249, .62);
+  --ex-line: rgba(221, 208, 246, .16);
+  --ex-soft: rgba(255, 255, 255, .08);
+}
+.mp-extra-detail.is-velvet {
+  --ex-bg: linear-gradient(155deg, #2b0d18 0%, #190912 62%, #12060c 100%);
+  --ex-text: #f8e8ec;
+  --ex-muted: rgba(240, 208, 217, .6);
+  --ex-line: rgba(216, 137, 155, .2);
+  --ex-soft: rgba(255, 255, 255, .075);
+}
+.mp-extra-detail.is-console {
+  background-image:
+    repeating-linear-gradient(0deg, rgba(151, 214, 185, .035) 0 1px, transparent 1px 24px),
+    var(--ex-bg);
+}
+.mp-extra-detail.is-dream {
+  background-image:
+    radial-gradient(circle at 82% 14%, rgba(255, 255, 255, .24) 0 1px, transparent 2px),
+    radial-gradient(circle at 68% 34%, rgba(255, 255, 255, .2) 0 1px, transparent 2px),
+    radial-gradient(circle at 23% 74%, rgba(255, 255, 255, .16) 0 1px, transparent 2px),
+    var(--ex-bg);
+}
+.mp-extra-detail.is-velvet {
+  background-image:
+    radial-gradient(ellipse at 50% -10%, rgba(158, 52, 78, .34), transparent 58%),
+    var(--ex-bg);
+}
+.mp-extra-detail * { box-sizing: border-box; }
+
+.mp-extra-cover {
+  position: relative;
+  z-index: 1;
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--ex-line);
+}
+.mp-extra-cover-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.mp-extra-detail .mp-extra-badge {
+  background: var(--ex-soft);
+  color: var(--ex-text);
+}
+.mp-extra-cover-date {
+  color: var(--ex-muted);
+  font-size: calc(10.5px * var(--font-scale));
+  letter-spacing: .04em;
+}
+.mp-extra-title {
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+  font-family: var(--font-serif);
+  font-size: calc(25px * var(--font-scale));
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: .01em;
+}
+.mp-extra-byline {
+  margin-top: 8px;
+  overflow: hidden;
+  color: var(--ex-muted);
+  font-size: calc(11.5px * var(--font-scale));
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-extra-paper-rule {
+  position: absolute;
+  top: 0;
+  right: 24px;
+  left: 24px;
+  height: 4px;
+  background: repeating-linear-gradient(90deg, rgba(164, 122, 77, .36) 0 9px, transparent 9px 15px);
+  opacity: .65;
+}
+.mp-extra-console-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: -4px 0 13px;
+  color: var(--ex-muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 9.5px;
+  letter-spacing: .08em;
+}
+.mp-extra-console-bar span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ex-muted);
+  opacity: .55;
+}
+.mp-extra-console-bar b {
+  margin-left: auto;
+  font-weight: 500;
+  opacity: .78;
+}
+.mp-extra-dream-orb {
+  position: absolute;
+  top: -54px;
+  right: -34px;
+  width: 156px;
+  height: 156px;
+  border: 1px solid rgba(226, 207, 255, .2);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(238, 223, 255, .16), transparent 66%);
+  pointer-events: none;
+}
+.mp-extra-velvet-rule {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(211, 132, 151, .56), transparent);
+}
+
+.mp-extra-detail .mp-extra-source {
+  margin: 13px 0 0;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: var(--ex-soft);
+  box-shadow: inset 0 0 0 1px var(--ex-line);
+  color: var(--ex-muted);
+}
+.mp-extra-detail .mp-extra-source .mp-i { color: var(--ex-muted); }
+
+.mp-extra-sections {
+  position: relative;
+  z-index: 1;
+  padding-top: 3px;
+}
+.mp-extra-section {
+  min-width: 0;
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--ex-line);
+}
+.mp-extra-section:first-child { margin-top: 6px; }
+.mp-extra-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.mp-extra-section-index {
+  flex: none;
+  color: var(--ex-muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 9.5px;
+  letter-spacing: .04em;
+}
+.mp-extra-section-title {
+  overflow-wrap: anywhere;
+  color: var(--ex-text);
+  font-size: calc(12.5px * var(--font-scale));
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: .03em;
+}
+.mp-extra-section-body {
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+  color: var(--ex-text);
+  font-family: var(--font-serif);
+  font-size: calc(14px * var(--font-scale));
+  line-height: calc(1.9 * var(--line-scale));
+  white-space: pre-wrap;
+}
+.mp-extra-foot {
+  margin-top: 18px;
+  padding-top: 11px;
+  border-top: 1px solid var(--ex-line);
+  color: var(--ex-muted);
+  font-size: calc(10px * var(--font-scale));
+  letter-spacing: .04em;
+}
+
+/* 每类页面的骨架差异 */
+.mp-extra-detail.is-paper .mp-extra-section-title { font-family: var(--font-serif); }
+.mp-extra-detail.is-console .mp-extra-title,
+.mp-extra-detail.is-console .mp-extra-section-title,
+.mp-extra-detail.is-console .mp-extra-section-body {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.mp-extra-detail.is-console .mp-extra-title { font-size: calc(21px * var(--font-scale)); }
+.mp-extra-detail.is-console .mp-extra-section { border-top-style: dashed; }
+.mp-extra-detail.is-console .mp-extra-section-title::before {
+  content: "> ";
+  color: var(--ex-muted);
+}
+.mp-extra-detail.is-dream .mp-extra-section {
+  margin-top: 10px;
+  padding: 12px 12px 11px;
+  border: 1px solid var(--ex-line);
+  border-radius: 13px;
+  background: var(--ex-soft);
+}
+.mp-extra-detail.is-dream .mp-extra-section:first-child { margin-top: 6px; }
+.mp-extra-detail.is-dream .mp-extra-section-body { font-style: italic; }
+.mp-extra-detail.is-velvet .mp-extra-title { letter-spacing: .04em; }
+.mp-extra-detail.is-velvet .mp-extra-section-title { color: #f0cad4; }
+.mp-extra-detail.is-velvet .mp-extra-section-body { color: #f7e4e9; }
+
+/* 18+ 门页 */
+.mp-extra-detail.is-gated {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 420px;
+  padding: 26px 18px;
+}
+.mp-extra-gate {
+  width: 100%;
+  max-width: 290px;
+  text-align: center;
+}
+.mp-extra-gate-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 15px;
+  border: 1px solid rgba(244, 205, 215, .4);
+  border-radius: 50%;
+  color: #f6dbe2;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.mp-extra-gate-title {
+  overflow-wrap: anywhere;
+  color: #f8e8ec;
+  font-family: var(--font-serif);
+  font-size: calc(23px * var(--font-scale));
+  font-weight: 700;
+  line-height: 1.36;
+}
+.mp-extra-gate-meta {
+  margin-top: 8px;
+  color: var(--ex-muted);
+  font-size: calc(11px * var(--font-scale));
+}
+.mp-extra-gate-note {
+  margin: 15px 0 18px;
+  color: var(--ex-muted);
+  font-size: calc(12px * var(--font-scale));
+  line-height: calc(1.75 * var(--line-scale));
+}
+.mp-extra-gate-btn {
+  width: 100%;
+  min-height: 40px;
+  justify-content: center;
+}
+.mp-extra-detail.is-velvet .mp-extra-gate-btn {
+  background: #b4546b;
+  color: #fff;
+  box-shadow: 0 9px 18px rgba(86, 17, 34, .3);
+}
+
+/* 主题适配：纸张与梦境在夜间换成低亮版本；Meta / 丝绒保持深色 */
+.mp-root[data-mp-theme="night"] .mp-extra-detail.is-paper {
+  --ex-bg: linear-gradient(145deg, #2d251d 0%, #251d17 60%, #1d1712 100%);
+  --ex-text: #f4e8d6;
+  --ex-muted: rgba(236, 218, 193, .58);
+  --ex-line: rgba(233, 203, 164, .17);
+  --ex-soft: rgba(255, 255, 255, .06);
+}
+.mp-root[data-mp-theme="night"] .mp-extra-detail.is-dream {
+  --ex-bg: linear-gradient(150deg, #101027 0%, #1b1738 56%, #2b1f3e 100%);
+  --ex-soft: rgba(255, 255, 255, .06);
+}
+.mp-root[data-mp-skin="frost"] .mp-extra-filter,
+.mp-root[data-mp-skin="frost"] .mp-extra-kind-panel,
+.mp-root[data-mp-skin="frost"] .mp-extra-card {
+  background: rgba(255, 255, 255, .58);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7);
+}
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-extra-filter,
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-extra-kind-panel,
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-extra-card {
+  background: rgba(44, 44, 48, .6);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
+}
+.mp-root[data-mp-art="pixel"] .mp-extra-filter,
+.mp-root[data-mp-art="pixel"] .mp-extra-kind-panel,
+.mp-root[data-mp-art="pixel"] .mp-extra-card {
+  border-radius: 2px;
+}
+.mp-root[data-mp-art="pixel"] .mp-extra-detail {
+  border-radius: 2px;
+  box-shadow: 4px 4px 0 rgba(30, 26, 34, .18);
+}
+
+@media (max-width: 370px) {
+  .mp-extra-kind-head { display: block; }
+  .mp-extra-kind-sub { margin-top: 3px; text-align: left; }
+  .mp-extra-detail { padding: 16px 14px 13px; }
+  .mp-extra-title { font-size: calc(22px * var(--font-scale)); }
+}
+
 
 
 
@@ -7017,6 +7552,8 @@ function emptyState() {
       user: { name: '我', avatar: '', key: '' },
       /* 主界面顶栏：签名自己写，横幅图自己挑；空着就用酒馆里那份 */
       profile: { bio: '', banner: '' },
+      /* 小剧场：类型影响这一轮写什么；按角色开关仍走 extrasOn */
+      theater: { kind: 'daily' },
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
@@ -7438,6 +7975,68 @@ function latestDiary(state) {
 
 /* ---------------------------------------------------------- 小剧场等 */
 
+/**
+ * 小剧场类型：决定这一轮请模型写什么，以及详情页用哪套美化模板。
+ * 当前先内置四种；后续类型只需要在这里加一项，页面和存储不用复制。
+ */
+const THEATER_KINDS = [
+  {
+    id: 'daily',
+    label: '日常',
+    badge: '日常',
+    sub: '聊天之外的小片段',
+    icon: 'theater',
+    page: 'paper',
+    titles: ['心理活动', '小彩蛋'],
+    prompt: '写一小段贴合角色和当下情境的小剧场：可以写没说出口的情绪、动作或一个生活切片；不替用户决定言行。',
+  },
+  {
+    id: 'meta',
+    label: 'Meta',
+    badge: 'META',
+    sub: '跳出剧情吐个槽',
+    icon: 'code',
+    page: 'console',
+    titles: ['吐槽', '幕后注'],
+    prompt: '写一段 Meta 小剧场：角色可以跳出剧情，吐槽叙事、设定或和“作者/读者”对话；不要把模型的真实推理说成角色的想法，也不要冒充系统提示。',
+  },
+  {
+    id: 'dream',
+    label: '幻想',
+    badge: '梦境',
+    sub: '另一种可能',
+    icon: 'spark',
+    page: 'dream',
+    titles: ['梦境', '醒来'],
+    prompt: '写一段幻想或梦境小剧场：允许意象跳跃、场景变形，但保持角色性格和关系；不替用户决定言行。',
+  },
+  {
+    id: 'nsfw',
+    label: 'NSFW',
+    badge: '18+',
+    sub: '克制的私密片段',
+    icon: 'heart',
+    page: 'velvet',
+    gate: true,
+    titles: ['靠近', '余温'],
+    prompt: '写一段成年角色之间克制的私密小剧场：只写情绪、气氛、关系张力和留白，不写露骨性行为、身体细节或具体动作，也不替用户决定言行。',
+  },
+];
+
+function normalizeTheaterKind(value) {
+  return THEATER_KINDS.some(kind => kind.id === value) ? value : 'daily';
+}
+
+function theaterKindById(value) {
+  const id = normalizeTheaterKind(value);
+  return THEATER_KINDS.find(kind => kind.id === id) || THEATER_KINDS[0];
+}
+
+/** 当前手机选中的小剧场类型；页面和请求共用这一处。 */
+function theaterKindFor(state) {
+  return normalizeTheaterKind(state?.settings?.theater?.kind);
+}
+
 function extrasOf(state, contactId) {
   state.extras[contactId] = state.extras[contactId] || [];
   return state.extras[contactId];
@@ -7449,21 +8048,20 @@ function extrasEnabledFor(state, contactId) {
 }
 
 /** 小剧场的返回协议：正常聊天在前，<phone-extras>JSON</phone-extras> 在后。 */
-function theaterPrompt(contactName) {
+function theaterPrompt(contactName, kind = 'daily') {
   const name = String(contactName || '对方').trim() || '对方';
+  const genre = theaterKindById(kind);
   const shape = JSON.stringify({
     role: name,
-    sections: [
-      { title: '心理活动', content: '……' },
-      { title: '小彩蛋', content: '……' },
-    ],
+    sections: genre.titles.map(title => ({ title, content: '……' })),
   });
   return [
-    `这一轮正常聊天之外，再给「${name}」写一小段小剧场。`,
+    `这一轮正常聊天之外，再给「${name}」写一小段「${genre.label}」小剧场。`,
+    genre.prompt,
     '先完整输出 TA 要发的聊天消息，然后在消息之后另起一行，追加且只追加一个块：',
     `<phone-extras>${shape}</phone-extras>`,
     '这个块不会显示在聊天里，只存进小剧场 App；不要写进聊天正文，不要用代码围栏，也不要为它另发一次请求。',
-    '每节 1–3 句，贴合人设和当下情境；可以写没说出口的小情绪或动作，不替用户决定言行。',
+    '每节 1–3 句，贴合人设和当下情境；不要为小剧场写 HTML，也不要在字符串里再放 <phone-extras> 标签。',
   ].join('\n');
 }
 
@@ -7503,12 +8101,22 @@ function splitTheaterBlocks(text, contactName = '') {
 /** 把一段小剧场并进该联系人的 App 列表；不新增聊天气泡。 */
 function addExtrasEntry(state, contactId, sections, meta = {}) {
   if (!Array.isArray(sections) || !sections.length) return null;
-  const title = sections.map(section => section.title).filter(Boolean).slice(0, 2).join(' · ') || '小剧场';
+  const cleanSections = sections
+    .map(section => ({
+      title: String(section?.title || '').trim().slice(0, 80),
+      content: String(section?.content || '').trim().slice(0, 4000),
+    }))
+    .filter(section => section.title && section.content);
+  if (!cleanSections.length) return null;
+  const kind = normalizeTheaterKind(meta.kind);
+  const title = cleanSections.map(section => section.title).slice(0, 2).join(' · ') || '小剧场';
   const entry = {
     id: newId('x'),
     title,
+    kind,
+    sections: cleanSections,
     date: dayKey(),
-    lines: sections.map(section => `${section.title}：${section.content}`),
+    lines: cleanSections.map(section => `${section.title}：${section.content}`),
     messageId: meta.messageId || '',
     chatId: meta.chatId || '',
     at: Date.now(),
@@ -7756,11 +8364,32 @@ function demoState() {
 
 
   state.extras[shen.id] = [
-    { id: 'x1', title: '楼下的便利店', date: '2026-11-10', messageId: 'ch_demo_shen_m0', chatId: 'ch_demo_shen', lines: ['他把外套领子立起来，靠在电动车上抬头看我的窗户。', '灯管太白，照得人有点狼狈。'] },
-    { id: 'x2', title: '第 41 分钟', date: '2026-11-06', lines: ['他说等 41 分钟就走。', '结果等到第 58 分钟。'] },
+    {
+      id: 'x1', title: '楼下的便利店', kind: 'daily', date: '2026-11-10', messageId: 'ch_demo_shen_m0', chatId: 'ch_demo_shen',
+      sections: [
+        { title: '心理活动', content: '他把外套领子立起来，靠在电动车上抬头看我的窗户。灯管太白，照得人有点狼狈。' },
+        { title: '小彩蛋', content: '他把剩下半个饭团吃掉了，说味道还行。' },
+      ],
+      lines: ['他把外套领子立起来，靠在电动车上抬头看我的窗户。', '灯管太白，照得人有点狼狈。'],
+    },
+    {
+      id: 'x2', title: '第 41 分钟', kind: 'meta', date: '2026-11-06',
+      sections: [
+        { title: '吐槽', content: '他说等 41 分钟就走。这个数字后来被反复引用，像某种只有我们知道的暗号。' },
+        { title: '幕后注', content: '叙事到这里其实已经偏心了，但当事人显然不打算承认。' },
+      ],
+      lines: ['他说等 41 分钟就走。', '结果等到第 58 分钟。'],
+    },
   ];
   state.extras[jiang.id] = [
-    { id: 'x3', title: '车里那首歌', date: '2026-11-02', lines: ['副歌进来的时候他跟着哼了一句。'] },
+    {
+      id: 'x3', title: '车里那首歌', kind: 'dream', date: '2026-11-02',
+      sections: [
+        { title: '梦境', content: '车窗外是一条没有尽头的路，副歌进来的时候他跟着哼了一句。' },
+        { title: '醒来', content: '醒来以后旋律还在，但已经不记得他哼的是哪一句。' },
+      ],
+      lines: ['副歌进来的时候他跟着哼了一句。'],
+    },
   ];
 
   state.plans = [
@@ -7894,6 +8523,10 @@ function normalize(raw) {
       ? profileRaw.banner
       : '',
   };
+  merged.settings.theater = {
+    ...(merged.settings.theater && typeof merged.settings.theater === 'object' ? merged.settings.theater : {}),
+    kind: normalizeTheaterKind(raw.settings?.theater?.kind ?? raw.settings?.theaterKind),
+  };
   const dressRaw = raw.settings?.dress && typeof raw.settings.dress === 'object' && !Array.isArray(raw.settings.dress)
     ? raw.settings.dress
     : {};
@@ -8013,7 +8646,37 @@ function normalize(raw) {
   merged.music.current = merged.music.current && typeof merged.music.current === 'object'
     ? merged.music.current
     : null;
-  merged.extras = merged.extras || {};
+  merged.extras = merged.extras && typeof merged.extras === 'object' && !Array.isArray(merged.extras)
+    ? Object.fromEntries(Object.entries(merged.extras).map(([contactId, list]) => [
+      contactId,
+      (Array.isArray(list) ? list : []).slice(0, 1000).map((entry, index) => {
+        const lines = Array.isArray(entry?.lines)
+          ? entry.lines.map(line => String(line || '').trim()).filter(Boolean).slice(0, 12)
+          : [];
+        const sections = Array.isArray(entry?.sections)
+          ? entry.sections.map(section => ({
+            title: String(section?.title || '').trim().slice(0, 80),
+            content: String(section?.content || '').trim().slice(0, 4000),
+          })).filter(section => section.title && section.content).slice(0, 6)
+          : [];
+        if (!sections.length) {
+          lines.forEach(line => {
+            const at = line.indexOf('：');
+            const title = at > 0 ? line.slice(0, at).trim().slice(0, 80) : '片段';
+            const content = (at > 0 ? line.slice(at + 1) : line).trim().slice(0, 4000);
+            if (title && content) sections.push({ title, content });
+          });
+        }
+        return {
+          ...entry,
+          id: String(entry?.id || `x_${contactId}_${index}`),
+          kind: normalizeTheaterKind(entry?.kind),
+          lines,
+          sections: sections.slice(0, 6),
+        };
+      }).filter(entry => entry.id),
+    ]))
+    : {};
   merged.extrasOn = Array.isArray(merged.extrasOn) ? merged.extrasOn.map(String) : [];
   merged.favorites = Array.isArray(merged.favorites) ? merged.favorites : [];
   merged.emoji = Array.isArray(merged.emoji) && merged.emoji.length ? merged.emoji : base.emoji;
@@ -8074,6 +8737,10 @@ exports["dayKey"] = dayKey;
 exports["diaryEntry"] = diaryEntry;
 exports["writeDiary"] = writeDiary;
 exports["latestDiary"] = latestDiary;
+exports["THEATER_KINDS"] = THEATER_KINDS;
+exports["normalizeTheaterKind"] = normalizeTheaterKind;
+exports["theaterKindById"] = theaterKindById;
+exports["theaterKindFor"] = theaterKindFor;
 exports["extrasOf"] = extrasOf;
 exports["extrasEnabledFor"] = extrasEnabledFor;
 exports["theaterPrompt"] = theaterPrompt;
@@ -10915,7 +11582,7 @@ __mods["meme/apps/chat.js"] = function(module, exports, __req){
 const { icon } = __req("meme/icons.js");
 const {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
-  wakeAllowed, messagePreview, addExtrasEntry,
+  wakeAllowed, messagePreview, addExtrasEntry, theaterKindFor,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, normalizeReplyItems,
 } = __req("meme/data.js");
@@ -11111,6 +11778,8 @@ function saveMessageExtra(ctx, chat, contact, message) {
   const item = {
     id: 'x' + Date.now().toString(36),
     title: (message.text || '这一条').slice(0, 12),
+    kind: theaterKindFor(ctx.state),
+    sections: [{ title: '原文', content: message.text || '' }],
     date: new Date(message.at || Date.now()).toLocaleDateString('sv-SE'),
     lines: [message.text || ''],
     messageId: message.id,
@@ -11463,10 +12132,12 @@ function reply(ctx, chat, contact, replaceId = '') {
   setTimeout(async () => {
     let text = '';
     let sections = [];
+    let kind = '';
     try {
       const result = await ctx.ai.reply(ctx, chat, contact, pick(poolFor(contact)));
       text = typeof result === 'string' ? result : String(result?.text || '');
       sections = Array.isArray(result?.sections) ? result.sections : [];
+      kind = String(result?.kind || '');
     } catch {
       text = '';
     }
@@ -11482,7 +12153,11 @@ function reply(ctx, chat, contact, replaceId = '') {
         saved = pushMessage(ctx.state, chat.id, { from: 'them', text });
       }
       if (saved && sections.length) {
-        addExtrasEntry(ctx.state, contact?.id || chat.contactId, sections, { chatId: chat.id, messageId: saved.id });
+        addExtrasEntry(ctx.state, contact?.id || chat.contactId, sections, {
+          chatId: chat.id,
+          messageId: saved.id,
+          kind: kind || theaterKindFor(ctx.state),
+        });
         ctx.toast('这轮的小剧场收进 App 了');
       }
     } else if (replaceId) {
@@ -12976,7 +13651,7 @@ __mods["meme/apps/more.js"] = function(module, exports, __req){
 
 const { icon, ICON_NAMES, ICON_LABELS, APP_ICON_TARGETS } = __req("meme/icons.js");
 const { esc, tintStyle, chatAvatarHtml } = __req("meme/shell.js");
-const { contactsOf, contactById, extrasOf } = __req("meme/data.js");
+const { contactsOf, contactById, extrasOf, THEATER_KINDS, normalizeTheaterKind, theaterKindById, theaterKindFor } = __req("meme/data.js");
 const { PIXEL_BUNNY } = __req("meme/theme-data.js");
 
 function head(title, sub) {
@@ -12985,6 +13660,19 @@ function head(title, sub) {
 
 /* --------------------------------------------------------- 小剧场 */
 
+let extrasFilter = 'all';
+let nsfwUnlockedId = '';
+
+function extraKindOf(item) {
+  return theaterKindById(item?.kind);
+}
+
+function extraSummary(item) {
+  const kind = extraKindOf(item);
+  if (kind.gate) return '18+ · 进入后确认';
+  return String((item.lines || []).join(' ')).slice(0, 120);
+}
+
 const extrasApp = {
   id: 'extras', name: '小剧场', icon: 'theater',
 
@@ -12992,32 +13680,62 @@ const extrasApp = {
     const filter = params.contactId;
     const groups = contactsOf(ctx.state)
       .filter(contact => !filter || contact.id === filter)
-      .map(contact => ({ contact, list: ctx.state.extras[contact.id] || [] }))
+      .map(contact => ({
+        contact,
+        list: (ctx.state.extras[contact.id] || []).filter(item => extrasFilter === 'all' || extraKindOf(item).id === extrasFilter),
+      }))
       .filter(group => group.list.length);
+
+    const filters = [{ id: 'all', label: '全部', badge: '' }, ...THEATER_KINDS.map(kind => ({
+      id: kind.id,
+      label: kind.label,
+      badge: kind.badge && kind.badge.toLowerCase() !== kind.label.toLowerCase() ? kind.badge : '',
+    }))];
+    const filterBar = `
+      <div class="mp-extra-filters" role="tablist" aria-label="小剧场类型">
+        ${filters.map(kind => `
+          <button class="mp-extra-filter${extrasFilter === kind.id ? ' on' : ''}" data-act="extra-filter" data-kind="${kind.id}" type="button">
+            ${kind.badge ? `<span class="mp-extra-filter-badge">${esc(kind.badge)}</span>` : ''}${esc(kind.label)}
+          </button>`).join('')}
+      </div>`;
 
     const cards = groups.map(group => `
       <div class="mp-group-label" style="margin-top:12px">${esc(group.contact.name)} · ${group.list.length} 段</div>
-      ${group.list.map(item => `
-        <button class="mp-card" data-act="open-extra" data-contact="${group.contact.id}" data-extra="${item.id}" type="button" style="display:block;width:100%;text-align:left;border:0;font:inherit;cursor:pointer">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <span class="mp-pill">${esc(item.date || '')}</span>
-            <span style="font-size: calc(13.5px * var(--font-scale));font-weight:600">${esc(item.title)}</span>
+      ${group.list.map(item => {
+        const kind = extraKindOf(item);
+        return `
+        <button class="mp-extra-card is-${kind.id}" data-act="open-extra" data-contact="${group.contact.id}" data-extra="${item.id}" type="button">
+          <span class="mp-extra-card-bar"></span>
+          <div class="mp-extra-card-main">
+            <div class="mp-extra-card-meta">
+              <span class="mp-extra-badge">${esc(kind.badge)}</span>
+              <span class="mp-pill">${esc(item.date || '')}</span>
+            </div>
+            <div class="mp-extra-card-title">${esc(item.title)}</div>
+            <div class="mp-extra-card-text">${esc(extraSummary(item))}</div>
           </div>
-          <div style="font-family:var(--font-serif);font-size: calc(12.5px * var(--font-scale));line-height: calc(1.7 * var(--line-scale));color:var(--text-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc((item.lines || []).join(' '))}</div>
-        </button>`).join('')}`).join('');
+          <span class="mp-extra-card-chevron">${icon('chevron')}</span>
+        </button>`;
+      }).join('')}`).join('');
 
-    return `<div class="mp-page-body">${head('小剧场', '聊天之外的那些片段')}${cards || '<div class="mp-empty">还没有片段。<br>在加号菜单的「小剧场」里打开某个角色的开关，之后聊完就会自动收到一段。</div>'}</div>`;
+    return `<div class="mp-page-body">${head('小剧场', '聊天之外的那些片段')}${filterBar}${cards || '<div class="mp-empty">这个类型还没有片段。<br>在加号菜单的「小剧场」里打开开关，聊完就会自动收到一段。</div>'}</div>`;
   },
 
   handle(ctx, act, data) {
+    if (act === 'extra-filter') {
+      extrasFilter = THEATER_KINDS.some(kind => kind.id === data.kind) ? data.kind : 'all';
+      ctx.rerender();
+      return true;
+    }
     if (act === 'open-extra') {
       const contact = contactById(ctx.state, data.contact);
       const item = (ctx.state.extras[data.contact] || []).find(entry => entry.id === data.extra);
       if (!contact || !item) return true;
+      const kind = extraKindOf(item);
       ctx.openSheet({
         title: `${contact.name} · ${item.date || ''}`,
         items: [
-          { label: '读这一段', value: 'read', icon: 'theater' },
+          { label: `读这一段 · ${kind.label}`, value: 'read', icon: kind.icon },
           { label: '删掉这一段', value: 'delete', icon: 'trash', danger: true },
         ],
         onPick: (value) => {
@@ -13045,6 +13763,22 @@ const extrasSwitchApp = {
     const contacts = contactsOf(ctx.state);
     const on = new Set(ctx.state.extrasOn || []);
     const allOn = contacts.length > 0 && contacts.every(contact => on.has(contact.id));
+    const current = theaterKindById(theaterKindFor(ctx.state));
+
+    const kindPicker = `
+      <div class="mp-extra-kind-panel">
+        <div class="mp-extra-kind-head">
+          <div class="mp-extra-kind-title">这轮写哪种</div>
+          <div class="mp-extra-kind-sub">开关只决定带不带；类型决定写哪一种小剧场</div>
+        </div>
+        <div class="mp-extra-kinds">
+          ${THEATER_KINDS.map(kind => `
+            <button class="mp-extra-kind${current.id === kind.id ? ' on' : ''} is-${kind.id}" data-act="extra-kind" data-kind="${kind.id}" type="button">
+              ${kind.badge && kind.badge.toLowerCase() !== kind.label.toLowerCase() ? `<span class="mp-extra-kind-badge">${esc(kind.badge)}</span>` : ''}
+              <span class="mp-extra-kind-label">${esc(kind.label)}</span>
+            </button>`).join('')}
+        </div>
+      </div>`;
 
     const rows = contacts.map(contact => {
       const count = (ctx.state.extras[contact.id] || []).length;
@@ -13054,7 +13788,7 @@ const extrasSwitchApp = {
           ${chatAvatarHtml(contact)}
           <div class="mp-row-main">
             <div class="mp-row-name">${esc(contact.name)}</div>
-            <div class="mp-row-sub">${count ? `${count} 段 · ` : ''}${enabled ? '这轮会带小剧场' : '只聊天'}</div>
+            <div class="mp-row-sub">${count ? `${count} 段 · ` : ''}${enabled ? `这轮会带${esc(current.label)}小剧场` : '只聊天'}</div>
           </div>
           <span class="mp-switch${enabled ? ' on' : ''}"></span>
         </button>`;
@@ -13063,6 +13797,7 @@ const extrasSwitchApp = {
     return `
       <div class="mp-page-body">
         <div class="mp-subtitle" style="margin-top:0">小剧场 · 打开后，这一轮回复会让 AI 附一段小剧场；内容只进小剧场 App，不在聊天里显示</div>
+        ${kindPicker}
         <button class="mp-row" data-act="extras-toggle-all" type="button" style="width:100%;margin-top:10px">
           <span class="mp-set-ico">${icon('theater')}</span>
           <div class="mp-row-main">
@@ -13079,6 +13814,15 @@ const extrasSwitchApp = {
   handle(ctx, act, data) {
     const on = (ctx.state.extrasOn = Array.isArray(ctx.state.extrasOn) ? ctx.state.extrasOn : []);
     const contacts = contactsOf(ctx.state);
+
+    if (act === 'extra-kind') {
+      const kind = theaterKindById(data.kind);
+      ctx.state.settings.theater = { ...(ctx.state.settings.theater || {}), kind: kind.id };
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`这轮写${kind.label}小剧场`);
+      return true;
+    }
 
     if (act === 'extra-toggle') {
       const contact = contactById(ctx.state, data.contact);
@@ -13114,6 +13858,26 @@ const extrasSwitchApp = {
   },
 };
 
+function extraSectionsFor(item) {
+  if (Array.isArray(item?.sections) && item.sections.length) {
+    return item.sections
+      .map(section => ({
+        title: String(section?.title || '').trim(),
+        content: String(section?.content || '').trim(),
+      }))
+      .filter(section => section.title && section.content);
+  }
+  return (item?.lines || [])
+    .map(line => String(line || '').trim())
+    .filter(Boolean)
+    .map(line => {
+      const at = line.indexOf('：');
+      return at > 0
+        ? { title: line.slice(0, at).trim(), content: line.slice(at + 1).trim() }
+        : { title: '片段', content: line };
+    });
+}
+
 const extraDetailApp = {
   id: 'extra-detail', name: '片段', icon: 'theater',
 
@@ -13128,17 +13892,70 @@ const extraDetailApp = {
     }
     const contact = contactById(ctx.state, ownerId);
     if (!item) return `<div class="mp-page-body"><div class="mp-empty">这一段不在了。</div></div>`;
+    const kind = extraKindOf(item);
     const sourceChat = item.chatId ? ctx.state.chats[item.chatId] : null;
     const source = sourceChat?.messages?.find(message => message.id === item.messageId);
-    return `
-      <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button><span style="flex:1"></span></div>
+    const nav = `<div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button><span style="flex:1"></span></div>`;
+
+    if (kind.gate && nsfwUnlockedId !== item.id) {
+      return `${nav}
+        <div class="mp-page-body">
+          <div class="mp-extra-detail is-${kind.page} is-gated" data-kind="${kind.id}">
+            <div class="mp-extra-gate">
+              <div class="mp-extra-gate-badge">${esc(kind.badge)}</div>
+              <div class="mp-extra-gate-title">${esc(item.title)}</div>
+              <div class="mp-extra-gate-meta">${esc(contact?.name || '')} · ${esc(item.date || '')}</div>
+              <p class="mp-extra-gate-note">这段是成年角色之间克制的私密片段。确认后才会显示正文，内容只保留情绪、气氛和留白。</p>
+              <button class="mp-btn accent mp-extra-gate-btn" data-act="extra-unlock" data-extra="${item.id}" type="button">我已成年，查看</button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    const sections = extraSectionsFor(item);
+    const coverRule = kind.id === 'daily'
+      ? '<span class="mp-extra-paper-rule"></span>'
+      : kind.id === 'meta'
+        ? '<div class="mp-extra-console-bar"><span></span><span></span><span></span><b>META / NOTE</b></div>'
+        : kind.id === 'dream'
+          ? '<div class="mp-extra-dream-orb" aria-hidden="true"></div>'
+          : '<div class="mp-extra-velvet-rule" aria-hidden="true"></div>';
+
+    return `${nav}
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-bottom:6px">${esc(contact?.name || '')} · ${esc(item.date || '')}</div>
-        <div class="mp-title" style="font-size: calc(24px * var(--font-scale));margin-bottom:14px">${esc(item.title)}</div>
-        ${source ? `<div class="mp-extra-source">${icon('reply')}<span>${esc(source.text)}</span></div>` : ''}
-        ${(item.lines || []).map(line => `
-          <div style="font-family:var(--font-serif);font-size: calc(14px * var(--font-scale));line-height: calc(1.9 * var(--line-scale));color:var(--text);margin-bottom:10px">${esc(line)}</div>`).join('')}
+        <div class="mp-extra-detail is-${kind.page}" data-kind="${kind.id}">
+          ${coverRule}
+          <div class="mp-extra-cover">
+            <div class="mp-extra-cover-top">
+              <span class="mp-extra-badge">${esc(kind.badge)}</span>
+              <span class="mp-extra-cover-date">${esc(item.date || '')}</span>
+            </div>
+            <div class="mp-extra-title">${esc(item.title)}</div>
+            <div class="mp-extra-byline">${esc(contact?.name || '')} · ${esc(kind.sub)}</div>
+          </div>
+          ${source && !kind.gate ? `<div class="mp-extra-source">${icon('reply')}<span>${esc(source.text)}</span></div>` : ''}
+          <div class="mp-extra-sections">
+            ${sections.map((section, index) => `
+              <section class="mp-extra-section">
+                <div class="mp-extra-section-head">
+                  <span class="mp-extra-section-index">${String(index + 1).padStart(2, '0')}</span>
+                  <span class="mp-extra-section-title">${esc(section.title)}</span>
+                </div>
+                <div class="mp-extra-section-body">${esc(section.content)}</div>
+              </section>`).join('')}
+          </div>
+          <div class="mp-extra-foot">${esc(kind.label)} 小剧场 · 只保存在本地</div>
+        </div>
       </div>`;
+  },
+
+  handle(ctx, act, data) {
+    if (act === 'extra-unlock') {
+      nsfwUnlockedId = String(data.extra || '');
+      ctx.rerender();
+      return true;
+    }
+    return false;
   },
 };
 
@@ -19927,7 +20744,6 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
   const memoryText = String(options.memoryText || '');
 
   if (options.lead) messages.push({ role: 'system', content: options.lead, source: '场景提示' });
-  if (options.extraPrompt) messages.push({ role: 'system', content: String(options.extraPrompt), source: '小剧场' });
 
   const seen = new Set();
   let used = 0;
@@ -19977,6 +20793,9 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
     reportItems.push({ ...base, status: 'injected', chars: content.length, reason: block.reason || '' });
   }
 
+  /* 小剧场放在全部预设条目之后、最后一条聊天之前，避免被前面的回复格式/行为条目盖掉。 */
+  if (options.extraPrompt) messages.push({ role: 'system', content: String(options.extraPrompt), source: '小剧场' });
+
   if (chat && !options.omitLastUser) {
     const last = chat.messages?.[chat.messages.length - 1];
     if (last && !options.proactive) {
@@ -20023,7 +20842,7 @@ __mods["meme/index.js"] = function(module, exports, __req){
  */
 
 const { createStore } = __req("meme/store.js");
-const { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, splitTheaterBlocks } = __req("meme/data.js");
+const { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks } = __req("meme/data.js");
 const { createShell, applyWall, applyLook } = __req("meme/shell.js");
 const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } = __req("meme/host.js");
 const { chatApp, threadApp, threadSettingsApp } = __req("meme/apps/chat.js");
@@ -20123,24 +20942,25 @@ function makeAi(state) {
     const ctxSettings = replyContextFor(state, chat);
     const memoryLimit = options.proactive ? 900 : 1200;
     const storyBlock = ctxSettings.memory ? await story(chat, memoryLimit) : { text: '' };
+    const theaterKind = theaterKindFor(state);
     const wantsTheater = !options.proactive && extrasEnabledFor(state, contact?.id);
     const built = await buildReplyMessages(state, chat, contact, {
       memoryText: String(storyBlock?.text || ''),
       lead: options.proactive ? proactiveLead(state, contact) : replyLead(contact),
-      extraPrompt: wantsTheater ? theaterPrompt(contact?.name) : '',
+      extraPrompt: wantsTheater ? theaterPrompt(contact?.name, theaterKind) : '',
       proactive: Boolean(options.proactive),
       omitLastUser: Boolean(options.omitLastUser),
     });
-    return { built, wantsTheater, ctxSettings };
+    return { built, wantsTheater, theaterKind, ctxSettings };
   }
 
   return {
     async reply(context, chat, contact, demoReply) {
-      const { built, wantsTheater } = await compose(chat, contact);
+      const { built, wantsTheater, theaterKind } = await compose(chat, contact);
       const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
-      if (!wantsTheater) return { text: result.text, sections: [] };
+      if (!wantsTheater) return { text: result.text, sections: [], kind: '' };
       const split = splitTheaterBlocks(result.text, contact?.name);
-      return { text: split.text, sections: split.sections };
+      return { text: split.text, sections: split.sections, kind: theaterKind };
     },
 
     /**
@@ -20155,6 +20975,7 @@ function makeAi(state) {
         chat?.messages?.length || 0,
         last?.id || '',
         extrasEnabledFor(state, contact?.id) ? 'theater' : 'plain',
+        theaterKindFor(state),
         replyContextFor(state, chat).memory ? 'memory' : 'nomemory',
         state.settings?.memory?.activeId || '',
         state.settings?.memory?.readMode || '',

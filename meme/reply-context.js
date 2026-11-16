@@ -322,7 +322,6 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
   const memoryText = String(options.memoryText || '');
 
   if (options.lead) messages.push({ role: 'system', content: options.lead, source: '场景提示' });
-  if (options.extraPrompt) messages.push({ role: 'system', content: String(options.extraPrompt), source: '小剧场' });
 
   const seen = new Set();
   let used = 0;
@@ -371,6 +370,9 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
     messages.push({ role: item.role || 'system', content, source: item.label, id: item.id });
     reportItems.push({ ...base, status: 'injected', chars: content.length, reason: block.reason || '' });
   }
+
+  /* 小剧场放在全部预设条目之后、最后一条聊天之前，避免被前面的回复格式/行为条目盖掉。 */
+  if (options.extraPrompt) messages.push({ role: 'system', content: String(options.extraPrompt), source: '小剧场' });
 
   if (chat && !options.omitLastUser) {
     const last = chat.messages?.[chat.messages.length - 1];

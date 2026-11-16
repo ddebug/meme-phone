@@ -5,7 +5,7 @@
 
 import { icon, ICON_NAMES, ICON_LABELS, APP_ICON_TARGETS } from '../icons.js';
 import { esc, tintStyle, chatAvatarHtml } from '../shell.js';
-import { contactsOf, contactById, extrasOf } from '../data.js';
+import { contactsOf, contactById, extrasOf, THEATER_KINDS, normalizeTheaterKind, theaterKindById, theaterKindFor } from '../data.js';
 import { PIXEL_BUNNY } from '../theme-data.js';
 
 function head(title, sub) {
@@ -14,6 +14,19 @@ function head(title, sub) {
 
 /* --------------------------------------------------------- 小剧场 */
 
+let extrasFilter = 'all';
+let nsfwUnlockedId = '';
+
+function extraKindOf(item) {
+  return theaterKindById(item?.kind);
+}
+
+function extraSummary(item) {
+  const kind = extraKindOf(item);
+  if (kind.gate) return '18+ · 进入后确认';
+  return String((item.lines || []).join(' ')).slice(0, 120);
+}
+
 export const extrasApp = {
   id: 'extras', name: '小剧场', icon: 'theater',
 
@@ -21,32 +34,62 @@ export const extrasApp = {
     const filter = params.contactId;
     const groups = contactsOf(ctx.state)
       .filter(contact => !filter || contact.id === filter)
-      .map(contact => ({ contact, list: ctx.state.extras[contact.id] || [] }))
+      .map(contact => ({
+        contact,
+        list: (ctx.state.extras[contact.id] || []).filter(item => extrasFilter === 'all' || extraKindOf(item).id === extrasFilter),
+      }))
       .filter(group => group.list.length);
+
+    const filters = [{ id: 'all', label: '全部', badge: '' }, ...THEATER_KINDS.map(kind => ({
+      id: kind.id,
+      label: kind.label,
+      badge: kind.badge && kind.badge.toLowerCase() !== kind.label.toLowerCase() ? kind.badge : '',
+    }))];
+    const filterBar = `
+      <div class="mp-extra-filters" role="tablist" aria-label="小剧场类型">
+        ${filters.map(kind => `
+          <button class="mp-extra-filter${extrasFilter === kind.id ? ' on' : ''}" data-act="extra-filter" data-kind="${kind.id}" type="button">
+            ${kind.badge ? `<span class="mp-extra-filter-badge">${esc(kind.badge)}</span>` : ''}${esc(kind.label)}
+          </button>`).join('')}
+      </div>`;
 
     const cards = groups.map(group => `
       <div class="mp-group-label" style="margin-top:12px">${esc(group.contact.name)} · ${group.list.length} 段</div>
-      ${group.list.map(item => `
-        <button class="mp-card" data-act="open-extra" data-contact="${group.contact.id}" data-extra="${item.id}" type="button" style="display:block;width:100%;text-align:left;border:0;font:inherit;cursor:pointer">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <span class="mp-pill">${esc(item.date || '')}</span>
-            <span style="font-size: calc(13.5px * var(--font-scale));font-weight:600">${esc(item.title)}</span>
+      ${group.list.map(item => {
+        const kind = extraKindOf(item);
+        return `
+        <button class="mp-extra-card is-${kind.id}" data-act="open-extra" data-contact="${group.contact.id}" data-extra="${item.id}" type="button">
+          <span class="mp-extra-card-bar"></span>
+          <div class="mp-extra-card-main">
+            <div class="mp-extra-card-meta">
+              <span class="mp-extra-badge">${esc(kind.badge)}</span>
+              <span class="mp-pill">${esc(item.date || '')}</span>
+            </div>
+            <div class="mp-extra-card-title">${esc(item.title)}</div>
+            <div class="mp-extra-card-text">${esc(extraSummary(item))}</div>
           </div>
-          <div style="font-family:var(--font-serif);font-size: calc(12.5px * var(--font-scale));line-height: calc(1.7 * var(--line-scale));color:var(--text-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc((item.lines || []).join(' '))}</div>
-        </button>`).join('')}`).join('');
+          <span class="mp-extra-card-chevron">${icon('chevron')}</span>
+        </button>`;
+      }).join('')}`).join('');
 
-    return `<div class="mp-page-body">${head('小剧场', '聊天之外的那些片段')}${cards || '<div class="mp-empty">还没有片段。<br>在加号菜单的「小剧场」里打开某个角色的开关，之后聊完就会自动收到一段。</div>'}</div>`;
+    return `<div class="mp-page-body">${head('小剧场', '聊天之外的那些片段')}${filterBar}${cards || '<div class="mp-empty">这个类型还没有片段。<br>在加号菜单的「小剧场」里打开开关，聊完就会自动收到一段。</div>'}</div>`;
   },
 
   handle(ctx, act, data) {
+    if (act === 'extra-filter') {
+      extrasFilter = THEATER_KINDS.some(kind => kind.id === data.kind) ? data.kind : 'all';
+      ctx.rerender();
+      return true;
+    }
     if (act === 'open-extra') {
       const contact = contactById(ctx.state, data.contact);
       const item = (ctx.state.extras[data.contact] || []).find(entry => entry.id === data.extra);
       if (!contact || !item) return true;
+      const kind = extraKindOf(item);
       ctx.openSheet({
         title: `${contact.name} · ${item.date || ''}`,
         items: [
-          { label: '读这一段', value: 'read', icon: 'theater' },
+          { label: `读这一段 · ${kind.label}`, value: 'read', icon: kind.icon },
           { label: '删掉这一段', value: 'delete', icon: 'trash', danger: true },
         ],
         onPick: (value) => {
@@ -74,6 +117,22 @@ export const extrasSwitchApp = {
     const contacts = contactsOf(ctx.state);
     const on = new Set(ctx.state.extrasOn || []);
     const allOn = contacts.length > 0 && contacts.every(contact => on.has(contact.id));
+    const current = theaterKindById(theaterKindFor(ctx.state));
+
+    const kindPicker = `
+      <div class="mp-extra-kind-panel">
+        <div class="mp-extra-kind-head">
+          <div class="mp-extra-kind-title">这轮写哪种</div>
+          <div class="mp-extra-kind-sub">开关只决定带不带；类型决定写哪一种小剧场</div>
+        </div>
+        <div class="mp-extra-kinds">
+          ${THEATER_KINDS.map(kind => `
+            <button class="mp-extra-kind${current.id === kind.id ? ' on' : ''} is-${kind.id}" data-act="extra-kind" data-kind="${kind.id}" type="button">
+              ${kind.badge && kind.badge.toLowerCase() !== kind.label.toLowerCase() ? `<span class="mp-extra-kind-badge">${esc(kind.badge)}</span>` : ''}
+              <span class="mp-extra-kind-label">${esc(kind.label)}</span>
+            </button>`).join('')}
+        </div>
+      </div>`;
 
     const rows = contacts.map(contact => {
       const count = (ctx.state.extras[contact.id] || []).length;
@@ -83,7 +142,7 @@ export const extrasSwitchApp = {
           ${chatAvatarHtml(contact)}
           <div class="mp-row-main">
             <div class="mp-row-name">${esc(contact.name)}</div>
-            <div class="mp-row-sub">${count ? `${count} 段 · ` : ''}${enabled ? '这轮会带小剧场' : '只聊天'}</div>
+            <div class="mp-row-sub">${count ? `${count} 段 · ` : ''}${enabled ? `这轮会带${esc(current.label)}小剧场` : '只聊天'}</div>
           </div>
           <span class="mp-switch${enabled ? ' on' : ''}"></span>
         </button>`;
@@ -92,6 +151,7 @@ export const extrasSwitchApp = {
     return `
       <div class="mp-page-body">
         <div class="mp-subtitle" style="margin-top:0">小剧场 · 打开后，这一轮回复会让 AI 附一段小剧场；内容只进小剧场 App，不在聊天里显示</div>
+        ${kindPicker}
         <button class="mp-row" data-act="extras-toggle-all" type="button" style="width:100%;margin-top:10px">
           <span class="mp-set-ico">${icon('theater')}</span>
           <div class="mp-row-main">
@@ -108,6 +168,15 @@ export const extrasSwitchApp = {
   handle(ctx, act, data) {
     const on = (ctx.state.extrasOn = Array.isArray(ctx.state.extrasOn) ? ctx.state.extrasOn : []);
     const contacts = contactsOf(ctx.state);
+
+    if (act === 'extra-kind') {
+      const kind = theaterKindById(data.kind);
+      ctx.state.settings.theater = { ...(ctx.state.settings.theater || {}), kind: kind.id };
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`这轮写${kind.label}小剧场`);
+      return true;
+    }
 
     if (act === 'extra-toggle') {
       const contact = contactById(ctx.state, data.contact);
@@ -143,6 +212,26 @@ export const extrasSwitchApp = {
   },
 };
 
+function extraSectionsFor(item) {
+  if (Array.isArray(item?.sections) && item.sections.length) {
+    return item.sections
+      .map(section => ({
+        title: String(section?.title || '').trim(),
+        content: String(section?.content || '').trim(),
+      }))
+      .filter(section => section.title && section.content);
+  }
+  return (item?.lines || [])
+    .map(line => String(line || '').trim())
+    .filter(Boolean)
+    .map(line => {
+      const at = line.indexOf('：');
+      return at > 0
+        ? { title: line.slice(0, at).trim(), content: line.slice(at + 1).trim() }
+        : { title: '片段', content: line };
+    });
+}
+
 export const extraDetailApp = {
   id: 'extra-detail', name: '片段', icon: 'theater',
 
@@ -157,17 +246,70 @@ export const extraDetailApp = {
     }
     const contact = contactById(ctx.state, ownerId);
     if (!item) return `<div class="mp-page-body"><div class="mp-empty">这一段不在了。</div></div>`;
+    const kind = extraKindOf(item);
     const sourceChat = item.chatId ? ctx.state.chats[item.chatId] : null;
     const source = sourceChat?.messages?.find(message => message.id === item.messageId);
-    return `
-      <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button><span style="flex:1"></span></div>
+    const nav = `<div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button><span style="flex:1"></span></div>`;
+
+    if (kind.gate && nsfwUnlockedId !== item.id) {
+      return `${nav}
+        <div class="mp-page-body">
+          <div class="mp-extra-detail is-${kind.page} is-gated" data-kind="${kind.id}">
+            <div class="mp-extra-gate">
+              <div class="mp-extra-gate-badge">${esc(kind.badge)}</div>
+              <div class="mp-extra-gate-title">${esc(item.title)}</div>
+              <div class="mp-extra-gate-meta">${esc(contact?.name || '')} · ${esc(item.date || '')}</div>
+              <p class="mp-extra-gate-note">这段是成年角色之间克制的私密片段。确认后才会显示正文，内容只保留情绪、气氛和留白。</p>
+              <button class="mp-btn accent mp-extra-gate-btn" data-act="extra-unlock" data-extra="${item.id}" type="button">我已成年，查看</button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    const sections = extraSectionsFor(item);
+    const coverRule = kind.id === 'daily'
+      ? '<span class="mp-extra-paper-rule"></span>'
+      : kind.id === 'meta'
+        ? '<div class="mp-extra-console-bar"><span></span><span></span><span></span><b>META / NOTE</b></div>'
+        : kind.id === 'dream'
+          ? '<div class="mp-extra-dream-orb" aria-hidden="true"></div>'
+          : '<div class="mp-extra-velvet-rule" aria-hidden="true"></div>';
+
+    return `${nav}
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-bottom:6px">${esc(contact?.name || '')} · ${esc(item.date || '')}</div>
-        <div class="mp-title" style="font-size: calc(24px * var(--font-scale));margin-bottom:14px">${esc(item.title)}</div>
-        ${source ? `<div class="mp-extra-source">${icon('reply')}<span>${esc(source.text)}</span></div>` : ''}
-        ${(item.lines || []).map(line => `
-          <div style="font-family:var(--font-serif);font-size: calc(14px * var(--font-scale));line-height: calc(1.9 * var(--line-scale));color:var(--text);margin-bottom:10px">${esc(line)}</div>`).join('')}
+        <div class="mp-extra-detail is-${kind.page}" data-kind="${kind.id}">
+          ${coverRule}
+          <div class="mp-extra-cover">
+            <div class="mp-extra-cover-top">
+              <span class="mp-extra-badge">${esc(kind.badge)}</span>
+              <span class="mp-extra-cover-date">${esc(item.date || '')}</span>
+            </div>
+            <div class="mp-extra-title">${esc(item.title)}</div>
+            <div class="mp-extra-byline">${esc(contact?.name || '')} · ${esc(kind.sub)}</div>
+          </div>
+          ${source && !kind.gate ? `<div class="mp-extra-source">${icon('reply')}<span>${esc(source.text)}</span></div>` : ''}
+          <div class="mp-extra-sections">
+            ${sections.map((section, index) => `
+              <section class="mp-extra-section">
+                <div class="mp-extra-section-head">
+                  <span class="mp-extra-section-index">${String(index + 1).padStart(2, '0')}</span>
+                  <span class="mp-extra-section-title">${esc(section.title)}</span>
+                </div>
+                <div class="mp-extra-section-body">${esc(section.content)}</div>
+              </section>`).join('')}
+          </div>
+          <div class="mp-extra-foot">${esc(kind.label)} 小剧场 · 只保存在本地</div>
+        </div>
       </div>`;
+  },
+
+  handle(ctx, act, data) {
+    if (act === 'extra-unlock') {
+      nsfwUnlockedId = String(data.extra || '');
+      ctx.rerender();
+      return true;
+    }
+    return false;
   },
 };
 

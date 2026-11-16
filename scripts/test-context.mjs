@@ -6,6 +6,7 @@
 import {
   demoState, normalize, normalizeReplyContext, normalizeReplyItems, replyPresetFor, replyPresetsOf, chatsOf,
   extrasEnabledFor, theaterPrompt, splitTheaterBlocks, addExtrasEntry, defaultReplyItems, REPLY_INSTRUCTION_ID,
+  THEATER_KINDS, normalizeTheaterKind, theaterKindById, theaterKindFor,
 } from '../meme/data.js';
 import { buildReplyMessages, estimateTokens, requestStats } from '../meme/reply-context.js';
 
@@ -195,12 +196,35 @@ function findItem(items, id) {
   ok(extrasEnabledFor(state, contact.id) === false, '小剧场默认关闭');
   state.extrasOn = [contact.id];
   ok(extrasEnabledFor(state, contact.id) === true, '打开后按角色生效');
+  ok(theaterKindFor(state) === 'daily', '小剧场类型默认是日常');
   const prompt = theaterPrompt(contact.name);
   const { messages } = await buildReplyMessages(state, chat, contact, { extraPrompt: prompt });
   const theater = messages.find(message => message.source === '小剧场');
   ok(!!theater, '打开后小剧场提示词进了上下文');
   ok(theater.content.includes('<phone-extras>'), '提示词带返回协议');
   ok(messages[messages.length - 1].role === 'user', '小剧场提示词在最后一条聊天之前');
+  const lastPresetAt = messages.reduce((last, message, index) => (message.id ? index : last), -1);
+  ok(messages.indexOf(theater) > lastPresetAt, '小剧场排在全部预设条目之后');
+}
+
+/* 类型：四种 id、非法值回退、不同提示词、设置归一化 */
+{
+  ok(THEATER_KINDS.length === 4, '内置四种小剧场类型');
+  ok(THEATER_KINDS.every(kind => ['daily', 'meta', 'dream', 'nsfw'].includes(kind.id)), '类型 id 完整');
+  ok(normalizeTheaterKind('meta') === 'meta', '合法类型保留');
+  ok(normalizeTheaterKind('adult') === 'daily', '非法类型回退日常');
+  ok(theaterKindById('dream').page === 'dream', '类型带自己的页面模板');
+  const metaPrompt = theaterPrompt('沈砚', 'meta');
+  ok(metaPrompt.includes('Meta') && metaPrompt.includes('吐槽'), 'Meta 提示词单独生成');
+  const nsfwPrompt = theaterPrompt('沈砚', 'nsfw');
+  ok(nsfwPrompt.includes('不写露骨性行为') && nsfwPrompt.includes('成年角色'), 'NSFW 提示词保持克制边界');
+  const state = demoState();
+  state.settings.theater.kind = 'nsfw';
+  ok(theaterKindFor(state) === 'nsfw', '当前类型从 settings 读取');
+  const normalized = normalize(state);
+  ok(normalized.settings.theater.kind === 'nsfw', '类型写入 settings.theater.kind');
+  normalized.settings.theater.kind = 'bad';
+  ok(theaterKindFor(normalize(normalized)) === 'daily', '存档里的非法类型回退日常');
 }
 
 /* 11. 返回解析：块要从聊天里摘掉，角色对不上不存 */
@@ -214,16 +238,34 @@ function findItem(items, id) {
   ok(!broken.text.includes('phone-extras'), '没闭合的块也不会留在聊天里');
 }
 
-/* 12. 存进 App：新条目在最前，带来源消息 */
+/* 12. 存进 App：新条目在最前，带来源消息、类型和分节 */
 {
   const state = demoState();
   const chat = chatsOf(state)[0];
   const before = (state.extras[chat.contactId] || []).length;
-  const entry = addExtrasEntry(state, chat.contactId, [{ title: '心理活动', content: '一句' }], { chatId: chat.id, messageId: 'm_test' });
+  const entry = addExtrasEntry(state, chat.contactId, [{ title: '心理活动', content: '一句' }], {
+    chatId: chat.id, messageId: 'm_test', kind: 'meta',
+  });
   ok(!!entry && entry.lines[0] === '心理活动：一句', '小剧场存成 App 条目');
+  ok(entry.kind === 'meta', '条目保留小剧场类型');
+  ok(entry.sections[0].title === '心理活动' && entry.sections[0].content === '一句', '条目保留原始分节');
   ok(state.extras[chat.contactId].length === before + 1, '条目数加一');
   ok(state.extras[chat.contactId][0].id === entry.id, '新条目排在最前');
   ok(entry.messageId === 'm_test' && entry.chatId === chat.id, '条目记住来源消息');
+}
+
+/* 13. 旧条目兼容：没有类型/分节时补日常，并从 lines 还原 */
+{
+  const state = demoState();
+  const contactId = chatsOf(state)[0].contactId;
+  state.extras[contactId] = [{
+    id: 'x_old', title: '旧片段', date: '2026-11-01', lines: ['心理活动：把手插回口袋。', '小彩蛋：多等了两分钟。'],
+  }];
+  const normalized = normalize(state);
+  const entry = normalized.extras[contactId][0];
+  ok(entry.kind === 'daily', '旧条目默认补成日常');
+  ok(entry.sections.length === 2 && entry.sections[0].title === '心理活动', '旧条目从 lines 还原分节');
+  ok(entry.lines.length === 2, '旧条目保留原 lines');
 }
 
 /* 内置三套预设仍是旧 13 条时，首次读取升级为完整默认；自建预设不动 */

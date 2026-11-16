@@ -6,7 +6,7 @@
 import { icon } from '../icons.js';
 import {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
-  wakeAllowed, messagePreview, addExtrasEntry,
+  wakeAllowed, messagePreview, addExtrasEntry, theaterKindFor,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, normalizeReplyItems,
 } from '../data.js';
@@ -202,6 +202,8 @@ function saveMessageExtra(ctx, chat, contact, message) {
   const item = {
     id: 'x' + Date.now().toString(36),
     title: (message.text || '这一条').slice(0, 12),
+    kind: theaterKindFor(ctx.state),
+    sections: [{ title: '原文', content: message.text || '' }],
     date: new Date(message.at || Date.now()).toLocaleDateString('sv-SE'),
     lines: [message.text || ''],
     messageId: message.id,
@@ -554,10 +556,12 @@ function reply(ctx, chat, contact, replaceId = '') {
   setTimeout(async () => {
     let text = '';
     let sections = [];
+    let kind = '';
     try {
       const result = await ctx.ai.reply(ctx, chat, contact, pick(poolFor(contact)));
       text = typeof result === 'string' ? result : String(result?.text || '');
       sections = Array.isArray(result?.sections) ? result.sections : [];
+      kind = String(result?.kind || '');
     } catch {
       text = '';
     }
@@ -573,7 +577,11 @@ function reply(ctx, chat, contact, replaceId = '') {
         saved = pushMessage(ctx.state, chat.id, { from: 'them', text });
       }
       if (saved && sections.length) {
-        addExtrasEntry(ctx.state, contact?.id || chat.contactId, sections, { chatId: chat.id, messageId: saved.id });
+        addExtrasEntry(ctx.state, contact?.id || chat.contactId, sections, {
+          chatId: chat.id,
+          messageId: saved.id,
+          kind: kind || theaterKindFor(ctx.state),
+        });
         ctx.toast('这轮的小剧场收进 App 了');
       }
     } else if (replaceId) {

@@ -4,7 +4,7 @@
  */
 
 import { createStore } from './store.js';
-import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, splitTheaterBlocks } from './data.js';
+import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks } from './data.js';
 import { createShell, applyWall, applyLook } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
@@ -104,24 +104,25 @@ function makeAi(state) {
     const ctxSettings = replyContextFor(state, chat);
     const memoryLimit = options.proactive ? 900 : 1200;
     const storyBlock = ctxSettings.memory ? await story(chat, memoryLimit) : { text: '' };
+    const theaterKind = theaterKindFor(state);
     const wantsTheater = !options.proactive && extrasEnabledFor(state, contact?.id);
     const built = await buildReplyMessages(state, chat, contact, {
       memoryText: String(storyBlock?.text || ''),
       lead: options.proactive ? proactiveLead(state, contact) : replyLead(contact),
-      extraPrompt: wantsTheater ? theaterPrompt(contact?.name) : '',
+      extraPrompt: wantsTheater ? theaterPrompt(contact?.name, theaterKind) : '',
       proactive: Boolean(options.proactive),
       omitLastUser: Boolean(options.omitLastUser),
     });
-    return { built, wantsTheater, ctxSettings };
+    return { built, wantsTheater, theaterKind, ctxSettings };
   }
 
   return {
     async reply(context, chat, contact, demoReply) {
-      const { built, wantsTheater } = await compose(chat, contact);
+      const { built, wantsTheater, theaterKind } = await compose(chat, contact);
       const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
-      if (!wantsTheater) return { text: result.text, sections: [] };
+      if (!wantsTheater) return { text: result.text, sections: [], kind: '' };
       const split = splitTheaterBlocks(result.text, contact?.name);
-      return { text: split.text, sections: split.sections };
+      return { text: split.text, sections: split.sections, kind: theaterKind };
     },
 
     /**
@@ -136,6 +137,7 @@ function makeAi(state) {
         chat?.messages?.length || 0,
         last?.id || '',
         extrasEnabledFor(state, contact?.id) ? 'theater' : 'plain',
+        theaterKindFor(state),
         replyContextFor(state, chat).memory ? 'memory' : 'nomemory',
         state.settings?.memory?.activeId || '',
         state.settings?.memory?.readMode || '',

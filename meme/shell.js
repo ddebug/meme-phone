@@ -8,7 +8,7 @@
 import { icon as ico, TINT } from './icons.js';
 import { PIXEL_BUNNY } from './theme-data.js';
 import {
-  chatsOf, chatById, lastMessage, contactById, latestDiary, unreadTotal, dayKey,
+  unreadTotal, dayKey,
 } from './data.js';
 
 export function esc(text) {
@@ -162,11 +162,6 @@ export function createShell(options) {
 
   function desktopHtml() {
     const state = ctx.state;
-    const chats = chatsOf(state);
-    const recent = chats.find(chat => lastMessage(chat));
-    const diary = latestDiary(state);
-    const recentContact = recent ? contactById(state, recent.contactId) : null;
-    const recentMsg = recent ? lastMessage(recent) : null;
     const me = Array.isArray(state.users)
       ? state.users.find(item => item && item.key && item.key === state.settings.user.key) || null
       : null;
@@ -217,35 +212,10 @@ export function createShell(options) {
         </div>
         <input id="mpProfileBanner" type="file" accept="image/*" style="position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0">
 
-        <div class="mp-widget-strip">
-          <button class="mp-mini-widget" data-act="open-app" data-app="chat" type="button">
-            <span class="mp-mini-head">${ico('chat')} 最近</span>
-            ${recentContact ? `
-            <span class="mp-mini-main">
-              ${avatarHtml(recentContact.name, recentContact.avatar, 'mp-mini-avatar')}
-              <span class="mp-mini-copy">
-                <span class="mp-mini-name">${esc(recentContact.name)}</span>
-                <span class="mp-mini-msg">${esc(recentMsg?.text || '')}</span>
-              </span>
-            </span>` : `
-            <span class="mp-mini-empty">等一条新消息</span>`}
-          </button>
-
-          <button class="mp-mini-widget" data-act="open-app" data-app="diary" type="button">
-            <span class="mp-mini-head">${ico('diary')} ${diary ? esc(diaryDateLabel(diary)) : '昨日日记'}</span>
-            <span class="mp-mini-text">${diary ? esc(diary.text) : '这一格还空着。写一句今天的事，它就会留在这里。'}</span>
-          </button>
-        </div>
-
         <div class="mp-apps">${iconButtons}</div>
 
         <div class="mp-dock">${dockButtons}</div>
       </div>`;
-  }
-
-  function diaryDateLabel(diary) {
-    const [, month, day] = diary.key.split('-');
-    return `${Number(month)}月${Number(day)}日`;
   }
 
   function pageHtml() {

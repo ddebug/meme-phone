@@ -564,100 +564,6 @@
 
 .mp-profile-loc .mp-i { width: 12px; height: 12px; }
 
-/* ------------------------------------------------------ 桌面小部件条 */
-.mp-widget-strip {
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.mp-mini-widget {
-  min-width: 0;
-  padding: 10px 12px 11px;
-  border: 0;
-  border-radius: 20px;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  background: linear-gradient(160deg, rgba(255, 255, 255, .8), rgba(255, 255, 255, .56));
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  box-shadow: 0 10px 24px rgba(120, 108, 180, .12), inset 0 0 0 1px rgba(255, 255, 255, .74);
-  transition: transform .2s cubic-bezier(.22, .68, .38, 1);
-}
-
-.mp-mini-widget:active { transform: scale(.97); }
-
-.mp-mini-head {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-3);
-  font-size: calc(10.5px * var(--font-scale));
-  letter-spacing: .01em;
-}
-
-.mp-mini-head .mp-i { width: 13px; height: 13px; }
-
-.mp-mini-main {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: 7px;
-  min-width: 0;
-}
-
-.mp-mini-avatar {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
-  border-radius: 9px;
-  background-size: cover;
-  background-position: center;
-  color: #fff;
-  font-size: calc(10px * var(--font-scale));
-  font-weight: 600;
-}
-
-.mp-mini-copy { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
-
-.mp-mini-name {
-  color: var(--text);
-  font-size: calc(12px * var(--font-scale));
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.mp-mini-msg
-.mp-mini-empty {
-  color: var(--text-3);
-  font-size: calc(11px * var(--font-scale));
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.mp-mini-empty { display: block; margin-top: 9px; }
-
-.mp-mini-text {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  margin-top: 6px;
-  color: var(--text-2);
-  font-size: calc(11.5px * var(--font-scale));
-  line-height: calc(1.45 * var(--line-scale));
-}
-
 /* ------------------------------------------------------ 桌面图标网格 */
 .mp-apps {
   flex: 1;
@@ -2057,11 +1963,6 @@
   background: rgba(255, 255, 255, .08);
   color: rgba(236, 233, 247, .62);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .10);
-}
-
-.mp-root[data-mp-theme="night"] .mp-mini-widget {
-  background: linear-gradient(160deg, rgba(44, 38, 66, .74), rgba(30, 26, 48, .58));
-  box-shadow: 0 10px 24px rgba(0, 0, 0, .34), inset 0 0 0 1px rgba(255, 255, 255, .10);
 }
 
 .mp-root[data-mp-theme="night"] .mp-di-card { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .08); }
@@ -5540,7 +5441,7 @@
 
 /* ------------------------------------------------ 3. 桌面 / 面板 / 列表底 */
 .mp-root[data-mp-skin="frost"] :is(
-  .mp-widget, .mp-profile, .mp-mini-widget, .mp-di-card,
+  .mp-widget, .mp-profile, .mp-di-card,
   .mp-row, .mp-group-box, .mp-card, .mp-diary-hero, .mp-diary-card,
   .mp-chat-set-head, .mp-extra-source, .mp-quote-chip, .mp-sheet,
   .mp-theme-card, .mp-dress-hero, .mp-dress-toggle, .mp-dress-app-grid,
@@ -6115,7 +6016,7 @@
 
 /* frost 夜间面板与按钮 */
 .mp-root[data-mp-skin="frost"][data-mp-theme="night"] :is(
-  .mp-widget, .mp-profile, .mp-mini-widget, .mp-di-card,
+  .mp-widget, .mp-profile, .mp-di-card,
   .mp-row, .mp-group-box, .mp-card, .mp-diary-hero, .mp-diary-card,
   .mp-chat-set-head, .mp-extra-source, .mp-quote-chip, .mp-sheet,
   .mp-theme-card, .mp-dress-hero, .mp-dress-toggle, .mp-dress-app-grid,
@@ -6359,15 +6260,6 @@
   pointer-events: none;
   z-index: 3;
   opacity: .82;
-}
-
-.mp-root[data-mp-art="pixel"] .mp-mini-widget {
-  background: rgba(251, 251, 252, .72);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, .74),
-    0 8px 24px rgba(0, 0, 0, .05);
-  backdrop-filter: blur(22px) saturate(.55);
-  -webkit-backdrop-filter: blur(22px) saturate(.55);
 }
 
 .mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-profile-banner {

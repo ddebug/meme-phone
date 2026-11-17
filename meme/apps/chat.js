@@ -339,9 +339,6 @@ function settingsBody(ctx, chatId) {
   const replyAppCount = replyItems.filter(item => item.kind === 'app').length;
   const injectedCount = replyItems.filter(item => item.kind === 'context' && item.enabled).length;
   const replySub = `${ownReply ? `只对这个会话 · ${ownReply.name || '未命名'}` : `跟随手机 · ${globalReply?.name || '默认回复方式'}`} · ${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
-  const wakeSub = chat.wake === undefined
-    ? `跟随手机设置 · ${state.settings.chat?.wake === false ? '关' : '开'}`
-    : (chat.wake ? '这个会话单独开着' : '这个会话单独关掉');
 
   return `
     <div class="mp-page-body">
@@ -361,11 +358,6 @@ function settingsBody(ctx, chatId) {
         <div class="mp-group-box">
           ${chatSetRow(chat.id, { iconName: 'pin', title: '置顶聊天', sub: chat.pinned ? '已固定在会话列表最上面' : '让这个会话排在前面', act: 'ts-toggle-pin', toggle: chat.pinned })}
           ${chatSetRow(chat.id, { iconName: 'bell', title: '消息免打扰', sub: chat.muted ? '新消息不显示未读角标' : '这个会话的新消息照常计数', act: 'ts-toggle-mute', toggle: chat.muted })}
-          ${chatSetRow(chat.id, {
-            iconName: 'chat', title: '空着发送 = 让 TA 主动开口',
-            sub: wakeSub, act: 'ts-toggle-wake',
-            value: chat.wake === undefined ? '跟随' : (chat.wake ? '开' : '关'),
-          })}
         </div>
       </div>
 
@@ -552,7 +544,7 @@ function threadBody(ctx, chatId) {
       <div class="mp-messages" id="mpMessages">${blocks.join('')}</div>
       <div class="mp-composer">
         ${debugBar}
-        <div class="mp-composer-tip">${wakeAllowed(ctx.state, chat) ? '空着发出去，TA 会主动开口' : '空发送已关掉，去聊天设置里打开'}</div>
+        <div class="mp-composer-tip">空着发出去，TA 会主动开口</div>
         ${quote ? `
         <div class="mp-quote-chip">
           <span style="color:var(--accent-deep)">${icon('reply')}</span>
@@ -591,12 +583,6 @@ function doSend(ctx, chatId) {
   const contact = contactById(ctx.state, chat.contactId);
 
   if (!text) {
-    if (!wakeAllowed(ctx.state, chat)) {
-      ctx.toast(ctx.state.settings?.proactive?.enabled === false
-        ? '设置里关掉了主动开口'
-        : (ctx.state.settings?.chat?.wake === false ? '设置里关掉了空发送' : '这个会话的空发送已经关掉了'));
-      return;
-    }
     wake(ctx, chat, contact);
     return;
   }
@@ -909,16 +895,6 @@ export const threadSettingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(chat.muted ? '这个会话不再显示未读角标' : '恢复未读角标');
-      return true;
-    }
-
-    if (act === 'ts-toggle-wake') {
-      chat.wake = chat.wake === undefined ? true : (chat.wake ? false : undefined);
-      ctx.save();
-      ctx.rerender();
-      ctx.toast(chat.wake === undefined
-        ? '这个会话恢复跟随手机设置'
-        : (chat.wake ? '这个会话空发送可以触发主动开口' : '这个会话空发送已关掉'));
       return true;
     }
 

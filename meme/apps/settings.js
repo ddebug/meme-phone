@@ -52,7 +52,6 @@ export const settingsApp = {
           <div class="mp-group-label">聊天</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'bell', title: '消息提醒', sub: '有新消息时在图标上显示红点', act: 'set-toggle-remind', toggle: state.settings.chat.remind !== false })}
-            ${row(ctx, { iconName: 'chat', title: '空着发送 = 让 TA 主动开口', sub: '不写空消息，只触发一句主动的话', act: 'set-toggle-wake', toggle: state.settings.chat.wake !== false })}
             ${row(ctx, { iconName: 'code', title: '请求调试栏', sub: '在输入框上方显示预计 token 与请求构成', act: 'set-toggle-debug', toggle: state.settings.chat.debugBar !== false })}
             ${row(ctx, { iconName: 'reply', title: '回复预设', sub: '告诉模型该怎么回消息，可多套切换', act: 'set-open', app: 'presets' })}
           </div>
@@ -68,7 +67,6 @@ export const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">主动开口</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'spark', title: '允许主动开口', sub: state.settings.proactive.enabled ? '开着：空发送可以触发；没有定时任务' : '已关闭：空发送不会触发', act: 'set-toggle-proactive', toggle: state.settings.proactive.enabled })}
             ${row(ctx, { iconName: 'clock', title: '空发送时参考沉默多久', sub: '写进主动开口的提示，不会自己定时发消息', act: 'set-idle', value: `${state.settings.proactive.idleMinutes} 分钟` })}
           </div>
         </div>
@@ -130,14 +128,6 @@ export const settingsApp = {
       return true;
     }
 
-    if (act === 'set-toggle-wake') {
-      state.settings.chat.wake = state.settings.chat.wake === false;
-      ctx.save();
-      ctx.rerender();
-      ctx.toast(state.settings.chat.wake ? '空发送可以触发主动开口' : '空发送不再触发');
-      return true;
-    }
-
     if (act === 'set-toggle-debug') {
       state.settings.chat.debugBar = state.settings.chat.debugBar === false;
       ctx.save();
@@ -154,14 +144,6 @@ export const settingsApp = {
       ctx.toast(store.readMode === 'recent'
         ? '默认改成读原文；按角色单独切过的仍然按开关'
         : '默认改回读总结；没有总结时自动读原文');
-      return true;
-    }
-
-    if (act === 'set-toggle-proactive') {
-      state.settings.proactive.enabled = !state.settings.proactive.enabled;
-      ctx.save();
-      ctx.rerender();
-      ctx.toast(state.settings.proactive.enabled ? '允许主动开口了' : '主动开口关掉了');
       return true;
     }
 

@@ -7972,11 +7972,9 @@ function unreadTotal(state) {
   return Object.values(state.chats).reduce((sum, chat) => sum + (chat.muted ? 0 : (chat.unread || 0)), 0);
 }
 
-/* 空发送能不能真的发出去：全局总开关 + 手机默认 + 这个会话的单独设置 */
-function wakeAllowed(state, chat) {
-  if (state.settings?.proactive?.enabled === false) return false;
-  if (chat && chat.wake === false) return false;
-  return state.settings?.chat?.wake !== false;
+/* 空发送永远触发主动开口：这是固定行为，不再提供全局、会话级开关 */
+function wakeAllowed(/* state, chat */) {
+  return true;
 }
 
 
@@ -12322,9 +12320,6 @@ function settingsBody(ctx, chatId) {
   const replyAppCount = replyItems.filter(item => item.kind === 'app').length;
   const injectedCount = replyItems.filter(item => item.kind === 'context' && item.enabled).length;
   const replySub = `${ownReply ? `只对这个会话 · ${ownReply.name || '未命名'}` : `跟随手机 · ${globalReply?.name || '默认回复方式'}`} · ${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
-  const wakeSub = chat.wake === undefined
-    ? `跟随手机设置 · ${state.settings.chat?.wake === false ? '关' : '开'}`
-    : (chat.wake ? '这个会话单独开着' : '这个会话单独关掉');
 
   return `
     <div class="mp-page-body">
@@ -12344,11 +12339,6 @@ function settingsBody(ctx, chatId) {
         <div class="mp-group-box">
           ${chatSetRow(chat.id, { iconName: 'pin', title: '置顶聊天', sub: chat.pinned ? '已固定在会话列表最上面' : '让这个会话排在前面', act: 'ts-toggle-pin', toggle: chat.pinned })}
           ${chatSetRow(chat.id, { iconName: 'bell', title: '消息免打扰', sub: chat.muted ? '新消息不显示未读角标' : '这个会话的新消息照常计数', act: 'ts-toggle-mute', toggle: chat.muted })}
-          ${chatSetRow(chat.id, {
-            iconName: 'chat', title: '空着发送 = 让 TA 主动开口',
-            sub: wakeSub, act: 'ts-toggle-wake',
-            value: chat.wake === undefined ? '跟随' : (chat.wake ? '开' : '关'),
-          })}
         </div>
       </div>
 
@@ -12535,7 +12525,7 @@ function threadBody(ctx, chatId) {
       <div class="mp-messages" id="mpMessages">${blocks.join('')}</div>
       <div class="mp-composer">
         ${debugBar}
-        <div class="mp-composer-tip">${wakeAllowed(ctx.state, chat) ? '空着发出去，TA 会主动开口' : '空发送已关掉，去聊天设置里打开'}</div>
+        <div class="mp-composer-tip">空着发出去，TA 会主动开口</div>
         ${quote ? `
         <div class="mp-quote-chip">
           <span style="color:var(--accent-deep)">${icon('reply')}</span>
@@ -12574,12 +12564,6 @@ function doSend(ctx, chatId) {
   const contact = contactById(ctx.state, chat.contactId);
 
   if (!text) {
-    if (!wakeAllowed(ctx.state, chat)) {
-      ctx.toast(ctx.state.settings?.proactive?.enabled === false
-        ? '设置里关掉了主动开口'
-        : (ctx.state.settings?.chat?.wake === false ? '设置里关掉了空发送' : '这个会话的空发送已经关掉了'));
-      return;
-    }
     wake(ctx, chat, contact);
     return;
   }
@@ -12892,16 +12876,6 @@ const threadSettingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(chat.muted ? '这个会话不再显示未读角标' : '恢复未读角标');
-      return true;
-    }
-
-    if (act === 'ts-toggle-wake') {
-      chat.wake = chat.wake === undefined ? true : (chat.wake ? false : undefined);
-      ctx.save();
-      ctx.rerender();
-      ctx.toast(chat.wake === undefined
-        ? '这个会话恢复跟随手机设置'
-        : (chat.wake ? '这个会话空发送可以触发主动开口' : '这个会话空发送已关掉'));
       return true;
     }
 
@@ -14003,7 +13977,6 @@ const settingsApp = {
           <div class="mp-group-label">聊天</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'bell', title: '消息提醒', sub: '有新消息时在图标上显示红点', act: 'set-toggle-remind', toggle: state.settings.chat.remind !== false })}
-            ${row(ctx, { iconName: 'chat', title: '空着发送 = 让 TA 主动开口', sub: '不写空消息，只触发一句主动的话', act: 'set-toggle-wake', toggle: state.settings.chat.wake !== false })}
             ${row(ctx, { iconName: 'code', title: '请求调试栏', sub: '在输入框上方显示预计 token 与请求构成', act: 'set-toggle-debug', toggle: state.settings.chat.debugBar !== false })}
             ${row(ctx, { iconName: 'reply', title: '回复预设', sub: '告诉模型该怎么回消息，可多套切换', act: 'set-open', app: 'presets' })}
           </div>
@@ -14019,7 +13992,6 @@ const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">主动开口</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'spark', title: '允许主动开口', sub: state.settings.proactive.enabled ? '开着：空发送可以触发；没有定时任务' : '已关闭：空发送不会触发', act: 'set-toggle-proactive', toggle: state.settings.proactive.enabled })}
             ${row(ctx, { iconName: 'clock', title: '空发送时参考沉默多久', sub: '写进主动开口的提示，不会自己定时发消息', act: 'set-idle', value: `${state.settings.proactive.idleMinutes} 分钟` })}
           </div>
         </div>
@@ -14081,14 +14053,6 @@ const settingsApp = {
       return true;
     }
 
-    if (act === 'set-toggle-wake') {
-      state.settings.chat.wake = state.settings.chat.wake === false;
-      ctx.save();
-      ctx.rerender();
-      ctx.toast(state.settings.chat.wake ? '空发送可以触发主动开口' : '空发送不再触发');
-      return true;
-    }
-
     if (act === 'set-toggle-debug') {
       state.settings.chat.debugBar = state.settings.chat.debugBar === false;
       ctx.save();
@@ -14105,14 +14069,6 @@ const settingsApp = {
       ctx.toast(store.readMode === 'recent'
         ? '默认改成读原文；按角色单独切过的仍然按开关'
         : '默认改回读总结；没有总结时自动读原文');
-      return true;
-    }
-
-    if (act === 'set-toggle-proactive') {
-      state.settings.proactive.enabled = !state.settings.proactive.enabled;
-      ctx.save();
-      ctx.rerender();
-      ctx.toast(state.settings.proactive.enabled ? '允许主动开口了' : '主动开口关掉了');
       return true;
     }
 

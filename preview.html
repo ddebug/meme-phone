@@ -7005,6 +7005,229 @@ body {
   .mp-extra-title { font-size: calc(22px * var(--font-scale)); }
 }
 
+/* --------------------------------------------- 聊天加号：小剧场弹窗 */
+.mp-sheet-panel {
+  padding: 13px 12px 10px;
+}
+.mp-theater-panel {
+  min-width: 0;
+}
+.mp-theater-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 3px 11px;
+  border-bottom: 1px solid var(--line);
+}
+.mp-theater-title {
+  font-size: calc(17px * var(--font-scale));
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+}
+.mp-theater-sub {
+  max-width: 250px;
+  margin-top: 4px;
+  font-size: calc(10.5px * var(--font-scale));
+  line-height: 1.45;
+  color: var(--text-3);
+}
+.mp-theater-current-state {
+  flex: none;
+  max-width: 94px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text-3);
+  font-size: calc(10px * var(--font-scale));
+  line-height: 1.4;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-root[data-mp-theme="night"] .mp-theater-current-state {
+  background: rgba(255, 255, 255, .07);
+}
+.mp-theater-section {
+  margin-top: 12px;
+}
+.mp-theater-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 3px 6px;
+  color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale));
+  line-height: 1.4;
+}
+.mp-theater-section-head span:first-child {
+  color: var(--text);
+  font-weight: 600;
+}
+.mp-theater-types {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.mp-theater-types .mp-extra-kind {
+  min-height: 35px;
+  padding: 8px 9px;
+  border-radius: 11px;
+  background: transparent;
+}
+.mp-theater-types .mp-extra-kind.on {
+  background: var(--kind-soft);
+}
+.mp-theater-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 5px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mp-theater-row.is-current {
+  background: rgba(142, 123, 242, .08);
+}
+.mp-root[data-mp-theme="night"] .mp-theater-row.is-current {
+  background: rgba(255, 255, 255, .07);
+}
+.mp-theater-row.is-all {
+  background: var(--card);
+  padding: 10px 9px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.mp-root[data-mp-theme="night"] .mp-theater-row.is-all {
+  background: rgba(255, 255, 255, .055);
+}
+.mp-theater-row-main {
+  flex: 1;
+  min-width: 0;
+}
+.mp-theater-row-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--text);
+  font-size: calc(13px * var(--font-scale));
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.mp-theater-row-name > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mp-theater-current {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(142, 123, 242, .13);
+  color: #7362c9;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: .02em;
+}
+.mp-root[data-mp-theme="night"] .mp-theater-current {
+  background: rgba(185, 166, 255, .14);
+  color: #cbbbff;
+}
+.mp-theater-row-sub {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale));
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-theater-all-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 31px;
+  height: 31px;
+  border-radius: 10px;
+  background: rgba(142, 123, 242, .12);
+  color: #7b6bd3;
+}
+.mp-theater-all-icon .mp-i { width: 16px; height: 16px; }
+.mp-theater-list {
+  max-height: 222px;
+  margin-top: 6px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.mp-theater-list::-webkit-scrollbar { width: 4px; }
+.mp-theater-list::-webkit-scrollbar-thumb { background: rgba(120, 104, 160, .16); border-radius: 4px; }
+.mp-theater-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 3px 1px;
+  border-top: 1px solid var(--line);
+}
+.mp-theater-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: calc(10.5px * var(--font-scale));
+  line-height: 1.4;
+  cursor: pointer;
+  text-align: left;
+}
+.mp-theater-link .mp-i { width: 13px; height: 13px; opacity: .7; }
+.mp-theater-link:active { color: var(--text); }
+.mp-theater-list .mp-empty { padding: 10px 3px; }
+.mp-root[data-mp-skin="frost"] .mp-theater-row.is-all {
+  background: rgba(255, 255, 255, .52);
+}
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-theater-row.is-all {
+  background: rgba(255, 255, 255, .06);
+}
+.mp-root[data-mp-art="pixel"] .mp-theater-row.is-all,
+.mp-root[data-mp-art="pixel"] .mp-theater-types .mp-extra-kind {
+  border-radius: 2px;
+}
+.mp-root[data-mp-art="pixel"] .mp-sheet-panel {
+  border-radius: 2px;
+  box-shadow: 5px 5px 0 rgba(30, 26, 34, .16), inset 0 0 0 1px rgba(255, 255, 255, .9);
+}
+.mp-root[data-mp-art="pixel"] .mp-theater-row {
+  border-radius: 2px;
+}
+.mp-root[data-mp-art="pixel"] .mp-theater-all-icon {
+  border-radius: 2px;
+}
+.mp-root[data-mp-art="pixel"] .mp-theater-current {
+  border-radius: 1px;
+}
+@media (max-width: 360px) {
+  .mp-theater-head { gap: 6px; }
+  .mp-theater-sub { max-width: 218px; }
+  .mp-theater-current-state { max-width: 78px; }
+}
+
 
 
 
@@ -10562,6 +10785,22 @@ function createShell(options) {
         </div>`;
     }
 
+    if (sheet.kind === 'panel') {
+      let content = '';
+      try {
+        content = typeof sheet.render === 'function' ? String(sheet.render()) : String(sheet.body || '');
+      } catch (error) {
+        content = '<div class="mp-empty">面板暂时打不开。</div>';
+      }
+      return `
+        <div class="mp-mask${still}" data-act="sheet-close"></div>
+        <div class="mp-sheet mp-sheet-panel${still}" role="dialog" aria-modal="true">
+          ${sheet.title ? `<div class="mp-sheet-title">${esc(sheet.title)}</div>` : ''}
+          ${content}
+          <button class="mp-sheet-cancel" data-act="sheet-close" type="button">${esc(sheet.doneLabel || '完成')}</button>
+        </div>`;
+    }
+
     if (sheet.kind === 'form') {
       const fields = (sheet.fields || []).map((field, index) => {
         const id = `mpField${index}`;
@@ -11582,13 +11821,13 @@ __mods["meme/apps/chat.js"] = function(module, exports, __req){
 const { icon } = __req("meme/icons.js");
 const {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
-  wakeAllowed, messagePreview, addExtrasEntry, theaterKindFor,
+  wakeAllowed, messagePreview, addExtrasEntry, theaterKindFor, THEATER_KINDS, theaterKindById,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, normalizeReplyItems,
 } = __req("meme/data.js");
 const { memoryPresetSummary } = __req("meme/memory.js");
 const { requestStats, estimateTokens, proactiveLead } = __req("meme/reply-context.js");
-const { avatarHtml, esc, shortText, timeText } = __req("meme/shell.js");
+const { avatarHtml, chatAvatarHtml, esc, shortText, timeText } = __req("meme/shell.js");
 
 const REPLY_POOL = {
   沈砚: ['到楼下了，风比刚才小一点。', '你先忙，我在便利店坐着。', '记得吃点东西，别又是咖啡。', '刚看到你窗户还亮着。'],
@@ -11819,6 +12058,92 @@ function openMessageExtra(ctx, chat, contact, message) {
       }
       if (value === 'all') ctx.go('app-extras', { contactId: chat.contactId });
     },
+  });
+}
+
+function theaterPanelHtml(ctx, chat) {
+  const state = ctx.state;
+  const contacts = contactsOf(state);
+  const currentId = chat?.contactId || '';
+  const current = contactById(state, currentId);
+  const on = new Set(Array.isArray(state.extrasOn) ? state.extrasOn.map(String) : []);
+  const kind = theaterKindById(theaterKindFor(state));
+  const allOn = contacts.length > 0 && contacts.every(contact => on.has(contact.id));
+  const currentOn = on.has(currentId);
+  const onCount = contacts.filter(contact => on.has(contact.id)).length;
+  const ordered = current && currentId
+    ? [current, ...contacts.filter(contact => String(contact.id) !== String(currentId))]
+    : contacts;
+
+  const typeButtons = THEATER_KINDS.map(item => {
+    const badge = item.gate ? '<span class="mp-extra-kind-badge">18+</span>' : '';
+    return `
+      <button class="mp-extra-kind mp-theater-type is-${item.id}${kind.id === item.id ? ' on' : ''}" data-act="theater-kind" data-kind="${item.id}" type="button">
+        ${badge}<span class="mp-extra-kind-label">${esc(item.label)}</span>
+      </button>`;
+  }).join('');
+
+  const rows = ordered.map(contact => {
+    const enabled = on.has(contact.id);
+    const isCurrent = contact.id === currentId;
+    return `
+      <button class="mp-theater-row${isCurrent ? ' is-current' : ''}" data-act="theater-toggle" data-contact="${contact.id}" data-chat="${chat?.id || ''}" type="button">
+        ${chatAvatarHtml(contact)}
+        <div class="mp-theater-row-main">
+          <div class="mp-theater-row-name">${esc(contact.name)}${isCurrent ? '<span class="mp-theater-current">当前会话</span>' : ''}</div>
+          <div class="mp-theater-row-sub">${enabled ? `会带 ${esc(kind.label)} 小剧场` : '只聊天'}</div>
+        </div>
+        <span class="mp-switch${enabled ? ' on' : ''}"></span>
+      </button>`;
+  }).join('');
+
+  return `
+    <div class="mp-theater-panel">
+      <div class="mp-theater-head">
+        <div>
+          <div class="mp-theater-title">小剧场</div>
+          <div class="mp-theater-sub">这一轮让 AI 附一段；内容只进小剧场 App，不显示在聊天里。</div>
+        </div>
+        <span class="mp-theater-current-state">${current ? (currentOn ? `会写 ${esc(kind.label)}` : '这轮不带') : '未选角色'}</span>
+      </div>
+
+      <div class="mp-theater-section">
+        <div class="mp-theater-section-head">
+          <span>写哪种</span>
+          <span>${esc(kind.sub)}</span>
+        </div>
+        <div class="mp-theater-types">${typeButtons}</div>
+      </div>
+
+      <div class="mp-theater-section">
+        <div class="mp-theater-section-head">
+          <span>这轮带小剧场</span>
+          <span>${onCount ? `${onCount} 个角色` : '全部关闭'}</span>
+        </div>
+        <button class="mp-theater-row is-all" data-act="theater-all" type="button">
+          <span class="mp-theater-all-icon">${icon('theater')}</span>
+          <div class="mp-theater-row-main">
+            <div class="mp-theater-row-name">全部角色</div>
+            <div class="mp-theater-row-sub">当前会话和通讯录里的所有角色</div>
+          </div>
+          <span class="mp-switch${allOn ? ' on' : ''}"></span>
+        </button>
+        <div class="mp-theater-list">${rows || '<div class="mp-empty">通讯录里还没有角色。</div>'}</div>
+      </div>
+
+      <div class="mp-theater-foot">
+        <button class="mp-theater-link" data-act="theater-app" data-chat="${chat?.id || ''}" type="button">${icon('theater')}打开小剧场 App</button>
+        <button class="mp-theater-link" data-act="theater-manage" type="button">${icon('chevron')}管理所有角色</button>
+      </div>
+    </div>`;
+}
+
+function openTheaterSheet(ctx, chat) {
+  ctx.openSheet({
+    kind: 'panel',
+    title: '',
+    doneLabel: '完成',
+    render: () => theaterPanelHtml(ctx, chat),
   });
 }
 
@@ -12509,6 +12834,47 @@ const threadApp = {
       return true;
     }
 
+    if (act === 'theater-kind') {
+      const kind = theaterKindById(data.kind);
+      ctx.state.settings.theater = { ...(ctx.state.settings.theater || {}), kind: kind.id };
+      ctx.save();
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'theater-toggle') {
+      const on = (ctx.state.extrasOn = Array.isArray(ctx.state.extrasOn) ? ctx.state.extrasOn : []);
+      const contact = contactById(ctx.state, data.contact);
+      if (!contact) return true;
+      const index = on.indexOf(contact.id);
+      if (index >= 0) on.splice(index, 1);
+      else on.push(contact.id);
+      ctx.save();
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'theater-all') {
+      const contacts = contactsOf(ctx.state);
+      const on = (ctx.state.extrasOn = Array.isArray(ctx.state.extrasOn) ? ctx.state.extrasOn : []);
+      const allOn = contacts.length > 0 && contacts.every(contact => on.includes(contact.id));
+      ctx.state.extrasOn = allOn ? [] : contacts.map(contact => contact.id);
+      ctx.save();
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'theater-app') {
+      const chat = chatById(ctx.state, chatId);
+      ctx.go('app-extras', chat?.contactId ? { contactId: chat.contactId } : {});
+      return true;
+    }
+
+    if (act === 'theater-manage') {
+      ctx.go('extras-switch');
+      return true;
+    }
+
     if (act === 'composer-plus') {
       ctx.openSheet({
         title: '加点什么',
@@ -12516,7 +12882,7 @@ const threadApp = {
           { label: '照片', value: 'photo', icon: 'image', note: '从相册选一张，压小了再存进手机' },
           { label: '表情', value: 'emoji', icon: 'smile', note: '发一个大表情，不是文字里的贴图' },
           { label: '戳一戳', value: 'poke', icon: 'spark', note: '在聊天里留一行「你拍了拍 TA」' },
-          { label: '小剧场', value: 'extras-switch', icon: 'theater', note: '开关这轮要不要 AI 带小剧场；看内容去小剧场 App' },
+          { label: '小剧场', value: 'theater', icon: 'theater', note: '这轮带不带、写哪种；内容去小剧场 App 看' },
           { label: '引用最近一条', value: 'quote', icon: 'reply' },
           { label: '把这条存进小剧场', value: 'extra', icon: 'theater' },
         ],
@@ -12554,8 +12920,9 @@ const threadApp = {
             ctx.rerender();
             scrollToBottom(ctx);
           }
-          if (value === 'extras-switch') {
-            ctx.go('extras-switch');
+          if (value === 'theater') {
+            openTheaterSheet(ctx, chat);
+            return;
           }
           if (value === 'quote') {
             const last = lastMessage(chat);

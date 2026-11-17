@@ -280,6 +280,22 @@ export function createShell(options) {
         </div>`;
     }
 
+    if (sheet.kind === 'panel') {
+      let content = '';
+      try {
+        content = typeof sheet.render === 'function' ? String(sheet.render()) : String(sheet.body || '');
+      } catch (error) {
+        content = '<div class="mp-empty">面板暂时打不开。</div>';
+      }
+      return `
+        <div class="mp-mask${still}" data-act="sheet-close"></div>
+        <div class="mp-sheet mp-sheet-panel${still}" role="dialog" aria-modal="true">
+          ${sheet.title ? `<div class="mp-sheet-title">${esc(sheet.title)}</div>` : ''}
+          ${content}
+          <button class="mp-sheet-cancel" data-act="sheet-close" type="button">${esc(sheet.doneLabel || '完成')}</button>
+        </div>`;
+    }
+
     if (sheet.kind === 'form') {
       const fields = (sheet.fields || []).map((field, index) => {
         const id = `mpField${index}`;

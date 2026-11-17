@@ -6,13 +6,13 @@
 import { icon } from '../icons.js';
 import {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
-  wakeAllowed, messagePreview, addExtrasEntry, theaterKindFor,
+  wakeAllowed, messagePreview, addExtrasEntry, theaterKindFor, THEATER_KINDS, theaterKindById,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, normalizeReplyItems,
 } from '../data.js';
 import { memoryPresetSummary } from '../memory.js';
 import { requestStats, estimateTokens, proactiveLead } from '../reply-context.js';
-import { avatarHtml, esc, shortText, timeText } from '../shell.js';
+import { avatarHtml, chatAvatarHtml, esc, shortText, timeText } from '../shell.js';
 
 const REPLY_POOL = {
   沈砚: ['到楼下了，风比刚才小一点。', '你先忙，我在便利店坐着。', '记得吃点东西，别又是咖啡。', '刚看到你窗户还亮着。'],
@@ -243,6 +243,92 @@ function openMessageExtra(ctx, chat, contact, message) {
       }
       if (value === 'all') ctx.go('app-extras', { contactId: chat.contactId });
     },
+  });
+}
+
+function theaterPanelHtml(ctx, chat) {
+  const state = ctx.state;
+  const contacts = contactsOf(state);
+  const currentId = chat?.contactId || '';
+  const current = contactById(state, currentId);
+  const on = new Set(Array.isArray(state.extrasOn) ? state.extrasOn.map(String) : []);
+  const kind = theaterKindById(theaterKindFor(state));
+  const allOn = contacts.length > 0 && contacts.every(contact => on.has(contact.id));
+  const currentOn = on.has(currentId);
+  const onCount = contacts.filter(contact => on.has(contact.id)).length;
+  const ordered = current && currentId
+    ? [current, ...contacts.filter(contact => String(contact.id) !== String(currentId))]
+    : contacts;
+
+  const typeButtons = THEATER_KINDS.map(item => {
+    const badge = item.gate ? '<span class="mp-extra-kind-badge">18+</span>' : '';
+    return `
+      <button class="mp-extra-kind mp-theater-type is-${item.id}${kind.id === item.id ? ' on' : ''}" data-act="theater-kind" data-kind="${item.id}" type="button">
+        ${badge}<span class="mp-extra-kind-label">${esc(item.label)}</span>
+      </button>`;
+  }).join('');
+
+  const rows = ordered.map(contact => {
+    const enabled = on.has(contact.id);
+    const isCurrent = contact.id === currentId;
+    return `
+      <button class="mp-theater-row${isCurrent ? ' is-current' : ''}" data-act="theater-toggle" data-contact="${contact.id}" data-chat="${chat?.id || ''}" type="button">
+        ${chatAvatarHtml(contact)}
+        <div class="mp-theater-row-main">
+          <div class="mp-theater-row-name">${esc(contact.name)}${isCurrent ? '<span class="mp-theater-current">当前会话</span>' : ''}</div>
+          <div class="mp-theater-row-sub">${enabled ? `会带 ${esc(kind.label)} 小剧场` : '只聊天'}</div>
+        </div>
+        <span class="mp-switch${enabled ? ' on' : ''}"></span>
+      </button>`;
+  }).join('');
+
+  return `
+    <div class="mp-theater-panel">
+      <div class="mp-theater-head">
+        <div>
+          <div class="mp-theater-title">小剧场</div>
+          <div class="mp-theater-sub">这一轮让 AI 附一段；内容只进小剧场 App，不显示在聊天里。</div>
+        </div>
+        <span class="mp-theater-current-state">${current ? (currentOn ? `会写 ${esc(kind.label)}` : '这轮不带') : '未选角色'}</span>
+      </div>
+
+      <div class="mp-theater-section">
+        <div class="mp-theater-section-head">
+          <span>写哪种</span>
+          <span>${esc(kind.sub)}</span>
+        </div>
+        <div class="mp-theater-types">${typeButtons}</div>
+      </div>
+
+      <div class="mp-theater-section">
+        <div class="mp-theater-section-head">
+          <span>这轮带小剧场</span>
+          <span>${onCount ? `${onCount} 个角色` : '全部关闭'}</span>
+        </div>
+        <button class="mp-theater-row is-all" data-act="theater-all" type="button">
+          <span class="mp-theater-all-icon">${icon('theater')}</span>
+          <div class="mp-theater-row-main">
+            <div class="mp-theater-row-name">全部角色</div>
+            <div class="mp-theater-row-sub">当前会话和通讯录里的所有角色</div>
+          </div>
+          <span class="mp-switch${allOn ? ' on' : ''}"></span>
+        </button>
+        <div class="mp-theater-list">${rows || '<div class="mp-empty">通讯录里还没有角色。</div>'}</div>
+      </div>
+
+      <div class="mp-theater-foot">
+        <button class="mp-theater-link" data-act="theater-app" data-chat="${chat?.id || ''}" type="button">${icon('theater')}打开小剧场 App</button>
+        <button class="mp-theater-link" data-act="theater-manage" type="button">${icon('chevron')}管理所有角色</button>
+      </div>
+    </div>`;
+}
+
+function openTheaterSheet(ctx, chat) {
+  ctx.openSheet({
+    kind: 'panel',
+    title: '',
+    doneLabel: '完成',
+    render: () => theaterPanelHtml(ctx, chat),
   });
 }
 
@@ -933,6 +1019,47 @@ export const threadApp = {
       return true;
     }
 
+    if (act === 'theater-kind') {
+      const kind = theaterKindById(data.kind);
+      ctx.state.settings.theater = { ...(ctx.state.settings.theater || {}), kind: kind.id };
+      ctx.save();
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'theater-toggle') {
+      const on = (ctx.state.extrasOn = Array.isArray(ctx.state.extrasOn) ? ctx.state.extrasOn : []);
+      const contact = contactById(ctx.state, data.contact);
+      if (!contact) return true;
+      const index = on.indexOf(contact.id);
+      if (index >= 0) on.splice(index, 1);
+      else on.push(contact.id);
+      ctx.save();
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'theater-all') {
+      const contacts = contactsOf(ctx.state);
+      const on = (ctx.state.extrasOn = Array.isArray(ctx.state.extrasOn) ? ctx.state.extrasOn : []);
+      const allOn = contacts.length > 0 && contacts.every(contact => on.includes(contact.id));
+      ctx.state.extrasOn = allOn ? [] : contacts.map(contact => contact.id);
+      ctx.save();
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'theater-app') {
+      const chat = chatById(ctx.state, chatId);
+      ctx.go('app-extras', chat?.contactId ? { contactId: chat.contactId } : {});
+      return true;
+    }
+
+    if (act === 'theater-manage') {
+      ctx.go('extras-switch');
+      return true;
+    }
+
     if (act === 'composer-plus') {
       ctx.openSheet({
         title: '加点什么',
@@ -940,7 +1067,7 @@ export const threadApp = {
           { label: '照片', value: 'photo', icon: 'image', note: '从相册选一张，压小了再存进手机' },
           { label: '表情', value: 'emoji', icon: 'smile', note: '发一个大表情，不是文字里的贴图' },
           { label: '戳一戳', value: 'poke', icon: 'spark', note: '在聊天里留一行「你拍了拍 TA」' },
-          { label: '小剧场', value: 'extras-switch', icon: 'theater', note: '开关这轮要不要 AI 带小剧场；看内容去小剧场 App' },
+          { label: '小剧场', value: 'theater', icon: 'theater', note: '这轮带不带、写哪种；内容去小剧场 App 看' },
           { label: '引用最近一条', value: 'quote', icon: 'reply' },
           { label: '把这条存进小剧场', value: 'extra', icon: 'theater' },
         ],
@@ -978,8 +1105,9 @@ export const threadApp = {
             ctx.rerender();
             scrollToBottom(ctx);
           }
-          if (value === 'extras-switch') {
-            ctx.go('extras-switch');
+          if (value === 'theater') {
+            openTheaterSheet(ctx, chat);
+            return;
           }
           if (value === 'quote') {
             const last = lastMessage(chat);

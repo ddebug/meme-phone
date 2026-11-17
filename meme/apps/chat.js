@@ -12,6 +12,7 @@ import {
 } from '../data.js';
 import { memoryPresetSummary } from '../memory.js';
 import { requestStats, estimateTokens, proactiveLead } from '../reply-context.js';
+import { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } from '../chat-transfer.js';
 import { avatarHtml, chatAvatarHtml, esc, shortText, timeText } from '../shell.js';
 
 const REPLY_POOL = {
@@ -412,6 +413,8 @@ function settingsBody(ctx, chatId) {
       <div class="mp-group">
         <div class="mp-group-label">记录</div>
         <div class="mp-group-box">
+          ${chatSetRow(chat.id, { iconName: 'download', title: '导出这段聊天', sub: '存成 json；换手机或导入别的会话时用', act: 'ts-export-chat' })}
+          ${chatSetRow(chat.id, { iconName: 'upload', title: '导入聊天记录', sub: '合并到这段聊天，重复消息自动跳过', act: 'ts-import-chat' })}
           ${chatSetRow(chat.id, { iconName: 'trash', title: '清空这个会话的消息', sub: '只删聊天记录，联系人和角色卡都还在', act: 'ts-clear', danger: true })}
           ${chatSetRow(chat.id, { iconName: 'close', title: '删除这个会话', sub: '连同会话设置一起删掉', act: 'ts-delete', danger: true })}
         </div>
@@ -758,6 +761,124 @@ export const chatApp = {
   },
 };
 
+/* ------------------------------------------------- 单角色聊天导出 / 导入 */
+
+function chatTransferFileName(contact) {
+  const date = new Date().toISOString().slice(0, 10);
+  const name = String(contact?.name || '角色')
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 36) || '角色';
+  return `meme-chat-${name}-${date}.json`;
+}
+
+function exportThreadChat(ctx, chat, contact) {
+  if (!chat.messages?.length) {
+    ctx.toast('这段聊天还没有消息');
+    return;
+  }
+  try {
+    const payload = createChatExport({ chat, contact });
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = chatTransferFileName(contact);
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    ctx.toast(`已导出 ${payload.messageCount} 条消息`);
+  } catch (error) {
+    ctx.toast(`导出失败：${error?.message || '聊天记录读不出来'}`);
+  }
+}
+
+function applyThreadChatImport(ctx, chat, transfer) {
+  const chatNow = chatById(ctx.state, chat.id);
+  if (!chatNow) {
+    ctx.toast('这个会话已经不在了');
+    return;
+  }
+  if (!Array.isArray(chatNow.messages)) chatNow.messages = [];
+  const merged = mergeChatHistory(chatNow.messages, transfer.messages);
+  if (!merged.addedCount) {
+    ctx.toast(`没有新增消息（${merged.skippedCount} 条重复）`);
+    return;
+  }
+
+  chatNow.messages = merged.messages;
+  const newestAt = merged.messages.reduce((latest, message) => (
+    Number.isFinite(message?.at) ? Math.max(latest, message.at) : latest
+  ), Number(chatNow.updatedAt) || 0);
+  chatNow.updatedAt = Math.max(Number(chatNow.updatedAt) || 0, newestAt);
+
+  ctx.save().then(saved => {
+    if (!saved) return;
+    ctx.rerender();
+    ctx.toast(`已导入 ${merged.addedCount} 条消息${merged.skippedCount ? `，跳过 ${merged.skippedCount} 条重复` : ''}`);
+  });
+}
+
+function reviewThreadChatImport(ctx, chat, contact, transfer) {
+  const currentMessages = Array.isArray(chat.messages) ? chat.messages : [];
+  const merged = mergeChatHistory(currentMessages, transfer.messages);
+  if (!merged.addedCount) {
+    ctx.toast(`没有新增消息（${merged.skippedCount} 条重复）`);
+    return;
+  }
+
+  const sourceName = transfer.character?.name || contact?.name || 'TA';
+  const currentName = contact?.name || '当前角色';
+  const differentCharacter = transfer.character?.id && transfer.character.id !== chat.contactId;
+  const title = differentCharacter
+    ? `导入「${sourceName}」的 ${merged.addedCount} 条消息？`
+    : `导入 ${merged.addedCount} 条消息？`;
+
+  ctx.openSheet({
+    title,
+    items: [{
+      label: `合并到「${currentName}」${merged.skippedCount ? `，跳过 ${merged.skippedCount} 条重复` : ''}`,
+      value: 'import',
+      icon: 'upload',
+    }],
+    onPick: (value) => {
+      if (value !== 'import') return;
+      applyThreadChatImport(ctx, chat, transfer);
+    },
+  });
+}
+
+function pickThreadChatImport(ctx, chat, contact) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.style.display = 'none';
+  document.body.append(input);
+  input.addEventListener('cancel', () => input.remove());
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    input.remove();
+    if (!file) return;
+    if (file.size > MAX_CHAT_TRANSFER_BYTES) {
+      ctx.toast('导入失败：文件超过 32 MiB');
+      return;
+    }
+    try {
+      const transfer = parseChatTransferText(await file.text());
+      if (!transfer.messages.length) {
+        ctx.toast('文件里没有聊天消息');
+        return;
+      }
+      reviewThreadChatImport(ctx, chat, contact, transfer);
+    } catch (error) {
+      ctx.toast(`导入失败：${error?.message || '文件格式不对'}`);
+    }
+  };
+  input.click();
+}
+
 export const threadSettingsApp = {
   id: 'thread-settings', name: '聊天设置', icon: 'settings',
 
@@ -919,6 +1040,16 @@ export const threadSettingsApp = {
     if (act === 'ts-diary') { ctx.go('thread-diary', { chatId: chat.id }); return true; }
 
     if (act === 'ts-extras') { ctx.go('app-extras', { contactId: chat.contactId }); return true; }
+
+    if (act === 'ts-export-chat') {
+      exportThreadChat(ctx, chat, contact);
+      return true;
+    }
+
+    if (act === 'ts-import-chat') {
+      pickThreadChatImport(ctx, chat, contact);
+      return true;
+    }
 
     if (act === 'ts-clear') {
       ctx.openSheet({

@@ -248,17 +248,11 @@ function openMessageExtra(ctx, chat, contact, message) {
 
 function theaterPanelHtml(ctx, chat) {
   const state = ctx.state;
-  const contacts = contactsOf(state);
-  const currentId = chat?.contactId || '';
+  const currentId = chat?.contactId ? String(chat.contactId) : '';
   const current = contactById(state, currentId);
   const on = new Set(Array.isArray(state.extrasOn) ? state.extrasOn.map(String) : []);
   const kind = theaterKindById(theaterKindFor(state));
-  const allOn = contacts.length > 0 && contacts.every(contact => on.has(contact.id));
-  const currentOn = on.has(currentId);
-  const onCount = contacts.filter(contact => on.has(contact.id)).length;
-  const ordered = current && currentId
-    ? [current, ...contacts.filter(contact => String(contact.id) !== String(currentId))]
-    : contacts;
+  const currentOn = current ? on.has(current.id) : false;
 
   const typeButtons = THEATER_KINDS.map(item => {
     const badge = item.gate ? '<span class="mp-extra-kind-badge">18+</span>' : '';
@@ -268,28 +262,25 @@ function theaterPanelHtml(ctx, chat) {
       </button>`;
   }).join('');
 
-  const rows = ordered.map(contact => {
-    const enabled = on.has(contact.id);
-    const isCurrent = contact.id === currentId;
-    return `
-      <button class="mp-theater-row${isCurrent ? ' is-current' : ''}" data-act="theater-toggle" data-contact="${contact.id}" data-chat="${chat?.id || ''}" type="button">
-        ${chatAvatarHtml(contact)}
+  const currentRow = current
+    ? `
+      <button class="mp-theater-row is-current" data-act="theater-toggle" data-contact="${esc(current.id)}" type="button">
+        ${chatAvatarHtml(current)}
         <div class="mp-theater-row-main">
-          <div class="mp-theater-row-name">${esc(contact.name)}${isCurrent ? '<span class="mp-theater-current">当前会话</span>' : ''}</div>
-          <div class="mp-theater-row-sub">${enabled ? `会带 ${esc(kind.label)} 小剧场` : '只聊天'}</div>
+          <div class="mp-theater-row-name">这轮带小剧场</div>
+          <div class="mp-theater-row-sub">${currentOn ? `会带 ${esc(kind.label)} 小剧场` : '当前角色只聊天'}</div>
         </div>
-        <span class="mp-switch${enabled ? ' on' : ''}"></span>
-      </button>`;
-  }).join('');
+        <span class="mp-switch${currentOn ? ' on' : ''}"></span>
+      </button>`
+    : '<div class="mp-empty">这个会话没有关联角色。</div>';
 
   return `
     <div class="mp-theater-panel">
       <div class="mp-theater-head">
         <div>
           <div class="mp-theater-title">小剧场</div>
-          <div class="mp-theater-sub">这一轮让 AI 附一段；内容只进小剧场 App，不显示在聊天里。</div>
+          <div class="mp-theater-sub">只控制当前角色这一轮带不带；内容只进小剧场 App，不显示在聊天里。</div>
         </div>
-        <span class="mp-theater-current-state">${current ? (currentOn ? `会写 ${esc(kind.label)}` : '这轮不带') : '未选角色'}</span>
       </div>
 
       <div class="mp-theater-section">
@@ -300,25 +291,10 @@ function theaterPanelHtml(ctx, chat) {
         <div class="mp-theater-types">${typeButtons}</div>
       </div>
 
-      <div class="mp-theater-section">
-        <div class="mp-theater-section-head">
-          <span>这轮带小剧场</span>
-          <span>${onCount ? `${onCount} 个角色` : '全部关闭'}</span>
-        </div>
-        <button class="mp-theater-row is-all" data-act="theater-all" type="button">
-          <span class="mp-theater-all-icon">${icon('theater')}</span>
-          <div class="mp-theater-row-main">
-            <div class="mp-theater-row-name">全部角色</div>
-            <div class="mp-theater-row-sub">当前会话和通讯录里的所有角色</div>
-          </div>
-          <span class="mp-switch${allOn ? ' on' : ''}"></span>
-        </button>
-        <div class="mp-theater-list">${rows || '<div class="mp-empty">通讯录里还没有角色。</div>'}</div>
-      </div>
+      <div class="mp-theater-now">${currentRow}</div>
 
       <div class="mp-theater-foot">
         <button class="mp-theater-link" data-act="theater-app" data-chat="${chat?.id || ''}" type="button">${icon('theater')}打开小剧场 App</button>
-        <button class="mp-theater-link" data-act="theater-manage" type="button">${icon('chevron')}管理所有角色</button>
       </div>
     </div>`;
 }
@@ -1039,24 +1015,9 @@ export const threadApp = {
       return true;
     }
 
-    if (act === 'theater-all') {
-      const contacts = contactsOf(ctx.state);
-      const on = (ctx.state.extrasOn = Array.isArray(ctx.state.extrasOn) ? ctx.state.extrasOn : []);
-      const allOn = contacts.length > 0 && contacts.every(contact => on.includes(contact.id));
-      ctx.state.extrasOn = allOn ? [] : contacts.map(contact => contact.id);
-      ctx.save();
-      ctx.rerender();
-      return true;
-    }
-
     if (act === 'theater-app') {
       const chat = chatById(ctx.state, chatId);
       ctx.go('app-extras', chat?.contactId ? { contactId: chat.contactId } : {});
-      return true;
-    }
-
-    if (act === 'theater-manage') {
-      ctx.go('extras-switch');
       return true;
     }
 

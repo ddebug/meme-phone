@@ -6996,10 +6996,6 @@
   min-width: 0;
 }
 .mp-theater-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
   padding: 3px 3px 11px;
   border-bottom: 1px solid var(--line);
 }
@@ -7010,28 +7006,11 @@
   color: var(--text);
 }
 .mp-theater-sub {
-  max-width: 250px;
+  max-width: 100%;
   margin-top: 4px;
   font-size: calc(10.5px * var(--font-scale));
   line-height: 1.45;
   color: var(--text-3);
-}
-.mp-theater-current-state {
-  flex: none;
-  max-width: 94px;
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: var(--card);
-  color: var(--text-3);
-  font-size: calc(10px * var(--font-scale));
-  line-height: 1.4;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mp-root[data-mp-theme="night"] .mp-theater-current-state {
-  background: rgba(255, 255, 255, .07);
 }
 .mp-theater-section {
   margin-top: 12px;
@@ -7079,18 +7058,16 @@
   text-align: left;
   cursor: pointer;
 }
-.mp-theater-row.is-current {
-  background: rgba(142, 123, 242, .08);
+.mp-theater-now {
+  margin-top: 12px;
 }
-.mp-root[data-mp-theme="night"] .mp-theater-row.is-current {
-  background: rgba(255, 255, 255, .07);
-}
-.mp-theater-row.is-all {
+.mp-theater-now .mp-theater-row {
+  padding: 11px 10px;
+  border-radius: 14px;
   background: var(--card);
-  padding: 10px 9px;
   box-shadow: inset 0 0 0 1px var(--line);
 }
-.mp-root[data-mp-theme="night"] .mp-theater-row.is-all {
+.mp-root[data-mp-theme="night"] .mp-theater-now .mp-theater-row {
   background: rgba(255, 255, 255, .055);
 }
 .mp-theater-row-main {
@@ -7108,24 +7085,6 @@
   line-height: 1.4;
   white-space: nowrap;
 }
-.mp-theater-row-name > span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mp-theater-current {
-  flex: none;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: rgba(142, 123, 242, .13);
-  color: #7362c9;
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: .02em;
-}
-.mp-root[data-mp-theme="night"] .mp-theater-current {
-  background: rgba(185, 166, 255, .14);
-  color: #cbbbff;
-}
 .mp-theater-row-sub {
   margin-top: 2px;
   overflow: hidden;
@@ -7135,30 +7094,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.mp-theater-all-icon {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 31px;
-  height: 31px;
-  border-radius: 10px;
-  background: rgba(142, 123, 242, .12);
-  color: #7b6bd3;
-}
-.mp-theater-all-icon .mp-i { width: 16px; height: 16px; }
-.mp-theater-list {
-  max-height: 222px;
-  margin-top: 6px;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-.mp-theater-list::-webkit-scrollbar { width: 4px; }
-.mp-theater-list::-webkit-scrollbar-thumb { background: rgba(120, 104, 160, .16); border-radius: 4px; }
 .mp-theater-foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
   margin-top: 10px;
   padding: 10px 3px 1px;
@@ -7181,34 +7119,23 @@
 }
 .mp-theater-link .mp-i { width: 13px; height: 13px; opacity: .7; }
 .mp-theater-link:active { color: var(--text); }
-.mp-theater-list .mp-empty { padding: 10px 3px; }
-.mp-root[data-mp-skin="frost"] .mp-theater-row.is-all {
+.mp-theater-now .mp-empty { padding: 10px 3px; }
+.mp-root[data-mp-skin="frost"] .mp-theater-now .mp-theater-row {
   background: rgba(255, 255, 255, .52);
 }
-.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-theater-row.is-all {
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-theater-now .mp-theater-row {
   background: rgba(255, 255, 255, .06);
 }
-.mp-root[data-mp-art="pixel"] .mp-theater-row.is-all,
-.mp-root[data-mp-art="pixel"] .mp-theater-types .mp-extra-kind {
+.mp-root[data-mp-art="pixel"] .mp-theater-types .mp-extra-kind,
+.mp-root[data-mp-art="pixel"] .mp-theater-now .mp-theater-row {
   border-radius: 2px;
 }
 .mp-root[data-mp-art="pixel"] .mp-sheet-panel {
   border-radius: 2px;
   box-shadow: 5px 5px 0 rgba(30, 26, 34, .16), inset 0 0 0 1px rgba(255, 255, 255, .9);
 }
-.mp-root[data-mp-art="pixel"] .mp-theater-row {
-  border-radius: 2px;
-}
-.mp-root[data-mp-art="pixel"] .mp-theater-all-icon {
-  border-radius: 2px;
-}
-.mp-root[data-mp-art="pixel"] .mp-theater-current {
-  border-radius: 1px;
-}
 @media (max-width: 360px) {
-  .mp-theater-head { gap: 6px; }
-  .mp-theater-sub { max-width: 218px; }
-  .mp-theater-current-state { max-width: 78px; }
+  .mp-theater-sub { max-width: 100%; }
 }
 
 

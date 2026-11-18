@@ -43,8 +43,8 @@ export async function readTavernCharacters() {
     .map(character => ({
       name: character.name,
       tavernAvatar: character.avatar || character.name,
-      avatarUrl: typeof thumbnail === 'function' && character.avatar
-        ? thumbnail('avatar', `characters/${character.avatar}`)
+      avatarUrl: typeof thumbnail === 'function' && character.avatar && character.avatar !== 'none'
+        ? thumbnail('avatar', character.avatar)
         : '',
     }));
 }
@@ -60,8 +60,8 @@ export async function readTavernCards() {
       .map(character => ({
         name: character.name,
         avatar: character.avatar || character.name,
-        avatarUrl: typeof thumbnail === 'function' && character.avatar
-          ? thumbnail('avatar', `characters/${character.avatar}`)
+        avatarUrl: typeof thumbnail === 'function' && character.avatar && character.avatar !== 'none'
+          ? thumbnail('avatar', character.avatar)
           : '',
         description: character.description || '',
         personality: character.personality || '',

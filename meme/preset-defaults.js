@@ -59,7 +59,7 @@ export const FULL_REPLY_ITEM_DEFS = [
   },
   {
     "context": "history",
-    "label": "QQ聊天记录 - 最新消息",
+    "label": "历史小手机消息",
     "enabled": true
   },
   {
@@ -175,7 +175,7 @@ export const FULL_REPLY_ITEM_DEFS = [
   },
   {
     "context": "memory",
-    "label": "酒馆记忆",
+    "label": "历史酒馆消息",
     "enabled": true
   },
   {

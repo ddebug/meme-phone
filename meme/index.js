@@ -151,6 +151,7 @@ function makeAi(state) {
         extrasEnabledFor(state, contact?.id) ? 'theater' : 'plain',
         theaterKindFor(state),
         replyContextFor(state, chat).memory ? 'memory' : 'nomemory',
+        JSON.stringify(chat?.history || {}),
         state.settings?.memory?.activeId || '',
         state.settings?.memory?.readMode || '',
       ].join('|');

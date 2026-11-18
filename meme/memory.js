@@ -8,7 +8,7 @@
  * 手机默认一套方案，某个会话可以单独换一套。
  */
 
-import { contactById, memoryPresetFor, memoryReadModeFor } from './data.js';
+import { contactById, memoryPresetFor, effectiveTavernHistory } from './data.js';
 import { chatMemorySummary, summaryText } from './book.js';
 import { readLatestTavernChat, readTavernContext } from './host.js';
 
@@ -96,13 +96,14 @@ function emptyResult(preset, floors, extra = {}) {
 /**
  * 读这个会话的酒馆记忆。
  * limit 是总字数预算，层数是方案里的 floors。
- * 实际读总结还是原文由 memoryReadModeFor 决定（角色开关 > 方案 > 手机默认）。
+ * 实际读总结还是原文由 effectiveTavernHistory 决定（角色会话设置 > 角色开关 > 方案 > 手机默认）。
  */
 export async function buildMemoryContext(state, chat, limit = 1200) {
   const preset = activeMemoryPreset(state, chat);
   const contact = contactById(state, chat?.contactId);
-  const wanted = memoryReadModeFor(state, chat?.contactId, preset);
-  const floors = Math.max(1, Math.min(50, Number(preset?.floors) || 10));
+  const tavern = effectiveTavernHistory(state, chat, preset);
+  const wanted = tavern.mode;
+  const floors = Math.max(1, Math.min(50, Number(tavern.floors) || 10));
   const summaryLimit = Math.max(300, Math.floor(limit * 0.75));
 
   /* 先找到这个角色最新的一份酒馆聊天。柏宝书只按这份聊天文件读：

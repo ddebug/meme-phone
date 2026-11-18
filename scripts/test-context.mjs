@@ -39,7 +39,7 @@ function findItem(items, id) {
   const labels = items.map(item => item.label);
   ['头部', 'QQ聊天任务', 'QQ聊天行为要求', '用户角色设定', '个签历史 - 用户个性签名',
     '角色档案 - 人设、历史记录、线下剧情等', '手机相关记录 - 占位符', '表情包库',
-    'QQ聊天记录 - 最新消息', '收藏夹消息', '约定计划', '修改个性签名', '戳一戳消息',
+    '历史小手机消息', '历史酒馆消息', '收藏夹消息', '约定计划', '修改个性签名', '戳一戳消息',
     '撤回消息', '引用消息', '转账', '会员', '关注用户的消息细节', '时间信息',
     '用户当前操作提醒', '用户操作 - 本轮任务清单', '中文回复', '回复格式要求',
     'QQ 回复格式（原版）', '尾部'].forEach(label => {
@@ -73,7 +73,7 @@ function findItem(items, id) {
   ok(!text.includes('【旧毛衣】'), '关闭的世界书条目不注入');
   ok(text.includes('【角色档案 · 沈砚】'), '角色档案按角色卡读取');
   ok(text.includes('【场景信息】'), '场景信息单独成条');
-  ok(text.includes('【手机聊天记录】'), '聊天记录按条数注入');
+  ok(text.includes('【历史小手机消息】'), '聊天记录按条数注入');
   ok(text.includes('【我的个性签名】') && text.includes('夜里也要好好吃饭'), '个签按当前资料注入');
   ok(text.includes('【表情包库】') && text.includes('抱抱（🫂）'), '表情包库按当前面板注入');
   ok(messages[messages.length - 1].role === 'user', '最后一条聊天作为 user 消息');

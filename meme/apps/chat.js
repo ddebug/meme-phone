@@ -7,8 +7,9 @@ import { icon } from '../icons.js';
 import {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
   wakeAllowed, messagePreview, addExtrasEntry, theaterKindFor, THEATER_KINDS, theaterKindById,
-  apiPresetsOf, memoryPresetsOf, memoryPresetFor,
-  replyPresetsOf, replyPresetFor, normalizeReplyItems,
+  apiPresetsOf, memoryPresetsOf, memoryPresetFor, memoryReadModeFor,
+  replyPresetsOf, replyPresetFor, replyContextFor, normalizeReplyItems,
+  chatHistoryFor, effectivePhoneHistoryLimit, effectiveTavernHistory,
 } from '../data.js';
 import { memoryPresetSummary } from '../memory.js';
 import { requestStats, estimateTokens, proactiveLead } from '../reply-context.js';
@@ -53,6 +54,9 @@ function debugKey(ctx, chat) {
     (ctx.state.extrasOn || []).includes(String(chat.contactId)) ? 'theater' : 'plain',
     ctx.state.settings?.api?.activeChat || '',
     replyPresetFor(ctx.state, chat)?.id || '',
+    JSON.stringify(chat.history || {}),
+    ctx.state.settings?.memory?.activeId || '',
+    ctx.state.settings?.memory?.readMode || '',
     wakeAllowed(ctx.state, chat) ? 'wake' : 'nowake',
   ].join('|');
 }
@@ -346,6 +350,25 @@ function settingsBody(ctx, chatId) {
   const injectedCount = replyItems.filter(item => item.kind === 'context' && item.enabled).length;
   const replySub = `${ownReply ? `只对这个会话 · ${ownReply.name || '未命名'}` : `跟随手机 · ${globalReply?.name || '默认回复方式'}`} · ${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
   const behavior = behaviorSettings(state, chat);
+  const historyConfig = chatHistoryFor(chat);
+  const phoneCount = effectivePhoneHistoryLimit(chat, replyContextFor(state, chat));
+  const tavern = effectiveTavernHistory(state, chat, memoryPresetFor(state, chat));
+  const followTavernMode = memoryReadModeFor(state, chat.contactId, memoryPresetFor(state, chat));
+  const tavernValue = tavern.mode === 'summary'
+    ? '全部总结'
+    : tavern.mode === 'recent' ? `最近 ${tavern.floors} 层`
+      : followTavernMode === 'summary' ? '方案 · 总结'
+        : followTavernMode === 'recent' ? `方案 · 原文 ${tavern.floors} 层`
+          : `自动 · ${tavern.floors} 层`;
+  const phoneValue = `${phoneCount} 条`;
+  const tavernSub = [
+    '只改这个角色',
+    historyConfig.tavernMode || historyConfig.tavernFloors ? '已单独设置' : '跟随记忆方案',
+  ].join(' · ');
+  const phoneSub = [
+    '只改这个会话',
+    historyConfig.phoneLimit ? '已单独设置' : '跟随回复预设',
+  ].join(' · ');
 
   return `
     <div class="mp-page-body">
@@ -404,7 +427,15 @@ function settingsBody(ctx, chatId) {
         <div class="mp-group-label">上下文</div>
         <div class="mp-group-box">
           ${chatSetRow(chat.id, {
-            iconName: 'book', title: '酒馆记忆',
+            iconName: 'clock', title: '历史酒馆消息',
+            sub: `全部总结或最近几层原文 · ${tavernSub}`, act: 'ts-tavern-history', value: tavernValue,
+          })}
+          ${chatSetRow(chat.id, {
+            iconName: 'chat', title: '历史小手机消息',
+            sub: `这个小手机最近几条 · ${phoneSub}`, act: 'ts-phone-history', value: phoneValue,
+          })}
+          ${chatSetRow(chat.id, {
+            iconName: 'book', title: '酒馆记忆方案',
             sub: memorySub, act: 'ts-memory', value: ownMemory ? '单独' : '跟随',
           })}
         </div>
@@ -1132,6 +1163,81 @@ export const threadSettingsApp = {
           ctx.save();
           ctx.rerender();
           ctx.toast(`这个会话改用「${preset.name || '未命名预设'}」`);
+        },
+      });
+      return true;
+    }
+
+    if (act === 'ts-tavern-history') {
+      const preset = memoryPresetFor(ctx.state, chat);
+      const current = effectiveTavernHistory(ctx.state, chat, preset);
+      const applyHistory = (patch, message) => {
+        chat.history = { ...chatHistoryFor(chat), ...patch };
+        ctx.ai?.clearPreview?.(chat.id);
+        ctx.shell.debugPreview = null;
+        ctx.save();
+        ctx.rerender();
+        ctx.toast(message);
+      };
+      ctx.openSheet({
+        kind: 'pick',
+        title: '历史酒馆消息',
+        note: `只影响「${contact?.name || '这个角色'}」。全部总结 = 只注入柏宝书总结；最近 N 层 = 注入酒馆原文。`,
+        items: [
+          { label: '跟随记忆方案', value: 'follow', icon: 'book', note: `现在 ${memoryPresetSummary(preset)}` },
+          { label: '全部总结', value: 'summary', icon: 'book', note: current.mode === 'summary' ? '现在用的' : '没有总结时不会补原文' },
+          ...[5, 10, 15, 20, 30, 50].map(value => ({
+            value: `n:${value}`,
+            label: `最近 ${value} 层原文`,
+            note: current.mode === 'recent' && current.floors === value ? '现在用的' : '',
+          })),
+          { label: '管理记忆方案', value: 'manage', icon: 'settings', note: '新建方案、改全局层数' },
+        ],
+        onPick: value => {
+          if (value === 'follow') {
+            applyHistory({ tavernMode: '', tavernFloors: 0 }, '历史酒馆消息已跟随记忆方案');
+            return;
+          }
+          if (value === 'summary') {
+            applyHistory({ tavernMode: 'summary' }, '历史酒馆消息改成全部总结');
+            return;
+          }
+          if (value === 'manage') {
+            ctx.go('memory-presets', { contactId: chat.contactId });
+            return;
+          }
+          if (String(value).startsWith('n:')) {
+            const floors = Number(String(value).slice(2));
+            applyHistory({ tavernMode: 'recent', tavernFloors: floors }, `历史酒馆消息改成最近 ${floors} 层原文`);
+          }
+        },
+      });
+      return true;
+    }
+
+    if (act === 'ts-phone-history') {
+      const current = effectivePhoneHistoryLimit(chat, replyContextFor(ctx.state, chat));
+      ctx.openSheet({
+        kind: 'pick',
+        title: '历史小手机消息',
+        note: '只改这个小手机聊天注入几条最近消息；酒馆聊天记录另有一项。',
+        items: [
+          { label: '跟随回复预设', value: 'follow', icon: 'reply', note: `现在 ${replyContextFor(ctx.state, chat).historyLimit} 条` },
+          ...[5, 10, 15, 20, 30, 50].map(value => ({
+            value: `n:${value}`,
+            label: `最近 ${value} 条`,
+            note: current === value ? '现在用的' : '',
+          })),
+        ],
+        onPick: value => {
+          let next = 0;
+          if (String(value).startsWith('n:')) next = Number(String(value).slice(2));
+          chat.history = { ...chatHistoryFor(chat), phoneLimit: next };
+          ctx.ai?.clearPreview?.(chat.id);
+          ctx.shell.debugPreview = null;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(next ? `历史小手机消息改成最近 ${next} 条` : '历史小手机消息已跟随回复预设');
         },
       });
       return true;

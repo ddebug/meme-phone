@@ -4,7 +4,7 @@
  * 旧的独立拼装函数已删除，避免出现两套逻辑。
  */
 
-import { replyContextFor, replyItemsFor, replyPresetFor, fillPromptTokens, characterCardFor, itemAppliesToChat } from './data.js';
+import { replyContextFor, replyItemsFor, replyPresetFor, fillPromptTokens, characterCardFor, itemAppliesToChat, effectivePhoneHistoryLimit } from './data.js';
 import { readWorldBook } from './host.js';
 import { buildMemoryContext } from './memory.js';
 import { behaviorContextText } from './behavior.js';
@@ -56,7 +56,9 @@ function requestGroup(message) {
   if (source === '小剧场') return { key: 'theater', label: '小剧场' };
   if (source === '回复要求' || source === '场景提示') return { key: 'rule', label: '规则' };
   if (source === '最后一条聊天' || source === '主动消息占位') return { key: 'turn', label: '本条' };
-  if (source.includes('聊天记录')) return { key: 'history', label: '记录' };
+  if (source.includes('聊天记录') || source.includes('历史小手机') || source.includes('历史酒馆') || source.includes('酒馆记忆')) {
+    return { key: 'history', label: '记录' };
+  }
   return { key: 'context', label: '设定' };
 }
 
@@ -285,15 +287,15 @@ async function contextBlockFor(item, state, chat, contact, context, memoryText) 
   }
   if (key === 'lorebook') return lorebookBlock(state, chat, contact, context);
   if (key === 'memory') {
-    const text = memoryText ? `【酒馆记忆】\n${memoryText}` : '';
+    const text = memoryText ? `【历史酒馆消息】\n${memoryText}` : '';
     return { text, status: text ? 'injected' : 'empty', reason: text ? '' : '这个会话还没读到记忆' };
   }
   if (key === 'time') return { text: clockBlock(), status: 'injected', reason: '' };
   if (key === 'history') {
-    const limit = Math.max(1, Number(context.historyLimit) || 10);
+    const limit = effectivePhoneHistoryLimit(chat, context);
     const text = transcript(state, chat, limit);
     return {
-      text: text ? `【手机聊天记录】\n${text}` : '',
+      text: text ? `【历史小手机消息】\n${text}` : '',
       status: text ? 'injected' : 'empty',
       reason: text ? '' : '这个会话还没有聊天记录',
     };

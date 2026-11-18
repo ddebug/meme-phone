@@ -86,6 +86,45 @@ export function normalizeReplyContext(raw) {
   };
 }
 
+/* 会话级历史读取覆盖：预设只放占位，具体读多少由角色聊天决定。
+ * 0 / 空字符串 = 跟随预设或记忆方案，不写死默认值，旧会话保持原行为。 */
+export const DEFAULT_CHAT_HISTORY = {
+  phoneLimit: 0,       // 0 跟随回复预设的 historyLimit；1–50 是这个小手机最近几条
+  tavernMode: '',      // '' 跟随记忆方案；summary 全部总结；recent 最近 N 层原文
+  tavernFloors: 0,     // 0 跟随记忆方案；1–50 是最近几层酒馆聊天
+};
+
+export function normalizeChatHistory(raw) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  return {
+    phoneLimit: clampNumber(source.phoneLimit, 0, 50, 0),
+    tavernMode: ['summary', 'recent'].includes(source.tavernMode) ? source.tavernMode : '',
+    tavernFloors: clampNumber(source.tavernFloors, 0, 50, 0),
+  };
+}
+
+export function chatHistoryFor(chat) {
+  return normalizeChatHistory(chat?.history);
+}
+
+/** 这个小手机聊天注入最近几条：会话覆盖 > 回复预设；返回值至少 1。 */
+export function effectivePhoneHistoryLimit(chat, context) {
+  const own = chatHistoryFor(chat).phoneLimit;
+  if (own > 0) return own;
+  return clampNumber(context?.historyLimit, 1, 50, DEFAULT_REPLY_CONTEXT.historyLimit);
+}
+
+/** 这个角色读酒馆总结还是原文、读几层：会话覆盖 > 角色记忆开关 > 记忆方案。 */
+export function effectiveTavernHistory(state, chat, preset) {
+  const own = chatHistoryFor(chat);
+  const wanted = own.tavernMode || memoryReadModeFor(state, chat?.contactId, preset);
+  const mode = wanted === 'summary' ? 'summary' : wanted === 'recent' ? 'recent' : 'auto';
+  const floors = own.tavernFloors > 0
+    ? own.tavernFloors
+    : clampNumber(preset?.floors, 1, 50, 10);
+  return { mode, floors, fromChat: Boolean(own.tavernMode || own.tavernFloors) };
+}
+
 /* 旧 QQ 预设把上下文注入也做成列表里的条目，而不是列表下面的一组开关：
  * 用户设定、角色档案、聊天记录、时间信息各自有 role 和顺序，能单独开关、能排序。
  * 这里沿用同一套做法，新增 kind:'context' + auto 字段；内容是运行时从手机/酒馆读取的。 */
@@ -126,10 +165,10 @@ export const REPLY_CONTEXT_SPECS = {
   },
   memory: {
     id: 'reply_context_memory',
-    label: '酒馆记忆',
+    label: '历史酒馆消息',
     role: 'system',
     content: '__AUTO_MEMORY__',
-    note: '酒馆总结或最近几层',
+    note: '全部总结或最近 N 层酒馆原文，角色聊天里可改',
     hintOrder: 1.54,
   },
   scene: {
@@ -150,10 +189,10 @@ export const REPLY_CONTEXT_SPECS = {
   },
   history: {
     id: 'reply_context_history',
-    label: '手机聊天记录',
+    label: '历史小手机消息',
     role: 'system',
     content: '__AUTO_CHAT_HISTORY__',
-    note: '本机会话最近几条',
+    note: '这个会话最近几条，角色聊天里可改',
     hintOrder: 1.56,
   },
   time: {
@@ -261,7 +300,7 @@ export function normalizeReplyItems(raw, rawContext) {
       return {
         ...contextItem(auto),
         id: spec.id,
-        label: String(item?.label || '').trim().slice(0, 30) || spec.label,
+        label: spec.label,
         enabled: item?.enabled !== undefined ? item.enabled !== false : context[auto] !== false,
         characters: normalizeCharacters(item?.characters),
         order: Number.isFinite(order) ? order : spec.hintOrder,
@@ -484,6 +523,8 @@ export function addChat(state, contactId, options = {}) {
     muted: false,
     llmPresetId: '',
     memoryPresetId: '',
+    replyPresetId: options.replyPresetId || '',
+    history: normalizeChatHistory(options.history),
     updatedAt: Date.now(),
   };
   return state.chats[id];
@@ -1610,6 +1651,7 @@ export function normalize(raw) {
         behavior: normalizeBehavior(message.kind, message.behavior),
       }))
       : [];
+    chat.history = normalizeChatHistory(chat.history);
     chat.unread = chat.unread || 0;
   }
   return merged;

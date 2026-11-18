@@ -874,8 +874,8 @@ export const replyPresetApp = {
         note: `${count ? `${count} 条条目 · ${label}` : '这个分组还没有条目'}`,
         items: [
           { label: '重命名分组', value: 'rename', icon: 'reply' },
-          count ? { label: '删除分组', value: 'delete', icon: 'trash', danger: true } : null,
-        ].filter(Boolean),
+          { label: '删除分组', value: 'delete', icon: 'trash', danger: true },
+        ],
         onPick: value => {
           if (value === 'rename') {
             setTimeout(() => {
@@ -896,7 +896,6 @@ export const replyPresetApp = {
             return;
           }
           if (value === 'delete') {
-            if (nonEmpty.length === 1) { ctx.toast('至少保留一个有内容的位置片段'); return; }
             if (!count) {
               preset.groups = groups.filter(item => item.id !== group.id);
               ctx.save();
@@ -904,6 +903,7 @@ export const replyPresetApp = {
               ctx.toast('空分组已删除');
               return;
             }
+            if (nonEmpty.length === 1) { ctx.toast('至少保留一个有内容的位置片段'); return; }
             setTimeout(() => {
               const fallback = groups.find(item => item.id === groups[groups.findIndex(row => row.id === group.id) - 1]?.id) ||
                 groups.find(item => item.id === groups[groups.findIndex(row => row.id === group.id) + 1]?.id);

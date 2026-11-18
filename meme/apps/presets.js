@@ -6,7 +6,7 @@
 
 import { icon } from '../icons.js';
 import { esc } from '../shell.js';
-import { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext, normalizeReplyItems, normalizeCharacters, normalizeReplyGroups, replyGroupIdFor, defaultReplyItems, REPLY_CONTEXT_SPECS, chatsOf, REPLY_INSTRUCTION_ID, withReplyInstruction } from '../data.js';
+import { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext, normalizeReplyItems, normalizeCharacters, normalizeReplyGroups, replyGroupIdFor, positionalReplyGroups, defaultReplyItems, REPLY_CONTEXT_SPECS, chatsOf, REPLY_INSTRUCTION_ID, withReplyInstruction } from '../data.js';
 import { buildReplyMessages } from '../reply-context.js';
 import { tavernQuietPrompt } from '../host.js';
 
@@ -208,21 +208,20 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat', groupId = '') {
     ctx.toast('这条是固定条目，不能改内容');
     return;
   }
-  const groups = normalizeReplyGroups(preset.groups);
+  const groups = positionalReplyGroups(items, preset.groups);
   const defaultKind = item?.kind || (scope === 'app' ? 'app' : 'chat');
   const rawDefaultGroup = String(item?.group || groupId || '');
   const defaultGroup = groups.some(group => group.id === rawDefaultGroup)
     ? rawDefaultGroup
     : replyGroupIdFor({ kind: defaultKind }, groups);
+  const groupName = groups.find(group => group.id === defaultGroup)?.name || '未分组';
   const charOptions = characterOptions(ctx);
   ctx.openSheet({
     kind: 'form',
-    title: item ? '编辑提示词条目' : '添加提示词条目',
+    title: item ? `编辑条目 · ${groupName}` : `添加条目 · ${groupName}`,
     confirm: item ? '保存' : '添加',
     fields: [
       { name: 'label', type: 'text', label: '名称', value: item?.label || '', placeholder: '比如：聊天任务、行为要求', maxLength: 30 },
-      { name: 'group', type: 'select', label: '分组', value: defaultGroup, options: groups.map(group => ({ value: group.id, label: group.name })),
-        hint: '分组只影响编辑页归类；条目仍按整张列表的顺序拼接。' },
       { name: 'kind', type: 'select', label: '类型', value: defaultKind, options: [
         { value: 'chat', label: '聊天行为（聊天软件）' },
         { value: 'app', label: '其他软件' },
@@ -245,10 +244,14 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat', groupId = '') {
     ],
     onForm: values => {
       const next = promptItems(preset);
-      const groups = normalizeReplyGroups(preset.groups);
-      const pickedGroup = groups.some(group => group.id === String(values.group || ''))
-        ? String(values.group)
+      const groups = positionalReplyGroups(next, preset.groups);
+      const pickedGroup = groups.some(group => group.id === String(defaultGroup))
+        ? String(defaultGroup)
         : replyGroupIdFor({ kind: values.kind === 'app' ? 'app' : 'chat' }, groups);
+      const groupItems = next.filter(row => row.group === pickedGroup);
+      const lastOrder = groupItems.length
+        ? Math.max(...groupItems.map(row => Number(row.order) || 0))
+        : next.length;
       const nextItem = {
         id: item?.id || newId('item'),
         label: String(values.label || '').trim().slice(0, 30) || '自定义条目',
@@ -263,7 +266,7 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat', groupId = '') {
         editable: true,
         deletable: true,
         group: pickedGroup,
-        order: item?.order ?? next.length,
+        order: item?.order ?? (lastOrder + 0.5),
       };
       if (index >= 0) next[index] = { ...next[index], ...nextItem, id: next[index].id };
       else next.push(nextItem);
@@ -475,8 +478,8 @@ function bindPresetDrag(ctx) {
     if (!items.length) return;
     const ids = [...state.list.querySelectorAll('.mp-preset-item')].map(row => row.dataset.id);
     const byId = new Map(items.map(item => [item.id, item]));
-    const groups = normalizeReplyGroups(preset.groups);
-    const groupItems = items.filter(item => replyGroupIdFor(item, groups) === state.groupId);
+    const groups = positionalReplyGroups(items, preset.groups);
+    const groupItems = items.filter(item => item.group === state.groupId);
     const ordered = ids.map(id => byId.get(id)).filter(Boolean);
     groupItems.forEach(item => {
       if (!ids.includes(item.id)) ordered.push(item);
@@ -484,9 +487,9 @@ function bindPresetDrag(ctx) {
     const inGroup = new Set(groupItems.map(item => item.id));
     let cursor = 0;
     const next = items.map(item => (inGroup.has(item.id) ? ordered[cursor++] || item : item));
-    next.forEach((item, index) => {
+    next.forEach(item => {
       if (inGroup.has(item.id)) item.group = state.groupId;
-      item.order = index;
+      item.order = next.indexOf(item);
     });
     preset.groups = groups;
     preset.items = next;
@@ -652,11 +655,16 @@ export const replyPresetApp = {
     const isActive = active?.id === preset.id;
     const context = normalizeReplyContext(preset.context);
     const items = promptItems(preset);
-    const groups = normalizeReplyGroups(preset.groups);
-    const grouped = groups.map(group => ({
-      ...group,
-      items: items.filter(item => replyGroupIdFor(item, groups) === group.id),
-    }));
+    const groups = positionalReplyGroups(items, preset.groups);
+    preset.groups = groups;
+    let cursor = 0;
+    const grouped = groups.map(group => {
+      const groupItems = items.filter(item => item.group === group.id);
+      const start = groupItems.length ? cursor + 1 : 0;
+      const end = start ? cursor + groupItems.length : 0;
+      cursor += groupItems.length;
+      return { ...group, items: groupItems, start, end };
+    });
     const contextCount = items.filter(item => item.kind === 'context').length;
     const itemRow = (item, groupKind = '') => {
       const isContext = item.kind === 'context';
@@ -684,10 +692,11 @@ export const replyPresetApp = {
     };
     const groupRows = grouped.map(group => {
       const rows = group.items.map(item => itemRow(item, group.kind)).join('') || '<div class="mp-preset-empty">这个分组还没有条目</div>';
+      const range = group.start ? ` · 位置 ${group.start}${group.end > group.start ? `–${group.end}` : ''}` : '';
       return `
         <div class="mp-preset-group-head">
           <button class="mp-preset-group-title" data-act="reply-group-open" data-group="${esc(group.id)}" type="button">
-            <span>${esc(group.name)}</span><small>${group.items.length} 条</small>${icon('chevron')}
+            <span>${esc(group.name)}</span><small>${group.items.length} 条${group.start ? range : ' · 未使用'}</small>${icon('chevron')}
           </button>
           ${group.kind === 'context' ? '' : `<button class="mp-icon-btn" data-act="reply-item-add" data-group="${esc(group.id)}" data-scope="${group.kind === 'app' ? 'app' : 'chat'}" type="button" aria-label="往「${esc(group.name)}」加一条">${icon('plus')}</button>`}
         </div>
@@ -732,7 +741,7 @@ export const replyPresetApp = {
         </div>
         ${groupRows || '<div class="mp-group mp-preset-empty" style="padding:16px 14px">还没有条目。</div>'}
         <div class="mp-api-note" style="margin-top:8px">
-          分组只改变编辑页的归类，条目仍按原来的顺序拼进模型；点分组名可以改名或删除，每组的加号把新条目加到这一组。
+          分组只圈住「一段连续的位置」，不会移动条目；点组名可改名或删除，组内加号会加在这一段的末尾。不同位置的条目不能并进同一组。
         </div>
 
         <div class="mp-group" style="margin-top:12px">
@@ -807,19 +816,42 @@ export const replyPresetApp = {
     }
 
     if (act === 'reply-group-add') {
+      const all = promptItems(preset);
+      const groups = positionalReplyGroups(all, preset.groups);
+      if (groups.length >= 48) { ctx.toast('位置分组已经很多了'); return true; }
+      const options = all.map((item, index) => ({
+        value: item.id,
+        label: `${index + 1}. ${item.label}${item.kind === 'context' ? '（上下文）' : item.kind === 'app' ? '（其他软件）' : ''}`,
+      }));
       ctx.openSheet({
         kind: 'form',
         title: '新建分组',
-        fields: [{ name: 'name', type: 'text', label: '分组名称', value: '', placeholder: '比如：我的聊天习惯', maxLength: 20 }],
+        fields: [
+          { name: 'name', type: 'text', label: '分组名称', value: '', placeholder: '比如：QQ 聊天行为', maxLength: 20 },
+          { name: 'from', type: 'select', label: '从这一条开始', value: options[0]?.value || '', options },
+          { name: 'to', type: 'select', label: '到这一条结束', value: options[options.length - 1]?.value || '', options,
+            hint: '分组只圈住这一段连续位置，不会移动条目。' },
+        ],
         onForm: values => {
           const name = String(values.name || '').trim().slice(0, 20);
           if (!name) { ctx.toast('给分组起个名字'); return; }
-          const groups = normalizeReplyGroups(preset.groups);
-          if (groups.length >= 12) { ctx.toast('最多 12 个分组'); return; }
-          preset.groups = [...groups, { id: newId('group'), name, kind: 'chat' }];
+          const from = all.findIndex(item => item.id === String(values.from || ''));
+          const to = all.findIndex(item => item.id === String(values.to || ''));
+          if (from < 0 || to < 0) { ctx.toast('选择一段连续条目'); return; }
+          const start = Math.min(from, to);
+          const end = Math.max(from, to);
+          const picked = all.slice(start, end + 1);
+          const kind = picked.every(item => item.kind === 'context') ? 'context'
+            : picked.every(item => item.kind === 'app') ? 'app' : 'chat';
+          const group = { id: newId('group'), name, kind };
+          const rangeIds = new Set(picked.map(item => item.id));
+          const next = all.map(item => rangeIds.has(item.id) ? { ...item, group: group.id } : item);
+          preset.groups = [...groups, group];
+          preset.items = next;
+          resetPreview();
           ctx.save();
           ctx.rerender();
-          ctx.toast(`已新建分组「${name}」`);
+          ctx.toast(`在这段连续位置上建立「${name}」`);
         },
       });
       return true;
@@ -827,17 +859,22 @@ export const replyPresetApp = {
 
     if (act === 'reply-group-open') {
       const groupId = String(data.group || '');
-      const groups = normalizeReplyGroups(preset.groups);
+      const items = promptItems(preset);
+      const groups = positionalReplyGroups(items, preset.groups);
       const group = groups.find(item => item.id === groupId);
       if (!group) return true;
-      const count = promptItems(preset).filter(item => replyGroupIdFor(item, groups) === group.id).length;
+      const count = items.filter(item => item.group === group.id).length;
+      const nonEmpty = groups.filter(item => items.some(row => row.group === item.id));
+      const first = count ? items.findIndex(item => item.group === group.id) + 1 : 0;
+      const last = count ? items.filter(item => item.group === group.id).length + first - 1 : 0;
+      const label = count ? `位置 ${first}${last > first ? `–${last}` : ''}` : '空分组';
       ctx.openSheet({
         kind: 'pick',
         title: `分组 · ${group.name}`,
-        note: `${count} 条条目 · 分组名只影响编辑页显示`,
+        note: `${count ? `${count} 条条目 · ${label}` : '这个分组还没有条目'}`,
         items: [
           { label: '重命名分组', value: 'rename', icon: 'reply' },
-          groups.length > 1 ? { label: '删除分组', value: 'delete', icon: 'trash', danger: true } : null,
+          count ? { label: '删除分组', value: 'delete', icon: 'trash', danger: true } : null,
         ].filter(Boolean),
         onPick: value => {
           if (value === 'rename') {
@@ -849,8 +886,7 @@ export const replyPresetApp = {
                 onForm: values => {
                   const name = String(values.name || '').trim().slice(0, 20);
                   if (!name) { ctx.toast('分组名不能为空'); return; }
-                  const next = normalizeReplyGroups(preset.groups).map(item => item.id === group.id ? { ...item, name } : item);
-                  preset.groups = next;
+                  preset.groups = groups.map(item => item.id === group.id ? { ...item, name } : item);
                   ctx.save();
                   ctx.rerender();
                   ctx.toast(`分组改名为「${name}」`);
@@ -860,25 +896,31 @@ export const replyPresetApp = {
             return;
           }
           if (value === 'delete') {
+            if (nonEmpty.length === 1) { ctx.toast('至少保留一个有内容的位置片段'); return; }
+            if (!count) {
+              preset.groups = groups.filter(item => item.id !== group.id);
+              ctx.save();
+              ctx.rerender();
+              ctx.toast('空分组已删除');
+              return;
+            }
             setTimeout(() => {
-              const remaining = groups.filter(item => item.id !== group.id);
-              const fallback = remaining[0];
+              const fallback = groups.find(item => item.id === groups[groups.findIndex(row => row.id === group.id) - 1]?.id) ||
+                groups.find(item => item.id === groups[groups.findIndex(row => row.id === group.id) + 1]?.id);
               ctx.openSheet({
                 kind: 'pick',
                 title: `删除「${group.name}」`,
-                note: `这组里的 ${count} 条会移到「${fallback.name}」，条目内容不会丢。`,
+                note: `条目位置不变，只去掉这层组名，并并入相邻的「${fallback?.name || '位置块'}」。`,
                 items: [{ label: '确认删除分组', value: 'delete', icon: 'trash', danger: true }],
                 onPick: confirm => {
                   if (confirm !== 'delete') return;
-                  const items = promptItems(preset).map(item => (
-                    replyGroupIdFor(item, groups) === group.id ? { ...item, group: fallback.id } : item
-                  ));
-                  preset.groups = remaining;
+                  if (fallback) items.forEach(item => { if (item.group === group.id) item.group = fallback.id; });
+                  preset.groups = groups.filter(item => item.id !== group.id);
                   preset.items = items;
                   resetPreview();
                   ctx.save();
                   ctx.rerender();
-                  ctx.toast(`分组「${group.name}」已删除，条目已移到「${fallback.name}」`);
+                  ctx.toast(`分组「${group.name}」已删除，条目位置不变`);
                 },
               });
             }, 0);

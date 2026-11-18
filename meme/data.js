@@ -106,7 +106,7 @@ export function normalizeReplyGroups(raw) {
   const source = Array.isArray(raw) && raw.length ? raw : DEFAULT_REPLY_GROUPS;
   const groups = [];
   const seen = new Set();
-  source.slice(0, 12).forEach((item, index) => {
+  source.slice(0, 48).forEach((item, index) => {
     if (!item || typeof item !== 'object') return;
     let id = String(item.id || `group_${index + 1}`).trim().slice(0, 40);
     if (!id || seen.has(id)) id = `group_${index + 1}_${seen.size}`;
@@ -130,6 +130,42 @@ export function replyGroupIdFor(item, groups) {
   const kind = item?.kind === 'context' ? 'context' : item?.kind === 'app' ? 'app' : 'chat';
   const match = list.find(group => group.kind === kind);
   return (match || list[0]).id;
+}
+
+/** 按真正的上下文顺序，把同名分组切成一段段连续的位置块。
+ *  同一组只能覆盖相邻条目；中间夹了别组条目，就拆成新的位置块，
+ *  这样渲染时不会把不同位置的条目强行并到一个分组里。 */
+export function positionalReplyGroups(items, rawGroups) {
+  const base = normalizeReplyGroups(rawGroups);
+  const list = (Array.isArray(items) ? items : [])
+    .slice()
+    .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+  const groups = [];
+  const used = new Set();
+  let lastBase = '';
+  let lastGroup = null;
+  list.forEach(item => {
+    const baseId = replyGroupIdFor(item, base);
+    const baseGroup = base.find(group => group.id === baseId) || base[0];
+    if (baseId !== lastBase || !lastGroup) {
+      let id = baseGroup.id;
+      let n = 0;
+      while (used.has(id)) {
+        n += 1;
+        id = `${baseGroup.id}_p${n}`;
+      }
+      used.add(id);
+      lastGroup = { id, name: baseGroup.name, kind: baseGroup.kind };
+      groups.push(lastGroup);
+      lastBase = baseId;
+    }
+    item.group = lastGroup.id;
+  });
+  /* 空的「其他软件」不在聊天上下文里，保留在列表底部，方便继续加 app 条目。 */
+  base.forEach(group => {
+    if (group.kind === 'app' && !groups.some(item => item.id === group.id)) groups.push({ ...group });
+  });
+  return groups;
 }
 
 /* 会话级历史读取覆盖：预设只放占位，具体读多少由角色聊天决定。

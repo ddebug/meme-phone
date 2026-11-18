@@ -7,10 +7,10 @@ import {
 } from '../meme/data.js';
 import { buildReplyMessages } from '../meme/reply-context.js';
 
-test('会话历史设置会归一化，非法值回落到跟随', () => {
+test('会话历史设置会归一化，历史小手机条数允许任意正整数', () => {
   assert.deepEqual(normalizeChatHistory({}), { phoneLimit: 0, tavernMode: '', tavernFloors: 0 });
   assert.deepEqual(normalizeChatHistory({ phoneLimit: 999, tavernMode: 'wat', tavernFloors: -3 }), {
-    phoneLimit: 50,
+    phoneLimit: 999,
     tavernMode: '',
     tavernFloors: 0,
   });

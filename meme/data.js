@@ -46,6 +46,7 @@ export function replyInstructionItem(content, order = 2.5) {
     editable: true,
     deletable: true,
     note: '',
+    group: 'group_chat',
     order: Number.isFinite(Number(order)) ? Number(order) : 2.5,
   };
 }
@@ -84,6 +85,44 @@ export function normalizeReplyContext(raw) {
     bookBudget: clampNumber(source.bookBudget, 400, 6000, DEFAULT_REPLY_CONTEXT.bookBudget),
     charBudget: clampNumber(source.charBudget, 2000, 20000, DEFAULT_REPLY_CONTEXT.charBudget),
   };
+}
+
+/* 预设条目分组：默认把聊天行为、上下文注入、其他软件分成三组。
+ * 分组只影响编辑页的归类和阅读顺序，不改变条目真正拼接时的 order。 */
+export const DEFAULT_REPLY_GROUPS = [
+  { id: 'group_chat', name: '聊天行为', kind: 'chat' },
+  { id: 'group_context', name: '上下文注入', kind: 'context' },
+  { id: 'group_app', name: '其他软件', kind: 'app' },
+];
+
+export function normalizeReplyGroups(raw) {
+  const source = Array.isArray(raw) && raw.length ? raw : DEFAULT_REPLY_GROUPS;
+  const groups = [];
+  const seen = new Set();
+  source.slice(0, 12).forEach((item, index) => {
+    if (!item || typeof item !== 'object') return;
+    let id = String(item.id || `group_${index + 1}`).trim().slice(0, 40);
+    if (!id || seen.has(id)) id = `group_${index + 1}_${seen.size}`;
+    seen.add(id);
+    const name = String(item.name || '').trim().slice(0, 20);
+    if (!name) return;
+    const kind = item.kind === 'context' ? 'context' : item.kind === 'app' ? 'app' : 'chat';
+    groups.push({ id, name, kind });
+  });
+  if (!groups.length) {
+    return DEFAULT_REPLY_GROUPS.map(group => ({ ...group }));
+  }
+  return groups;
+}
+
+/** 条目落在哪一组：先看自己存的分组，再按类型找默认组，最后回退第一组。 */
+export function replyGroupIdFor(item, groups) {
+  const list = Array.isArray(groups) && groups.length ? groups : DEFAULT_REPLY_GROUPS;
+  const ids = new Set(list.map(group => group.id));
+  if (item?.group && ids.has(String(item.group))) return String(item.group);
+  const kind = item?.kind === 'context' ? 'context' : item?.kind === 'app' ? 'app' : 'chat';
+  const match = list.find(group => group.kind === kind);
+  return (match || list[0]).id;
 }
 
 /* 会话级历史读取覆盖：预设只放占位，具体读多少由角色聊天决定。
@@ -219,6 +258,7 @@ function contextItem(key, overrides = {}) {
     enabled: true,
     editable: false,
     deletable: false,
+    group: 'group_context',
     order: spec.hintOrder,
     ...overrides,
   };
@@ -247,6 +287,7 @@ export function defaultReplyItems() {
       editable: true,
       deletable: def.deletable !== false,
       note: String(def.note || ''),
+      group: 'group_chat',
       order: index,
     };
   });
@@ -303,6 +344,7 @@ export function normalizeReplyItems(raw, rawContext) {
         label: spec.label,
         enabled: item?.enabled !== undefined ? item.enabled !== false : context[auto] !== false,
         characters: normalizeCharacters(item?.characters),
+        group: String(item?.group || 'group_context').trim().slice(0, 40),
         order: Number.isFinite(order) ? order : spec.hintOrder,
       };
     }
@@ -321,6 +363,7 @@ export function normalizeReplyItems(raw, rawContext) {
       editable: item?.editable !== false,
       deletable: item?.deletable !== false,
       note: String(item?.note || '').trim().slice(0, 60),
+      group: String(item?.group || '').trim().slice(0, 40),
       order: Number.isFinite(order) ? order : index,
     };
   }).filter(Boolean);
@@ -390,6 +433,7 @@ export function emptyState() {
             id: 'reply_natural', name: '自然发消息',
             text: '',
             context: { ...DEFAULT_REPLY_CONTEXT },
+            groups: DEFAULT_REPLY_GROUPS.map(group => ({ ...group })),
             items: withReplyInstruction(defaultReplyItems(), '像平时发微信一样回消息：口语、短句，一次只回一两句。不要写旁白、括号里的动作，也不要写成小说段落。', 2.5),
           },
         ],
@@ -500,6 +544,7 @@ export function contactById(state, id) {
 export function addChat(state, contactId, options = {}) {
   const id = options.id || newId('ch');
   const messages = (options.messages || []).map((message, index) => ({ id: `${id}_m${index}`, ...message }));
+  const lastAt = messages.length ? Number(messages[messages.length - 1]?.at) : 0;
   state.chats[id] = {
     id,
     contactId,
@@ -513,7 +558,7 @@ export function addChat(state, contactId, options = {}) {
     memoryPresetId: '',
     replyPresetId: options.replyPresetId || '',
     history: normalizeChatHistory(options.history),
-    updatedAt: Date.now(),
+    updatedAt: Number.isFinite(lastAt) && lastAt > 0 ? lastAt : Date.now(),
   };
   return state.chats[id];
 }
@@ -1450,6 +1495,7 @@ export function normalize(raw) {
       name: String(item.name || '').trim().slice(0, 20) || `预设 ${index + 1}`,
       text: '',
       context: normalizeReplyContext(item.context),
+      groups: normalizeReplyGroups(item.groups),
       items: presetItems,
     });
   });

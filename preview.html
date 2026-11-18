@@ -3406,6 +3406,52 @@ body {
   padding: 0 4px 7px 6px;
 }
 .mp-root .mp-group-head .mp-group-label { padding: 0; flex: 1; }
+.mp-root .mp-preset-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 13px 4px 7px 6px;
+}
+.mp-root .mp-preset-group-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  font: inherit;
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.mp-root .mp-preset-group-title > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-root .mp-preset-group-title small {
+  flex: 0 0 auto;
+  font-size: calc(10.5px * var(--font-scale));
+  font-weight: 400;
+  color: var(--text-4);
+}
+.mp-root .mp-preset-group-title .mp-i {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  color: var(--text-4);
+}
+.mp-root .mp-preset-empty {
+  padding: 14px;
+  color: var(--text-4);
+  font-size: calc(12px * var(--font-scale));
+  text-align: center;
+}
 .mp-root .mp-preset-item {
   display: flex;
   align-items: center;
@@ -8295,6 +8341,7 @@ function replyInstructionItem(content, order = 2.5) {
     editable: true,
     deletable: true,
     note: '',
+    group: 'group_chat',
     order: Number.isFinite(Number(order)) ? Number(order) : 2.5,
   };
 }
@@ -8333,6 +8380,44 @@ function normalizeReplyContext(raw) {
     bookBudget: clampNumber(source.bookBudget, 400, 6000, DEFAULT_REPLY_CONTEXT.bookBudget),
     charBudget: clampNumber(source.charBudget, 2000, 20000, DEFAULT_REPLY_CONTEXT.charBudget),
   };
+}
+
+/* 预设条目分组：默认把聊天行为、上下文注入、其他软件分成三组。
+ * 分组只影响编辑页的归类和阅读顺序，不改变条目真正拼接时的 order。 */
+const DEFAULT_REPLY_GROUPS = [
+  { id: 'group_chat', name: '聊天行为', kind: 'chat' },
+  { id: 'group_context', name: '上下文注入', kind: 'context' },
+  { id: 'group_app', name: '其他软件', kind: 'app' },
+];
+
+function normalizeReplyGroups(raw) {
+  const source = Array.isArray(raw) && raw.length ? raw : DEFAULT_REPLY_GROUPS;
+  const groups = [];
+  const seen = new Set();
+  source.slice(0, 12).forEach((item, index) => {
+    if (!item || typeof item !== 'object') return;
+    let id = String(item.id || `group_${index + 1}`).trim().slice(0, 40);
+    if (!id || seen.has(id)) id = `group_${index + 1}_${seen.size}`;
+    seen.add(id);
+    const name = String(item.name || '').trim().slice(0, 20);
+    if (!name) return;
+    const kind = item.kind === 'context' ? 'context' : item.kind === 'app' ? 'app' : 'chat';
+    groups.push({ id, name, kind });
+  });
+  if (!groups.length) {
+    return DEFAULT_REPLY_GROUPS.map(group => ({ ...group }));
+  }
+  return groups;
+}
+
+/** 条目落在哪一组：先看自己存的分组，再按类型找默认组，最后回退第一组。 */
+function replyGroupIdFor(item, groups) {
+  const list = Array.isArray(groups) && groups.length ? groups : DEFAULT_REPLY_GROUPS;
+  const ids = new Set(list.map(group => group.id));
+  if (item?.group && ids.has(String(item.group))) return String(item.group);
+  const kind = item?.kind === 'context' ? 'context' : item?.kind === 'app' ? 'app' : 'chat';
+  const match = list.find(group => group.kind === kind);
+  return (match || list[0]).id;
 }
 
 /* 会话级历史读取覆盖：预设只放占位，具体读多少由角色聊天决定。
@@ -8468,6 +8553,7 @@ function contextItem(key, overrides = {}) {
     enabled: true,
     editable: false,
     deletable: false,
+    group: 'group_context',
     order: spec.hintOrder,
     ...overrides,
   };
@@ -8496,6 +8582,7 @@ function defaultReplyItems() {
       editable: true,
       deletable: def.deletable !== false,
       note: String(def.note || ''),
+      group: 'group_chat',
       order: index,
     };
   });
@@ -8552,6 +8639,7 @@ function normalizeReplyItems(raw, rawContext) {
         label: spec.label,
         enabled: item?.enabled !== undefined ? item.enabled !== false : context[auto] !== false,
         characters: normalizeCharacters(item?.characters),
+        group: String(item?.group || 'group_context').trim().slice(0, 40),
         order: Number.isFinite(order) ? order : spec.hintOrder,
       };
     }
@@ -8570,6 +8658,7 @@ function normalizeReplyItems(raw, rawContext) {
       editable: item?.editable !== false,
       deletable: item?.deletable !== false,
       note: String(item?.note || '').trim().slice(0, 60),
+      group: String(item?.group || '').trim().slice(0, 40),
       order: Number.isFinite(order) ? order : index,
     };
   }).filter(Boolean);
@@ -8639,6 +8728,7 @@ function emptyState() {
             id: 'reply_natural', name: '自然发消息',
             text: '',
             context: { ...DEFAULT_REPLY_CONTEXT },
+            groups: DEFAULT_REPLY_GROUPS.map(group => ({ ...group })),
             items: withReplyInstruction(defaultReplyItems(), '像平时发微信一样回消息：口语、短句，一次只回一两句。不要写旁白、括号里的动作，也不要写成小说段落。', 2.5),
           },
         ],
@@ -8749,6 +8839,7 @@ function contactById(state, id) {
 function addChat(state, contactId, options = {}) {
   const id = options.id || newId('ch');
   const messages = (options.messages || []).map((message, index) => ({ id: `${id}_m${index}`, ...message }));
+  const lastAt = messages.length ? Number(messages[messages.length - 1]?.at) : 0;
   state.chats[id] = {
     id,
     contactId,
@@ -8762,7 +8853,7 @@ function addChat(state, contactId, options = {}) {
     memoryPresetId: '',
     replyPresetId: options.replyPresetId || '',
     history: normalizeChatHistory(options.history),
-    updatedAt: Date.now(),
+    updatedAt: Number.isFinite(lastAt) && lastAt > 0 ? lastAt : Date.now(),
   };
   return state.chats[id];
 }
@@ -9699,6 +9790,7 @@ function normalize(raw) {
       name: String(item.name || '').trim().slice(0, 20) || `预设 ${index + 1}`,
       text: '',
       context: normalizeReplyContext(item.context),
+      groups: normalizeReplyGroups(item.groups),
       items: presetItems,
     });
   });
@@ -9903,6 +9995,9 @@ exports["REPLY_INSTRUCTION_ID"] = REPLY_INSTRUCTION_ID;
 exports["replyInstructionItem"] = replyInstructionItem;
 exports["withReplyInstruction"] = withReplyInstruction;
 exports["normalizeReplyContext"] = normalizeReplyContext;
+exports["DEFAULT_REPLY_GROUPS"] = DEFAULT_REPLY_GROUPS;
+exports["normalizeReplyGroups"] = normalizeReplyGroups;
+exports["replyGroupIdFor"] = replyGroupIdFor;
 exports["DEFAULT_CHAT_HISTORY"] = DEFAULT_CHAT_HISTORY;
 exports["normalizeChatHistory"] = normalizeChatHistory;
 exports["chatHistoryFor"] = chatHistoryFor;
@@ -22378,7 +22473,7 @@ __mods["meme/apps/presets.js"] = function(module, exports, __req){
 
 const { icon } = __req("meme/icons.js");
 const { esc } = __req("meme/shell.js");
-const { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext, normalizeReplyItems, normalizeCharacters, defaultReplyItems, REPLY_CONTEXT_SPECS, chatsOf, REPLY_INSTRUCTION_ID, withReplyInstruction } = __req("meme/data.js");
+const { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext, normalizeReplyItems, normalizeCharacters, normalizeReplyGroups, replyGroupIdFor, defaultReplyItems, REPLY_CONTEXT_SPECS, chatsOf, REPLY_INSTRUCTION_ID, withReplyInstruction } = __req("meme/data.js");
 const { buildReplyMessages } = __req("meme/reply-context.js");
 const { tavernQuietPrompt } = __req("meme/host.js");
 
@@ -22572,7 +22667,7 @@ function openCharactersForm(ctx, preset, item) {
   });
 }
 
-function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
+function openItemForm(ctx, preset, itemId = '', scope = 'chat', groupId = '') {
   const items = promptItems(preset);
   const index = itemId ? items.findIndex(item => item.id === itemId) : -1;
   const item = index >= 0 ? items[index] : null;
@@ -22580,7 +22675,12 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
     ctx.toast('这条是固定条目，不能改内容');
     return;
   }
+  const groups = normalizeReplyGroups(preset.groups);
   const defaultKind = item?.kind || (scope === 'app' ? 'app' : 'chat');
+  const rawDefaultGroup = String(item?.group || groupId || '');
+  const defaultGroup = groups.some(group => group.id === rawDefaultGroup)
+    ? rawDefaultGroup
+    : replyGroupIdFor({ kind: defaultKind }, groups);
   const charOptions = characterOptions(ctx);
   ctx.openSheet({
     kind: 'form',
@@ -22588,6 +22688,8 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
     confirm: item ? '保存' : '添加',
     fields: [
       { name: 'label', type: 'text', label: '名称', value: item?.label || '', placeholder: '比如：聊天任务、行为要求', maxLength: 30 },
+      { name: 'group', type: 'select', label: '分组', value: defaultGroup, options: groups.map(group => ({ value: group.id, label: group.name })),
+        hint: '分组只影响编辑页归类；条目仍按整张列表的顺序拼接。' },
       { name: 'kind', type: 'select', label: '类型', value: defaultKind, options: [
         { value: 'chat', label: '聊天行为（聊天软件）' },
         { value: 'app', label: '其他软件' },
@@ -22610,6 +22712,10 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
     ],
     onForm: values => {
       const next = promptItems(preset);
+      const groups = normalizeReplyGroups(preset.groups);
+      const pickedGroup = groups.some(group => group.id === String(values.group || ''))
+        ? String(values.group)
+        : replyGroupIdFor({ kind: values.kind === 'app' ? 'app' : 'chat' }, groups);
       const nextItem = {
         id: item?.id || newId('item'),
         label: String(values.label || '').trim().slice(0, 30) || '自定义条目',
@@ -22623,6 +22729,7 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat') {
         enabled: item?.enabled !== false,
         editable: true,
         deletable: true,
+        group: pickedGroup,
         order: item?.order ?? next.length,
       };
       if (index >= 0) next[index] = { ...next[index], ...nextItem, id: next[index].id };
@@ -22657,6 +22764,7 @@ function exportPresets(ctx) {
       name: preset.name,
       text: preset.text,
       context: normalizeReplyContext(preset.context),
+      groups: normalizeReplyGroups(preset.groups),
       items: promptItems(preset),
     })),
   };
@@ -22670,6 +22778,7 @@ function exportCurrentPreset(ctx, preset) {
     name: preset.name,
     text: String(preset.text || ''),
     context: normalizeReplyContext(preset.context),
+    groups: normalizeReplyGroups(preset.groups),
     items: promptItems(preset).map(item => ({
       id: item.id,
       label: item.label,
@@ -22678,6 +22787,7 @@ function exportCurrentPreset(ctx, preset) {
       enabled: item.enabled,
       editable: item.editable,
       deletable: item.deletable,
+      group: item.group || '',
       order: item.order,
       ...(item.kind === 'context' ? { kind: 'context', auto: item.auto } : {}),
       ...(item.note ? { note: item.note } : {}),
@@ -22702,6 +22812,7 @@ function normalizeImportedPreset(item, index, seen) {
     name: String(item?.name || '').trim().slice(0, 20) || `导入预设 ${index + 1}`,
     text: '',
     context: normalizeReplyContext(item?.context),
+    groups: normalizeReplyGroups(item?.groups),
     items,
   };
 }
@@ -22784,6 +22895,7 @@ function bindPresetDrag(ctx) {
       moved: false,
       row,
       list,
+      groupId: String(list.dataset.group || ''),
       grip,
       body: list.closest('.mp-page-body'),
       presetId: editingId,
@@ -22830,16 +22942,25 @@ function bindPresetDrag(ctx) {
     if (!items.length) return;
     const ids = [...state.list.querySelectorAll('.mp-preset-item')].map(row => row.dataset.id);
     const byId = new Map(items.map(item => [item.id, item]));
-    const next = ids.map(id => byId.get(id)).filter(Boolean);
-    items.forEach(item => {
-      if (!ids.includes(item.id)) next.push(item);
+    const groups = normalizeReplyGroups(preset.groups);
+    const groupItems = items.filter(item => replyGroupIdFor(item, groups) === state.groupId);
+    const ordered = ids.map(id => byId.get(id)).filter(Boolean);
+    groupItems.forEach(item => {
+      if (!ids.includes(item.id)) ordered.push(item);
     });
-    next.forEach((item, index) => { item.order = index; });
+    const inGroup = new Set(groupItems.map(item => item.id));
+    let cursor = 0;
+    const next = items.map(item => (inGroup.has(item.id) ? ordered[cursor++] || item : item));
+    next.forEach((item, index) => {
+      if (inGroup.has(item.id)) item.group = state.groupId;
+      item.order = index;
+    });
+    preset.groups = groups;
     preset.items = next;
     resetPreview();
     ctx.save();
     ctx.rerender();
-    ctx.toast('条目顺序已调整');
+    ctx.toast(`「${groups.find(group => group.id === state.groupId)?.name || '分组'}」顺序已调整`);
   };
   window.addEventListener('pointerup', endDrag);
   window.addEventListener('pointercancel', endDrag);
@@ -22950,6 +23071,7 @@ const presetsApp = {
         name,
         text: '',
         context: normalizeReplyContext(source?.context),
+        groups: normalizeReplyGroups(source?.groups),
         items: promptItems(source).map(item => ({ ...item })),
       };
       ctx.state.settings.reply.presets.push(preset);
@@ -22997,9 +23119,15 @@ const replyPresetApp = {
     const isActive = active?.id === preset.id;
     const context = normalizeReplyContext(preset.context);
     const items = promptItems(preset);
+    const groups = normalizeReplyGroups(preset.groups);
+    const grouped = groups.map(group => ({
+      ...group,
+      items: items.filter(item => replyGroupIdFor(item, groups) === group.id),
+    }));
     const contextCount = items.filter(item => item.kind === 'context').length;
-    const itemRow = (item) => {
+    const itemRow = (item, groupKind = '') => {
       const isContext = item.kind === 'context';
+      const showTag = !groupKind || (item.kind || 'chat') !== groupKind;
       const openAct = isContext ? 'reply-context-open' : 'reply-item-open';
       const chars = charactersLabel(item);
       const note = item.note ? ` · ${item.note}` : '';
@@ -23010,7 +23138,7 @@ const replyPresetApp = {
       <div class="mp-preset-item${isContext ? ' is-context' : ''}" data-id="${esc(item.id)}">
         <span class="mp-preset-grip" data-preset-grip title="按住拖动排序" aria-hidden="true">${icon('grip')}</span>
         <button class="mp-preset-item-main" data-act="${openAct}" data-id="${esc(item.id)}" type="button">
-          <span class="mp-preset-item-label"><span class="mp-preset-name">${esc(item.label)}</span><span class="mp-preset-tag${isContext ? ' is-context' : item.kind === 'app' ? ' is-app' : ''}">${esc(itemKindLabel(item))}</span></span>
+          <span class="mp-preset-item-label"><span class="mp-preset-name">${esc(item.label)}</span>${showTag ? `<span class="mp-preset-tag${isContext ? ' is-context' : item.kind === 'app' ? ' is-app' : ''}">${esc(itemKindLabel(item))}</span>` : ''}</span>
           <span class="mp-preset-item-sub">${esc(sub)}</span>
         </button>
         <div class="mp-preset-item-actions">
@@ -23021,7 +23149,17 @@ const replyPresetApp = {
         </div>
       </div>`;
     };
-    const itemRows = items.map(itemRow).join('');
+    const groupRows = grouped.map(group => {
+      const rows = group.items.map(item => itemRow(item, group.kind)).join('') || '<div class="mp-preset-empty">这个分组还没有条目</div>';
+      return `
+        <div class="mp-preset-group-head">
+          <button class="mp-preset-group-title" data-act="reply-group-open" data-group="${esc(group.id)}" type="button">
+            <span>${esc(group.name)}</span><small>${group.items.length} 条</small>${icon('chevron')}
+          </button>
+          ${group.kind === 'context' ? '' : `<button class="mp-icon-btn" data-act="reply-item-add" data-group="${esc(group.id)}" data-scope="${group.kind === 'app' ? 'app' : 'chat'}" type="button" aria-label="往「${esc(group.name)}」加一条">${icon('plus')}</button>`}
+        </div>
+        <div class="mp-group mp-preset-list" data-group="${esc(group.id)}">${rows}</div>`;
+    }).join('');
 
     return `
       <div class="mp-nav mp-preset-nav">
@@ -23057,13 +23195,11 @@ const replyPresetApp = {
 
         <div class="mp-group-head" style="margin-top:16px">
           <div class="mp-group-label">提示词条目 · ${items.length} 条${contextCount ? `（上下文 ${contextCount}）` : ''}</div>
-          <button class="mp-icon-btn" data-act="reply-item-add" type="button" aria-label="添加提示词条目">${icon('plus')}</button>
+          <button class="mp-draw-side" data-act="reply-group-add" type="button">新建分组</button>
         </div>
-        <div class="mp-group mp-preset-list">
-          ${itemRows || '<div class="mp-empty" style="padding:16px 14px">还没有条目，点上面的加号加一条。</div>'}
-        </div>
+        ${groupRows || '<div class="mp-group mp-preset-empty" style="padding:16px 14px">还没有条目。</div>'}
         <div class="mp-api-note" style="margin-top:8px">
-          带「上下文注入」的是手机按当前会话自动读取的条目，和手写条目在同一个列表里，可以开关、排序；点开还能改世界书、聊天记录和适用角色。
+          分组只改变编辑页的归类，条目仍按原来的顺序拼进模型；点分组名可以改名或删除，每组的加号把新条目加到这一组。
         </div>
 
         <div class="mp-group" style="margin-top:12px">
@@ -23137,6 +23273,88 @@ const replyPresetApp = {
       return false;
     }
 
+    if (act === 'reply-group-add') {
+      ctx.openSheet({
+        kind: 'form',
+        title: '新建分组',
+        fields: [{ name: 'name', type: 'text', label: '分组名称', value: '', placeholder: '比如：我的聊天习惯', maxLength: 20 }],
+        onForm: values => {
+          const name = String(values.name || '').trim().slice(0, 20);
+          if (!name) { ctx.toast('给分组起个名字'); return; }
+          const groups = normalizeReplyGroups(preset.groups);
+          if (groups.length >= 12) { ctx.toast('最多 12 个分组'); return; }
+          preset.groups = [...groups, { id: newId('group'), name, kind: 'chat' }];
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`已新建分组「${name}」`);
+        },
+      });
+      return true;
+    }
+
+    if (act === 'reply-group-open') {
+      const groupId = String(data.group || '');
+      const groups = normalizeReplyGroups(preset.groups);
+      const group = groups.find(item => item.id === groupId);
+      if (!group) return true;
+      const count = promptItems(preset).filter(item => replyGroupIdFor(item, groups) === group.id).length;
+      ctx.openSheet({
+        kind: 'pick',
+        title: `分组 · ${group.name}`,
+        note: `${count} 条条目 · 分组名只影响编辑页显示`,
+        items: [
+          { label: '重命名分组', value: 'rename', icon: 'reply' },
+          groups.length > 1 ? { label: '删除分组', value: 'delete', icon: 'trash', danger: true } : null,
+        ].filter(Boolean),
+        onPick: value => {
+          if (value === 'rename') {
+            setTimeout(() => {
+              ctx.openSheet({
+                kind: 'form',
+                title: '重命名分组',
+                fields: [{ name: 'name', type: 'text', label: '分组名称', value: group.name, maxLength: 20 }],
+                onForm: values => {
+                  const name = String(values.name || '').trim().slice(0, 20);
+                  if (!name) { ctx.toast('分组名不能为空'); return; }
+                  const next = normalizeReplyGroups(preset.groups).map(item => item.id === group.id ? { ...item, name } : item);
+                  preset.groups = next;
+                  ctx.save();
+                  ctx.rerender();
+                  ctx.toast(`分组改名为「${name}」`);
+                },
+              });
+            }, 0);
+            return;
+          }
+          if (value === 'delete') {
+            setTimeout(() => {
+              const remaining = groups.filter(item => item.id !== group.id);
+              const fallback = remaining[0];
+              ctx.openSheet({
+                kind: 'pick',
+                title: `删除「${group.name}」`,
+                note: `这组里的 ${count} 条会移到「${fallback.name}」，条目内容不会丢。`,
+                items: [{ label: '确认删除分组', value: 'delete', icon: 'trash', danger: true }],
+                onPick: confirm => {
+                  if (confirm !== 'delete') return;
+                  const items = promptItems(preset).map(item => (
+                    replyGroupIdFor(item, groups) === group.id ? { ...item, group: fallback.id } : item
+                  ));
+                  preset.groups = remaining;
+                  preset.items = items;
+                  resetPreview();
+                  ctx.save();
+                  ctx.rerender();
+                  ctx.toast(`分组「${group.name}」已删除，条目已移到「${fallback.name}」`);
+                },
+              });
+            }, 0);
+          }
+        },
+      });
+      return true;
+    }
+
     if (act === 'reply-item-reset') {
       const defaults = defaultReplyItems();
       const currentMain = promptItems(preset).find(item => item.id === REPLY_INSTRUCTION_ID);
@@ -23172,6 +23390,13 @@ const replyPresetApp = {
     }
 
     if (act === 'reply-item-add') {
+      if (data.group) {
+        const groups = normalizeReplyGroups(preset.groups);
+        const group = groups.find(item => item.id === String(data.group));
+        const scope = String(data.scope || (group?.kind === 'app' ? 'app' : 'chat'));
+        openItemForm(ctx, preset, '', scope === 'app' ? 'app' : 'chat', group?.id || '');
+        return true;
+      }
       if (data.scope === 'chat' || data.scope === 'app') {
         openItemForm(ctx, preset, '', data.scope);
         return true;

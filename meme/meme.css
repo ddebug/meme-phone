@@ -3389,6 +3389,52 @@
   padding: 0 4px 7px 6px;
 }
 .mp-root .mp-group-head .mp-group-label { padding: 0; flex: 1; }
+.mp-root .mp-preset-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 13px 4px 7px 6px;
+}
+.mp-root .mp-preset-group-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  font: inherit;
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.mp-root .mp-preset-group-title > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-root .mp-preset-group-title small {
+  flex: 0 0 auto;
+  font-size: calc(10.5px * var(--font-scale));
+  font-weight: 400;
+  color: var(--text-4);
+}
+.mp-root .mp-preset-group-title .mp-i {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  color: var(--text-4);
+}
+.mp-root .mp-preset-empty {
+  padding: 14px;
+  color: var(--text-4);
+  font-size: calc(12px * var(--font-scale));
+  text-align: center;
+}
 .mp-root .mp-preset-item {
   display: flex;
   align-items: center;

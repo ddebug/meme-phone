@@ -11,7 +11,9 @@ import re
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODULES = [
     "meme/preset-defaults.js",
+    "meme/behavior.js",
     "meme/data.js",
+    "meme/behavior-domains.js",
     "meme/store.js",
     "meme/host.js",
     "meme/icons.js",
@@ -30,6 +32,7 @@ MODULES = [
     "meme/apps/draw.js",
     "meme/apps/api.js",
     "meme/apps/user.js",
+    "meme/apps/wallet.js",
   "meme/apps/characters.js",
   "meme/apps/charphone.js",
   "meme/apps/music.js",

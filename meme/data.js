@@ -6,8 +6,9 @@
  */
 
 import { FULL_REPLY_ITEM_DEFS } from './preset-defaults.js';
+import { normalizeBehavior, behaviorPreview } from './behavior.js';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /* 回复预设除了「怎么说」，还要决定「给模型看哪些上下文」。
  * 这一组开关沿用旧独立小手机的 QQ 预设：角色档案、用户设定、聊天记录、记忆、时间。 */
@@ -325,7 +326,11 @@ export function emptyState() {
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
-      chat: { showTime: true, enterToSend: false, remind: true, wake: true, debugBar: true },
+      chat: {
+        showTime: true, enterToSend: false, remind: true, wake: true, debugBar: true,
+        /* 行为标签：默认只放开约定计划和个签，转账/会员/好友申请要自己开 */
+        behavior: { transfer: false, redpacket: false, membership: false, plan: true, friend: false, signature: true },
+      },
       /* 酒馆记忆方案：默认有酒馆总结就用总结，没有就取最近 10 层酒馆聊天 */
       memory: {
         activeId: 'mem_auto',
@@ -409,6 +414,12 @@ export function emptyState() {
     extras: {},
     extrasOn: [],
     favorites: [],
+    /* 行为功能：钱包、会员、约定计划、好友申请、个签历史 */
+    wallet: { balance: 0, transactions: [] },
+    membership: { user: { type: 'none', expireAt: 0, queue: [], history: [] }, byContact: {} },
+    appointments: { byContact: {} },
+    friendRequests: [],
+    signatures: { byContact: {} },
     dress: { accent: '#8e7bf2' },
   };
 }
@@ -660,10 +671,12 @@ export function lastMessage(chat) {
   return null;
 }
 
-/** 会话列表/收藏页共用的一句话摘要：图片、表情、转发都别显示成空白 */
+/** 会话列表/收藏页共用的一句话摘要：图片、表情、转发、行为消息都别显示成空白 */
 export function messagePreview(message) {
   if (!message) return '';
   if (message.kind === 'recalled') return '[已撤回]';
+  const behaviorText = behaviorPreview(message);
+  if (behaviorText) return behaviorText;
   if (message.kind === 'image' || message.image) return '[图片]';
   if (message.kind === 'emoji' || message.emoji) return message.emoji || '[表情]';
   if (message.forward) return `[转发] ${message.forward.text || ''}`.trim();
@@ -673,12 +686,13 @@ export function messagePreview(message) {
 export function pushMessage(state, chatId, message) {
   const chat = state.chats[chatId];
   if (!chat) return null;
+  const kind = message.kind || 'text';
   const entry = {
     id: message.id || newId('m'),
     from: message.from || 'them',      // me | them | system
     text: message.text || '',
     at: message.at || Date.now(),
-    kind: message.kind || 'text',      // text | system | extra | proactive | image | emoji | poke | recalled | forwarded
+    kind,                              // text | system | extra | proactive | image | emoji | poke | recalled | forwarded | 行为类型
     quote: message.quote || null,
     proactive: Boolean(message.proactive),
     pending: Boolean(message.pending),
@@ -686,6 +700,7 @@ export function pushMessage(state, chatId, message) {
     image: message.image || '',
     emoji: message.emoji || '',
     forward: message.forward || null,
+    behavior: normalizeBehavior(kind, message.behavior),
   };
   chat.messages.push(entry);
   chat.updatedAt = entry.at;
@@ -1174,6 +1189,140 @@ function at(hour, minute) {
 
 /* ---------------------------------------------------------------- 迁移 */
 
+function isPlainRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function limitNumber(value, min, max, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(min, Math.min(max, num));
+}
+
+function normalizeWalletState(raw) {
+  const source = isPlainRecord(raw) ? raw : {};
+  const transactions = Array.isArray(source.transactions)
+    ? source.transactions.filter(item => isPlainRecord(item) && Number.isFinite(Number(item.amount))).slice(0, 5000).map(item => ({
+      id: String(item.id || '').slice(0, 48),
+      contactId: String(item.contactId || '').slice(0, 60),
+      type: ['transfer', 'redpacket', 'gift'].includes(item.type) ? item.type : 'transfer',
+      direction: item.direction === 'received' ? 'received' : 'sent',
+      amount: Math.max(0, Math.min(10000, Number(item.amount) || 0)),
+      note: String(item.note || item.message || '').slice(0, 80),
+      messageId: String(item.messageId || '').slice(0, 60),
+      status: item.status === 'reversed' ? 'reversed' : 'completed',
+      at: Number(item.at) || Date.now(),
+    }))
+    : [];
+  return { balance: Math.max(0, Math.min(10000, Number(source.balance) || 0)), transactions };
+}
+
+function normalizeMembershipRecord(raw) {
+  const source = isPlainRecord(raw) ? raw : {};
+  const expire = Number(source.expireAt) || 0;
+  return {
+    type: ['vip', 'svip'].includes(source.type) ? source.type : 'none',
+    expireAt: expire && expire < 1e12 ? expire * 1000 : expire,
+    queue: Array.isArray(source.queue)
+      ? source.queue.filter(item => isPlainRecord(item)).slice(-20).map(item => ({
+        type: item.type === 'svip' ? 'svip' : 'vip',
+        duration: limitNumber(item.duration, 1, 3650, 30),
+        messageId: String(item.messageId || '').slice(0, 60),
+      }))
+      : [],
+    history: Array.isArray(source.history)
+      ? source.history.filter(item => isPlainRecord(item)).slice(-200).map(item => ({
+        id: String(item.id || '').slice(0, 48),
+        type: item.type === 'svip' ? 'svip' : 'vip',
+        months: item.months === 12 ? 12 : 1,
+        duration: limitNumber(item.duration, 1, 3650, 30),
+        price: Math.max(0, Number(item.price) || 0),
+        from: String(item.from || '').slice(0, 60),
+        messageId: String(item.messageId || '').slice(0, 60),
+        at: Number(item.at) || Date.now(),
+        reversed: Boolean(item.reversed),
+      }))
+      : [],
+  };
+}
+
+function normalizeMembershipState(raw) {
+  const source = isPlainRecord(raw) ? raw : {};
+  const byContact = {};
+  for (const [contactId, value] of Object.entries(isPlainRecord(source.byContact) ? source.byContact : {})) {
+    if (!contactId) continue;
+    byContact[String(contactId).slice(0, 60)] = normalizeMembershipRecord(value);
+  }
+  return { user: normalizeMembershipRecord(source.user), byContact };
+}
+
+function normalizeAppointment(raw, contactId) {
+  const source = isPlainRecord(raw) ? raw : {};
+  const status = ['pending', 'accepted', 'rejected', 'completed', 'cancelled'].includes(source.status)
+    ? source.status : 'pending';
+  return {
+    id: String(source.id || `plan_${contactId}_${Date.now().toString(36)}`).slice(0, 60),
+    contactId: String(contactId || '').slice(0, 60),
+    messageId: String(source.messageId || '').slice(0, 60),
+    title: String(source.title || '').slice(0, 80),
+    initiator: source.initiator === 'me' ? 'me' : 'them',
+    status,
+    createdAt: Number(source.createdAt) || Date.now(),
+    respondedAt: Number(source.respondedAt) || 0,
+    completedAt: Number(source.completedAt) || 0,
+    story: isPlainRecord(source.story) ? {
+      id: String(source.story.id || '').slice(0, 48),
+      title: String(source.story.title || '').slice(0, 80),
+      text: String(source.story.text || '').slice(0, 4000),
+      outcome: String(source.story.outcome || '').slice(0, 20),
+      at: Number(source.story.at) || 0,
+    } : null,
+  };
+}
+
+function normalizeAppointmentsState(raw) {
+  const source = isPlainRecord(raw) ? raw : {};
+  const byContact = {};
+  for (const [contactId, value] of Object.entries(isPlainRecord(source.byContact) ? source.byContact : {})) {
+    if (!contactId) continue;
+    byContact[String(contactId).slice(0, 60)] = Array.isArray(value)
+      ? value.filter(isPlainRecord).slice(-200).map(item => normalizeAppointment(item, contactId))
+      : [];
+  }
+  return { byContact };
+}
+
+function normalizeFriendRequestsState(raw) {
+  return Array.isArray(raw)
+    ? raw.filter(isPlainRecord).slice(-200).map(item => ({
+      id: String(item.id || '').slice(0, 48),
+      contactId: String(item.contactId || '').slice(0, 60),
+      name: String(item.name || '').slice(0, 40),
+      text: String(item.text || '').slice(0, 400),
+      status: ['pending', 'accepted', 'rejected'].includes(item.status) ? item.status : 'pending',
+      messageId: String(item.messageId || '').slice(0, 60),
+      at: Number(item.at) || Date.now(),
+    }))
+    : [];
+}
+
+function normalizeSignaturesState(raw) {
+  const source = isPlainRecord(raw) ? raw : {};
+  const byContact = {};
+  for (const [contactId, value] of Object.entries(isPlainRecord(source.byContact) ? source.byContact : {})) {
+    if (!contactId) continue;
+    byContact[String(contactId).slice(0, 60)] = Array.isArray(value)
+      ? value.filter(isPlainRecord).slice(0, 50).map(item => ({
+        id: String(item.id || '').slice(0, 48),
+        text: String(item.text || '').slice(0, 80),
+        actionType: item.actionType === 'like' ? 'like' : 'update',
+        at: Number(item.at) || Date.now(),
+      }))
+      : [];
+  }
+  return { byContact };
+}
+
 /** 读取旧文件时补齐缺失字段，永远不因为缺字段白屏。 */
 export function normalize(raw) {
   const base = emptyState();
@@ -1194,9 +1343,11 @@ export function normalize(raw) {
   };
   /* 旧存档的 settings.chat 可能没有新字段，这里按默认补一次，避免被浅合并冲掉 */
   merged.settings.chat = { ...base.settings.chat, ...(merged.settings.chat || {}) };
-  delete merged.membership;
+  merged.settings.chat.behavior = {
+    ...base.settings.chat.behavior,
+    ...(merged.settings.chat.behavior && typeof merged.settings.chat.behavior === 'object' ? merged.settings.chat.behavior : {}),
+  };
   delete merged.favorites;
-  delete merged.wallet;
   for (const [contactId, entries] of Object.entries(raw.diary?.contacts || {})) {
     if (!contactId || !entries || typeof entries !== 'object' || Array.isArray(entries)) continue;
     merged.diary.contacts[contactId] = {};
@@ -1445,10 +1596,19 @@ export function normalize(raw) {
     : {};
   merged.extrasOn = Array.isArray(merged.extrasOn) ? merged.extrasOn.map(String) : [];
   merged.favorites = Array.isArray(merged.favorites) ? merged.favorites : [];
+  merged.wallet = normalizeWalletState(raw.wallet);
+  merged.membership = normalizeMembershipState(raw.membership);
+  merged.appointments = normalizeAppointmentsState(raw.appointments);
+  merged.friendRequests = normalizeFriendRequestsState(raw.friendRequests);
+  merged.signatures = normalizeSignaturesState(raw.signatures);
   merged.emoji = Array.isArray(merged.emoji) && merged.emoji.length ? merged.emoji : base.emoji;
   for (const [chatId, chat] of Object.entries(merged.chats)) {
     chat.messages = Array.isArray(chat.messages)
-      ? chat.messages.map((message, index) => ({ id: message.id || `${chatId}_m${index}`, ...message }))
+      ? chat.messages.map((message, index) => ({
+        ...message,
+        id: message.id || `${chatId}_m${index}`,
+        behavior: normalizeBehavior(message.kind, message.behavior),
+      }))
       : [];
     chat.unread = chat.unread || 0;
   }

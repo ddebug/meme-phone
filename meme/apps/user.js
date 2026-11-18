@@ -7,6 +7,7 @@
 
 import { icon } from '../icons.js';
 import { esc, avatarHtml } from '../shell.js';
+import { walletBalance, userMembership, membershipLabel } from '../behavior-domains.js';
 
 function head(title, sub) {
   return `<div class="mp-subtitle" style="margin-top:2px">${esc(title)} · ${esc(sub)}</div>`;
@@ -203,6 +204,7 @@ export const userEditApp = {
     const isCurrent = state.settings.userMode === 'pin'
       ? state.settings.pinnedUser === user.key
       : state.settings.user.key === user.key;
+    const member = userMembership(state);
 
     return `
       <div class="mp-page-body">
@@ -238,6 +240,23 @@ export const userEditApp = {
           </div>
         </div>
 
+        <div class="mp-group">
+          <div class="mp-group-label">账户</div>
+          <div class="mp-group-box">
+            <button class="mp-set-row" data-act="user-wallet" data-key="${esc(user.key)}" type="button">
+              <span class="mp-set-ico">${icon('wallet')}</span>
+              <span class="mp-set-name">钱包<small>转账、红包、送会员都从余额扣</small></span>
+              <span class="mp-set-value">¥${walletBalance(state).toFixed(2)}</span>
+              ${icon('chevron')}
+            </button>
+            <div class="mp-set-row is-static">
+              <span class="mp-set-ico">${icon('spark')}</span>
+              <span class="mp-set-name">会员<small>${member.expireAt > Date.now() ? '当前有效' : '还没有开通'}</small></span>
+              <span class="mp-set-value">${esc(membershipLabel(member.type))}</span>
+            </div>
+          </div>
+        </div>
+
         <div class="mp-user-actions">
           <button class="mp-btn" data-act="user-use" data-key="${esc(user.key)}" type="button">${icon('pin')}<span>${isCurrent ? '正在用这位' : '小手机用这位'}</span></button>
           <button class="mp-btn accent" data-act="user-save" data-key="${esc(user.key)}" type="button">${icon('refresh')}<span>写回酒馆</span></button>
@@ -251,6 +270,11 @@ export const userEditApp = {
     const state = ctx.state;
     const key = String(data?.key || '');
     const user = userByKey(state, key);
+
+    if (act === 'user-wallet') {
+      ctx.go('app-wallet');
+      return true;
+    }
 
     if (act === 'user-name') {
       if (!user) return true;

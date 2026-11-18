@@ -7,6 +7,7 @@
 import { replyContextFor, replyItemsFor, replyPresetFor, fillPromptTokens, characterCardFor, itemAppliesToChat } from './data.js';
 import { readWorldBook } from './host.js';
 import { buildMemoryContext } from './memory.js';
+import { behaviorContextText } from './behavior.js';
 
 /* ------------------------------------------------------------ 请求统计 */
 
@@ -93,11 +94,13 @@ export function transcript(state, chat, limit = 10) {
   if (!chat) return '';
   const contact = state.contacts?.[chat.contactId];
   return (chat.messages || []).slice(-limit).map(message => {
+    if (message.kind === 'system' || message.kind === 'recalled') return '';
     const who = message.from === 'me'
       ? state.settings.user.name
       : (state.contacts[message.speaker]?.name || contact?.name || 'TA');
-    return `${who}：${message.text}`;
-  }).join('\n');
+    const text = behaviorContextText(message) || message.text || '';
+    return text ? `${who}：${text}` : '';
+  }).filter(Boolean).join('\n');
 }
 
 export function characterBlock(state, contact) {
@@ -371,6 +374,9 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
     reportItems.push({ ...base, status: 'injected', chars: content.length, reason: block.reason || '' });
   }
 
+  /* 行为标签：只把当前打开的转账 / 计划 / 会员等写进系统提示，关掉的就不教模型。 */
+  if (options.behaviorPrompt) messages.push({ role: 'system', content: String(options.behaviorPrompt), source: '行为提示' });
+
   /* 小剧场放在全部预设条目之后、最后一条聊天之前，避免被前面的回复格式/行为条目盖掉。 */
   if (options.extraPrompt) messages.push({ role: 'system', content: String(options.extraPrompt), source: '小剧场' });
 
@@ -378,7 +384,7 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
     const last = chat.messages?.[chat.messages.length - 1];
     if (last && !options.proactive) {
       const who = last.from === 'me' ? (state.settings.user.name || '我') : (contact?.name || '对方');
-      messages.push({ role: 'user', content: `${who}：${last.text}`, source: '最后一条聊天' });
+      messages.push({ role: 'user', content: `${who}：${behaviorContextText(last) || last.text || ''}`, source: '最后一条聊天' });
     }
   }
   if (options.proactive && !messages.some(message => message.role === 'user')) {

@@ -12,12 +12,14 @@ import { favoritesApp } from './apps/favorites.js';
 import { photoApp } from './apps/photo.js';
 import { buildMemoryContext } from './memory.js';
 import { buildReplyMessages, transcript, replyLead, proactiveLead } from './reply-context.js';
+import { behaviorPrompt, behaviorSettings, parseBehaviorReply } from './behavior.js';
 import { diaryApp, threadDiaryApp } from './apps/diary.js';
 import { contactsApp, contactApp } from './apps/contacts.js';
 import { settingsApp, appearanceApp } from './apps/settings.js';
 import { drawApp } from './apps/draw.js';
 import { apiListApp } from './apps/api.js';
 import { userListApp, userEditApp } from './apps/user.js';
+import { walletApp } from './apps/wallet.js';
 import { characterApp } from './apps/characters.js';
 import { charPhoneApp, charPhoneThreadApp, ensureLookup } from './apps/charphone.js';
 import { musicApp, musicPlaylistApp, stopMusic } from './apps/music.js';
@@ -50,6 +52,7 @@ const APPS = {
   'reply-item': replyPresetApp,
   'app-user': userListApp,
   'user-item': userEditApp,
+  'app-wallet': walletApp,
   'character-card': characterApp,
   'p-charphone': charPhoneApp,
   'p-chatphone': charPhoneThreadApp,
@@ -110,6 +113,7 @@ function makeAi(state) {
       memoryText: String(storyBlock?.text || ''),
       lead: options.proactive ? proactiveLead(state, contact) : replyLead(contact),
       extraPrompt: wantsTheater ? theaterPrompt(contact?.name, theaterKind) : '',
+      behaviorPrompt: behaviorPrompt(state, chat),
       proactive: Boolean(options.proactive),
       omitLastUser: Boolean(options.omitLastUser),
     });
@@ -120,9 +124,17 @@ function makeAi(state) {
     async reply(context, chat, contact, demoReply) {
       const { built, wantsTheater, theaterKind } = await compose(chat, contact);
       const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
-      if (!wantsTheater) return { text: result.text, sections: [], kind: '' };
-      const split = splitTheaterBlocks(result.text, contact?.name);
-      return { text: split.text, sections: split.sections, kind: theaterKind };
+      const content = wantsTheater ? splitTheaterBlocks(result.text, contact?.name).text : result.text;
+      const bubbles = parseBehaviorReply(content, {
+        from: 'them',
+        allowed: behaviorSettings(state, chat),
+      });
+      return {
+        text: bubbles.map(item => item.text || '').join('\n'),
+        bubbles,
+        sections: wantsTheater ? splitTheaterBlocks(result.text, contact?.name).sections : [],
+        kind: wantsTheater ? theaterKind : '',
+      };
     },
 
     /**

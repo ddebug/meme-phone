@@ -6,6 +6,8 @@
  * 同时兼容 acsus-phone-standalone 的单个角色导出文件。
  */
 
+import { fromAcsusMessage } from './behavior.js';
+
 export const MEME_CHAT_FORMAT = 'meme-phone-chat';
 export const MEME_CHAT_VERSION = 1;
 export const ACSUS_CHAT_FORMAT = 'acsus-phone-chat';
@@ -15,6 +17,10 @@ export const MAX_CHAT_TRANSFER_MESSAGES = 50000;
 const MAX_VALUE_DEPTH = 12;
 const BLOCKED_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 const FROM_VALUES = new Set(['me', 'them', 'system']);
+const ACSUS_BEHAVIOR_KINDS = new Set([
+  'transfer', 'redpacket', 'gift-membership', 'buy-membership', 'plan', 'plan-story',
+  'friend-request', 'friend-added', 'friend-deleted', 'signature',
+]);
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -160,6 +166,10 @@ function acsusQuoteToMeme(quoted) {
 function acsusMessageToMeme(message, index, fallbackKey) {
   const from = acsusSenderToFrom(message?.sender);
   if (!from) throw new TypeError(`ac sus 第 ${index + 1} 条消息发送者无效`);
+
+  /* 行为消息优先走统一映射，导入只还原历史，不触发钱包 / 会员 / 计划副作用。 */
+  const mapped = fromAcsusMessage(message, index, fallbackKey);
+  if (mapped && ACSUS_BEHAVIOR_KINDS.has(mapped.kind)) return mapped;
 
   const type = typeof message.type === 'string' ? message.type : 'text';
   const content = message.content ?? message.replyContent ?? message.description ?? message.message ?? message.originalContent ?? '';

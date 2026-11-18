@@ -5,6 +5,7 @@
 import { icon } from '../icons.js';
 import { contactsOf, contactById, chatFor, chatById, lastMessage, addContact, syncTavernContacts } from '../data.js';
 import { avatarHtml, esc, shortText } from '../shell.js';
+import { pendingFriendRequests, respondFriendRequest, contactMembership, membershipLabel, signatureHistory } from '../behavior-domains.js';
 import { charactersPanel, charactersHandle, characterDetailHtml, characterCardHandle } from './characters.js';
 
 function groupOf(contact) {
@@ -21,6 +22,24 @@ export const contactsApp = {
     const tab = ctx.shell.contactsTab === 'cards' ? 'cards' : 'contacts';
     const contacts = contactsOf(ctx.state);
     const groups = ['酒馆角色', '群聊', '自己加的'];
+    const pending = pendingFriendRequests(ctx.state);
+    const pendingBlock = pending.length ? `
+      <div class="mp-group">
+        <div class="mp-group-label">新的好友申请 · ${pending.length}</div>
+        <div class="mp-group-box">
+          ${pending.slice(0, 6).map(request => `
+            <div class="mp-friend-request">
+              <div class="mp-friend-request-main">
+                <div class="mp-row-name">${esc(request.name || '有人想加你')}</div>
+                <div class="mp-row-sub">${esc(request.text || '想和你成为好友')}</div>
+              </div>
+              <div class="mp-friend-request-actions">
+                <button class="mp-mini-btn" data-act="friend-request-respond" data-request="${esc(request.id)}" data-accept="1" type="button">通过</button>
+                <button class="mp-mini-btn plain" data-act="friend-request-respond" data-request="${esc(request.id)}" data-accept="0" type="button">拒绝</button>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>` : '';
     const body = groups.map(group => {
       const list = contacts.filter(contact => groupOf(contact) === group);
       if (!list.length) return '';
@@ -54,11 +73,20 @@ export const contactsApp = {
 
         ${tab === 'cards'
           ? charactersPanel(ctx)
-          : (body || '<div class="mp-empty">通讯录还是空的。<br>点右上角，把酒馆里的角色同步过来。</div>')}
+          : (pendingBlock + (body || '<div class="mp-empty">通讯录还是空的。<br>点右上角，把酒馆里的角色同步过来。</div>'))}
       </div>`;
   },
 
   handle(ctx, act, data) {
+    if (act === 'friend-request-respond') {
+      const result = respondFriendRequest(ctx.state, { requestId: data.request, accept: data.accept === '1' });
+      if (!result.ok) { ctx.toast(result.reason || '处理失败'); return true; }
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(data.accept === '1' ? '已通过好友申请' : '已拒绝');
+      return true;
+    }
+
     if (act === 'contacts-tab') {
       ctx.shell.contactsTab = data.tab === 'cards' ? 'cards' : 'contacts';
       ctx.rerender();
@@ -147,6 +175,9 @@ export const contactApp = {
     const extras = ctx.state.extras[contact.id] || [];
     const last = chats[0] ? lastMessage(chats[0]) : null;
     const card = (ctx.state.characters || []).find(item => item.name === contact.name) || null;
+    const member = contactMembership(ctx.state, contact.id);
+    const memberActive = member.expireAt > Date.now();
+    const signatures = signatureHistory(ctx.state, contact.id).slice(0, 6);
 
     const rows = chats.map(chat => `
       <button class="mp-row" data-act="open-thread" data-chat="${chat.id}" type="button">
@@ -169,6 +200,7 @@ export const contactApp = {
             <div style="font-size: calc(12px * var(--font-scale));color:var(--text-3);margin-top:3px">${esc(contact.signature || '还没有签名')}</div>
             <div style="display:flex;gap:5px;margin-top:7px">
               <span class="mp-pill">${groupOf(contact)}</span>
+              ${memberActive ? `<span class="mp-pill plain">${esc(membershipLabel(member.type))}</span>` : ''}
               ${last ? `<span class="mp-pill plain">${shortText(last.at)}说过话</span>` : ''}
             </div>
           </div>
@@ -178,6 +210,22 @@ export const contactApp = {
           <button class="mp-btn" data-act="contact-extras" data-contact="${contact.id}" type="button" style="flex:1">${icon('theater')}小剧场 ${extras.length || ''}</button>
         </div>
         ${contact.kind === 'group' ? '' : `<button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button">${icon('search')}查 TA 的手机</button>`}
+        <div class="mp-group">
+          <div class="mp-group-label">TA 的状态</div>
+          <div class="mp-group-box">
+            <div class="mp-set-row is-static">
+              <span class="mp-set-ico">${icon('spark')}</span>
+              <span class="mp-set-name">会员<small>${memberActive ? `${new Date(member.expireAt).toLocaleDateString('sv-SE')} 到期` : '还没有开通'}</small></span>
+              <span class="mp-set-value">${esc(membershipLabel(member.type))}</span>
+            </div>
+            <div class="mp-set-row is-static">
+              <span class="mp-set-ico">${icon('reply')}</span>
+              <span class="mp-set-name">个签<small>${esc(contact.signature || '还没有签名')}</small></span>
+              <span class="mp-set-value">${signatures.length} 条</span>
+            </div>
+          </div>
+        </div>
+        ${signatures.length ? `<div class="mp-group"><div class="mp-group-label">个签历史</div><div class="mp-group-box">${signatures.map(item => `<div class="mp-set-row is-static"><span class="mp-set-ico">${icon('clock')}</span><span class="mp-set-name">${esc(item.text)}<small>${shortText(item.at)}</small></span></div>`).join('')}</div></div>` : ''}
         ${rows}
         ${card ? characterDetailHtml(ctx, card) : ''}
       </div>`;

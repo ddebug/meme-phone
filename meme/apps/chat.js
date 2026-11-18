@@ -14,6 +14,12 @@ import { memoryPresetSummary } from '../memory.js';
 import { requestStats, estimateTokens, proactiveLead } from '../reply-context.js';
 import { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } from '../chat-transfer.js';
 import { avatarHtml, chatAvatarHtml, esc, shortText, timeText } from '../shell.js';
+import { renderBehaviorBubble, isSystemBehavior, behaviorSettings } from '../behavior.js';
+import {
+  applyBehaviorMessage, appointmentByMessage, respondAppointment, completeAppointment,
+  respondFriendRequest, friendRequests, walletBalance, refundTransfer, revokeMembership,
+  cancelAppointment,
+} from '../behavior-domains.js';
 
 const REPLY_POOL = {
   沈砚: ['到楼下了，风比刚才小一点。', '你先忙，我在便利店坐着。', '记得吃点东西，别又是咖啡。', '刚看到你窗户还亮着。'],
@@ -186,9 +192,9 @@ function ensureDebugPreview(ctx, chat, contact) {
 }
 
 /* 聊天设置页：行样式沿用全局设置页，不另造一套 */
-function chatSetRow(chatId, { iconName, title, sub, act, toggle, value, danger }) {
+function chatSetRow(chatId, { iconName, title, sub, act, toggle, value, danger, kind }) {
   return `
-    <button class="mp-set-row${danger ? ' is-danger' : ''}" data-act="${act}" data-chat="${esc(chatId)}" type="button">
+    <button class="mp-set-row${danger ? ' is-danger' : ''}" data-act="${act}" data-chat="${esc(chatId)}"${kind ? ` data-kind="${esc(kind)}"` : ''} type="button">
       <span class="mp-set-ico">${icon(iconName)}</span>
       <span class="mp-set-name">${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
       ${toggle !== undefined
@@ -339,6 +345,7 @@ function settingsBody(ctx, chatId) {
   const replyAppCount = replyItems.filter(item => item.kind === 'app').length;
   const injectedCount = replyItems.filter(item => item.kind === 'context' && item.enabled).length;
   const replySub = `${ownReply ? `只对这个会话 · ${ownReply.name || '未命名'}` : `跟随手机 · ${globalReply?.name || '默认回复方式'}`} · ${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
+  const behavior = behaviorSettings(state, chat);
 
   return `
     <div class="mp-page-body">
@@ -378,6 +385,18 @@ function settingsBody(ctx, chatId) {
             iconName: 'reply', title: '回复预设',
             sub: replySub, act: 'ts-reply', value: ownReply ? '单独' : '跟随',
           })}
+        </div>
+      </div>
+
+      <div class="mp-group">
+        <div class="mp-group-label">行为</div>
+        <div class="mp-group-box">
+          ${chatSetRow(chat.id, { iconName: 'transfer', title: '转账', sub: '允许 TA 在回复里发转账标签', act: 'ts-behavior-toggle', kind: 'transfer', toggle: behavior.transfer })}
+          ${chatSetRow(chat.id, { iconName: 'transfer', title: '红包', sub: '允许 TA 在回复里发红包标签', act: 'ts-behavior-toggle', kind: 'redpacket', toggle: behavior.redpacket })}
+          ${chatSetRow(chat.id, { iconName: 'spark', title: '会员', sub: '允许 TA 送会员或自己开会员', act: 'ts-behavior-toggle', kind: 'membership', toggle: behavior.membership })}
+          ${chatSetRow(chat.id, { iconName: 'plan', title: '约定计划', sub: '允许 TA 发约定，接受后可以完成并写故事', act: 'ts-behavior-toggle', kind: 'plan', toggle: behavior.plan })}
+          ${chatSetRow(chat.id, { iconName: 'contacts', title: '好友申请', sub: '允许 TA 发好友申请，你可以在聊天里通过', act: 'ts-behavior-toggle', kind: 'friend', toggle: behavior.friend })}
+          ${chatSetRow(chat.id, { iconName: 'reply', title: '个签', sub: '允许 TA 改自己的个签', act: 'ts-behavior-toggle', kind: 'signature', toggle: behavior.signature })}
         </div>
       </div>
 
@@ -479,7 +498,7 @@ function threadBody(ctx, chatId) {
   };
   for (const message of messages) {
     const startGroup = message.at - lastAt > 30 * 60 * 1000;
-    if (message.kind === 'system' || message.from === 'system' || message.kind === 'recalled' || message.kind === 'poke') {
+    if (message.kind === 'system' || message.from === 'system' || message.kind === 'recalled' || message.kind === 'poke' || isSystemBehavior(message)) {
       if (startGroup) {
         blocks.push(`<div class="mp-time">${timeText(message.at)}</div>`);
         lastAt = message.at;
@@ -488,6 +507,8 @@ function threadBody(ctx, chatId) {
         blocks.push(`<div class="mp-sys is-recall">${message.from === 'me' ? '你撤回了一条消息' : `${esc(speakerName(message))}撤回了一条消息`}</div>`);
       } else if (message.kind === 'poke') {
         blocks.push(`<div class="mp-sys is-poke">${message.from === 'me' ? `你拍了拍「${esc(contact?.name || 'TA')}」` : `「${esc(contact?.name || 'TA')}」拍了拍你`}</div>`);
+      } else if (isSystemBehavior(message)) {
+        blocks.push(renderBehaviorBubble(message, { chatId: chat.id, contact }));
       } else {
         blocks.push(`<div class="mp-sys">${esc(message.text)}</div>`);
       }
@@ -499,13 +520,14 @@ function threadBody(ctx, chatId) {
     }
     const me = message.from === 'me';
     const speaker = message.speaker ? contactById(state, message.speaker) : null;
-    const bubble = message.image
+    const behaviorBubble = renderBehaviorBubble(message, { chatId: chat.id, contact });
+    const bubble = behaviorBubble || (message.image
       ? `<button class="mp-bubble mp-bubble-photo" data-act="view-photo" data-chat="${chat.id}" data-msg="${message.id}" type="button"><img src="${esc(message.image)}" alt="照片"></button>`
       : message.emoji
         ? `<div class="mp-bubble mp-bubble-emoji">${esc(message.emoji)}</div>`
         : message.forward
           ? `<div class="mp-bubble mp-bubble-forward"><div class="mp-forward-head">${icon('forward')}<span>转发的消息</span></div><div class="mp-forward-text">${esc(message.forward.text || '')}</div>${message.forward.from ? `<div class="mp-forward-src">来自 ${esc(message.forward.from)}</div>` : ''}</div>`
-          : `<div class="mp-bubble">${esc(message.text)}</div>`;
+          : `<div class="mp-bubble">${esc(message.text)}</div>`);
     blocks.push(`
       <div class="mp-msg${me ? ' me' : ''}" data-hold="message-menu" data-chat="${chat.id}" data-msg="${message.id}">
         ${me
@@ -544,6 +566,7 @@ function threadBody(ctx, chatId) {
       <div class="mp-messages" id="mpMessages">${blocks.join('')}</div>
       <div class="mp-composer">
         ${debugBar}
+        ${behaviorFormHtml(ctx, chat)}
         <div class="mp-composer-tip">空着发出去，TA 会主动开口</div>
         ${quote ? `
         <div class="mp-quote-chip">
@@ -563,11 +586,60 @@ function threadBody(ctx, chatId) {
     </div>`;
 }
 
-function nav(ctx, right = '') {
-  return `<div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button><span style="flex:1"></span>${right}</div>`;
+function behaviorFormHtml(ctx, chat) {
+  const form = ctx.shell.behaviorForm;
+  if (!form || form.chatId !== chat.id) return '';
+  const kind = form.kind;
+  if (kind === 'transfer' || kind === 'redpacket') {
+    return `
+      <div class="mp-behavior-form">
+        <div class="mp-behavior-form-head"><span>${kind === 'redpacket' ? '红包' : '转账'} · 余额 ¥${walletBalance(ctx.state).toFixed(2)}</span><button class="mp-sq-btn" data-act="behavior-form-cancel" data-chat="${chat.id}" type="button" aria-label="收起">${icon('close')}</button></div>
+        <input id="mpBehaviorAmount" class="mp-behavior-input" type="text" inputmode="decimal" placeholder="金额" aria-label="金额">
+        <input id="mpBehaviorNote" class="mp-behavior-input" type="text" maxlength="80" placeholder="留言（可不写）" aria-label="留言">
+        <div class="mp-behavior-actions">
+          <button class="mp-mini-btn plain" data-act="behavior-form-cancel" data-chat="${chat.id}" type="button">取消</button>
+          <button class="mp-mini-btn" data-act="behavior-form-send" data-chat="${chat.id}" data-kind="${kind}" type="button">发送</button>
+        </div>
+      </div>`;
+  }
+  if (kind === 'plan') {
+    return `
+      <div class="mp-behavior-form">
+        <div class="mp-behavior-form-head"><span>约定计划</span><button class="mp-sq-btn" data-act="behavior-form-cancel" data-chat="${chat.id}" type="button" aria-label="收起">${icon('close')}</button></div>
+        <input id="mpBehaviorTitle" class="mp-behavior-input" type="text" maxlength="80" placeholder="比如：周末一起去看海" aria-label="计划">
+        <div class="mp-behavior-actions">
+          <button class="mp-mini-btn plain" data-act="behavior-form-cancel" data-chat="${chat.id}" type="button">取消</button>
+          <button class="mp-mini-btn" data-act="behavior-form-send" data-chat="${chat.id}" data-kind="plan" type="button">发起</button>
+        </div>
+      </div>`;
+  }
+  if (kind === 'membership') {
+    return `
+      <div class="mp-behavior-form">
+        <div class="mp-behavior-form-head"><span>送会员</span><button class="mp-sq-btn" data-act="behavior-form-cancel" data-chat="${chat.id}" type="button" aria-label="收起">${icon('close')}</button></div>
+        <div class="mp-behavior-form-row">
+          <select id="mpBehaviorMemberType" class="mp-behavior-input">
+            <option value="vip">VIP</option>
+            <option value="svip">SVIP</option>
+          </select>
+          <select id="mpBehaviorMemberMonths" class="mp-behavior-input">
+            <option value="1">1 个月</option>
+            <option value="12">12 个月</option>
+          </select>
+        </div>
+        <div class="mp-behavior-hint">会从钱包余额扣除，赠送记录会写进收支。</div>
+        <div class="mp-behavior-actions">
+          <button class="mp-mini-btn plain" data-act="behavior-form-cancel" data-chat="${chat.id}" type="button">取消</button>
+          <button class="mp-mini-btn" data-act="behavior-form-send" data-chat="${chat.id}" data-kind="membership" type="button">赠送</button>
+        </div>
+      </div>`;
+  }
+  return '';
 }
 
-/* --------------------------------------------------------- 发送逻辑 */
+function nav(ctx, right = '') {
+  return `<div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button><span style="flex:1"></span>${right}</div>`;
+}/* --------------------------------------------------------- 发送逻辑 */
 
 function scrollToBottom(ctx) {
   const box = ctx.shell.root.querySelector('.mp-messages');
@@ -598,6 +670,45 @@ function doSend(ctx, chatId) {
   reply(ctx, chat, contact);
 }
 
+function commitBehaviorMessage(ctx, chat, contact, draft) {
+  const saved = pushMessage(ctx.state, chat.id, draft);
+  if (!saved) return null;
+  const applied = applyBehaviorMessage(ctx.state, saved, {
+    chatId: chat.id,
+    contactId: chat.contactId,
+    contact,
+  });
+  if (!applied.ok) {
+    chat.messages = chat.messages.filter(item => item.id !== saved.id);
+    ctx.toast(applied.reason || '这一步没做成');
+    ctx.rerender();
+    return null;
+  }
+  return saved;
+}
+
+function rollbackBehavior(ctx, chat, message) {
+  const behavior = message.behavior;
+  if (!behavior) return { ok: true };
+  if (message.kind === 'transfer' || message.kind === 'redpacket') {
+    if (!behavior.txId) return { ok: true };
+    const result = refundTransfer(ctx.state, behavior.txId);
+    if (!result.ok && /余额不足/.test(result.reason || '')) return result;
+    return { ok: true };
+  }
+  if (message.kind === 'gift-membership' || message.kind === 'buy-membership') {
+    const target = behavior.target || (message.from === 'me' ? 'contact' : 'user');
+    const membership = revokeMembership(ctx.state, { target, contactId: chat.contactId, messageId: message.id });
+    return membership.ok ? membership : { ok: true };
+  }
+  if (message.kind === 'plan') {
+    const plan = appointmentByMessage(ctx.state, chat.contactId, message.id)
+      || (behavior.planId ? appointmentByMessage(ctx.state, chat.contactId, behavior.planId) : null);
+    return plan ? cancelAppointment(ctx.state, { contactId: chat.contactId, planId: plan.id }) : { ok: true };
+  }
+  return { ok: true };
+}
+
 function reply(ctx, chat, contact, replaceId = '') {
   chat.typing = true;
   ctx.rerender();
@@ -608,29 +719,77 @@ function reply(ctx, chat, contact, replaceId = '') {
     let text = '';
     let sections = [];
     let kind = '';
+    let bubbles = [];
     try {
       const result = await ctx.ai.reply(ctx, chat, contact, pick(poolFor(contact)));
       text = typeof result === 'string' ? result : String(result?.text || '');
       sections = Array.isArray(result?.sections) ? result.sections : [];
       kind = String(result?.kind || '');
+      bubbles = Array.isArray(result?.bubbles) && result.bubbles.length
+        ? result.bubbles
+        : (text ? [{ kind: 'text', text, behavior: null }] : []);
     } catch {
-      text = '';
+      bubbles = [];
     }
     chat.typing = false;
-    if (text) {
+    if (bubbles.length) {
+      let firstSaved = null;
       const index = replaceId ? chat.messages.findIndex(item => item.id === replaceId) : -1;
-      let saved = null;
       if (index >= 0) {
-        /* 重新生成：新内容回来后才覆盖原来那条，生成失败时原消息还在 */
-        chat.messages[index] = { ...chat.messages[index], text, at: Date.now() };
+        const old = chat.messages[index];
+        const rolled = rollbackBehavior(ctx, chat, old);
+        if (!rolled.ok) {
+          ctx.toast(rolled.reason || '原来这条关联的状态退不回去，先不重写');
+          ctx.save();
+          ctx.rerender();
+          return;
+        }
+        const first = bubbles[0];
+        chat.messages[index] = {
+          ...old,
+          kind: first.kind || 'text',
+          text: first.text || '',
+          image: first.image || '',
+          emoji: first.emoji || '',
+          forward: first.forward || null,
+          quote: first.quote || null,
+          behavior: first.behavior || null,
+          at: Date.now(),
+        };
         chat.updatedAt = chat.messages[index].at;
+        firstSaved = chat.messages[index];
+        applyBehaviorMessage(ctx.state, firstSaved, { chatId: chat.id, contactId: chat.contactId, contact });
       } else {
-        saved = pushMessage(ctx.state, chat.id, { from: 'them', text });
+        const first = bubbles[0];
+        firstSaved = pushMessage(ctx.state, chat.id, {
+          from: 'them',
+          kind: first.kind || 'text',
+          text: first.text || '',
+          image: first.image || '',
+          emoji: first.emoji || '',
+          forward: first.forward || null,
+          quote: first.quote || null,
+          behavior: first.behavior || null,
+        });
+        if (firstSaved) applyBehaviorMessage(ctx.state, firstSaved, { chatId: chat.id, contactId: chat.contactId, contact });
       }
-      if (saved && sections.length) {
+      for (const bubble of bubbles.slice(1)) {
+        const extra = pushMessage(ctx.state, chat.id, {
+          from: 'them',
+          kind: bubble.kind || 'text',
+          text: bubble.text || '',
+          image: bubble.image || '',
+          emoji: bubble.emoji || '',
+          forward: bubble.forward || null,
+          quote: bubble.quote || null,
+          behavior: bubble.behavior || null,
+        });
+        if (extra) applyBehaviorMessage(ctx.state, extra, { chatId: chat.id, contactId: chat.contactId, contact });
+      }
+      if (firstSaved && sections.length) {
         addExtrasEntry(ctx.state, contact?.id || chat.contactId, sections, {
           chatId: chat.id,
-          messageId: saved.id,
+          messageId: firstSaved.id,
           kind: kind || theaterKindFor(ctx.state),
         });
         ctx.toast('这轮的小剧场收进 App 了');
@@ -882,6 +1041,17 @@ export const threadSettingsApp = {
     }
     const contact = contactById(ctx.state, chat.contactId);
 
+    if (act === 'ts-behavior-toggle') {
+      const key = String(data.kind || '');
+      if (!['transfer', 'redpacket', 'membership', 'plan', 'friend', 'signature'].includes(key)) return true;
+      const current = behaviorSettings(ctx.state, chat);
+      chat.behavior = { ...(chat.behavior || {}), [key]: !current[key] };
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`${current[key] ? '已关闭' : '已打开'}${key === 'friend' ? '好友申请' : key === 'signature' ? '个签' : key === 'plan' ? '约定计划' : key === 'membership' ? '会员' : key === 'redpacket' ? '红包' : '转账'}`);
+      return true;
+    }
+
     if (act === 'ts-toggle-pin') {
       chat.pinned = !chat.pinned;
       ctx.save();
@@ -1128,6 +1298,129 @@ export const threadApp = {
       return true;
     }
 
+    if (act === 'behavior-form-cancel') {
+      ctx.shell.behaviorForm = null;
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'behavior-form-send') {
+      const chat = chatById(ctx.state, chatId);
+      const contact = chat ? contactById(ctx.state, chat.contactId) : null;
+      if (!chat || !contact) return true;
+      const root = ctx.shell.root;
+      const kind = data.kind;
+      let draft = null;
+      if (kind === 'transfer' || kind === 'redpacket') {
+        const amount = Number((root.querySelector('#mpBehaviorAmount')?.value || '').replace(/[^\d.]/g, ''));
+        const note = root.querySelector('#mpBehaviorNote')?.value || '';
+        if (!Number.isFinite(amount) || amount <= 0) { ctx.toast('先填一个金额'); return true; }
+        if (amount > 10000) { ctx.toast('一次最多 ¥10000'); return true; }
+        draft = {
+          from: 'me', kind,
+          text: `[${kind === 'redpacket' ? '红包' : '转账'}] ¥${amount.toFixed(2)}${note ? ` ${note}` : ''}`,
+          behavior: { amount, note, status: 'pending', direction: 'sent' },
+        };
+      } else if (kind === 'plan') {
+        const title = (root.querySelector('#mpBehaviorTitle')?.value || '').trim();
+        if (!title) { ctx.toast('写一句想约什么'); return true; }
+        draft = {
+          from: 'me', kind: 'plan',
+          text: `[约定计划] ${title}`,
+          behavior: { title, planId: '', status: 'pending', initiator: 'me' },
+        };
+      } else if (kind === 'membership') {
+        const membershipType = root.querySelector('#mpBehaviorMemberType')?.value === 'svip' ? 'svip' : 'vip';
+        const months = Number(root.querySelector('#mpBehaviorMemberMonths')?.value) === 12 ? 12 : 1;
+        const price = membershipType === 'svip' ? (months === 12 ? 216 : 20) : (months === 12 ? 108 : 10);
+        if (walletBalance(ctx.state) < price) { ctx.toast(`余额不足，需要 ¥${price}`); return true; }
+        draft = {
+          from: 'me', kind: 'gift-membership',
+          text: `[送会员] ${membershipType.toUpperCase()} ${months} 个月`,
+          behavior: { membershipType, months, price, status: 'pending', target: 'contact' },
+        };
+      }
+      if (!draft) return true;
+      const saved = commitBehaviorMessage(ctx, chat, contact, draft);
+      if (!saved) return true;
+      ctx.shell.behaviorForm = null;
+      ctx.save();
+      ctx.rerender();
+      scrollToBottom(ctx);
+      ctx.toast('发出去了');
+      reply(ctx, chat, contact);
+      return true;
+    }
+
+    if (act === 'behavior-plan-respond') {
+      const chat = chatById(ctx.state, chatId);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (!chat || !message) return true;
+      const plan = appointmentByMessage(ctx.state, chat.contactId, message.id)
+        || (message.behavior?.planId ? appointmentByMessage(ctx.state, chat.contactId, message.behavior.planId) : null);
+      if (!plan) { ctx.toast('找不到这个约定'); return true; }
+      const result = respondAppointment(ctx.state, { contactId: chat.contactId, planId: plan.id, accept: data.accept === '1' });
+      if (!result.ok) { ctx.toast(result.reason || '处理失败'); return true; }
+      message.behavior = { ...(message.behavior || {}), planId: plan.id, status: plan.status };
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(plan.status === 'accepted' ? '约定已接受' : '已经拒绝了');
+      return true;
+    }
+
+    if (act === 'behavior-plan-complete') {
+      const chat = chatById(ctx.state, chatId);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (!chat || !message) return true;
+      const plan = appointmentByMessage(ctx.state, chat.contactId, message.id)
+        || (message.behavior?.planId ? appointmentByMessage(ctx.state, chat.contactId, message.behavior.planId) : null);
+      if (!plan) { ctx.toast('找不到这个约定'); return true; }
+      if (!['accepted', 'completed'].includes(plan.status)) { ctx.toast('先接受这个约定'); return true; }
+      const story = pushMessage(ctx.state, chat.id, {
+        from: 'them',
+        kind: 'plan-story',
+        text: `[计划故事] ${plan.title}`,
+        behavior: { planId: plan.id, title: plan.title, story: `关于「${plan.title}」的那天，最后真的成行了。`, status: 'completed' },
+      });
+      if (story) applyBehaviorMessage(ctx.state, story, { chatId: chat.id, contactId: chat.contactId, contact: contactById(ctx.state, chat.contactId) });
+      ctx.save();
+      ctx.rerender();
+      scrollToBottom(ctx);
+      ctx.toast('计划完成，故事也记下了');
+      return true;
+    }
+
+    if (act === 'behavior-friend-respond') {
+      const chat = chatById(ctx.state, chatId);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (!chat || !message) return true;
+      const request = friendRequests(ctx.state).find(item => item.id === (message.behavior?.requestId || data.request))
+        || friendRequests(ctx.state).find(item => item.messageId === message.id);
+      if (!request) { ctx.toast('找不到这条好友申请'); return true; }
+      const result = respondFriendRequest(ctx.state, { requestId: request.id, accept: data.accept === '1' });
+      if (!result.ok) { ctx.toast(result.reason || '处理失败'); return true; }
+      message.behavior = { ...(message.behavior || {}), requestId: request.id, status: request.status };
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(request.status === 'accepted' ? '已加为好友' : '已拒绝');
+      return true;
+    }
+
+    if (act === 'behavior-plan-story') {
+      const chat = chatById(ctx.state, chatId);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (!chat || !message) return true;
+      const plan = appointmentByMessage(ctx.state, chat.contactId, message.id)
+        || (message.behavior?.planId ? appointmentByMessage(ctx.state, chat.contactId, message.behavior.planId) : null);
+      if (!plan?.story) { ctx.toast('这个故事还没写出来'); return true; }
+      ctx.openSheet({
+        title: plan.story.title || '计划故事',
+        items: [{ label: plan.story.text || '', value: 'read', icon: 'book', note: plan.story.outcome || '' }],
+        onPick: () => {},
+      });
+      return true;
+    }
+
     if (act === 'composer-plus') {
       ctx.openSheet({
         title: '加点什么',
@@ -1135,6 +1428,10 @@ export const threadApp = {
           { label: '照片', value: 'photo', icon: 'image', note: '从相册选一张，压小了再存进手机' },
           { label: '表情', value: 'emoji', icon: 'smile', note: '发一个大表情，不是文字里的贴图' },
           { label: '戳一戳', value: 'poke', icon: 'spark', note: '在聊天里留一行「你拍了拍 TA」' },
+          { label: '转账', value: 'transfer', icon: 'transfer', note: `钱包余额 ¥${walletBalance(ctx.state).toFixed(2)}` },
+          { label: '红包', value: 'redpacket', icon: 'transfer', note: '发一个红包，留言可以不写' },
+          { label: '约定计划', value: 'plan', icon: 'plan', note: '发一条待 TA 接受的约定' },
+          { label: '送会员', value: 'membership', icon: 'spark', note: '从余额扣，给 TA 送 VIP / SVIP' },
           { label: '小剧场', value: 'theater', icon: 'theater', note: '这轮带不带、写哪种；内容去小剧场 App 看' },
           { label: '引用最近一条', value: 'quote', icon: 'reply' },
           { label: '把这条存进小剧场', value: 'extra', icon: 'theater' },
@@ -1172,6 +1469,21 @@ export const threadApp = {
             ctx.save();
             ctx.rerender();
             scrollToBottom(ctx);
+          }
+          if (value === 'transfer' || value === 'redpacket') {
+            ctx.shell.behaviorForm = { chatId, kind: value };
+            ctx.rerender();
+            return;
+          }
+          if (value === 'plan') {
+            ctx.shell.behaviorForm = { chatId, kind: 'plan' };
+            ctx.rerender();
+            return;
+          }
+          if (value === 'membership') {
+            ctx.shell.behaviorForm = { chatId, kind: 'membership' };
+            ctx.rerender();
+            return;
           }
           if (value === 'theater') {
             openTheaterSheet(ctx, chat);
@@ -1299,11 +1611,14 @@ export const threadApp = {
             });
           }
           if (value === 'recall') {
+            const rolled = rollbackBehavior(ctx, chat, message);
+            if (!rolled.ok) { ctx.toast(rolled.reason || '这条消息关联的状态退不回去了'); return; }
             message.kind = 'recalled';
             message.text = '';
             message.image = '';
             message.emoji = '';
             message.forward = null;
+            message.behavior = null;
             ctx.save();
             ctx.rerender();
             ctx.toast('已撤回');
@@ -1321,6 +1636,8 @@ export const threadApp = {
               items: [{ label: '确认删除这条', value: 'delete', icon: 'trash', danger: true, note: '只删这一条，不影响其他聊天记录；不能恢复。' }],
               onPick: (pick) => {
                 if (pick !== 'delete') return;
+                const rolled = rollbackBehavior(ctx, chat, message);
+                if (!rolled.ok) { ctx.toast(rolled.reason || '这条消息关联的状态退不回去了'); return; }
                 chat.messages = chat.messages.filter(item => item.id !== message.id);
                 ctx.save();
                 ctx.rerender();

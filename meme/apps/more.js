@@ -5,7 +5,8 @@
 
 import { icon, ICON_NAMES, ICON_LABELS, APP_ICON_TARGETS } from '../icons.js';
 import { esc, tintStyle, chatAvatarHtml } from '../shell.js';
-import { contactsOf, contactById, extrasOf, THEATER_KINDS, normalizeTheaterKind, theaterKindById, theaterKindFor } from '../data.js';
+import { contactsOf, contactById, extrasOf, THEATER_KINDS, normalizeTheaterKind, theaterKindById, theaterKindFor, chatFor } from '../data.js';
+import { appointmentById, completeAppointment, respondAppointment } from '../behavior-domains.js';
 import { PIXEL_BUNNY } from '../theme-data.js';
 
 function head(title, sub) {
@@ -387,9 +388,32 @@ export const plansApp = {
 
   render(ctx) {
     const plans = ctx.state.plans;
+    const appointments = Object.values(ctx.state.appointments?.byContact || {})
+      .flat()
+      .filter(item => item && item.status !== 'cancelled')
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 20)
+      .map(item => ({ ...item, contact: contactById(ctx.state, item.contactId) }));
+    const statusText = { pending: '等回应', accepted: '已接受', rejected: '已拒绝', completed: '已完成' };
     return `
       <div class="mp-page-body">
         ${head('计划', '要一起做的事')}
+        <div class="mp-group">
+          <div class="mp-group-label">和角色的约定 · ${appointments.length}</div>
+          <div class="mp-group-box">
+            ${appointments.length ? appointments.map(item => `
+              <div class="mp-row" style="cursor:default">
+                <div class="mp-row-main">
+                  <div class="mp-row-name">${esc(item.title)}</div>
+                  <div class="mp-row-sub">${esc(item.contact?.name || 'TA')} · ${esc(statusText[item.status] || item.status)}${item.story?.text ? ` · ${esc(item.story.text.slice(0, 18))}` : ''}</div>
+                </div>
+                <div class="mp-row-side">
+                  ${item.status === 'pending' ? `<button class="mp-mini-btn" data-act="appointment-respond" data-contact="${item.contactId}" data-plan="${item.id}" data-accept="1" type="button">接受</button>` : ''}
+                  ${item.status === 'accepted' ? `<button class="mp-mini-btn plain" data-act="appointment-complete" data-contact="${item.contactId}" data-plan="${item.id}" type="button">完成</button>` : ''}
+                </div>
+              </div>`).join('') : '<div class="mp-empty" style="padding:18px">还没有和角色约定过什么。</div>'}
+          </div>
+        </div>
         ${plans.map((plan, index) => `
           <div class="mp-row" style="cursor:default">
             <span style="width:26px;height:26px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;${plan.done ? tintStyle('plan') : 'background:rgba(43,41,55,.05)'}">
@@ -406,6 +430,29 @@ export const plansApp = {
   },
 
   handle(ctx, act, data, event) {
+    if (act === 'appointment-respond') {
+      const result = respondAppointment(ctx.state, { contactId: data.contact, planId: data.plan, accept: data.accept === '1' });
+      if (!result.ok) { ctx.toast(result.reason || '处理失败'); return true; }
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(result.plan.status === 'accepted' ? '约定已接受' : '已经拒绝');
+      return true;
+    }
+    if (act === 'appointment-complete') {
+      const plan = appointmentById(ctx.state, data.contact, data.plan);
+      if (!plan) { ctx.toast('找不到这个约定'); return true; }
+      const result = completeAppointment(ctx.state, {
+        contactId: data.contact,
+        planId: data.plan,
+        story: { title: plan.title, text: `关于「${plan.title}」的那天，最后真的成行了。` },
+      });
+      if (!result.ok) { ctx.toast(result.reason || '处理失败'); return true; }
+      ctx.save();
+      ctx.rerender();
+      ctx.toast('计划完成，故事也记下了');
+      return true;
+    }
+
     if (act === 'plan-toggle') {
       event?.stopPropagation?.();
       const plan = ctx.state.plans[Number(data.index)];

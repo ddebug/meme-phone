@@ -9,7 +9,7 @@ import {
   wakeAllowed, messagePreview, addExtrasEntry, theaterKindFor, THEATER_KINDS, theaterKindById,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor, memoryReadModeFor,
   replyPresetsOf, replyPresetFor, replyContextFor, normalizeReplyItems,
-  chatHistoryFor, effectivePhoneHistoryLimit, effectiveTavernHistory,
+  chatHistoryFor, effectiveTavernHistory,
 } from '../data.js';
 import { memoryPresetSummary } from '../memory.js';
 import { requestStats, estimateTokens, proactiveLead } from '../reply-context.js';
@@ -208,6 +208,19 @@ function chatSetRow(chatId, { iconName, title, sub, act, toggle, value, danger, 
     </button>`;
 }
 
+/* 数字设置行：直接填数字，change 时立即保存，交互对齐 acsus 的聊天设置。 */
+function chatNumberRow(chatId, { iconName, title, sub, act, value, placeholder, min = 1, max = 50 }) {
+  return `
+    <label class="mp-set-row mp-set-row-number">
+      <span class="mp-set-ico">${icon(iconName)}</span>
+      <span class="mp-set-name">${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
+      <input class="mp-set-number" type="number" inputmode="numeric"
+        min="${min}" max="${max}" step="1"
+        value="${esc(value)}" placeholder="${esc(placeholder)}"
+        data-act="${act}" data-chat="${esc(chatId)}" aria-label="${esc(title)}">
+    </label>`;
+}
+
 function saveMessageExtra(ctx, chat, contact, message) {
   const list = (ctx.state.extras[chat.contactId] = ctx.state.extras[chat.contactId] || []);
   const item = {
@@ -351,7 +364,6 @@ function settingsBody(ctx, chatId) {
   const replySub = `${ownReply ? `只对这个会话 · ${ownReply.name || '未命名'}` : `跟随手机 · ${globalReply?.name || '默认回复方式'}`} · ${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
   const behavior = behaviorSettings(state, chat);
   const historyConfig = chatHistoryFor(chat);
-  const phoneCount = effectivePhoneHistoryLimit(chat, replyContextFor(state, chat));
   const tavern = effectiveTavernHistory(state, chat, memoryPresetFor(state, chat));
   const followTavernMode = memoryReadModeFor(state, chat.contactId, memoryPresetFor(state, chat));
   const tavernValue = tavern.mode === 'summary'
@@ -360,14 +372,19 @@ function settingsBody(ctx, chatId) {
       : followTavernMode === 'summary' ? '方案 · 总结'
         : followTavernMode === 'recent' ? `方案 · 原文 ${tavern.floors} 层`
           : `自动 · ${tavern.floors} 层`;
-  const phoneValue = `${phoneCount} 条`;
+  const phoneFollowLimit = replyContextFor(state, chat).historyLimit;
   const tavernSub = [
     '只改这个角色',
     historyConfig.tavernMode || historyConfig.tavernFloors ? '已单独设置' : '跟随记忆方案',
   ].join(' · ');
-  const phoneSub = [
-    '只改这个会话',
-    historyConfig.phoneLimit ? '已单独设置' : '跟随回复预设',
+  const tavernFloorSub = [
+    '最近原文层数',
+    historyConfig.tavernFloors ? '已单独设置' : `空着跟随记忆方案 · ${tavern.floors} 层`,
+    '填数字后自动切到最近原文',
+  ].join(' · ');
+  const phoneNumberSub = [
+    '最近几条',
+    historyConfig.phoneLimit ? '已单独设置' : `空着跟随回复预设 · ${phoneFollowLimit} 条`,
   ].join(' · ');
 
   return `
@@ -430,9 +447,15 @@ function settingsBody(ctx, chatId) {
             iconName: 'clock', title: '历史酒馆消息',
             sub: `全部总结或最近几层原文 · ${tavernSub}`, act: 'ts-tavern-history', value: tavernValue,
           })}
-          ${chatSetRow(chat.id, {
+          ${chatNumberRow(chat.id, {
+            iconName: 'book', title: '酒馆原文层数',
+            sub: tavernFloorSub, act: 'ts-tavern-floors',
+            value: historyConfig.tavernFloors || '', placeholder: String(tavern.floors),
+          })}
+          ${chatNumberRow(chat.id, {
             iconName: 'chat', title: '历史小手机消息',
-            sub: `这个小手机最近几条 · ${phoneSub}`, act: 'ts-phone-history', value: phoneValue,
+            sub: phoneNumberSub, act: 'ts-phone-history',
+            value: historyConfig.phoneLimit || '', placeholder: String(phoneFollowLimit),
           })}
           ${chatSetRow(chat.id, {
             iconName: 'book', title: '酒馆记忆方案',
@@ -1182,15 +1205,11 @@ export const threadSettingsApp = {
       ctx.openSheet({
         kind: 'pick',
         title: '历史酒馆消息',
-        note: `只影响「${contact?.name || '这个角色'}」。全部总结 = 只注入柏宝书总结；最近 N 层 = 注入酒馆原文。`,
+        note: '层数不在这里选，回设置页直接填数字。',
         items: [
           { label: '跟随记忆方案', value: 'follow', icon: 'book', note: `现在 ${memoryPresetSummary(preset)}` },
           { label: '全部总结', value: 'summary', icon: 'book', note: current.mode === 'summary' ? '现在用的' : '没有总结时不会补原文' },
-          ...[5, 10, 15, 20, 30, 50].map(value => ({
-            value: `n:${value}`,
-            label: `最近 ${value} 层原文`,
-            note: current.mode === 'recent' && current.floors === value ? '现在用的' : '',
-          })),
+          { label: '最近原文', value: 'recent', icon: 'clock', note: current.mode === 'recent' ? `现在最近 ${current.floors} 层` : '层数回设置页填数字' },
           { label: '管理记忆方案', value: 'manage', icon: 'settings', note: '新建方案、改全局层数' },
         ],
         onPick: value => {
@@ -1206,40 +1225,63 @@ export const threadSettingsApp = {
             ctx.go('memory-presets', { contactId: chat.contactId });
             return;
           }
-          if (String(value).startsWith('n:')) {
-            const floors = Number(String(value).slice(2));
-            applyHistory({ tavernMode: 'recent', tavernFloors: floors }, `历史酒馆消息改成最近 ${floors} 层原文`);
+          if (value === 'recent') {
+            applyHistory({ tavernMode: 'recent', tavernFloors: current.floors }, `历史酒馆消息改成最近 ${current.floors} 层原文`);
           }
         },
       });
       return true;
     }
 
+    if (act === 'ts-tavern-floors') {
+      const raw = String(data.value || '').trim();
+      if (!raw) {
+        chat.history = { ...chatHistoryFor(chat), tavernFloors: 0 };
+        ctx.ai?.clearPreview?.(chat.id);
+        ctx.shell.debugPreview = null;
+        ctx.save();
+        ctx.rerender();
+        ctx.toast('酒馆原文层数已跟随记忆方案');
+        return true;
+      }
+      const floors = Number(raw);
+      if (!Number.isInteger(floors) || floors < 1 || floors > 50) {
+        ctx.toast('层数填 1–50 的整数');
+        ctx.rerender();
+        return true;
+      }
+      chat.history = { ...chatHistoryFor(chat), tavernMode: 'recent', tavernFloors: floors };
+      ctx.ai?.clearPreview?.(chat.id);
+      ctx.shell.debugPreview = null;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`酒馆原文改成最近 ${floors} 层`);
+      return true;
+    }
+
     if (act === 'ts-phone-history') {
-      const current = effectivePhoneHistoryLimit(chat, replyContextFor(ctx.state, chat));
-      ctx.openSheet({
-        kind: 'pick',
-        title: '历史小手机消息',
-        note: '只改这个小手机聊天注入几条最近消息；酒馆聊天记录另有一项。',
-        items: [
-          { label: '跟随回复预设', value: 'follow', icon: 'reply', note: `现在 ${replyContextFor(ctx.state, chat).historyLimit} 条` },
-          ...[5, 10, 15, 20, 30, 50].map(value => ({
-            value: `n:${value}`,
-            label: `最近 ${value} 条`,
-            note: current === value ? '现在用的' : '',
-          })),
-        ],
-        onPick: value => {
-          let next = 0;
-          if (String(value).startsWith('n:')) next = Number(String(value).slice(2));
-          chat.history = { ...chatHistoryFor(chat), phoneLimit: next };
-          ctx.ai?.clearPreview?.(chat.id);
-          ctx.shell.debugPreview = null;
-          ctx.save();
-          ctx.rerender();
-          ctx.toast(next ? `历史小手机消息改成最近 ${next} 条` : '历史小手机消息已跟随回复预设');
-        },
-      });
+      const raw = String(data.value || '').trim();
+      if (!raw) {
+        chat.history = { ...chatHistoryFor(chat), phoneLimit: 0 };
+        ctx.ai?.clearPreview?.(chat.id);
+        ctx.shell.debugPreview = null;
+        ctx.save();
+        ctx.rerender();
+        ctx.toast('历史小手机消息已跟随回复预设');
+        return true;
+      }
+      const count = Number(raw);
+      if (!Number.isInteger(count) || count < 1 || count > 50) {
+        ctx.toast('条数填 1–50 的整数');
+        ctx.rerender();
+        return true;
+      }
+      chat.history = { ...chatHistoryFor(chat), phoneLimit: count };
+      ctx.ai?.clearPreview?.(chat.id);
+      ctx.shell.debugPreview = null;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(`历史小手机消息改成最近 ${count} 条`);
       return true;
     }
 

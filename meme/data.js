@@ -392,18 +392,6 @@ export function emptyState() {
             context: { ...DEFAULT_REPLY_CONTEXT },
             items: withReplyInstruction(defaultReplyItems(), '像平时发微信一样回消息：口语、短句，一次只回一两句。不要写旁白、括号里的动作，也不要写成小说段落。', 2.5),
           },
-          {
-            id: 'reply_short', name: '再短一点',
-            text: '',
-            context: { ...DEFAULT_REPLY_CONTEXT },
-            items: withReplyInstruction(defaultReplyItems(), '回复尽量短，通常不超过 20 个字，像随手回一条消息。不要解释、不要总结、不要用括号写动作。', 2.5),
-          },
-          {
-            id: 'reply_soft', name: '带点情绪',
-            text: '',
-            context: { ...DEFAULT_REPLY_CONTEXT },
-            items: withReplyInstruction(defaultReplyItems(), '像平时发微信一样回消息，口语、短句，可以带一点情绪和停顿，但不要写成小说，也不要用括号写旁白动作。', 2.5),
-          },
         ],
       },
       api: {
@@ -1440,8 +1428,10 @@ export function normalize(raw) {
     if (!item || typeof item !== 'object') return;
     let id = String(item.id || `reply_${index + 1}`).trim().slice(0, 40);
     if (!id || seenReplyIds.has(id)) id = `reply_${index + 1}_${seenReplyIds.size}`;
+    /* 旧版内置的“再短一点 / 带点情绪”不再保留；只留“自然发消息”。 */
+    if (id === 'reply_short' || id === 'reply_soft') return;
     seenReplyIds.add(id);
-    const builtInId = ['reply_natural', 'reply_short', 'reply_soft'].includes(id);
+    const builtInId = id === 'reply_natural';
     const upgrade = builtInId && isLegacyDefaultReplyItems(item.items);
     let presetItems = upgrade ? defaultReplyItems() : normalizeReplyItems(item.items, item.context);
     const mainText = String(item.text || '').trim().slice(0, 4000);
@@ -1652,6 +1642,7 @@ export function normalize(raw) {
       }))
       : [];
     chat.history = normalizeChatHistory(chat.history);
+    if (chat.replyPresetId && !replyIds.has(String(chat.replyPresetId))) chat.replyPresetId = '';
     chat.unread = chat.unread || 0;
   }
   return merged;

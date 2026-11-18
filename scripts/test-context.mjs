@@ -268,7 +268,7 @@ function findItem(items, id) {
   ok(entry.lines.length === 2, '旧条目保留原 lines');
 }
 
-/* 内置三套预设仍是旧 13 条时，首次读取升级为完整默认；自建预设不动 */
+/* 内置「自然发消息」仍是旧 13 条时，首次读取升级为完整默认；自建预设不动 */
 {
   const legacyIds = [
     'reply_item_phone_task', 'reply_item_behavior', 'reply_context_user',

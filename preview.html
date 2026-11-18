@@ -8363,6 +8363,13 @@ function clampNumber(value, min, max, fallback) {
   return Math.max(min, Math.min(max, Math.round(num)));
 }
 
+/** 只保留下限、不设上限：历史小手机条数允许任意正整数，超长部分由整套字数预算裁剪。 */
+function clampMin(value, min, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(min, Math.round(num));
+}
+
 function normalizeReplyContext(raw) {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   return {
@@ -8374,7 +8381,7 @@ function normalizeReplyContext(raw) {
     memory: source.memory !== false,
     scene: source.scene !== false,
     history: source.history !== false,
-    historyLimit: clampNumber(source.historyLimit, 1, 50, DEFAULT_REPLY_CONTEXT.historyLimit),
+    historyLimit: clampMin(source.historyLimit, 1, DEFAULT_REPLY_CONTEXT.historyLimit),
     time: source.time !== false,
     bookFloors: clampNumber(source.bookFloors, 1, 50, DEFAULT_REPLY_CONTEXT.bookFloors),
     bookBudget: clampNumber(source.bookBudget, 400, 6000, DEFAULT_REPLY_CONTEXT.bookBudget),
@@ -8423,7 +8430,7 @@ function replyGroupIdFor(item, groups) {
 /* 会话级历史读取覆盖：预设只放占位，具体读多少由角色聊天决定。
  * 0 / 空字符串 = 跟随预设或记忆方案，不写死默认值，旧会话保持原行为。 */
 const DEFAULT_CHAT_HISTORY = {
-  phoneLimit: 0,       // 0 跟随回复预设的 historyLimit；1–50 是这个小手机最近几条
+  phoneLimit: 0,       // 0 跟随回复预设的 historyLimit；任意正整数是这个小手机最近几条
   tavernMode: '',      // '' 跟随记忆方案；summary 全部总结；recent 最近 N 层原文
   tavernFloors: 0,     // 0 跟随记忆方案；1–50 是最近几层酒馆聊天
 };
@@ -8431,7 +8438,7 @@ const DEFAULT_CHAT_HISTORY = {
 function normalizeChatHistory(raw) {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   return {
-    phoneLimit: clampNumber(source.phoneLimit, 0, 50, 0),
+    phoneLimit: clampMin(source.phoneLimit, 0, 0),
     tavernMode: ['summary', 'recent'].includes(source.tavernMode) ? source.tavernMode : '',
     tavernFloors: clampNumber(source.tavernFloors, 0, 50, 0),
   };
@@ -8445,7 +8452,7 @@ function chatHistoryFor(chat) {
 function effectivePhoneHistoryLimit(chat, context) {
   const own = chatHistoryFor(chat).phoneLimit;
   if (own > 0) return own;
-  return clampNumber(context?.historyLimit, 1, 50, DEFAULT_REPLY_CONTEXT.historyLimit);
+  return clampMin(context?.historyLimit, 1, DEFAULT_REPLY_CONTEXT.historyLimit);
 }
 
 /** 这个角色读酒馆总结还是原文、读几层：会话覆盖 > 角色记忆开关 > 记忆方案。 */
@@ -14045,12 +14052,13 @@ function chatSetRow(chatId, { iconName, title, sub, act, toggle, value, danger, 
 
 /* 数字设置行：直接填数字，change 时立即保存，交互对齐 acsus 的聊天设置。 */
 function chatNumberRow(chatId, { iconName, title, sub, act, value, placeholder, min = 1, max = 50 }) {
+  const maxAttr = max ? ` max="${max}"` : '';
   return `
     <label class="mp-set-row mp-set-row-number">
       <span class="mp-set-ico">${icon(iconName)}</span>
       <span class="mp-set-name">${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
       <input class="mp-set-number" type="number" inputmode="numeric"
-        min="${min}" max="${max}" step="1"
+        min="${min}"${maxAttr} step="1"
         value="${esc(value)}" placeholder="${esc(placeholder)}"
         data-act="${act}" data-chat="${esc(chatId)}" aria-label="${esc(title)}">
     </label>`;
@@ -14290,7 +14298,7 @@ function settingsBody(ctx, chatId) {
           ${chatNumberRow(chat.id, {
             iconName: 'chat', title: '历史小手机消息',
             sub: phoneNumberSub, act: 'ts-phone-history',
-            value: historyConfig.phoneLimit || '', placeholder: String(phoneFollowLimit),
+            value: historyConfig.phoneLimit || '', placeholder: String(phoneFollowLimit), max: null,
           })}
           ${chatSetRow(chat.id, {
             iconName: 'book', title: '酒馆记忆方案',
@@ -15106,8 +15114,8 @@ const threadSettingsApp = {
         return true;
       }
       const count = Number(raw);
-      if (!Number.isInteger(count) || count < 1 || count > 50) {
-        ctx.toast('条数填 1–50 的整数');
+      if (!Number.isInteger(count) || count < 1) {
+        ctx.toast('条数填正整数');
         ctx.rerender();
         return true;
       }
@@ -23454,6 +23462,15 @@ const replyPresetApp = {
       };
 
       if (item.auto === 'history') {
+        const openLimitForm = () => ctx.openSheet({
+          kind: 'text', title: '保留最近几条', value: String(context.historyLimit),
+          placeholder: '填正整数，比如 30', confirm: '存下',
+          onText: raw => {
+            const count = Number(String(raw || '').trim());
+            if (!Number.isInteger(count) || count < 1) { ctx.toast('条数填正整数'); return; }
+            setNumber('historyLimit', count, `聊天记录改成保留 ${count} 条`);
+          },
+        });
         ctx.openSheet({
           kind: 'pick',
           title: '手机聊天记录',
@@ -23465,11 +23482,13 @@ const replyPresetApp = {
               label: `保留最近 ${value} 条`,
               note: value === context.historyLimit ? '现在用的' : '',
             })),
+            { label: `自定义条数 · 当前 ${context.historyLimit} 条`, value: 'custom', icon: 'clock' },
             { label: '只对某些角色生效', value: 'characters', icon: 'contacts', note: charactersLabel(item) || '现在是全部角色' },
           ],
           onPick: value => {
             if (value === 'toggle') toggle();
             else if (value === 'characters') openCharactersForm(ctx, preset, item);
+            else if (value === 'custom') openLimitForm();
             else if (String(value).startsWith('n:')) {
               const count = Number(String(value).slice(2));
               setNumber('historyLimit', count, `聊天记录改成保留 ${count} 条`);

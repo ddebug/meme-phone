@@ -210,12 +210,13 @@ function chatSetRow(chatId, { iconName, title, sub, act, toggle, value, danger, 
 
 /* 数字设置行：直接填数字，change 时立即保存，交互对齐 acsus 的聊天设置。 */
 function chatNumberRow(chatId, { iconName, title, sub, act, value, placeholder, min = 1, max = 50 }) {
+  const maxAttr = max ? ` max="${max}"` : '';
   return `
     <label class="mp-set-row mp-set-row-number">
       <span class="mp-set-ico">${icon(iconName)}</span>
       <span class="mp-set-name">${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
       <input class="mp-set-number" type="number" inputmode="numeric"
-        min="${min}" max="${max}" step="1"
+        min="${min}"${maxAttr} step="1"
         value="${esc(value)}" placeholder="${esc(placeholder)}"
         data-act="${act}" data-chat="${esc(chatId)}" aria-label="${esc(title)}">
     </label>`;
@@ -455,7 +456,7 @@ function settingsBody(ctx, chatId) {
           ${chatNumberRow(chat.id, {
             iconName: 'chat', title: '历史小手机消息',
             sub: phoneNumberSub, act: 'ts-phone-history',
-            value: historyConfig.phoneLimit || '', placeholder: String(phoneFollowLimit),
+            value: historyConfig.phoneLimit || '', placeholder: String(phoneFollowLimit), max: null,
           })}
           ${chatSetRow(chat.id, {
             iconName: 'book', title: '酒馆记忆方案',
@@ -1271,8 +1272,8 @@ export const threadSettingsApp = {
         return true;
       }
       const count = Number(raw);
-      if (!Number.isInteger(count) || count < 1 || count > 50) {
-        ctx.toast('条数填 1–50 的整数');
+      if (!Number.isInteger(count) || count < 1) {
+        ctx.toast('条数填正整数');
         ctx.rerender();
         return true;
       }

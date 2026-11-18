@@ -68,6 +68,13 @@ function clampNumber(value, min, max, fallback) {
   return Math.max(min, Math.min(max, Math.round(num)));
 }
 
+/** 只保留下限、不设上限：历史小手机条数允许任意正整数，超长部分由整套字数预算裁剪。 */
+function clampMin(value, min, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(min, Math.round(num));
+}
+
 export function normalizeReplyContext(raw) {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   return {
@@ -79,7 +86,7 @@ export function normalizeReplyContext(raw) {
     memory: source.memory !== false,
     scene: source.scene !== false,
     history: source.history !== false,
-    historyLimit: clampNumber(source.historyLimit, 1, 50, DEFAULT_REPLY_CONTEXT.historyLimit),
+    historyLimit: clampMin(source.historyLimit, 1, DEFAULT_REPLY_CONTEXT.historyLimit),
     time: source.time !== false,
     bookFloors: clampNumber(source.bookFloors, 1, 50, DEFAULT_REPLY_CONTEXT.bookFloors),
     bookBudget: clampNumber(source.bookBudget, 400, 6000, DEFAULT_REPLY_CONTEXT.bookBudget),
@@ -128,7 +135,7 @@ export function replyGroupIdFor(item, groups) {
 /* 会话级历史读取覆盖：预设只放占位，具体读多少由角色聊天决定。
  * 0 / 空字符串 = 跟随预设或记忆方案，不写死默认值，旧会话保持原行为。 */
 export const DEFAULT_CHAT_HISTORY = {
-  phoneLimit: 0,       // 0 跟随回复预设的 historyLimit；1–50 是这个小手机最近几条
+  phoneLimit: 0,       // 0 跟随回复预设的 historyLimit；任意正整数是这个小手机最近几条
   tavernMode: '',      // '' 跟随记忆方案；summary 全部总结；recent 最近 N 层原文
   tavernFloors: 0,     // 0 跟随记忆方案；1–50 是最近几层酒馆聊天
 };
@@ -136,7 +143,7 @@ export const DEFAULT_CHAT_HISTORY = {
 export function normalizeChatHistory(raw) {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   return {
-    phoneLimit: clampNumber(source.phoneLimit, 0, 50, 0),
+    phoneLimit: clampMin(source.phoneLimit, 0, 0),
     tavernMode: ['summary', 'recent'].includes(source.tavernMode) ? source.tavernMode : '',
     tavernFloors: clampNumber(source.tavernFloors, 0, 50, 0),
   };
@@ -150,7 +157,7 @@ export function chatHistoryFor(chat) {
 export function effectivePhoneHistoryLimit(chat, context) {
   const own = chatHistoryFor(chat).phoneLimit;
   if (own > 0) return own;
-  return clampNumber(context?.historyLimit, 1, 50, DEFAULT_REPLY_CONTEXT.historyLimit);
+  return clampMin(context?.historyLimit, 1, DEFAULT_REPLY_CONTEXT.historyLimit);
 }
 
 /** 这个角色读酒馆总结还是原文、读几层：会话覆盖 > 角色记忆开关 > 记忆方案。 */

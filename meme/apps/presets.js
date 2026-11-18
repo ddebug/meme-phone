@@ -987,6 +987,15 @@ export const replyPresetApp = {
       };
 
       if (item.auto === 'history') {
+        const openLimitForm = () => ctx.openSheet({
+          kind: 'text', title: '保留最近几条', value: String(context.historyLimit),
+          placeholder: '填正整数，比如 30', confirm: '存下',
+          onText: raw => {
+            const count = Number(String(raw || '').trim());
+            if (!Number.isInteger(count) || count < 1) { ctx.toast('条数填正整数'); return; }
+            setNumber('historyLimit', count, `聊天记录改成保留 ${count} 条`);
+          },
+        });
         ctx.openSheet({
           kind: 'pick',
           title: '手机聊天记录',
@@ -998,11 +1007,13 @@ export const replyPresetApp = {
               label: `保留最近 ${value} 条`,
               note: value === context.historyLimit ? '现在用的' : '',
             })),
+            { label: `自定义条数 · 当前 ${context.historyLimit} 条`, value: 'custom', icon: 'clock' },
             { label: '只对某些角色生效', value: 'characters', icon: 'contacts', note: charactersLabel(item) || '现在是全部角色' },
           ],
           onPick: value => {
             if (value === 'toggle') toggle();
             else if (value === 'characters') openCharactersForm(ctx, preset, item);
+            else if (value === 'custom') openLimitForm();
             else if (String(value).startsWith('n:')) {
               const count = Number(String(value).slice(2));
               setNumber('historyLimit', count, `聊天记录改成保留 ${count} 条`);

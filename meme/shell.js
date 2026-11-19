@@ -307,12 +307,17 @@ export function createShell(options) {
 
     const items = (sheet.items || []).map(item => `
       <button class="mp-sheet-item${item.danger ? ' danger' : ''}${item.disabled ? ' is-off' : ''}" data-act="sheet-pick" data-value="${esc(item.value)}" type="button"${item.disabled ? ' disabled aria-disabled="true"' : ''}>
-        ${item.icon ? ico(item.icon) : ''}<span>${esc(item.label)}</span>
+        ${item.icon ? ico(item.icon) : ''}
+        <span class="mp-sheet-item-main">
+          <span>${esc(item.label)}</span>
+          ${item.note ? `<small>${esc(item.note)}</small>` : ''}
+        </span>
       </button>`).join('');
     return `
       <div class="mp-mask${still}" data-act="sheet-close"></div>
       <div class="mp-sheet${still}" role="dialog" aria-modal="true">
         ${sheet.title ? `<div class="mp-sheet-title">${esc(sheet.title)}</div>` : ''}
+        ${sheet.note ? `<div class="mp-sheet-note">${esc(sheet.note)}</div>` : ''}
         ${items}
         <button class="mp-sheet-cancel" data-act="sheet-close" type="button">取消</button>
       </div>`;

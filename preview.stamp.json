@@ -30,7 +30,7 @@
     "meme/css/apps-28.css": "c47af1bcb7bc0579e8f7d291f07d21695d0e60044f7dc2ee575417ca367b94fa",
     "meme/css/components-04.css": "558d777b0111c8e5afbfa4ade6db3fa1d632bf30f3964d9d7c5bf21c500adf07",
     "meme/css/components-06.css": "dee5a551e5b1aa9fded22cb08c72beb048105e1e44925e64dd3201961edbd8d9",
-    "meme/css/components-08.css": "60bfcd6b71b33a1ea78ba74e7fa882da29faf5e2743f7735badd7a8474af6124",
+    "meme/css/components-08.css": "83c5983e062e5e871e4fa5b384c5d5911ce3bfdf3ed43892704d5a524566c7a8",
     "meme/css/components-11.css": "3cb97fe2874502ff03797f2545dfbaf10579e3a2ab843477011b6974f3e4e4c2",
     "meme/css/components-15.css": "84afcd2ceb5fe1423395444f3626f457839801786a32b038f7ef091d8361bc60",
     "meme/css/components-17.css": "728b0624d044a76b79c678e4c8f50d3f32af9337a99af2bb074f53a18cb92aaf",
@@ -56,7 +56,7 @@
     "meme/memory.js": "433e673bec75c41d2d9b162ebab325a6692ed5948ca7dd0c681648e589fdd54d",
     "meme/preset-defaults.js": "2df646b58522c1819d1300295958c26c51f60d26302a8546b257fa13938caac3",
     "meme/reply-context.js": "3b1f1693e0e4c034d73bd26c998ded0a7cb55e0521599d360a95fd57ce48d851",
-    "meme/shell.js": "474cda8312e9908a1855320c6c163b5986f4f72968e84bd4007775d24309315a",
+    "meme/shell.js": "6be955a3e33df4e89742621cb2eeebbca6e3217fecefbc6a6ba7f3fd4ab2f2a5",
     "meme/store.js": "8b89793e3191ee6974c87d381e4975badb439093a43bf7701288944f9f79ffde",
     "meme/theme-data.js": "d06502af72bdbeca99841fe07bca1c614db6713665a56a270e682736c1d28ea5"
   }

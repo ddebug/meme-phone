@@ -10140,10 +10140,10 @@ const { addContact, contactById } = __req("meme/data.js");
 
 const MAX_LEDGER = 5000;
 const MAX_SIGNATURE_HISTORY = 50;
-const MAX_AMOUNT = 10000;
 
 function roundMoney(value) {
-  return Math.round(Math.max(0, Math.min(MAX_AMOUNT, Number(value) || 0)) * 100) / 100;
+  /* 只做分位取整与非负；不在这里封顶累计余额，避免收款/退款把余额截断。 */
+  return Math.round(Math.max(0, Number(value) || 0) * 100) / 100;
 }
 
 function localId(prefix) {
@@ -10391,13 +10391,19 @@ function revokeMembership(state, { target = 'user', contactId = '', messageId })
   if (!history) return { ok: false, reason: '找不到这次开通记录' };
   if (history.reversed) return { ok: true, duplicate: true };
   history.reversed = true;
+
+  /* 低等级开通只是排进队列，没有延长当前有效期限；撤销时只移除队列权益，不扣当前 SVIP/VIP 时长。 */
+  const queued = record.queue.findIndex(item => messageId && item.messageId === messageId);
+  if (queued >= 0) {
+    record.queue.splice(queued, 1);
+    return { ok: true, queued: true };
+  }
+
   record.expireAt = Math.max(0, record.expireAt - history.duration * 86400000);
   if (record.expireAt <= Date.now()) {
     record.type = 'none';
     record.expireAt = 0;
   }
-  const queued = record.queue.findIndex(item => messageId && item.messageId === messageId);
-  if (queued >= 0) record.queue.splice(queued, 1);
   return { ok: true };
 }
 
@@ -16108,6 +16114,7 @@ function hero(ctx, entries, contactId) {
   const isToday = key === dayKey(new Date());
   const label = isToday ? '今天' : `${Number(key.slice(5, 7))}月${Number(key.slice(8, 10))}日`;
   const text = entry?.text || '';
+  const busy = ctx.shell.diaryBusy === key;
 
   return `
     <div class="mp-diary-hero">
@@ -16122,7 +16129,7 @@ function hero(ctx, entries, contactId) {
         : `<div class="mp-diary-empty">这一格还空着。<br>可以手写一句，也可以让手机照着${contactId ? ` ${esc(name)} ` : '当天'}的聊天写。</div>`}
       <div style="display:flex;gap:6px;margin-top:11px;flex-wrap:wrap">
         ${(entry?.tags || []).map(tag => `<span class="mp-pill pink">${esc(tag)}</span>`).join('')}
-        <button class="mp-btn" data-act="diary-gen" data-day="${key}" data-contact="${esc(contactId)}" type="button">${icon('spark')}${contactId ? `让 ${esc(name)} 写这一天` : '让手机写这一天'}</button>
+        <button class="mp-btn" data-act="diary-gen" data-day="${key}" data-contact="${esc(contactId)}" type="button"${busy ? ' disabled' : ''}>${icon('spark')}${busy ? '正在写…' : contactId ? `让 ${esc(name)} 写这一天` : '让手机写这一天'}</button>
       </div>
     </div>`;
 }
@@ -16204,26 +16211,52 @@ function handleDiary(ctx, act, data) {
     return true;
   }
 
-  if (act === 'diary-gen') {
+  if (act === 'diary-gen' || act === 'diary-gen-confirm') {
     const key = data.day;
+    if (ctx.shell.diaryBusy === key) { ctx.toast('正在写这一天…'); return true; }
+    if (act === 'diary-gen-confirm') ctx.closeSheet();
+
+    if (act === 'diary-gen' && entries[key]?.text) {
+      /* 已有正文：先确认再覆盖，不直接替换。 */
+      ctx.openSheet({
+        kind: 'panel',
+        title: '重新生成会覆盖现有日记',
+        doneLabel: '取消',
+        render: () => `
+          <div class="mp-diary-hero-text">${esc(entries[key].text)}</div>
+          <div style="display:flex;gap:8px;margin-top:11px">
+            <button class="mp-btn" data-act="diary-gen-confirm" data-day="${esc(key)}" data-contact="${esc(contactId)}" type="button">覆盖并重新生成</button>
+          </div>`,
+      });
+      return true;
+    }
+
     const contact = contactId ? contactById(ctx.state, contactId) : null;
     const chat = contactId ? chatFor(ctx.state, contactId) : null;
+    ctx.shell.diaryBusy = key;
+    ctx.rerender();
     ctx.toast(contactId ? '正在让 TA 写这一天…' : '正在写这一天…');
     Promise.resolve(ctx.ai.diary(ctx, contactId ? { day: key, chat, contact } : { day: key }))
       .then(text => {
-        if (!text) { ctx.toast('模型没接通，先去设置里配 API'); return; }
-        const entry = entries[key] || { key, tags: [], auto: true, createdAt: 0, contactId };
+        ctx.shell.diaryBusy = '';
+        if (!text) { ctx.toast('模型没接通，先去设置里配 API'); ctx.rerender(); return; }
+        const next = entriesFor(ctx, contactId);
+        const entry = next[key] || { key, tags: [], auto: true, createdAt: 0, contactId };
         entry.text = text;
         entry.auto = true;
         entry.contactId = contactId;
         entry.createdAt = Date.now();
         entry.tags = contact ? [contact.name] : (entry.tags || []);
-        entries[key] = entry;
+        next[key] = entry;
         ctx.save();
         ctx.toast('写好了');
         ctx.rerender();
       })
-      .catch(() => ctx.toast('写日记失败'));
+      .catch(() => {
+        ctx.shell.diaryBusy = '';
+        ctx.toast('写日记失败');
+        ctx.rerender();
+      });
     return true;
   }
 
@@ -18798,6 +18831,7 @@ const drawApp = {
     }
 
     if (act === 'draw-run' || act === 'draw-again') {
+      if (draw.busy) { ctx.toast('正在生成…'); return true; }
       const prompt = act === 'draw-again'
         ? (draw.history[Number(data.i)]?.prompt || draw.lastPrompt)
         : draw.lastPrompt;
@@ -20517,7 +20551,7 @@ const walletApp = {
       const input = ctx.shell.root.querySelector('#mpWalletAdd');
       const amount = Number((input?.value || '').replace(/[^\d.]/g, ''));
       if (!Number.isFinite(amount) || amount <= 0) { ctx.toast('先填一个金额'); return true; }
-      ctx.state.wallet.balance = Math.min(10000, Math.round((walletBalance(ctx.state) + amount) * 100) / 100);
+      ctx.state.wallet.balance = Math.round((walletBalance(ctx.state) + amount) * 100) / 100;
       ctx.shell.walletAdd = false;
       ctx.save();
       ctx.rerender();
@@ -21225,7 +21259,7 @@ const charPhoneApp = {
           <div class="mp-cp-head-name">${esc(contact.name)} 的手机</div>
           <div class="mp-cp-head-sub">只能看，动了会被发现</div>
         </div>
-        <button class="mp-icon-btn" data-act="cp-gen" data-contact="${contact.id}" type="button" aria-label="生成">${icon('spark')}</button>
+        <button class="mp-icon-btn" data-act="cp-gen" data-contact="${contact.id}" type="button" aria-label="生成"${generating ? ' disabled' : ''}>${icon('spark')}</button>
       </div>`;
 
     const body = tab === 'roster'
@@ -21290,6 +21324,7 @@ const charPhoneApp = {
 
     if (act === 'cp-gen') {
       if (!contact) return true;
+      if (ctx.shell.cpBusy) { ctx.toast('正在生成…'); return true; }
       if (typeof ctx.ai?.lookup !== 'function') { ctx.toast('这个环境生成不了'); return true; }
       ctx.shell.cpBusy = true;
       ctx.rerender();
@@ -23064,47 +23099,51 @@ function downloadJson(payload, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** 单条预设条目的导出 schema；单套与整库导出共用，保证往返字段一致。 */
+function serializePresetItem(item) {
+  return {
+    id: item.id,
+    label: item.label,
+    role: item.role,
+    content: item.content,
+    enabled: item.enabled,
+    editable: item.editable,
+    deletable: item.deletable,
+    group: item.group || '',
+    order: item.order,
+    characters: normalizeCharacters(item.characters),
+    ...(item.kind === 'app' ? { kind: 'app', app: item.app || '' } : {}),
+    ...(item.kind === 'context' ? { kind: 'context', auto: item.auto } : {}),
+    ...(item.note ? { note: item.note } : {}),
+  };
+}
+
+/** 整套预设的导出 schema；导入侧 normalizeImportedPreset 与其对齐。 */
+function serializePreset(preset) {
+  return {
+    id: preset.id,
+    name: preset.name,
+    text: String(preset.text || ''),
+    context: normalizeReplyContext(preset.context),
+    groups: normalizeReplyGroups(preset.groups),
+    items: promptItems(preset).map(serializePresetItem),
+  };
+}
+
 function exportPresets(ctx) {
   const payload = {
     version: 1,
     kind: 'meme-phone-reply-presets',
     activeId: ctx.state.settings.reply?.activeId || '',
-    presets: replyPresetsOf(ctx.state).map(preset => ({
-      id: preset.id,
-      name: preset.name,
-      text: preset.text,
-      context: normalizeReplyContext(preset.context),
-      groups: normalizeReplyGroups(preset.groups),
-      items: promptItems(preset),
-    })),
+    presets: replyPresetsOf(ctx.state).map(serializePreset),
   };
   downloadJson(payload, `meme-phone-presets-${Date.now()}.json`);
   ctx.toast('预设已导出');
 }
 
-/** 单套导出：保留参考项目能直接读取的 items 字段。 */
+/** 单套导出：与整库导出共用同一 serializer。 */
 function exportCurrentPreset(ctx, preset) {
-  const payload = {
-    name: preset.name,
-    text: String(preset.text || ''),
-    context: normalizeReplyContext(preset.context),
-    groups: normalizeReplyGroups(preset.groups),
-    items: promptItems(preset).map(item => ({
-      id: item.id,
-      label: item.label,
-      role: item.role,
-      content: item.content,
-      enabled: item.enabled,
-      editable: item.editable,
-      deletable: item.deletable,
-      group: item.group || '',
-      order: item.order,
-      characters: normalizeCharacters(item.characters),
-      ...(item.kind === 'app' ? { app: item.app || '' } : {}),
-      ...(item.kind === 'context' ? { kind: 'context', auto: item.auto } : {}),
-      ...(item.note ? { note: item.note } : {}),
-    })),
-  };
+  const payload = serializePreset(preset);
   downloadJson(payload, `meme-phone-preset-${preset.id || Date.now()}.json`);
   ctx.toast(`已导出「${preset.name || '当前预设'}」`);
 }
@@ -24060,7 +24099,7 @@ __mods["meme/reply-context.js"] = function(module, exports, __req){
  * 旧的独立拼装函数已删除，避免出现两套逻辑。
  */
 
-const { replyContextFor, replyItemsFor, replyPresetFor, normalizeReplyContext, normalizeReplyItems, fillPromptTokens, characterCardFor, itemAppliesToChat, effectivePhoneHistoryLimit } = __req("meme/data.js");
+const { replyContextFor, replyItemsFor, replyPresetFor, normalizeReplyContext, normalizeReplyItems, fillPromptTokens, characterCardFor, itemAppliesToChat, effectivePhoneHistoryLimit, dayKey } = __req("meme/data.js");
 const { readWorldBook } = __req("meme/host.js");
 const { buildMemoryContext } = __req("meme/memory.js");
 const { behaviorContextText } = __req("meme/behavior.js");
@@ -24178,9 +24217,11 @@ function transcript(state, chat, limit = 10, options = {}) {
   if (!chat) return '';
   const contact = state.contacts?.[chat.contactId];
   const omitId = options.omitId || '';
+  const day = options.day || '';
   const valid = (chat.messages || [])
     .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded)
-    .filter(message => message.id !== omitId);
+    .filter(message => message.id !== omitId)
+    .filter(message => !day || dayKey(new Date(Number(message.at) || Date.now())) === day);
   return valid.slice(-Math.max(1, limit)).map(message => {
     const text = serializeMessage(message);
     return text ? `${messageWho(state, contact, message)}：${text}` : '';
@@ -24793,10 +24834,10 @@ function makeAi(getState) {
       const chat = payload.chat;
       const day = payload.day || new Date().toISOString().slice(0, 10);
       let material = '';
-      if (chat) material = transcript(state, chat, 30);
+      if (chat) material = transcript(state, chat, 30, { day });
       else {
         const chats = Object.values(state.chats);
-        material = chats.map(item => transcript(state, item, 10)).join('\n');
+        material = chats.map(item => transcript(state, item, 10, { day })).join('\n');
       }
       const storyBlock = await story(state, chat, 900);
       const prompt = [

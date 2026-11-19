@@ -4,7 +4,7 @@
  * 旧的独立拼装函数已删除，避免出现两套逻辑。
  */
 
-import { replyContextFor, replyItemsFor, replyPresetFor, normalizeReplyContext, normalizeReplyItems, fillPromptTokens, characterCardFor, itemAppliesToChat, effectivePhoneHistoryLimit } from './data.js';
+import { replyContextFor, replyItemsFor, replyPresetFor, normalizeReplyContext, normalizeReplyItems, fillPromptTokens, characterCardFor, itemAppliesToChat, effectivePhoneHistoryLimit, dayKey } from './data.js';
 import { readWorldBook } from './host.js';
 import { buildMemoryContext } from './memory.js';
 import { behaviorContextText } from './behavior.js';
@@ -122,9 +122,11 @@ export function transcript(state, chat, limit = 10, options = {}) {
   if (!chat) return '';
   const contact = state.contacts?.[chat.contactId];
   const omitId = options.omitId || '';
+  const day = options.day || '';
   const valid = (chat.messages || [])
     .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded)
-    .filter(message => message.id !== omitId);
+    .filter(message => message.id !== omitId)
+    .filter(message => !day || dayKey(new Date(Number(message.at) || Date.now())) === day);
   return valid.slice(-Math.max(1, limit)).map(message => {
     const text = serializeMessage(message);
     return text ? `${messageWho(state, contact, message)}：${text}` : '';

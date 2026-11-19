@@ -1112,6 +1112,7 @@ export const drawApp = {
     }
 
     if (act === 'draw-run' || act === 'draw-again') {
+      if (draw.busy) { ctx.toast('正在生成…'); return true; }
       const prompt = act === 'draw-again'
         ? (draw.history[Number(data.i)]?.prompt || draw.lastPrompt)
         : draw.lastPrompt;

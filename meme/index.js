@@ -278,10 +278,10 @@ function makeAi(getState) {
       const chat = payload.chat;
       const day = payload.day || new Date().toISOString().slice(0, 10);
       let material = '';
-      if (chat) material = transcript(state, chat, 30);
+      if (chat) material = transcript(state, chat, 30, { day });
       else {
         const chats = Object.values(state.chats);
-        material = chats.map(item => transcript(state, item, 10)).join('\n');
+        material = chats.map(item => transcript(state, item, 10, { day })).join('\n');
       }
       const storyBlock = await story(state, chat, 900);
       const prompt = [

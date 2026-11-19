@@ -68,6 +68,7 @@ function hero(ctx, entries, contactId) {
   const isToday = key === dayKey(new Date());
   const label = isToday ? '今天' : `${Number(key.slice(5, 7))}月${Number(key.slice(8, 10))}日`;
   const text = entry?.text || '';
+  const busy = ctx.shell.diaryBusy === key;
 
   return `
     <div class="mp-diary-hero">
@@ -82,7 +83,7 @@ function hero(ctx, entries, contactId) {
         : `<div class="mp-diary-empty">这一格还空着。<br>可以手写一句，也可以让手机照着${contactId ? ` ${esc(name)} ` : '当天'}的聊天写。</div>`}
       <div style="display:flex;gap:6px;margin-top:11px;flex-wrap:wrap">
         ${(entry?.tags || []).map(tag => `<span class="mp-pill pink">${esc(tag)}</span>`).join('')}
-        <button class="mp-btn" data-act="diary-gen" data-day="${key}" data-contact="${esc(contactId)}" type="button">${icon('spark')}${contactId ? `让 ${esc(name)} 写这一天` : '让手机写这一天'}</button>
+        <button class="mp-btn" data-act="diary-gen" data-day="${key}" data-contact="${esc(contactId)}" type="button"${busy ? ' disabled' : ''}>${icon('spark')}${busy ? '正在写…' : contactId ? `让 ${esc(name)} 写这一天` : '让手机写这一天'}</button>
       </div>
     </div>`;
 }
@@ -164,26 +165,52 @@ function handleDiary(ctx, act, data) {
     return true;
   }
 
-  if (act === 'diary-gen') {
+  if (act === 'diary-gen' || act === 'diary-gen-confirm') {
     const key = data.day;
+    if (ctx.shell.diaryBusy === key) { ctx.toast('正在写这一天…'); return true; }
+    if (act === 'diary-gen-confirm') ctx.closeSheet();
+
+    if (act === 'diary-gen' && entries[key]?.text) {
+      /* 已有正文：先确认再覆盖，不直接替换。 */
+      ctx.openSheet({
+        kind: 'panel',
+        title: '重新生成会覆盖现有日记',
+        doneLabel: '取消',
+        render: () => `
+          <div class="mp-diary-hero-text">${esc(entries[key].text)}</div>
+          <div style="display:flex;gap:8px;margin-top:11px">
+            <button class="mp-btn" data-act="diary-gen-confirm" data-day="${esc(key)}" data-contact="${esc(contactId)}" type="button">覆盖并重新生成</button>
+          </div>`,
+      });
+      return true;
+    }
+
     const contact = contactId ? contactById(ctx.state, contactId) : null;
     const chat = contactId ? chatFor(ctx.state, contactId) : null;
+    ctx.shell.diaryBusy = key;
+    ctx.rerender();
     ctx.toast(contactId ? '正在让 TA 写这一天…' : '正在写这一天…');
     Promise.resolve(ctx.ai.diary(ctx, contactId ? { day: key, chat, contact } : { day: key }))
       .then(text => {
-        if (!text) { ctx.toast('模型没接通，先去设置里配 API'); return; }
-        const entry = entries[key] || { key, tags: [], auto: true, createdAt: 0, contactId };
+        ctx.shell.diaryBusy = '';
+        if (!text) { ctx.toast('模型没接通，先去设置里配 API'); ctx.rerender(); return; }
+        const next = entriesFor(ctx, contactId);
+        const entry = next[key] || { key, tags: [], auto: true, createdAt: 0, contactId };
         entry.text = text;
         entry.auto = true;
         entry.contactId = contactId;
         entry.createdAt = Date.now();
         entry.tags = contact ? [contact.name] : (entry.tags || []);
-        entries[key] = entry;
+        next[key] = entry;
         ctx.save();
         ctx.toast('写好了');
         ctx.rerender();
       })
-      .catch(() => ctx.toast('写日记失败'));
+      .catch(() => {
+        ctx.shell.diaryBusy = '';
+        ctx.toast('写日记失败');
+        ctx.rerender();
+      });
     return true;
   }
 

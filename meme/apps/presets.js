@@ -291,47 +291,51 @@ function downloadJson(payload, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** 单条预设条目的导出 schema；单套与整库导出共用，保证往返字段一致。 */
+function serializePresetItem(item) {
+  return {
+    id: item.id,
+    label: item.label,
+    role: item.role,
+    content: item.content,
+    enabled: item.enabled,
+    editable: item.editable,
+    deletable: item.deletable,
+    group: item.group || '',
+    order: item.order,
+    characters: normalizeCharacters(item.characters),
+    ...(item.kind === 'app' ? { kind: 'app', app: item.app || '' } : {}),
+    ...(item.kind === 'context' ? { kind: 'context', auto: item.auto } : {}),
+    ...(item.note ? { note: item.note } : {}),
+  };
+}
+
+/** 整套预设的导出 schema；导入侧 normalizeImportedPreset 与其对齐。 */
+function serializePreset(preset) {
+  return {
+    id: preset.id,
+    name: preset.name,
+    text: String(preset.text || ''),
+    context: normalizeReplyContext(preset.context),
+    groups: normalizeReplyGroups(preset.groups),
+    items: promptItems(preset).map(serializePresetItem),
+  };
+}
+
 function exportPresets(ctx) {
   const payload = {
     version: 1,
     kind: 'meme-phone-reply-presets',
     activeId: ctx.state.settings.reply?.activeId || '',
-    presets: replyPresetsOf(ctx.state).map(preset => ({
-      id: preset.id,
-      name: preset.name,
-      text: preset.text,
-      context: normalizeReplyContext(preset.context),
-      groups: normalizeReplyGroups(preset.groups),
-      items: promptItems(preset),
-    })),
+    presets: replyPresetsOf(ctx.state).map(serializePreset),
   };
   downloadJson(payload, `meme-phone-presets-${Date.now()}.json`);
   ctx.toast('预设已导出');
 }
 
-/** 单套导出：保留参考项目能直接读取的 items 字段。 */
+/** 单套导出：与整库导出共用同一 serializer。 */
 function exportCurrentPreset(ctx, preset) {
-  const payload = {
-    name: preset.name,
-    text: String(preset.text || ''),
-    context: normalizeReplyContext(preset.context),
-    groups: normalizeReplyGroups(preset.groups),
-    items: promptItems(preset).map(item => ({
-      id: item.id,
-      label: item.label,
-      role: item.role,
-      content: item.content,
-      enabled: item.enabled,
-      editable: item.editable,
-      deletable: item.deletable,
-      group: item.group || '',
-      order: item.order,
-      characters: normalizeCharacters(item.characters),
-      ...(item.kind === 'app' ? { app: item.app || '' } : {}),
-      ...(item.kind === 'context' ? { kind: 'context', auto: item.auto } : {}),
-      ...(item.note ? { note: item.note } : {}),
-    })),
-  };
+  const payload = serializePreset(preset);
   downloadJson(payload, `meme-phone-preset-${preset.id || Date.now()}.json`);
   ctx.toast(`已导出「${preset.name || '当前预设'}」`);
 }

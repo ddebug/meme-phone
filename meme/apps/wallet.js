@@ -101,7 +101,7 @@ export const walletApp = {
       const input = ctx.shell.root.querySelector('#mpWalletAdd');
       const amount = Number((input?.value || '').replace(/[^\d.]/g, ''));
       if (!Number.isFinite(amount) || amount <= 0) { ctx.toast('先填一个金额'); return true; }
-      ctx.state.wallet.balance = Math.min(10000, Math.round((walletBalance(ctx.state) + amount) * 100) / 100);
+      ctx.state.wallet.balance = Math.round((walletBalance(ctx.state) + amount) * 100) / 100;
       ctx.shell.walletAdd = false;
       ctx.save();
       ctx.rerender();

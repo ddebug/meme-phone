@@ -7,7 +7,7 @@ import {
   grantUserMembership, userMembership, grantContactMembership, contactMembership,
   createAppointment, respondAppointment, completeAppointment,
   requestFriend, respondFriendRequest, updateSignature,
-  applyBehaviorMessage,
+  applyBehaviorMessage, revokeMembership,
 } from '../meme/behavior-domains.js';
 import { parseBehaviorReply } from '../meme/behavior.js';
 import { parseChatTransferText } from '../meme/chat-transfer.js';
@@ -148,4 +148,31 @@ test('ac sus 转账映射为行为消息，不触发钱包副作用', () => {
   assert.equal(converted.messages.length, 1);
   assert.equal(converted.messages[0].kind, 'transfer');
   assert.equal(converted.messages[0].behavior.amount, 30);
+});
+
+test('D3：收款再退款把余额原样退回，累计余额不被截断', () => {
+  const state = stateWithContact();
+  state.wallet.balance = 9995;
+  const received = receiveTransfer(state, { contactId: 'c1', amount: 10, messageId: 'r1' });
+  assert.equal(received.ok, true);
+  assert.equal(walletBalance(state), 10005);
+  refundTransfer(state, received.tx.id);
+  assert.equal(walletBalance(state), 9995);
+});
+
+test('D3：撤销排队中的低等级会员，只删队列权益，不扣当前 SVIP 期限', () => {
+  const state = stateWithContact();
+  grantUserMembership(state, { type: 'svip', months: 1, messageId: 'sv1' });
+  grantUserMembership(state, { type: 'vip', months: 1, messageId: 'vp1' });
+  const member = userMembership(state);
+  assert.equal(member.type, 'svip');
+  assert.equal(member.queue.length, 1);
+
+  const expireBefore = member.expireAt;
+  const result = revokeMembership(state, { target: 'user', messageId: 'vp1' });
+  assert.equal(result.ok, true);
+  const after = userMembership(state);
+  assert.equal(after.type, 'svip');
+  assert.equal(after.expireAt, expireBefore);
+  assert.equal(after.queue.length, 0);
 });

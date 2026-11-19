@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { demoState } from '../meme/data.js';
+import { demoState, dayKey } from '../meme/data.js';
 import { transcript, serializeMessage, buildReplyMessages } from '../meme/reply-context.js';
 
 function seedChat(state, messages) {
@@ -37,7 +37,7 @@ test('C2：历史先过滤 system/撤回/excluded，再按条数取最近 N 条'
   assert.ok(!text.includes('被排除的话'));
 });
 
-test('C2：最后一条聊天不与历史记录重复注入', async () => {
+test('C2：历史记录与最后一条聊天不与历史记录重复注入', async () => {
   const state = demoState();
   const { chat, contact } = seedChat(state, [
     { id: 'h1', from: 'them', kind: 'text', text: '前面的话' },
@@ -47,4 +47,20 @@ test('C2：最后一条聊天不与历史记录重复注入', async () => {
   const hits = result.messages.filter(message => String(message.content).includes('最后一句在吗'));
   assert.equal(hits.length, 1);
   assert.equal(hits[0].source, '最后一条聊天');
+});
+
+test('C2：日记按自然日过滤，别的日子的消息不进当天材料', () => {
+  const state = demoState();
+  const today = dayKey(new Date());
+  const yesterday = dayKey(new Date(Date.now() - 86400000));
+  const { chat, contact } = seedChat(state, [
+    { id: 'd1', from: 'them', kind: 'text', text: '昨天的话', at: Date.now() - 86400000 },
+    { id: 'd2', from: 'me', kind: 'text', text: '今天的话', at: Date.now() },
+  ]);
+  const todayText = transcript(state, chat, 30, { day: today });
+  assert.ok(todayText.includes('今天的话'));
+  assert.ok(!todayText.includes('昨天的话'));
+  const yesterdayText = transcript(state, chat, 30, { day: yesterday });
+  assert.ok(yesterdayText.includes('昨天的话'));
+  assert.ok(!yesterdayText.includes('今天的话'));
 });

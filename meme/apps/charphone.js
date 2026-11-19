@@ -294,7 +294,7 @@ export const charPhoneApp = {
           <div class="mp-cp-head-name">${esc(contact.name)} 的手机</div>
           <div class="mp-cp-head-sub">只能看，动了会被发现</div>
         </div>
-        <button class="mp-icon-btn" data-act="cp-gen" data-contact="${contact.id}" type="button" aria-label="生成">${icon('spark')}</button>
+        <button class="mp-icon-btn" data-act="cp-gen" data-contact="${contact.id}" type="button" aria-label="生成"${generating ? ' disabled' : ''}>${icon('spark')}</button>
       </div>`;
 
     const body = tab === 'roster'
@@ -359,6 +359,7 @@ export const charPhoneApp = {
 
     if (act === 'cp-gen') {
       if (!contact) return true;
+      if (ctx.shell.cpBusy) { ctx.toast('正在生成…'); return true; }
       if (typeof ctx.ai?.lookup !== 'function') { ctx.toast('这个环境生成不了'); return true; }
       ctx.shell.cpBusy = true;
       ctx.rerender();

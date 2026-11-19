@@ -9,10 +9,10 @@ import { addContact, contactById } from './data.js';
 
 const MAX_LEDGER = 5000;
 const MAX_SIGNATURE_HISTORY = 50;
-const MAX_AMOUNT = 10000;
 
 function roundMoney(value) {
-  return Math.round(Math.max(0, Math.min(MAX_AMOUNT, Number(value) || 0)) * 100) / 100;
+  /* 只做分位取整与非负；不在这里封顶累计余额，避免收款/退款把余额截断。 */
+  return Math.round(Math.max(0, Number(value) || 0) * 100) / 100;
 }
 
 function localId(prefix) {
@@ -260,13 +260,19 @@ export function revokeMembership(state, { target = 'user', contactId = '', messa
   if (!history) return { ok: false, reason: '找不到这次开通记录' };
   if (history.reversed) return { ok: true, duplicate: true };
   history.reversed = true;
+
+  /* 低等级开通只是排进队列，没有延长当前有效期限；撤销时只移除队列权益，不扣当前 SVIP/VIP 时长。 */
+  const queued = record.queue.findIndex(item => messageId && item.messageId === messageId);
+  if (queued >= 0) {
+    record.queue.splice(queued, 1);
+    return { ok: true, queued: true };
+  }
+
   record.expireAt = Math.max(0, record.expireAt - history.duration * 86400000);
   if (record.expireAt <= Date.now()) {
     record.type = 'none';
     record.expireAt = 0;
   }
-  const queued = record.queue.findIndex(item => messageId && item.messageId === messageId);
-  if (queued >= 0) record.queue.splice(queued, 1);
   return { ok: true };
 }
 

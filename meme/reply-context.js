@@ -4,7 +4,7 @@
  * 旧的独立拼装函数已删除，避免出现两套逻辑。
  */
 
-import { replyContextFor, replyItemsFor, replyPresetFor, fillPromptTokens, characterCardFor, itemAppliesToChat, effectivePhoneHistoryLimit } from './data.js';
+import { replyContextFor, replyItemsFor, replyPresetFor, normalizeReplyContext, normalizeReplyItems, fillPromptTokens, characterCardFor, itemAppliesToChat, effectivePhoneHistoryLimit } from './data.js';
 import { readWorldBook } from './host.js';
 import { buildMemoryContext } from './memory.js';
 import { behaviorContextText } from './behavior.js';
@@ -92,16 +92,42 @@ export function requestStats(messages) {
   };
 }
 
-export function transcript(state, chat, limit = 10) {
+/** 消息在历史里显示给谁；发言者来自分组消息，否则取联系人。 */
+function messageWho(state, contact, message) {
+  return message.from === 'me'
+    ? (state.settings?.user?.name || '我')
+    : (state.contacts?.[message.speaker]?.name || contact?.name || 'TA');
+}
+
+/**
+ * 统一的模型侧消息序列化：引用、转发、表情、图片说明、撤回、行为标签都转成可读文本。
+ * 图片 URL 不发给模型，只保留说明文字；没有说明时明确标注「未提供说明」，不用纯文字冒充模型真看到了图片。
+ */
+export function serializeMessage(message) {
+  if (!message) return '';
+  if (message.kind === 'recalled') return `[撤回]${String(message.text || '').trim()}`;
+  if (message.kind === 'image') {
+    const desc = String(message.text || '').trim();
+    return desc ? `[图片]${desc}` : '[图片]（未提供说明）';
+  }
+  if (message.kind === 'emoji') return `[表情]${String(message.emoji || message.text || '').trim()}`;
+  if (message.kind === 'forwarded') return `[转发]${String(message.forward?.text || message.text || '').trim()}`;
+  const behavior = behaviorContextText(message);
+  const body = behavior || String(message.text || '').trim();
+  if (message.quote?.text) return `[引用]${String(message.quote.text).trim()}｜${body}`;
+  return body;
+}
+
+export function transcript(state, chat, limit = 10, options = {}) {
   if (!chat) return '';
   const contact = state.contacts?.[chat.contactId];
-  return (chat.messages || []).slice(-limit).map(message => {
-    if (message.kind === 'system' || message.kind === 'recalled') return '';
-    const who = message.from === 'me'
-      ? state.settings.user.name
-      : (state.contacts[message.speaker]?.name || contact?.name || 'TA');
-    const text = behaviorContextText(message) || message.text || '';
-    return text ? `${who}：${text}` : '';
+  const omitId = options.omitId || '';
+  const valid = (chat.messages || [])
+    .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded)
+    .filter(message => message.id !== omitId);
+  return valid.slice(-Math.max(1, limit)).map(message => {
+    const text = serializeMessage(message);
+    return text ? `${messageWho(state, contact, message)}：${text}` : '';
   }).filter(Boolean).join('\n');
 }
 
@@ -263,7 +289,7 @@ async function lorebookBlock(state, chat, contact, context) {
 }
 
 /** 单个上下文条目的内容；只有世界书是异步读宿主，其余同步。 */
-async function contextBlockFor(item, state, chat, contact, context, memoryText) {
+async function contextBlockFor(item, state, chat, contact, context, memoryText, ctxOpts = {}) {
   const key = item.auto;
   if (key === 'character') {
     const text = characterBlock(state, contact);
@@ -293,7 +319,8 @@ async function contextBlockFor(item, state, chat, contact, context, memoryText) 
   if (key === 'time') return { text: clockBlock(), status: 'injected', reason: '' };
   if (key === 'history') {
     const limit = effectivePhoneHistoryLimit(chat, context);
-    const text = transcript(state, chat, limit);
+    const lastId = ctxOpts.omitLast ? (chat.messages?.[chat.messages.length - 1]?.id || '') : '';
+    const text = transcript(state, chat, limit, { omitId: lastId });
     return {
       text: text ? `【历史小手机消息】\n${text}` : '',
       status: text ? 'injected' : 'empty',
@@ -310,9 +337,13 @@ async function contextBlockFor(item, state, chat, contact, context, memoryText) 
  * 预览页直接拿它解释「为什么没出现」。
  */
 export async function buildReplyMessages(state, chat, contact, options = {}) {
-  const preset = replyPresetFor(state, chat);
-  const items = replyItemsFor(state, chat);
-  const context = replyContextFor(state, chat);
+  const preset = options.presetOverride || replyPresetFor(state, chat);
+  const context = options.presetOverride
+    ? normalizeReplyContext(preset?.context)
+    : replyContextFor(state, chat);
+  const items = options.presetOverride
+    ? normalizeReplyItems(preset?.items, context)
+    : replyItemsFor(state, chat);
   const messages = [];
   const reportItems = [];
 
@@ -349,7 +380,7 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
 
     let block;
     if (item.kind === 'context') {
-      block = await contextBlockFor(item, state, chat, contact, context, memoryText);
+      block = await contextBlockFor(item, state, chat, contact, context, memoryText, { omitLast: !options.proactive });
     } else {
       const text = fillPromptTokens(item.content, state, chat).trim();
       block = { text, status: text ? 'injected' : 'empty', reason: text ? '' : '条目内容是空的' };
@@ -385,9 +416,9 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
   if (chat && !options.omitLastUser) {
     const last = chat.messages?.[chat.messages.length - 1];
     const omitIds = new Set(options.omitIds || []);
-    if (last && !options.proactive && !omitIds.has(last.id)) {
-      const who = last.from === 'me' ? (state.settings.user.name || '我') : (contact?.name || '对方');
-      messages.push({ role: 'user', content: `${who}：${behaviorContextText(last) || last.text || ''}`, source: '最后一条聊天' });
+    if (last && !options.proactive && !last.excluded && !omitIds.has(last.id)) {
+      const text = serializeMessage(last);
+      if (text) messages.push({ role: 'user', content: `${messageWho(state, contact, last)}：${text}`, source: '最后一条聊天' });
     }
   }
   if (options.proactive && !messages.some(message => message.role === 'user')) {
@@ -401,6 +432,8 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
       presetName: preset?.name || '',
       modelCount: messages.length,
       charUsed: used,
+      charTotal: messages.reduce((sum, message) => sum + String(message?.content || '').length, 0),
+      estimate: true,
       charBudget,
       items: reportItems,
       memoryChars: memoryText.length,

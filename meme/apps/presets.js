@@ -16,6 +16,7 @@ let renaming = false;
 let deleting = false;
 let importing = null;
 let preview = { presetId: '', tab: 'messages', chatId: '', loading: false, error: '', data: null, flat: '' };
+let previewSeq = 0;
 
 const EXTERNAL_CONTEXT_IDS = {
   'user-persona': 'user',
@@ -325,6 +326,8 @@ function exportCurrentPreset(ctx, preset) {
       deletable: item.deletable,
       group: item.group || '',
       order: item.order,
+      characters: normalizeCharacters(item.characters),
+      ...(item.kind === 'app' ? { app: item.app || '' } : {}),
       ...(item.kind === 'context' ? { kind: 'context', auto: item.auto } : {}),
       ...(item.note ? { note: item.note } : {}),
     })),
@@ -333,7 +336,7 @@ function exportCurrentPreset(ctx, preset) {
   ctx.toast(`已导出「${preset.name || '当前预设'}」`);
 }
 
-function normalizeImportedPreset(item, index, seen) {
+export function normalizeImportedPreset(item, index, seen) {
   let id = String(item?.id || newId('reply'));
   if (seen.has(id)) id = `${id}_${index}`;
   seen.add(id);
@@ -346,7 +349,7 @@ function normalizeImportedPreset(item, index, seen) {
   return {
     id,
     name: String(item?.name || '').trim().slice(0, 20) || `导入预设 ${index + 1}`,
-    text: '',
+    text,
     context: normalizeReplyContext(item?.context),
     groups: normalizeReplyGroups(item?.groups),
     items,
@@ -1160,8 +1163,10 @@ export const replyPresetApp = {
       const chat = chats.find(item => item.id === preview.chatId) || chats[0] || null;
       const contact = chat ? ctx.state.contacts?.[chat.contactId] || null : null;
       preview = { presetId: preset.id, tab: preview.tab || 'messages', chatId: chat?.id || '', loading: true, error: '', data: null, flat: '' };
+      const mySeq = ++previewSeq;
       ctx.rerender();
-      buildReplyMessages(ctx.state, chat, contact).then(result => {
+      buildReplyMessages(ctx.state, chat, contact, { presetOverride: preset }).then(result => {
+        if (mySeq !== previewSeq) return; // 已有更新的预览请求，旧结果不覆盖
         preview = {
           presetId: preset.id,
           tab: preview.tab || 'messages',
@@ -1173,6 +1178,7 @@ export const replyPresetApp = {
         };
         ctx.rerender();
       }).catch(error => {
+        if (mySeq !== previewSeq) return;
         preview = { presetId: preset.id, tab: preview.tab || 'messages', chatId: chat?.id || '', loading: false, error: error?.message || '组装失败', data: null, flat: '' };
         ctx.rerender();
       });

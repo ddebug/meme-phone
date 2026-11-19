@@ -116,7 +116,8 @@ export function turnMessages(chat, message) {
 
 
 function debugEnabled(ctx) {
-  return ctx.state.settings?.chat?.debugBar !== false;
+  /* 默认关着，想要的人自己去设置里打开（老存档里写着开的仍然开） */
+  return ctx.state.settings?.chat?.debugBar === true;
 }
 
 function debugKey(ctx, chat) {

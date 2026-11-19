@@ -452,7 +452,7 @@ export function emptyState() {
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
       chat: {
-        showTime: true, enterToSend: false, remind: true, wake: true, debugBar: true,
+        showTime: true, enterToSend: false, remind: true, wake: true, debugBar: false,
         /* 行为标签：默认只放开约定计划和个签，转账/会员/好友申请要自己开 */
         behavior: { transfer: false, redpacket: false, membership: false, plan: true, friend: false, signature: true },
       },

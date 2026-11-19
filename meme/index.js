@@ -463,7 +463,7 @@ export async function openMemePhone(options = {}) {
       const chat = state.chats[entry.params?.chatId];
       if (chat) chat.draft = value;
       /* 调试栏要跟着草稿更新 token；输入停下后再重画，不逐键打断输入 */
-      if (state.settings.chat?.debugBar !== false) {
+      if (state.settings.chat?.debugBar === true) {
         clearTimeout(draftDebugTimer);
         draftDebugTimer = setTimeout(() => ctx.rerender?.(), 480);
       }

@@ -20,6 +20,8 @@
 const DEFAULT_FILE = 'meme-phone.json';
 const LS_KEY = 'meme-phone-state';
 
+import { stripSecrets } from './data.js';
+
 function utf8ToBase64(text) {
   const bytes = new TextEncoder().encode(text);
   let binary = '';
@@ -226,9 +228,10 @@ export function createStore(options = {}) {
       return api.flush();
     },
 
-    /** 导出当前内存状态（设置面板与「设置 → 数据」共用）。 */
-    exportJson() {
-      return JSON.stringify(state, null, 2);
+    /** 导出当前内存状态；默认剔除接口 Key，includeKeys=true 才带上凭据。 */
+    exportJson(includeKeys = false) {
+      const snapshot = includeKeys ? state : stripSecrets(state);
+      return JSON.stringify(snapshot, null, 2);
     },
   };
 

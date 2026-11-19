@@ -8,6 +8,35 @@ import { esc, tintStyle } from '../shell.js';
 import { contactsOf, chatsOf, unreadTotal } from '../data.js';
 import { imageEndpoint } from './draw.js';
 
+function downloadBackup(ctx, includeKeys) {
+  try {
+    const blob = new Blob([ctx.store.exportJson(includeKeys)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `meme-phone-${new Date().toISOString().slice(0, 10)}${includeKeys ? '-with-keys' : ''}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    ctx.toast(includeKeys ? '已导出（含接口 Key）' : '已导出（不含接口 Key）');
+  } catch { ctx.toast('导出失败'); }
+}
+
+function backupSummary(parsed) {
+  const state = parsed && typeof parsed === 'object' && parsed.meme ? parsed.meme : parsed;
+  if (!state || typeof state !== 'object') return { ok: false };
+  const chats = Object.values(state.chats || {});
+  return {
+    ok: true,
+    contacts: Object.keys(state.contacts || {}).length,
+    chats: chats.length,
+    messages: chats.reduce((sum, chat) => sum + (chat.messages?.length || 0), 0),
+    diary: Object.keys(state.diary?.entries || {}).length,
+    favorites: (state.favorites || []).length,
+  };
+}
+
 function row(ctx, { iconName, title, sub, act, value, toggle, app }) {
   return `
     <button class="mp-set-row" data-act="${act || 'noop'}"${app ? ` data-app="${app}"` : ''} type="button">
@@ -94,7 +123,8 @@ export const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">数据</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'copy', title: '导出备份', sub: '一份 json，包含全部聊天与日记', act: 'set-export' })}
+            ${row(ctx, { iconName: 'copy', title: '导出备份', sub: '一份 json，默认不含接口 Key', act: 'set-export' })}
+            ${row(ctx, { iconName: 'upload', title: '从备份恢复', sub: '先预检数量，确认后覆盖当前数据', act: 'set-import' })}
             ${row(ctx, { iconName: 'trash', title: '清空手机数据', sub: '联系方式、聊天、日记全部清掉', act: 'set-wipe' })}
           </div>
         </div>
@@ -183,18 +213,47 @@ export const settingsApp = {
     }
 
     if (act === 'set-export') {
-      try {
-        const blob = new Blob([ctx.store.exportJson()], { type: 'application/json;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `meme-phone-${new Date().toISOString().slice(0, 10)}.json`;
-        document.body.append(link);
-        link.click();
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        ctx.toast('已导出');
-      } catch { ctx.toast('导出失败'); }
+      ctx.openSheet({
+        title: '导出备份',
+        items: [
+          { label: '不含接口 Key（推荐）', value: 'no-keys', icon: 'download', note: '联系人、会话、日记、预设都导出；连接凭据留在本机' },
+          { label: '包含接口 Key', value: 'with-keys', icon: 'shield', danger: true, note: '会把接口密钥写进文件，分享前先确认' },
+        ],
+        onPick: (value) => downloadBackup(ctx, value === 'with-keys'),
+      });
+      return true;
+    }
+
+    if (act === 'set-import') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json,application/json';
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        let parsed;
+        try { parsed = JSON.parse(await file.text()); }
+        catch { ctx.toast('备份格式不对，当前数据未改动'); return; }
+        const summary = backupSummary(parsed);
+        if (!summary.ok) { ctx.toast('备份格式不对，当前数据未改动'); return; }
+        ctx.openSheet({
+          title: '恢复这份备份？',
+          items: [{
+            label: `联系人 ${summary.contacts} · 会话 ${summary.chats} · 消息 ${summary.messages} · 日记 ${summary.diary} · 收藏 ${summary.favorites}`,
+            value: 'confirm',
+            icon: 'upload',
+            note: '不含 Key 的备份恢复后，本机现有连接凭据保留不变；确认后覆盖当前数据。',
+          }],
+          onPick: async (value) => {
+            if (value !== 'confirm') return;
+            const result = await ctx.importBackup(parsed);
+            if (!result.ok) { ctx.toast(result.error || '恢复失败，当前数据未改动'); return; }
+            ctx.toast('已恢复备份');
+            ctx.rerender();
+          },
+        });
+      };
+      input.click();
       return true;
     }
 

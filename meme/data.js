@@ -846,6 +846,25 @@ export function dayKey(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+/** 导出备份前剔除接口凭据；默认导出不含 Key，只有显式要求时才带上。 */
+export function stripSecrets(state) {
+  const clone = JSON.parse(JSON.stringify(state || {}));
+  const blank = (obj) => {
+    if (obj && typeof obj === 'object') {
+      obj.key = '';
+      if ('proxy_password' in obj) obj.proxy_password = '';
+    }
+  };
+  const api = clone.settings?.api;
+  if (Array.isArray(api?.presets)) api.presets.forEach(blank);
+  const image = clone.settings?.image;
+  if (image) {
+    ['novelai', 'doubao', 'custom'].forEach(kind => blank(image[kind]));
+    if (Array.isArray(image.presets)) image.presets.forEach(blank);
+  }
+  return clone;
+}
+
 export function diaryEntry(state, key) {
   return state.diary.entries[key] || null;
 }
@@ -1649,6 +1668,31 @@ export function normalize(raw) {
   merged.settings.api.presets = Array.isArray(merged.settings.api.presets) && merged.settings.api.presets.length
     ? merged.settings.api.presets
     : base.settings.api.presets;
+
+  /* 不含 Key 的备份恢复时，按预设 id 保留本机现有连接凭据，不把本地 Key 擦成空。 */
+  const baseApiById = new Map((base.settings.api.presets || []).map(item => [item.id, item]));
+  merged.settings.api.presets = merged.settings.api.presets.map(item => {
+    const old = baseApiById.get(item.id);
+    if (old) {
+      if (!item.key && old.key) item.key = old.key;
+      if (!item.proxy_password && old.proxy_password) item.proxy_password = old.proxy_password;
+    }
+    return item;
+  });
+  const baseImageById = new Map((base.settings.image?.presets || []).map(item => [item.id, item]));
+  if (Array.isArray(merged.settings.image?.presets)) {
+    merged.settings.image.presets = merged.settings.image.presets.map(item => {
+      const old = baseImageById.get(item.id);
+      if (old && !item.key && old.key) item.key = old.key;
+      return item;
+    });
+  }
+  const baseImg = base.settings.image || {};
+  for (const kind of ['novelai', 'doubao', 'custom']) {
+    const target = merged.settings.image?.[kind];
+    const old = baseImg[kind];
+    if (target && old && !target.key && old.key) target.key = old.key;
+  }
 
   /* LLM 整体方案：旧存档没有就按当前 API + 当前回复预设补一套默认方案，不掺记忆 */
   const apiIds = new Set(merged.settings.api.presets.map(item => item.id));

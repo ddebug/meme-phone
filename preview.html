@@ -9148,6 +9148,25 @@ function dayKey(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+/** 导出备份前剔除接口凭据；默认导出不含 Key，只有显式要求时才带上。 */
+function stripSecrets(state) {
+  const clone = JSON.parse(JSON.stringify(state || {}));
+  const blank = (obj) => {
+    if (obj && typeof obj === 'object') {
+      obj.key = '';
+      if ('proxy_password' in obj) obj.proxy_password = '';
+    }
+  };
+  const api = clone.settings?.api;
+  if (Array.isArray(api?.presets)) api.presets.forEach(blank);
+  const image = clone.settings?.image;
+  if (image) {
+    ['novelai', 'doubao', 'custom'].forEach(kind => blank(image[kind]));
+    if (Array.isArray(image.presets)) image.presets.forEach(blank);
+  }
+  return clone;
+}
+
 function diaryEntry(state, key) {
   return state.diary.entries[key] || null;
 }
@@ -9952,6 +9971,31 @@ function normalize(raw) {
     ? merged.settings.api.presets
     : base.settings.api.presets;
 
+  /* 不含 Key 的备份恢复时，按预设 id 保留本机现有连接凭据，不把本地 Key 擦成空。 */
+  const baseApiById = new Map((base.settings.api.presets || []).map(item => [item.id, item]));
+  merged.settings.api.presets = merged.settings.api.presets.map(item => {
+    const old = baseApiById.get(item.id);
+    if (old) {
+      if (!item.key && old.key) item.key = old.key;
+      if (!item.proxy_password && old.proxy_password) item.proxy_password = old.proxy_password;
+    }
+    return item;
+  });
+  const baseImageById = new Map((base.settings.image?.presets || []).map(item => [item.id, item]));
+  if (Array.isArray(merged.settings.image?.presets)) {
+    merged.settings.image.presets = merged.settings.image.presets.map(item => {
+      const old = baseImageById.get(item.id);
+      if (old && !item.key && old.key) item.key = old.key;
+      return item;
+    });
+  }
+  const baseImg = base.settings.image || {};
+  for (const kind of ['novelai', 'doubao', 'custom']) {
+    const target = merged.settings.image?.[kind];
+    const old = baseImg[kind];
+    if (target && old && !target.key && old.key) target.key = old.key;
+  }
+
   /* LLM 整体方案：旧存档没有就按当前 API + 当前回复预设补一套默认方案，不掺记忆 */
   const apiIds = new Set(merged.settings.api.presets.map(item => item.id));
   const memoryIds = new Set(merged.settings.memory.presets.map(item => item.id));
@@ -10112,6 +10156,7 @@ exports["pushMessage"] = pushMessage;
 exports["unreadTotal"] = unreadTotal;
 exports["wakeAllowed"] = wakeAllowed;
 exports["dayKey"] = dayKey;
+exports["stripSecrets"] = stripSecrets;
 exports["diaryEntry"] = diaryEntry;
 exports["writeDiary"] = writeDiary;
 exports["latestDiary"] = latestDiary;
@@ -10730,6 +10775,8 @@ __mods["meme/store.js"] = function(module, exports, __req){
 const DEFAULT_FILE = 'meme-phone.json';
 const LS_KEY = 'meme-phone-state';
 
+const { stripSecrets } = __req("meme/data.js");
+
 function utf8ToBase64(text) {
   const bytes = new TextEncoder().encode(text);
   let binary = '';
@@ -10936,9 +10983,10 @@ function createStore(options = {}) {
       return api.flush();
     },
 
-    /** 导出当前内存状态（设置面板与「设置 → 数据」共用）。 */
-    exportJson() {
-      return JSON.stringify(state, null, 2);
+    /** 导出当前内存状态；默认剔除接口 Key，includeKeys=true 才带上凭据。 */
+    exportJson(includeKeys = false) {
+      const snapshot = includeKeys ? state : stripSecrets(state);
+      return JSON.stringify(snapshot, null, 2);
     },
   };
 
@@ -16629,6 +16677,35 @@ const { esc, tintStyle } = __req("meme/shell.js");
 const { contactsOf, chatsOf, unreadTotal } = __req("meme/data.js");
 const { imageEndpoint } = __req("meme/apps/draw.js");
 
+function downloadBackup(ctx, includeKeys) {
+  try {
+    const blob = new Blob([ctx.store.exportJson(includeKeys)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `meme-phone-${new Date().toISOString().slice(0, 10)}${includeKeys ? '-with-keys' : ''}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    ctx.toast(includeKeys ? '已导出（含接口 Key）' : '已导出（不含接口 Key）');
+  } catch { ctx.toast('导出失败'); }
+}
+
+function backupSummary(parsed) {
+  const state = parsed && typeof parsed === 'object' && parsed.meme ? parsed.meme : parsed;
+  if (!state || typeof state !== 'object') return { ok: false };
+  const chats = Object.values(state.chats || {});
+  return {
+    ok: true,
+    contacts: Object.keys(state.contacts || {}).length,
+    chats: chats.length,
+    messages: chats.reduce((sum, chat) => sum + (chat.messages?.length || 0), 0),
+    diary: Object.keys(state.diary?.entries || {}).length,
+    favorites: (state.favorites || []).length,
+  };
+}
+
 function row(ctx, { iconName, title, sub, act, value, toggle, app }) {
   return `
     <button class="mp-set-row" data-act="${act || 'noop'}"${app ? ` data-app="${app}"` : ''} type="button">
@@ -16715,7 +16792,8 @@ const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">数据</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'copy', title: '导出备份', sub: '一份 json，包含全部聊天与日记', act: 'set-export' })}
+            ${row(ctx, { iconName: 'copy', title: '导出备份', sub: '一份 json，默认不含接口 Key', act: 'set-export' })}
+            ${row(ctx, { iconName: 'upload', title: '从备份恢复', sub: '先预检数量，确认后覆盖当前数据', act: 'set-import' })}
             ${row(ctx, { iconName: 'trash', title: '清空手机数据', sub: '联系方式、聊天、日记全部清掉', act: 'set-wipe' })}
           </div>
         </div>
@@ -16804,18 +16882,47 @@ const settingsApp = {
     }
 
     if (act === 'set-export') {
-      try {
-        const blob = new Blob([ctx.store.exportJson()], { type: 'application/json;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `meme-phone-${new Date().toISOString().slice(0, 10)}.json`;
-        document.body.append(link);
-        link.click();
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        ctx.toast('已导出');
-      } catch { ctx.toast('导出失败'); }
+      ctx.openSheet({
+        title: '导出备份',
+        items: [
+          { label: '不含接口 Key（推荐）', value: 'no-keys', icon: 'download', note: '联系人、会话、日记、预设都导出；连接凭据留在本机' },
+          { label: '包含接口 Key', value: 'with-keys', icon: 'shield', danger: true, note: '会把接口密钥写进文件，分享前先确认' },
+        ],
+        onPick: (value) => downloadBackup(ctx, value === 'with-keys'),
+      });
+      return true;
+    }
+
+    if (act === 'set-import') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json,application/json';
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        let parsed;
+        try { parsed = JSON.parse(await file.text()); }
+        catch { ctx.toast('备份格式不对，当前数据未改动'); return; }
+        const summary = backupSummary(parsed);
+        if (!summary.ok) { ctx.toast('备份格式不对，当前数据未改动'); return; }
+        ctx.openSheet({
+          title: '恢复这份备份？',
+          items: [{
+            label: `联系人 ${summary.contacts} · 会话 ${summary.chats} · 消息 ${summary.messages} · 日记 ${summary.diary} · 收藏 ${summary.favorites}`,
+            value: 'confirm',
+            icon: 'upload',
+            note: '不含 Key 的备份恢复后，本机现有连接凭据保留不变；确认后覆盖当前数据。',
+          }],
+          onPick: async (value) => {
+            if (value !== 'confirm') return;
+            const result = await ctx.importBackup(parsed);
+            if (!result.ok) { ctx.toast(result.error || '恢复失败，当前数据未改动'); return; }
+            ctx.toast('已恢复备份');
+            ctx.rerender();
+          },
+        });
+      };
+      input.click();
       return true;
     }
 
@@ -25010,6 +25117,7 @@ async function openMemePhone(options = {}) {
       }
       ctx.rerender?.();
     },
+    importBackup: (raw) => importState(raw),
     onDraft: (entry, value) => {
       if (entry.view !== 'thread') return;
       const chat = state.chats[entry.params?.chatId];
@@ -25326,11 +25434,38 @@ function normalizeBackup(raw) {
   return next;
 }
 
+/** 不含凭据的备份恢复时，按 id 把本机现有连接凭据补回备份里空着的 Key，不擦除本地连接。 */
+function carryMissingCredentials(oldState, next) {
+  if (!oldState || !next?.settings) return;
+  const oldApi = new Map((oldState.settings?.api?.presets || []).map(item => [item.id, item]));
+  for (const preset of next.settings.api?.presets || []) {
+    const old = oldApi.get(preset.id);
+    if (old) {
+      if (!preset.key && old.key) preset.key = old.key;
+      if (!preset.proxy_password && old.proxy_password) preset.proxy_password = old.proxy_password;
+    }
+  }
+  const oldImage = oldState.settings?.image || {};
+  const nextImage = next.settings.image || {};
+  const oldImgById = new Map((oldImage.presets || []).map(item => [item.id, item]));
+  for (const preset of nextImage.presets || []) {
+    const old = oldImgById.get(preset.id);
+    if (old && !preset.key && old.key) preset.key = old.key;
+  }
+  for (const kind of ['novelai', 'doubao', 'custom']) {
+    const target = nextImage[kind];
+    const old = oldImage[kind];
+    if (target && old && !target.key && old.key) target.key = old.key;
+  }
+}
+
 async function importState(raw) {
   await initMemePhone();
   let next;
   try {
+    const old = getCurrentState();
     next = normalizeBackup(raw);
+    carryMissingCredentials(old, next);
   } catch (error) {
     return { ok: false, error: error.message || '备份格式不对，当前数据未改动' };
   }

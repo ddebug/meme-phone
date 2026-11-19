@@ -454,6 +454,7 @@ export async function openMemePhone(options = {}) {
       }
       ctx.rerender?.();
     },
+    importBackup: (raw) => importState(raw),
     onDraft: (entry, value) => {
       if (entry.view !== 'thread') return;
       const chat = state.chats[entry.params?.chatId];
@@ -770,11 +771,38 @@ function normalizeBackup(raw) {
   return next;
 }
 
+/** 不含凭据的备份恢复时，按 id 把本机现有连接凭据补回备份里空着的 Key，不擦除本地连接。 */
+function carryMissingCredentials(oldState, next) {
+  if (!oldState || !next?.settings) return;
+  const oldApi = new Map((oldState.settings?.api?.presets || []).map(item => [item.id, item]));
+  for (const preset of next.settings.api?.presets || []) {
+    const old = oldApi.get(preset.id);
+    if (old) {
+      if (!preset.key && old.key) preset.key = old.key;
+      if (!preset.proxy_password && old.proxy_password) preset.proxy_password = old.proxy_password;
+    }
+  }
+  const oldImage = oldState.settings?.image || {};
+  const nextImage = next.settings.image || {};
+  const oldImgById = new Map((oldImage.presets || []).map(item => [item.id, item]));
+  for (const preset of nextImage.presets || []) {
+    const old = oldImgById.get(preset.id);
+    if (old && !preset.key && old.key) preset.key = old.key;
+  }
+  for (const kind of ['novelai', 'doubao', 'custom']) {
+    const target = nextImage[kind];
+    const old = oldImage[kind];
+    if (target && old && !target.key && old.key) target.key = old.key;
+  }
+}
+
 export async function importState(raw) {
   await initMemePhone();
   let next;
   try {
+    const old = getCurrentState();
     next = normalizeBackup(raw);
+    carryMissingCredentials(old, next);
   } catch (error) {
     return { ok: false, error: error.message || '备份格式不对，当前数据未改动' };
   }

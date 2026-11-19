@@ -5,8 +5,13 @@
  */
 
 import { icon } from '../icons.js';
-import { chatById, chatFor, contactById, dayKey } from '../data.js';
+import { chatById, chatFor, contactById, dayKey, DIARY_SKIP_THRESHOLD } from '../data.js';
 import { esc } from '../shell.js';
+import {
+  diaryContextMode, diaryDayGroups, diaryDayStatuses, diaryFingerprint, diaryParamsFingerprint,
+  diaryRoleEntries, parseDiaryResponse, removeDiaryEntry, saveDiaryEntry, setDiaryUseOriginal,
+} from '../diary.js';
+import { diaryTranscriptForMessages, estimateTokens, serializeMessage } from '../reply-context.js';
 
 const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -90,6 +95,7 @@ function hero(ctx, entries, contactId) {
 
 function renderPage(ctx, params = {}) {
   const contactId = String(params.contactId || '');
+  if (contactId) return renderThreadPage(ctx, contactId);
   const contact = contactId ? contactById(ctx.state, contactId) : null;
   const entries = entriesFor(ctx, contactId);
   const month = curMonth(ctx);
@@ -123,8 +129,9 @@ function renderPage(ctx, params = {}) {
     </div>`;
 }
 
-function handleDiary(ctx, act, data) {
+function handleDiary(ctx, act, data, event) {
   const contactId = String(data?.contact || '');
+  if (contactId) return handleThreadDiary(ctx, act, data, event);
   const entries = entriesFor(ctx, contactId);
 
   if (act === 'diary-prev' || act === 'diary-next') {
@@ -217,10 +224,377 @@ function handleDiary(ctx, act, data) {
   return false;
 }
 
+/* ------------------------------------------------------ 角色聊天日记 */
+
+function threadState(ctx, contactId) {
+  ctx.shell.threadDiary = ctx.shell.threadDiary || {};
+  const store = ctx.shell.threadDiary;
+  if (!store[contactId] || typeof store[contactId] !== 'object') {
+    store[contactId] = { month: monthKey(new Date()), sel: dayKey(new Date()), selected: new Set() };
+  }
+  if (!(store[contactId].selected instanceof Set)) store[contactId].selected = new Set();
+  return store[contactId];
+}
+
+function threadCalendar(ctx, contactId, statuses) {
+  const st = threadState(ctx, contactId);
+  const first = parseMonth(st.month);
+  const lead = first.getDay();
+  const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  const today = dayKey(new Date());
+  const map = new Map(statuses.map(item => [item.date, item]));
+  const cells = ['<div class="mp-wd">日</div>', '<div class="mp-wd">一</div>', '<div class="mp-wd">二</div>', '<div class="mp-wd">三</div>', '<div class="mp-wd">四</div>', '<div class="mp-wd">五</div>', '<div class="mp-wd">六</div>'];
+  for (let index = 0; index < lead; index += 1) cells.push('<span></span>');
+  for (let day = 1; day <= days; day += 1) {
+    const key = `${st.month}-${String(day).padStart(2, '0')}`;
+    const row = map.get(key);
+    const entry = row?.entry;
+    const summarized = row?.status === 'summarized';
+    const pending = row?.status === 'pending';
+    const isSel = key === st.sel;
+    const mark = summarized ? '<span class="mark"></span>'
+      : pending ? '<span class="mark is-pending"></span>'
+        : entry?.text ? '<span class="mark is-stale"></span>' : '';
+    cells.push(`<button type="button" class="${isSel ? 'sel' : ''}${summarized ? ' has' : ''}${pending ? ' is-pending' : ''}${key === today ? ' today' : ''}" data-act="td-day" data-contact="${esc(contactId)}" data-day="${key}">${day}${mark}</button>`);
+  }
+  return `<div class="mp-cal">${cells.join('')}</div>`;
+}
+
+function formatTokens(text) {
+  const count = estimateTokens(text);
+  return count > 999 ? `${(count / 1000).toFixed(1)}k` : String(count);
+}
+
+function originalLine(state, contact, message) {
+  const date = new Date(Number(message.at));
+  const stamp = Number.isFinite(date.getTime()) ? `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` : '--:--';
+  const who = message.from === 'me' ? (state.settings?.user?.name || '我') : contact?.name || 'TA';
+  return `[${stamp}] ${who} · ${serializeMessage(message)}`;
+}
+
+function threadHero(ctx, contact, chat, status, latestDate, busy) {
+  const st = threadState(ctx, contact.id);
+  const date = st.sel;
+  const entry = status?.entry || null;
+  const text = String(entry?.text || '').trim();
+  const count = status?.messageCount || 0;
+  const skipped = count <= DIARY_SKIP_THRESHOLD;
+  const mode = diaryContextMode(ctx.state, chat, date, entry, status?.messages || [], latestDate);
+  const label = date === dayKey(new Date()) ? '今天' : `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`;
+  const originalTokens = status?.messages ? formatTokens(diaryTranscriptForMessages(ctx.state, chat, status.messages)) : '0';
+  const summaryTokens = text ? formatTokens(text) : '';
+  return `
+    <div class="mp-diary-hero">
+      <div class="mp-diary-hero-top">
+        <span class="mp-diary-hero-date">${label} · ${count} 条 · ${status ? (skipped ? '不用整理' : status.status === 'summarized' ? '已整理' : '待整理') : '没有聊天'}</span>
+        <div style="display:flex;gap:6px">
+          <button class="mp-btn ghost" data-act="td-edit" data-contact="${esc(contact.id)}" data-date="${date}" type="button">${icon('brush')}${text ? '改写' : '写一句'}</button>
+        </div>
+      </div>
+      ${text
+        ? `<div class="mp-diary-hero-text">${esc(text)}</div>`
+        : `<div class="mp-diary-empty">${skipped ? `这一天只有 ${count} 条聊天，${DIARY_SKIP_THRESHOLD} 条以内不整理。` : count ? `这一天有 ${count} 条聊天，还没有整理成日记。` : '这一天没有聊天记录。'}</div>`}
+      <div class="mp-diary-meta"><span>上下文：${esc(mode)}</span><span>原文约 ${originalTokens} tk${summaryTokens ? ` · 日记约 ${summaryTokens} tk` : ''}</span></div>
+      <div style="display:flex;gap:6px;margin-top:11px;flex-wrap:wrap">
+        <button class="mp-btn" data-act="td-generate-one" data-contact="${esc(contact.id)}" data-date="${date}" type="button"${busy || skipped ? ' disabled' : ''}>${icon('spark')}${busy ? '正在整理…' : text ? '重写这一天' : '整理这一天'}</button>
+        ${entry ? `<label class="mp-td-inline-check"><input type="checkbox" data-act="td-use-original" data-contact="${esc(contact.id)}" data-date="${date}"${entry.useOriginal ? ' checked' : ''}> 本日上下文用原文</label>` : ''}
+        ${entry ? `<button class="mp-btn ghost" data-act="td-delete" data-contact="${esc(contact.id)}" data-date="${date}" type="button">删日记</button>` : ''}
+      </div>
+      ${status?.messages?.length ? `<details class="mp-td-original"><summary>查看当天原文（${count} 条）</summary>${status.messages.map(message => `<div>${esc(originalLine(ctx.state, contact, message))}</div>`).join('')}</details>` : ''}
+    </div>`;
+}
+
+function threadDayRows(ctx, contactId, chat, statuses, latestDate, busy) {
+  const st = threadState(ctx, contactId);
+  const available = new Set(statuses.filter(item => item.status !== 'skipped').map(item => item.date));
+  st.selected = new Set([...st.selected].filter(date => available.has(date)));
+  const pending = statuses.filter(item => item.status === 'pending');
+  const rows = statuses.slice().reverse().map(item => {
+    const entry = item.entry;
+    const text = String(entry?.text || '').trim();
+    const mode = diaryContextMode(ctx.state, chat, item.date, entry, item.messages, latestDate);
+    const stateLabel = item.status === 'skipped' ? `${DIARY_SKIP_THRESHOLD} 条以内` : item.status === 'summarized' ? '已整理' : '待整理';
+    const originalTokens = formatTokens(diaryTranscriptForMessages(ctx.state, chat, item.messages));
+    const summaryTokens = text ? formatTokens(text) : '';
+    const disabled = busy || item.status === 'skipped';
+    return `
+      <div class="mp-td-row">
+        <input class="mp-td-check" type="checkbox" data-act="td-select" data-contact="${esc(contactId)}" data-date="${item.date}"${st.selected.has(item.date) ? ' checked' : ''}${item.status === 'skipped' ? ' disabled' : ''} aria-label="选择 ${item.date}">
+        <div class="mp-td-main">
+          <div class="mp-td-title">${Number(item.date.slice(5, 7))}月${Number(item.date.slice(8, 10))}日 <span class="mp-td-badge ${item.status}">${stateLabel}</span></div>
+          <div class="mp-td-sub">${item.messageCount} 条 · ${esc(mode)} · 原文约 ${originalTokens} tk${summaryTokens ? ` · 日记约 ${summaryTokens} tk` : ''}</div>
+        </div>
+        <button class="mp-btn ghost" data-act="td-generate-one" data-contact="${esc(contactId)}" data-date="${item.date}" type="button"${disabled ? ' disabled' : ''}>${busy ? '整理中…' : text ? '重写' : '整理'}</button>
+      </div>`;
+  }).join('');
+  return `
+    <div class="mp-group-label" style="margin-top:16px">按日期整理</div>
+    <div class="mp-td-actions">
+      <button class="mp-btn" data-act="td-generate-selected" data-contact="${esc(contactId)}" type="button"${busy || !st.selected.size ? ' disabled' : ''}>${icon('spark')}整理勾选（${st.selected.size} 天）</button>
+      <button class="mp-btn ghost" data-act="td-generate-pending" data-contact="${esc(contactId)}" type="button"${busy || !pending.length ? ' disabled' : ''}>全部待整理（${pending.length} 天）</button>
+    </div>
+    <div class="mp-td-note">选中的日期共用一次模型请求。生成会读取这个角色全部未排除的聊天记录，${DIARY_SKIP_THRESHOLD} 条以内的日期跳过。</div>
+    <div class="mp-td-list">${rows || '<div class="mp-empty">这个角色还没有聊天记录。</div>'}</div>`;
+}
+
+function renderThreadPage(ctx, contactId) {
+  const state = ctx.state;
+  const contact = contactById(state, contactId);
+  if (!contact) return '<div class="mp-page-body"><div class="mp-empty">这个联系人已经删掉了。</div></div>';
+  const chat = chatFor(state, contactId);
+  if (!chat) return '<div class="mp-page-body"><div class="mp-empty">这个角色还没有聊天。</div></div>';
+  const st = threadState(ctx, contactId);
+  const statuses = diaryDayStatuses(state, chat);
+  const latestDate = statuses.length ? statuses[statuses.length - 1].date : '';
+  if (!statuses.some(item => item.date === st.sel) && statuses.length) {
+    st.sel = latestDate;
+    if (st.month !== latestDate.slice(0, 7)) st.month = latestDate.slice(0, 7);
+  }
+  const selected = statuses.find(item => item.date === st.sel) || null;
+  const enabled = state.diary?.enabled !== false;
+  const busy = ctx.shell.threadDiaryBusy === contactId;
+  if (!statuses.length) {
+    return `
+      <div class="mp-page-body">
+        <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记 · 按天整理聊天，只在这个角色里保存</div>
+        <div class="mp-group-box" style="margin-top:10px">
+          <button class="mp-set-row" data-act="td-toggle-replace" type="button">
+            <span class="mp-set-ico">${icon('book')}</span>
+            <span class="mp-set-name">用日记替换聊天<small>${enabled ? '现在开启：旧日期用日记替换原文；最近一天仍读原文' : '现在关闭：聊天上下文全部读原文'}</small></span>
+            <span class="mp-switch${enabled ? ' on' : ''}"></span>
+          </button>
+        </div>
+        <div class="mp-td-toolbar">
+          <button class="mp-btn ghost" data-act="td-prompt" type="button">${icon('brush')}日记提示词</button>
+        </div>
+        <div class="mp-empty">这个角色还没有聊天记录。先聊过几天，再回来按日期整理。</div>
+      </div>`;
+  }
+  const target = parseMonth(st.month);
+  return `
+    <div class="mp-page-body">
+      <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记 · 按天整理聊天，只在这个角色里保存</div>
+      <div class="mp-group-box" style="margin-top:10px">
+        <button class="mp-set-row" data-act="td-toggle-replace" type="button">
+          <span class="mp-set-ico">${icon('book')}</span>
+          <span class="mp-set-name">用日记替换聊天<small>${enabled ? '现在开启：旧日期用日记替换原文；最近一天仍读原文' : '现在关闭：聊天上下文全部读原文'}</small></span>
+          <span class="mp-switch${enabled ? ' on' : ''}"></span>
+        </button>
+      </div>
+      <div class="mp-td-toolbar">
+        <button class="mp-btn ghost" data-act="td-prompt" type="button">${icon('brush')}日记提示词</button>
+        <span class="mp-td-toolbar-note">${statuses.filter(item => item.status === 'pending').length} 天待整理</span>
+      </div>
+      <div class="mp-month-bar">
+        <button class="mp-icon-btn" data-act="td-prev" data-contact="${esc(contactId)}" type="button" aria-label="上个月">${icon('back')}</button>
+        <span class="mp-month">${target.getFullYear()} 年 ${target.getMonth() + 1} 月</span>
+        <button class="mp-icon-btn" data-act="td-next" data-contact="${esc(contactId)}" type="button" aria-label="下个月" style="transform:rotate(180deg)">${icon('back')}</button>
+      </div>
+      ${threadCalendar(ctx, contactId, statuses)}
+      ${threadHero(ctx, contact, chat, selected, latestDate, busy)}
+      ${threadDayRows(ctx, contactId, chat, statuses, latestDate, busy)}
+    </div>`;
+}
+
+async function runThreadGeneration(ctx, contactId, dates) {
+  const state = ctx.state;
+  const chat = chatFor(state, contactId);
+  const contact = contactById(state, contactId);
+  if (!chat || !contact) { ctx.toast('找不到这个角色的聊天'); return; }
+  if (ctx.shell.threadDiaryBusy === contactId) { ctx.toast('正在整理这个角色的日记'); return; }
+  const uniqueDates = [...new Set(dates)].filter(Boolean).sort();
+  if (!uniqueDates.length) { ctx.toast('没有勾选日期'); return; }
+  const prompt = state.diary.prompt || '';
+  const snapshot = JSON.stringify(chat.messages || []);
+  ctx.shell.threadDiaryBusy = contactId;
+  ctx.rerender();
+  ctx.toast(`正在整理 ${uniqueDates.length} 天…`);
+  try {
+    const raw = await ctx.ai.diaryBatch(ctx, { chat, contact, dates: uniqueDates });
+    const parsed = parseDiaryResponse(raw, uniqueDates);
+    if (JSON.stringify(chat.messages || []) !== snapshot || (state.diary.prompt || '') !== prompt) {
+      throw new Error('生成期间聊天或日记提示词发生了变化，本轮结果没有保存');
+    }
+    const groups = diaryDayGroups(chat);
+    const paramsFingerprint = diaryParamsFingerprint(state, chat);
+    for (const item of parsed) {
+      const messages = groups.get(item.date) || [];
+      saveDiaryEntry(state, contactId, {
+        date: item.date,
+        content: item.content,
+        auto: true,
+        tags: [contact.name],
+        fromTime: messages[0]?.at || null,
+        toTime: messages[messages.length - 1]?.at || null,
+        messageCount: messages.length,
+        sourceFingerprint: diaryFingerprint(messages),
+        paramsFingerprint,
+      });
+    }
+    state.diary.lastGenerated = new Date().toISOString();
+    ctx.save();
+    ctx.toast(`整理好了 ${parsed.length} 天`);
+  } catch (error) {
+    ctx.toast(error?.message || '日记生成失败');
+  } finally {
+    ctx.shell.threadDiaryBusy = '';
+    ctx.rerender();
+  }
+}
+
+function requestThreadGeneration(ctx, contactId, dates) {
+  const state = ctx.state;
+  const entries = diaryRoleEntries(state, contactId);
+  const clean = [...new Set(dates.filter(Boolean))].sort();
+  if (!clean.length) { ctx.toast('没有可整理的日期'); return; }
+  const overwritten = clean.filter(date => entries[date]?.text);
+  if (!overwritten.length) { runThreadGeneration(ctx, contactId, clean); return; }
+  ctx.openSheet({
+    kind: 'panel',
+    title: '覆盖已有日记',
+    render: () => `
+      <div class="mp-td-note">会重写 ${overwritten.length} 天已有日记，原始聊天不会删除。所有目标日期共用一次请求。</div>
+      <div class="mp-diary-hero-text" style="margin-top:10px">${overwritten.map(date => esc(date)).join('、')}</div>
+      <button class="mp-btn" data-act="td-generate-run" data-contact="${esc(contactId)}" data-dates="${esc(clean.join(','))}" type="button" style="margin-top:12px">覆盖并开始整理</button>`,
+  });
+}
+
+function handleThreadDiary(ctx, act, data, event) {
+  const state = ctx.state;
+  const contactId = String(data?.contact || '');
+  if (!contactId) return false;
+  const chat = chatFor(state, contactId);
+  const contact = contactById(state, contactId);
+  if (!chat || !contact) return false;
+  const st = threadState(ctx, contactId);
+
+  if (act === 'td-prev' || act === 'td-next') {
+    const target = parseMonth(st.month);
+    target.setMonth(target.getMonth() + (act === 'td-prev' ? -1 : 1));
+    st.month = monthKey(target);
+    st.sel = dayKey(target);
+    ctx.rerender();
+    return true;
+  }
+  if (act === 'td-day') {
+    st.sel = String(data.day || st.sel);
+    ctx.rerender();
+    return true;
+  }
+  if (act === 'td-select') {
+    const date = String(data.date || '');
+    if (event?.target?.checked) st.selected.add(date); else st.selected.delete(date);
+    ctx.rerender();
+    return true;
+  }
+  if (act === 'td-toggle-replace') {
+    state.diary.enabled = state.diary.enabled === false;
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(state.diary.enabled ? '旧日期会用日记替换原文；最近一天仍读原文' : '日记替换已关闭，聊天上下文全部读原文');
+    return true;
+  }
+  if (act === 'td-prompt') {
+    ctx.openSheet({
+      kind: 'text',
+      title: '日记怎么写',
+      value: state.diary.prompt || '',
+      placeholder: '给模型的日记写作要求…',
+      confirm: '存下',
+      onText: (text) => {
+        state.diary.prompt = String(text || '').trim() || state.diary.prompt;
+        ctx.save();
+        ctx.rerender();
+        ctx.toast('日记提示词已保存；旧日记会标成待整理，重新整理后生效');
+      },
+    });
+    return true;
+  }
+  if (act === 'td-edit') {
+    const date = String(data.date || st.sel);
+    const entry = diaryRoleEntries(state, contactId)[date];
+    ctx.openSheet({
+      kind: 'text',
+      title: `写 ${date}`,
+      value: entry?.text || '',
+      placeholder: '这一天发生了什么…',
+      confirm: '存下来',
+      onText: (text) => {
+        const content = String(text || '').trim();
+        if (!content) { ctx.toast('正文为空，没有保存'); return; }
+        saveDiaryEntry(state, contactId, {
+          date,
+          content,
+          auto: false,
+          tags: entry?.tags || [contact.name],
+          sourceFingerprint: entry?.sourceFingerprint || '',
+          paramsFingerprint: entry?.paramsFingerprint || '',
+          fromTime: entry?.fromTime ?? null,
+          toTime: entry?.toTime ?? null,
+          messageCount: entry?.messageCount ?? null,
+        });
+        ctx.save();
+        ctx.rerender();
+        ctx.toast('日记已保存；原始聊天没有改动');
+      },
+    });
+    return true;
+  }
+  if (act === 'td-use-original') {
+    const date = String(data.date || '');
+    const checked = Boolean(event?.target?.checked);
+    try { setDiaryUseOriginal(state, contactId, date, checked); }
+    catch (error) { ctx.toast(error.message); return true; }
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(checked ? '这一天发送时改用原文，日记保留' : '这一天允许用日记替换原文');
+    return true;
+  }
+  if (act === 'td-delete') {
+    const date = String(data.date || st.sel);
+    ctx.openSheet({
+      kind: 'panel',
+      title: '删除这篇日记',
+      render: () => `
+        <div class="mp-td-note">删除 ${esc(date)} 的日记？原始聊天不会删除。</div>
+        <button class="mp-btn" data-act="td-delete-run" data-contact="${esc(contactId)}" data-date="${esc(date)}" type="button" style="margin-top:12px;background:#e46b7a">删除日记</button>`,
+    });
+    return true;
+  }
+  if (act === 'td-delete-run') {
+    const date = String(data.date || '');
+    ctx.closeSheet();
+    removeDiaryEntry(state, contactId, date);
+    ctx.save();
+    ctx.rerender();
+    ctx.toast('日记已删除，原始聊天保留');
+    return true;
+  }
+  if (act === 'td-generate-one') {
+    requestThreadGeneration(ctx, contactId, [String(data.date || st.sel)]);
+    return true;
+  }
+  if (act === 'td-generate-selected') {
+    requestThreadGeneration(ctx, contactId, [...st.selected]);
+    return true;
+  }
+  if (act === 'td-generate-pending') {
+    requestThreadGeneration(ctx, contactId, diaryDayStatuses(state, chat).filter(item => item.status === 'pending').map(item => item.date));
+    return true;
+  }
+  if (act === 'td-generate-run') {
+    const dates = String(data.dates || '').split(',').map(item => item.trim()).filter(Boolean);
+    ctx.closeSheet();
+    runThreadGeneration(ctx, contactId, dates);
+    return true;
+  }
+  return false;
+}
+
 export const diaryApp = {
   id: 'diary', name: '日记', icon: 'diary',
   render(ctx) { return renderPage(ctx); },
-  handle(ctx, act, data) { return handleDiary(ctx, act, data); },
+  handle(ctx, act, data, event) { return handleDiary(ctx, act, data, event); },
 };
 
 /** 聊天设置里的角色日记页。 */
@@ -230,5 +604,5 @@ export const threadDiaryApp = {
     const contactId = params.contactId || chatById(ctx.state, params.chatId)?.contactId || '';
     return renderPage(ctx, { contactId });
   },
-  handle(ctx, act, data) { return handleDiary(ctx, act, data); },
+  handle(ctx, act, data, event) { return handleDiary(ctx, act, data, event); },
 };

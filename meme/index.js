@@ -4,15 +4,16 @@
  */
 
 import { createStore } from './store.js';
-import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks } from './data.js';
+import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks, dayKey } from './data.js';
 import { createShell, applyWall, applyLook } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { favoritesApp } from './apps/favorites.js';
 import { photoApp } from './apps/photo.js';
 import { buildMemoryContext } from './memory.js';
-import { buildReplyMessages, transcript, replyLead, proactiveLead } from './reply-context.js';
+import { buildReplyMessages, transcript, replyLead, proactiveLead, diaryTranscript, characterBlock, sceneBlock, userBlock } from './reply-context.js';
 import { behaviorPrompt, behaviorSettings, parseBehaviorReply } from './behavior.js';
+import { DIARY_OUTPUT_PROTOCOL, diaryFingerprint } from './diary.js';
 import { diaryApp, threadDiaryApp } from './apps/diary.js';
 import { contactsApp, contactApp } from './apps/contacts.js';
 import { settingsApp, appearanceApp } from './apps/settings.js';
@@ -168,6 +169,8 @@ function makeAi(getState) {
         JSON.stringify(chat?.history || {}),
         state.settings?.memory?.activeId || '',
         state.settings?.memory?.readMode || '',
+        state.diary?.enabled !== false ? 'diaryon' : 'diaryoff',
+        diaryFingerprint(state.diary?.contacts?.[chat?.contactId] || {}),
       ].join('|');
       const hit = previewCache.get(key);
       if (hit && Date.now() - hit.at < 30000) return hit.value;
@@ -302,6 +305,44 @@ function makeAi(getState) {
         demo: demoMode,
       });
       if (result.error) return '';
+      return result.text;
+    },
+
+    /**
+     * 角色聊天日记：一次请求写多个日期。
+     * 完整未排除历史只作背景，模型必须只返回本次指定日期的 entries JSON。
+     */
+    async diaryBatch(context, payload = {}) {
+      const state = getState();
+      const chat = payload.chat;
+      const contact = payload.contact || state.contacts?.[chat?.contactId] || null;
+      const dates = Array.isArray(payload.dates) ? payload.dates.filter(Boolean).map(String) : [];
+      if (!chat || !contact || !dates.length) throw new Error('没有可整理的日期');
+      const profile = [characterBlock(state, contact), sceneBlock(state, contact), userBlock(state)].filter(Boolean).join('\n\n');
+      const transcriptText = diaryTranscript(state, chat) || '（没有聊天记录）';
+      const targets = dates.map(date => `${date}（${(chat.messages || []).filter(message => !message.excluded && dayKey(new Date(Number(message.at))) === date).length}条）`).join('、');
+      const messages = [
+        { role: 'system', content: `${state.diary?.prompt || '按角色视角写这一天的日记。'}\n\n${DIARY_OUTPUT_PROTOCOL}` },
+        {
+          role: 'user',
+          content: [
+            '【角色资料（背景数据）】',
+            profile || `日记作者：${contact.name}`,
+            `日记作者：${contact.name}（第一人称“我”）`,
+            `用户：${state.settings?.user?.name || '我'}`,
+            '',
+            '【该联系人全部未排除的原始手机聊天记录】',
+            transcriptText,
+            '',
+            '【本次任务】',
+            `只为以下日期各写一篇角色视角日记：${targets}。`,
+            '其他日期仅用于理解身份和关系。一次返回全部指定日期的 entries JSON。',
+          ].join('\n'),
+        },
+      ];
+      const demoText = JSON.stringify({ entries: dates.map(date => ({ date, content: `${date}\n今天聊了很多，先把这些记下来。` })) });
+      const result = await generate({ messages, demoReply: demoText, preset: llmPresetFor(state, chat), demo: demoMode });
+      if (result.error) throw new Error(result.error);
       return result.text;
     },
   };

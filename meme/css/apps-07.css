@@ -745,6 +745,117 @@
 
 .mp-diary-tags { display: flex; gap: 5px; flex-wrap: wrap; }
 
+/* ------------------------------------------------------ 角色聊天日记 */
+.mp-td-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 6px;
+}
+
+.mp-td-toolbar-note {
+  margin-left: auto;
+  font-size: calc(11.5px * var(--font-scale));
+  color: var(--text-4);
+}
+
+.mp-td-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.mp-td-note {
+  font-size: calc(11.5px * var(--font-scale));
+  line-height: calc(1.6 * var(--line-scale));
+  color: var(--text-3);
+  margin: 0 2px 8px;
+}
+
+.mp-td-list { display: flex; flex-direction: column; gap: 8px; }
+
+.mp-td-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border-radius: var(--r-m);
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+}
+
+.mp-td-check {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
+.mp-td-main { flex: 1; min-width: 0; }
+
+.mp-td-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: calc(12.5px * var(--font-scale));
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mp-td-sub {
+  margin-top: 3px;
+  font-size: calc(11px * var(--font-scale));
+  line-height: calc(1.5 * var(--line-scale));
+  color: var(--text-3);
+}
+
+.mp-td-badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: calc(10px * var(--font-scale));
+  font-weight: 500;
+  color: var(--text-3);
+  background: rgba(120, 120, 128, .12);
+}
+
+.mp-td-badge.pending { color: #9a6a08; background: rgba(245, 166, 35, .16); }
+.mp-td-badge.summarized { color: #3f7b57; background: rgba(52, 199, 89, .14); }
+
+.mp-td-inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: calc(11.5px * var(--font-scale));
+  color: var(--text-3);
+}
+
+.mp-diary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text-4);
+}
+
+.mp-td-original {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(120, 120, 128, .14);
+  font-size: calc(11.5px * var(--font-scale));
+  line-height: calc(1.65 * var(--line-scale));
+  color: var(--text-3);
+  max-height: 260px;
+  overflow: auto;
+}
+
+.mp-td-original summary { cursor: pointer; color: var(--text-3); }
+.mp-td-original > div { margin-top: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.mp-cal button .mark.is-pending { background: #f5a623; }
+.mp-cal button .mark.is-stale { background: var(--text-4); }
+
 /* ------------------------------------------------------------ 设置页 */
 .mp-group {
   margin-bottom: 14px;

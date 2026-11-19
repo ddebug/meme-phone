@@ -8,6 +8,7 @@ import { replyContextFor, replyItemsFor, replyPresetFor, normalizeReplyContext, 
 import { readWorldBook } from './host.js';
 import { buildMemoryContext } from './memory.js';
 import { behaviorContextText } from './behavior.js';
+import { diaryDayGroups, diaryEntryIsCurrent } from './diary.js';
 
 /* ------------------------------------------------------------ 请求统计 */
 
@@ -105,15 +106,16 @@ function messageWho(state, contact, message) {
  */
 export function serializeMessage(message) {
   if (!message) return '';
-  if (message.kind === 'recalled') return `[撤回]${String(message.text || '').trim()}`;
+  const rawText = message.text != null ? message.text : message.content;
+  if (message.kind === 'recalled') return `[撤回]${String(rawText || '').trim()}`;
   if (message.kind === 'image') {
-    const desc = String(message.text || '').trim();
+    const desc = String(rawText || '').trim();
     return desc ? `[图片]${desc}` : '[图片]（未提供说明）';
   }
-  if (message.kind === 'emoji') return `[表情]${String(message.emoji || message.text || '').trim()}`;
-  if (message.kind === 'forwarded') return `[转发]${String(message.forward?.text || message.text || '').trim()}`;
+  if (message.kind === 'emoji') return `[表情]${String(message.emoji || rawText || '').trim()}`;
+  if (message.kind === 'forwarded') return `[转发]${String(message.forward?.text || rawText || '').trim()}`;
   const behavior = behaviorContextText(message);
-  const body = behavior || String(message.text || '').trim();
+  const body = behavior || String(rawText || '').trim();
   if (message.quote?.text) return `[引用]${String(message.quote.text).trim()}｜${body}`;
   return body;
 }
@@ -149,6 +151,78 @@ export function transcript(state, chat, limit = 10, options = {}) {
     used += cost;
   }
   return kept.join('\n');
+}
+
+/**
+ * 聊天上下文里的手机历史。和普通 transcript 不同的只有一点：
+ * 发送窗口内的旧日期，如果已有当前有效的日记，就用一篇日记替换那天的原文；
+ * 最近一天永远发原文，逐日切回原文也不会删掉日记。
+ */
+export function historyTranscript(state, chat, limit = 10, options = {}) {
+  if (!chat) return '';
+  const contact = state.contacts?.[chat.contactId];
+  const omitId = options.omitId || '';
+  const maxChars = Math.max(0, Number(options.maxChars) || 0);
+  const valid = (chat.messages || [])
+    .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded)
+    .filter(message => message.id !== omitId);
+  const selected = valid.slice(-Math.max(1, limit));
+  const latestDate = valid.length ? dayKey(new Date(Number(valid[valid.length - 1].at))) : '';
+  const groups = diaryDayGroups(chat);
+  const entries = state?.diary?.contacts?.[chat.contactId] || {};
+  const replaced = new Set();
+  const lines = [];
+  for (const message of selected) {
+    const date = dayKey(new Date(Number(message.at)));
+    const entry = entries[date];
+    const replace = options.diary !== false && state?.diary?.enabled !== false && date !== latestDate &&
+      entry?.useOriginal !== true && diaryEntryIsCurrent(state, chat, entry, groups.get(date));
+    if (replace) {
+      if (!replaced.has(date)) {
+        lines.push(`[日记 ${date}]\n${entry.text}`);
+        replaced.add(date);
+      }
+      continue;
+    }
+    const text = serializeMessage(message);
+    if (text) lines.push(`${messageWho(state, contact, message)}：${text}`);
+  }
+
+  if (!maxChars) return lines.join('\n');
+  const kept = [];
+  let used = 0;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    const cost = line.length + (kept.length ? 1 : 0);
+    if (used + cost > maxChars) {
+      if (!kept.length) kept.unshift(line.slice(0, maxChars) + '…');
+      break;
+    }
+    kept.unshift(line);
+    used += cost;
+  }
+  return kept.join('\n');
+}
+
+/** 日记生成专用：完整未排除历史，每条带日期和时间，不受发送窗口影响。 */
+export function diaryTranscript(state, chat) {
+  return diaryTranscriptForMessages(state, chat, (chat?.messages || []));
+}
+
+export function diaryTranscriptForMessages(state, chat, messages) {
+  if (!chat) return '';
+  const contact = state.contacts?.[chat.contactId];
+  return (Array.isArray(messages) ? messages : [])
+    .filter(message => message && !message.excluded)
+    .map(message => {
+      const date = new Date(Number(message.at));
+      const stamp = Number.isFinite(date.getTime())
+        ? `${dayKey(date)} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+        : '时间未知';
+      return `[${stamp}] ${messageWho(state, contact, message)}：${serializeMessage(message)}`;
+    })
+    .filter(line => line.trim())
+    .join('\n');
 }
 
 export function characterBlock(state, contact) {
@@ -340,7 +414,11 @@ async function contextBlockFor(item, state, chat, contact, context, memoryText, 
   if (key === 'history') {
     const limit = effectivePhoneHistoryLimit(chat, context);
     const lastId = ctxOpts.omitLast ? (chat.messages?.[chat.messages.length - 1]?.id || '') : '';
-    const text = transcript(state, chat, limit, { omitId: lastId, maxChars: ctxOpts.historyMaxChars });
+    const text = historyTranscript(state, chat, limit, {
+      omitId: lastId,
+      maxChars: ctxOpts.historyMaxChars,
+      diary: true,
+    });
     return {
       text: text ? `【历史小手机消息】\n${text}` : '',
       status: text ? 'injected' : 'empty',

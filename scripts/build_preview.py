@@ -15,6 +15,7 @@ MODULES = [
     "meme/preset-defaults.js",
     "meme/behavior.js",
     "meme/data.js",
+    "meme/diary.js",
     "meme/behavior-domains.js",
     "meme/store.js",
     "meme/host.js",

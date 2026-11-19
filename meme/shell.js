@@ -146,7 +146,8 @@ export function createShell(options) {
     back: () => { shell.stack.pop(); shell.sheet = null; render(); },
     home: () => { shell.stack.length = 0; shell.sheet = null; render(); },
     rerender: () => render(),
-    toast: (message) => { shell.toastMessage = message; render(); scheduleToastClear(); },
+    /* 提示条就地更新，不整页重绘：不会打断正在输入的字、选区、弹层和滚动位置 */
+    toast: (message) => { shell.toastMessage = message; showToast(message); scheduleToastClear(); },
     openSheet: (sheet) => { shell.sheetAnimated = false; shell.sheet = sheet; render(); },
     closeSheet: () => { shell.sheet = null; shell.sheetAnimated = false; render(); },
     icon: ico,
@@ -338,6 +339,11 @@ export function createShell(options) {
     /* 同一页重绘（切下拉、保存、开关）时把滚动位置带回原位，别让它看起来像整页刷新 */
     const prevView = shell.stack[shell.stack.length - 1]?.view || '';
     const prevScroll = root.querySelector('.mp-page-body')?.scrollTop || 0;
+    /* 重绘前记下输入框的光标/选区，重绘后放回原位，别让正在打的字跳到末尾 */
+    const prevInput = root.querySelector('.mp-compose-box input');
+    const prevSel = prevInput && root.ownerDocument?.activeElement === prevInput
+      ? { start: prevInput.selectionStart, end: prevInput.selectionEnd, dir: prevInput.selectionDirection }
+      : null;
     root.className = 'mp-root';
     root.dataset.mpTheme = status;
     applyWall(root, state.settings);
@@ -362,7 +368,7 @@ export function createShell(options) {
         </div>
       </div>`;
 
-    restoreLive();
+    restoreLive(prevSel);
     shell.improveSendState();
     /* 文字弹层打开后把光标放进去，键盘能直接输入；不抢正在编辑的输入框焦点 */
     if (shell.sheet?.kind === 'text') {
@@ -376,14 +382,17 @@ export function createShell(options) {
     if (shell.sheet) shell.sheetAnimated = true;
   }
 
-  function restoreLive() {
+  function restoreLive(prevSel = null) {
     const input = root.querySelector('.mp-compose-box input');
     if (input && shell.live.inputValue) {
       input.value = shell.live.inputValue;
       shell.improveSendState();
       if (shell.live.focus) {
         input.focus();
-        input.setSelectionRange(input.value.length, input.value.length);
+        const len = input.value.length;
+        const start = prevSel ? Math.min(Math.max(0, prevSel.start), len) : len;
+        const end = prevSel ? Math.min(Math.max(start, prevSel.end), len) : len;
+        input.setSelectionRange(start, end, prevSel?.dir || 'none');
       }
     }
     if (shell.scroller) {
@@ -404,6 +413,26 @@ export function createShell(options) {
   shell.refresh = render;
 
   /* --------------------------------------------------------- 提示自动消失 */
+
+  /** 就地插入/更新提示条，不重绘整页。 */
+  function showToast(message = shell.toastMessage) {
+    if (!root) return;
+    const screen = root.querySelector('.mp-screen');
+    if (!screen) { render(); return; }
+    let node = root.querySelector('.mp-toast');
+    if (!node) {
+      node = document.createElement('div');
+      node.className = 'mp-toast';
+      const home = screen.querySelector('.mp-home-bar');
+      if (home) screen.insertBefore(node, home);
+      else screen.append(node);
+    }
+    node.textContent = String(message || '');
+    /* 连着弹两条时把进场动画重播一次 */
+    node.style.animation = 'none';
+    void node.offsetWidth;
+    node.style.animation = '';
+  }
 
   function scheduleToastClear() {
     clearTimeout(shell.toastTimer);

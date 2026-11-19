@@ -565,6 +565,8 @@ export function addContact(state, contact) {
     avatar: contact.avatar || '',
     kind: contact.kind || 'char',       // char | group | custom
     tavernAvatar: contact.tavernAvatar || '',
+    /* 卡片自己的名字单独记一份：用户改备注时不动它，同步时才知道该不该跟着卡片改名 */
+    cardName: contact.cardName || '',
     note: contact.note || '',
     signature: contact.signature || '',
     status: contact.status || 'online',  // online | busy | away
@@ -728,9 +730,25 @@ export function fillPromptTokens(text, state, chat) {
 export function characterCardFor(state, contact) {
   const cards = Array.isArray(state?.characters) ? state.characters : [];
   if (!cards.length || !contact) return null;
-  return cards.find(card => contact.tavernAvatar && card.avatar === contact.tavernAvatar)
-    || cards.find(card => card.name === contact.name)
-    || null;
+  if (contact.tavernAvatar) {
+    const byAvatar = cards.find(card => card.avatar && card.avatar === contact.tavernAvatar);
+    if (byAvatar) return byAvatar;
+  }
+  /* 旧存档只有名字：仅在同名唯一时认，避免同名卡片绑错 */
+  const names = [contact.cardName, contact.name].map(value => String(value || '').trim()).filter(Boolean);
+  for (const name of names) {
+    const same = cards.filter(card => card.name === name);
+    if (same.length === 1) return same[0];
+  }
+  return null;
+}
+
+/** 同名角色卡不止一张：页面提示让用户自己选，不替用户绑第一张。 */
+export function cardNameAmbiguous(state, contact) {
+  const cards = Array.isArray(state?.characters) ? state.characters : [];
+  if (!cards.length || !contact || contact.tavernAvatar) return false;
+  const names = [contact.cardName, contact.name].map(value => String(value || '').trim()).filter(Boolean);
+  return names.some(name => cards.filter(card => card.name === name).length > 1);
 }
 
 /** 一个联系人能被哪些写法匹配到：头像文件名、卡名、联系人名。 */
@@ -1054,15 +1072,29 @@ export function syncTavernContacts(state, tavernCharacters = []) {
   let created = 0;
   for (const character of tavernCharacters) {
     if (!character || !character.name) continue;
-    const key = character.tavernAvatar || character.name;
-    const existing = Object.values(state.contacts).find(item => item.tavernAvatar === key);
+    /* 关联用头像文件名（宿主里唯一），没有才退回名字。旧存档里存的是名字，也要能认领并升级。 */
+    const key = character.tavernAvatar || character.avatar || character.name;
+    const legacyKey = character.name;
+    const sameNameCount = tavernCharacters.filter(other => other?.name === character.name).length;
+    const existing = Object.values(state.contacts).find(item => item.tavernAvatar === key)
+      /* 旧存档绑的是名字而不是文件名 */
+      || Object.values(state.contacts).find(item => item.tavernAvatar === legacyKey)
+      /* 老联系人只有名字时，同名唯一才认领，别把名字相同的另一张卡接过来 */
+      || Object.values(state.contacts).find(item => !item.tavernAvatar
+        && (item.cardName === character.name || item.name === character.name)
+        && sameNameCount === 1);
     if (existing) {
-      existing.name = character.name;
+      /* 用户改过备注的，名字留原样；没改过的跟着卡片走 */
+      const renamed = existing.cardName && existing.name !== existing.cardName;
+      if (!existing.cardName) existing.cardName = character.name;
+      if (!renamed) existing.name = character.name;
+      existing.tavernAvatar = key;
       existing.avatar = character.avatarUrl || existing.avatar;
       continue;
     }
     addContact(state, {
       name: character.name,
+      cardName: character.name,
       avatar: character.avatarUrl || '',
       tavernAvatar: key,
       kind: 'char',
@@ -1070,6 +1102,31 @@ export function syncTavernContacts(state, tavernCharacters = []) {
     created += 1;
   }
   return created;
+}
+
+/**
+ * 旧存档迁移：联系人只有名字、没有头像文件名时，补上卡片关联。
+ * 只在同名唯一时绑定；重名就留空，让用户在页面里自己选，不替用户猜。
+ */
+export function linkContactCards(state) {
+  const cards = Array.isArray(state?.characters) ? state.characters : [];
+  if (!cards.length) return 0;
+  let linked = 0;
+  for (const contact of Object.values(state.contacts || {})) {
+    if (!contact || contact.kind === 'group') continue;
+    if (contact.tavernAvatar) {
+      const card = cards.find(item => item.avatar && item.avatar === contact.tavernAvatar);
+      if (card && !contact.cardName) contact.cardName = card.name;
+      continue;
+    }
+    const same = cards.filter(item => item.name === contact.name);
+    if (same.length !== 1) continue;
+    const card = same[0];
+    if (card.avatar) contact.tavernAvatar = card.avatar;
+    contact.cardName = card.name;
+    linked += 1;
+  }
+  return linked;
 }
 
 /* --------------------------------------------------------------- 演示数据 */
@@ -1663,6 +1720,16 @@ export function normalize(raw) {
   merged.users = Array.isArray(raw.users) ? raw.users.filter(item => item && (item.key || item.name)) : [];
   merged.characters = Array.isArray(raw.characters) ? raw.characters.filter(item => item && item.name) : [];
   merged.charactersFromTavern = Boolean(raw.charactersFromTavern);
+  for (const [id, contact] of Object.entries(merged.contacts && typeof merged.contacts === 'object' ? merged.contacts : {})) {
+    if (!contact || typeof contact !== 'object') continue;
+    merged.contacts[id] = {
+      ...contact,
+      tavernAvatar: String(contact.tavernAvatar || ''),
+      cardName: String(contact.cardName || ''),
+    };
+  }
+  /* 只有名字的旧联系人按同名唯一补卡片关联；重名不绑，等用户自己选 */
+  linkContactCards(merged);
   merged.lookups = (raw.lookups && typeof raw.lookups === 'object' && !Array.isArray(raw.lookups)) ? raw.lookups : {};
   merged.usersFromTavern = Boolean(raw.usersFromTavern);
   merged.settings.api.presets = Array.isArray(merged.settings.api.presets) && merged.settings.api.presets.length

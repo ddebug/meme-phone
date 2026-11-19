@@ -8883,6 +8883,8 @@ function addContact(state, contact) {
     avatar: contact.avatar || '',
     kind: contact.kind || 'char',       // char | group | custom
     tavernAvatar: contact.tavernAvatar || '',
+    /* 卡片自己的名字单独记一份：用户改备注时不动它，同步时才知道该不该跟着卡片改名 */
+    cardName: contact.cardName || '',
     note: contact.note || '',
     signature: contact.signature || '',
     status: contact.status || 'online',  // online | busy | away
@@ -9046,9 +9048,25 @@ function fillPromptTokens(text, state, chat) {
 function characterCardFor(state, contact) {
   const cards = Array.isArray(state?.characters) ? state.characters : [];
   if (!cards.length || !contact) return null;
-  return cards.find(card => contact.tavernAvatar && card.avatar === contact.tavernAvatar)
-    || cards.find(card => card.name === contact.name)
-    || null;
+  if (contact.tavernAvatar) {
+    const byAvatar = cards.find(card => card.avatar && card.avatar === contact.tavernAvatar);
+    if (byAvatar) return byAvatar;
+  }
+  /* 旧存档只有名字：仅在同名唯一时认，避免同名卡片绑错 */
+  const names = [contact.cardName, contact.name].map(value => String(value || '').trim()).filter(Boolean);
+  for (const name of names) {
+    const same = cards.filter(card => card.name === name);
+    if (same.length === 1) return same[0];
+  }
+  return null;
+}
+
+/** 同名角色卡不止一张：页面提示让用户自己选，不替用户绑第一张。 */
+function cardNameAmbiguous(state, contact) {
+  const cards = Array.isArray(state?.characters) ? state.characters : [];
+  if (!cards.length || !contact || contact.tavernAvatar) return false;
+  const names = [contact.cardName, contact.name].map(value => String(value || '').trim()).filter(Boolean);
+  return names.some(name => cards.filter(card => card.name === name).length > 1);
 }
 
 /** 一个联系人能被哪些写法匹配到：头像文件名、卡名、联系人名。 */
@@ -9372,15 +9390,29 @@ function syncTavernContacts(state, tavernCharacters = []) {
   let created = 0;
   for (const character of tavernCharacters) {
     if (!character || !character.name) continue;
-    const key = character.tavernAvatar || character.name;
-    const existing = Object.values(state.contacts).find(item => item.tavernAvatar === key);
+    /* 关联用头像文件名（宿主里唯一），没有才退回名字。旧存档里存的是名字，也要能认领并升级。 */
+    const key = character.tavernAvatar || character.avatar || character.name;
+    const legacyKey = character.name;
+    const sameNameCount = tavernCharacters.filter(other => other?.name === character.name).length;
+    const existing = Object.values(state.contacts).find(item => item.tavernAvatar === key)
+      /* 旧存档绑的是名字而不是文件名 */
+      || Object.values(state.contacts).find(item => item.tavernAvatar === legacyKey)
+      /* 老联系人只有名字时，同名唯一才认领，别把名字相同的另一张卡接过来 */
+      || Object.values(state.contacts).find(item => !item.tavernAvatar
+        && (item.cardName === character.name || item.name === character.name)
+        && sameNameCount === 1);
     if (existing) {
-      existing.name = character.name;
+      /* 用户改过备注的，名字留原样；没改过的跟着卡片走 */
+      const renamed = existing.cardName && existing.name !== existing.cardName;
+      if (!existing.cardName) existing.cardName = character.name;
+      if (!renamed) existing.name = character.name;
+      existing.tavernAvatar = key;
       existing.avatar = character.avatarUrl || existing.avatar;
       continue;
     }
     addContact(state, {
       name: character.name,
+      cardName: character.name,
       avatar: character.avatarUrl || '',
       tavernAvatar: key,
       kind: 'char',
@@ -9388,6 +9420,31 @@ function syncTavernContacts(state, tavernCharacters = []) {
     created += 1;
   }
   return created;
+}
+
+/**
+ * 旧存档迁移：联系人只有名字、没有头像文件名时，补上卡片关联。
+ * 只在同名唯一时绑定；重名就留空，让用户在页面里自己选，不替用户猜。
+ */
+function linkContactCards(state) {
+  const cards = Array.isArray(state?.characters) ? state.characters : [];
+  if (!cards.length) return 0;
+  let linked = 0;
+  for (const contact of Object.values(state.contacts || {})) {
+    if (!contact || contact.kind === 'group') continue;
+    if (contact.tavernAvatar) {
+      const card = cards.find(item => item.avatar && item.avatar === contact.tavernAvatar);
+      if (card && !contact.cardName) contact.cardName = card.name;
+      continue;
+    }
+    const same = cards.filter(item => item.name === contact.name);
+    if (same.length !== 1) continue;
+    const card = same[0];
+    if (card.avatar) contact.tavernAvatar = card.avatar;
+    contact.cardName = card.name;
+    linked += 1;
+  }
+  return linked;
 }
 
 /* --------------------------------------------------------------- 演示数据 */
@@ -9981,6 +10038,16 @@ function normalize(raw) {
   merged.users = Array.isArray(raw.users) ? raw.users.filter(item => item && (item.key || item.name)) : [];
   merged.characters = Array.isArray(raw.characters) ? raw.characters.filter(item => item && item.name) : [];
   merged.charactersFromTavern = Boolean(raw.charactersFromTavern);
+  for (const [id, contact] of Object.entries(merged.contacts && typeof merged.contacts === 'object' ? merged.contacts : {})) {
+    if (!contact || typeof contact !== 'object') continue;
+    merged.contacts[id] = {
+      ...contact,
+      tavernAvatar: String(contact.tavernAvatar || ''),
+      cardName: String(contact.cardName || ''),
+    };
+  }
+  /* 只有名字的旧联系人按同名唯一补卡片关联；重名不绑，等用户自己选 */
+  linkContactCards(merged);
   merged.lookups = (raw.lookups && typeof raw.lookups === 'object' && !Array.isArray(raw.lookups)) ? raw.lookups : {};
   merged.usersFromTavern = Boolean(raw.usersFromTavern);
   merged.settings.api.presets = Array.isArray(merged.settings.api.presets) && merged.settings.api.presets.length
@@ -10161,6 +10228,7 @@ exports["replyContextFor"] = replyContextFor;
 exports["replyItemsFor"] = replyItemsFor;
 exports["fillPromptTokens"] = fillPromptTokens;
 exports["characterCardFor"] = characterCardFor;
+exports["cardNameAmbiguous"] = cardNameAmbiguous;
 exports["characterRefsFor"] = characterRefsFor;
 exports["itemAppliesToChat"] = itemAppliesToChat;
 exports["chatSchemesOf"] = chatSchemesOf;
@@ -10186,6 +10254,7 @@ exports["theaterPrompt"] = theaterPrompt;
 exports["splitTheaterBlocks"] = splitTheaterBlocks;
 exports["addExtrasEntry"] = addExtrasEntry;
 exports["syncTavernContacts"] = syncTavernContacts;
+exports["linkContactCards"] = linkContactCards;
 exports["demoState"] = demoState;
 exports["normalize"] = normalize;
 };
@@ -16451,7 +16520,7 @@ __mods["meme/apps/contacts.js"] = function(module, exports, __req){
  */
 
 const { icon } = __req("meme/icons.js");
-const { contactsOf, contactById, chatFor, chatById, lastMessage, addContact, syncTavernContacts } = __req("meme/data.js");
+const { contactsOf, contactById, chatFor, chatById, lastMessage, addContact, syncTavernContacts, linkContactCards } = __req("meme/data.js");
 const { avatarHtml, esc, shortText } = __req("meme/shell.js");
 const { pendingFriendRequests, respondFriendRequest, contactMembership, membershipLabel, signatureHistory } = __req("meme/behavior-domains.js");
 const { charactersPanel, charactersHandle, characterDetailHtml, characterCardHandle } = __req("meme/apps/characters.js");
@@ -16727,6 +16796,8 @@ const contactApp = {
             ctx.openSheet({
               kind: 'text', title: '名字', value: contact.name, confirm: '改好',
               onText: (text) => {
+                /* 改名前先按旧名字把卡片关��绑住，否则改完备注就再也找不到那张卡了 */
+                linkContactCards(ctx.state);
                 contact.name = String(text || '').trim() || contact.name;
                 ctx.save();
                 ctx.rerender();
@@ -20796,7 +20867,18 @@ __mods["meme/apps/characters.js"] = function(module, exports, __req){
 
 const { icon } = __req("meme/icons.js");
 const { esc, avatarHtml } = __req("meme/shell.js");
-const { addContact, contactsOf, memoryPresetFor, memoryReadModeFor, memoryGlobalReadMode } = __req("meme/data.js");
+const { addContact, contactsOf, characterCardFor, cardNameAmbiguous, memoryPresetFor, memoryReadModeFor, memoryGlobalReadMode } = __req("meme/data.js");
+
+/** 这张卡对应的联系人：按头像文件名认，改过备注也找得到；同名卡片不唯一时不认。 */
+function contactForCard(state, card) {
+  if (!card) return null;
+  return contactsOf(state).find(item => {
+    if (!item || item.kind === 'group') return false;
+    const bound = characterCardFor(state, item);
+    if (!bound) return false;
+    return card.avatar ? bound.avatar === card.avatar : bound.name === card.name;
+  }) || null;
+}
 
 const SECTIONS = [
   ['描述', 'description'],
@@ -21064,7 +21146,20 @@ function characterDetailHtml(ctx, card) {
       </div>`).join('');
 
   const bookState = ensureBooks(ctx, card);
-  const contact = contactsOf(state).find(item => item.name === card.name) || null;
+  /* 联系人按头像文件名找，不按名字：改过备注的联系人也要能对上这张卡 */
+  const contact = contactForCard(state, card);
+  /* 同名卡不止一张时，通讯录里只有名字的联系人对不上号，让用户自己选，不替他绑第一张 */
+  const loose = contactsOf(state).filter(item => item && item.kind !== 'group'
+    && !item.tavernAvatar
+    && (item.cardName === card.name || item.name === card.name));
+  const needsBind = !contact && loose.length > 0 && (cardNameAmbiguous(state, loose[0]) || loose.length > 1);
+  const looseNote = needsBind
+    ? `<div class="mp-card mp-mem-card" style="margin-top:8px">
+        <div class="mp-card-title">同名角色有好几张</div>
+        <div class="mp-card-sub">通讯录里的「${esc(loose.map(item => item.name).join('、'))}」对不上具体是哪张卡，选一次就记住了。</div>
+        <button class="mp-btn" data-act="char-bind" data-name="${esc(card.name)}" type="button" style="margin-top:10px">${icon('contacts')}<span>选择关联的联系人</span></button>
+      </div>`
+    : '';
   const memPreset = memoryPresetFor(state, null);
   const memMode = contact ? memoryReadModeFor(state, contact.id, memPreset) : memoryGlobalReadMode(state);
   const readSummary = memMode !== 'recent';
@@ -21092,6 +21187,7 @@ function characterDetailHtml(ctx, card) {
         <span style="color:var(--text-4)">${icon('chevron')}</span>
       </button>` : ''}
     </div>
+    ${looseNote}
 
     <div class="mp-wi-head">
       <span class="mp-wi-title">关联世界书</span>
@@ -21109,7 +21205,7 @@ const characterApp = {
     if (!card) return '<div class="mp-page-body"><div class="mp-empty">这张卡不在了。</div></div>';
     activeCardName = card.name;
 
-    const inContacts = contactsOf(state).some(contact => contact.name === card.name);
+    const inContacts = Boolean(contactForCard(state, card));
 
     const tags = (card.tags || []).map(tag => `<span class="mp-char-tag">${esc(tag)}</span>`).join('');
 
@@ -21139,7 +21235,7 @@ const characterApp = {
     /* 这位角色读总结还是原文：存在通讯录联系人上，选角色时就顺手设好 */
     if (act === 'char-mem-toggle') {
       const card = findCard(state, String(data?.name || ''));
-      const contact = card ? contactsOf(state).find(item => item.name === card.name) || null : null;
+      const contact = card ? contactForCard(state, card) : null;
       if (!contact) { ctx.toast('先存进通讯录，才能记住这位角色的读取方式'); return true; }
       const store = state.settings.memory;
       if (!store.byContact || typeof store.byContact !== 'object') store.byContact = {};
@@ -21159,12 +21255,40 @@ const characterApp = {
       return true;
     }
 
+    if (act === 'char-bind') {
+      const card = findCard(state, String(data?.name || ''));
+      if (!card) return true;
+      const loose = contactsOf(state).filter(item => item && item.kind !== 'group'
+        && !item.tavernAvatar
+        && (item.cardName === card.name || item.name === card.name));
+      if (!loose.length) { ctx.toast('通讯录里没有可关联的同名联系人'); return true; }
+      ctx.openSheet({
+        title: `把这张「${card.name}」关联给谁`,
+        items: loose.map(item => ({
+          label: item.name,
+          value: item.id,
+          icon: 'contacts',
+          note: item.cardName ? `卡片名：${item.cardName}` : '还没关联过角色卡',
+        })),
+        onPick: (value) => {
+          const contact = loose.find(item => item.id === value);
+          if (!contact) return;
+          contact.tavernAvatar = card.avatar || card.name;
+          contact.cardName = card.name;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`「${contact.name}」已经关联到这张卡`);
+        },
+      });
+      return true;
+    }
+
     if (act === 'char-add') {
       const card = findCard(state, String(data?.name || ''));
       if (!card) return true;
-      const exists = contactsOf(state).some(contact => contact.name === card.name);
+      const exists = Boolean(contactForCard(state, card));
       if (exists) { ctx.toast('通讯录里已经有了'); return true; }
-      addContact(state, { name: card.name, avatar: card.avatarUrl, kind: 'char', tavernAvatar: card.avatar, signature: (card.tags || []).slice(0, 2).join(' · ') });
+      addContact(state, { name: card.name, cardName: card.name, avatar: card.avatarUrl, kind: 'char', tavernAvatar: card.avatar, signature: (card.tags || []).slice(0, 2).join(' · ') });
       ctx.save();
       ctx.toast('存进通讯录了');
       ctx.rerender();

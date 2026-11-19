@@ -3,7 +3,7 @@
  */
 
 import { icon } from '../icons.js';
-import { contactsOf, contactById, chatFor, chatById, lastMessage, addContact, syncTavernContacts } from '../data.js';
+import { contactsOf, contactById, chatFor, chatById, lastMessage, addContact, syncTavernContacts, linkContactCards } from '../data.js';
 import { avatarHtml, esc, shortText } from '../shell.js';
 import { pendingFriendRequests, respondFriendRequest, contactMembership, membershipLabel, signatureHistory } from '../behavior-domains.js';
 import { charactersPanel, charactersHandle, characterDetailHtml, characterCardHandle } from './characters.js';
@@ -279,6 +279,8 @@ export const contactApp = {
             ctx.openSheet({
               kind: 'text', title: '名字', value: contact.name, confirm: '改好',
               onText: (text) => {
+                /* 改名前先按旧名字把卡片关��绑住，否则改完备注就再也找不到那张卡了 */
+                linkContactCards(ctx.state);
                 contact.name = String(text || '').trim() || contact.name;
                 ctx.save();
                 ctx.rerender();

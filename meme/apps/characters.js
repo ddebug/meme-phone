@@ -7,7 +7,18 @@
 
 import { icon } from '../icons.js';
 import { esc, avatarHtml } from '../shell.js';
-import { addContact, contactsOf, memoryPresetFor, memoryReadModeFor, memoryGlobalReadMode } from '../data.js';
+import { addContact, contactsOf, characterCardFor, cardNameAmbiguous, memoryPresetFor, memoryReadModeFor, memoryGlobalReadMode } from '../data.js';
+
+/** 这张卡对应的联系人：按头像文件名认，改过备注也找得到；同名卡片不唯一时不认。 */
+function contactForCard(state, card) {
+  if (!card) return null;
+  return contactsOf(state).find(item => {
+    if (!item || item.kind === 'group') return false;
+    const bound = characterCardFor(state, item);
+    if (!bound) return false;
+    return card.avatar ? bound.avatar === card.avatar : bound.name === card.name;
+  }) || null;
+}
 
 const SECTIONS = [
   ['描述', 'description'],
@@ -275,7 +286,20 @@ export function characterDetailHtml(ctx, card) {
       </div>`).join('');
 
   const bookState = ensureBooks(ctx, card);
-  const contact = contactsOf(state).find(item => item.name === card.name) || null;
+  /* 联系人按头像文件名找，不按名字：改过备注的联系人也要能对上这张卡 */
+  const contact = contactForCard(state, card);
+  /* 同名卡不止一张时，通讯录里只有名字的联系人对不上号，让用户自己选，不替他绑第一张 */
+  const loose = contactsOf(state).filter(item => item && item.kind !== 'group'
+    && !item.tavernAvatar
+    && (item.cardName === card.name || item.name === card.name));
+  const needsBind = !contact && loose.length > 0 && (cardNameAmbiguous(state, loose[0]) || loose.length > 1);
+  const looseNote = needsBind
+    ? `<div class="mp-card mp-mem-card" style="margin-top:8px">
+        <div class="mp-card-title">同名角色有好几张</div>
+        <div class="mp-card-sub">通讯录里的「${esc(loose.map(item => item.name).join('、'))}」对不上具体是哪张卡，选一次就记住了。</div>
+        <button class="mp-btn" data-act="char-bind" data-name="${esc(card.name)}" type="button" style="margin-top:10px">${icon('contacts')}<span>选择关联的联系人</span></button>
+      </div>`
+    : '';
   const memPreset = memoryPresetFor(state, null);
   const memMode = contact ? memoryReadModeFor(state, contact.id, memPreset) : memoryGlobalReadMode(state);
   const readSummary = memMode !== 'recent';
@@ -303,6 +327,7 @@ export function characterDetailHtml(ctx, card) {
         <span style="color:var(--text-4)">${icon('chevron')}</span>
       </button>` : ''}
     </div>
+    ${looseNote}
 
     <div class="mp-wi-head">
       <span class="mp-wi-title">关联世界书</span>
@@ -320,7 +345,7 @@ export const characterApp = {
     if (!card) return '<div class="mp-page-body"><div class="mp-empty">这张卡不在了。</div></div>';
     activeCardName = card.name;
 
-    const inContacts = contactsOf(state).some(contact => contact.name === card.name);
+    const inContacts = Boolean(contactForCard(state, card));
 
     const tags = (card.tags || []).map(tag => `<span class="mp-char-tag">${esc(tag)}</span>`).join('');
 
@@ -350,7 +375,7 @@ export const characterApp = {
     /* 这位角色读总结还是原文：存在通讯录联系人上，选角色时就顺手设好 */
     if (act === 'char-mem-toggle') {
       const card = findCard(state, String(data?.name || ''));
-      const contact = card ? contactsOf(state).find(item => item.name === card.name) || null : null;
+      const contact = card ? contactForCard(state, card) : null;
       if (!contact) { ctx.toast('先存进通讯录，才能记住这位角色的读取方式'); return true; }
       const store = state.settings.memory;
       if (!store.byContact || typeof store.byContact !== 'object') store.byContact = {};
@@ -370,12 +395,40 @@ export const characterApp = {
       return true;
     }
 
+    if (act === 'char-bind') {
+      const card = findCard(state, String(data?.name || ''));
+      if (!card) return true;
+      const loose = contactsOf(state).filter(item => item && item.kind !== 'group'
+        && !item.tavernAvatar
+        && (item.cardName === card.name || item.name === card.name));
+      if (!loose.length) { ctx.toast('通讯录里没有可关联的同名联系人'); return true; }
+      ctx.openSheet({
+        title: `把这张「${card.name}」关联给谁`,
+        items: loose.map(item => ({
+          label: item.name,
+          value: item.id,
+          icon: 'contacts',
+          note: item.cardName ? `卡片名：${item.cardName}` : '还没关联过角色卡',
+        })),
+        onPick: (value) => {
+          const contact = loose.find(item => item.id === value);
+          if (!contact) return;
+          contact.tavernAvatar = card.avatar || card.name;
+          contact.cardName = card.name;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`「${contact.name}」已经关联到这张卡`);
+        },
+      });
+      return true;
+    }
+
     if (act === 'char-add') {
       const card = findCard(state, String(data?.name || ''));
       if (!card) return true;
-      const exists = contactsOf(state).some(contact => contact.name === card.name);
+      const exists = Boolean(contactForCard(state, card));
       if (exists) { ctx.toast('通讯录里已经有了'); return true; }
-      addContact(state, { name: card.name, avatar: card.avatarUrl, kind: 'char', tavernAvatar: card.avatar, signature: (card.tags || []).slice(0, 2).join(' · ') });
+      addContact(state, { name: card.name, cardName: card.name, avatar: card.avatarUrl, kind: 'char', tavernAvatar: card.avatar, signature: (card.tags || []).slice(0, 2).join(' · ') });
       ctx.save();
       ctx.toast('存进通讯录了');
       ctx.rerender();

@@ -169,29 +169,14 @@ function formatNumber(value) {
   return Number(value || 0).toLocaleString('zh-CN');
 }
 
-function roleLabel(role) {
-  return role === 'user' ? '用户' : role === 'assistant' ? '角色' : '系统';
-}
-
-function snippet(text, limit = 56) {
-  const line = String(text || '').replace(/\s+/g, ' ').trim();
-  return line.length > limit ? `${line.slice(0, limit)}…` : line;
-}
-
-function debugRowHtml(row) {
+function debugGroupHtml(group) {
   return `
-    <details class="mp-debug-row">
-      <summary>
-        <span class="mp-debug-dot mp-debug-dot-${row.group.key}"></span>
-        <span class="mp-debug-rowmain">
-          <span class="mp-debug-rowtop"><span class="mp-debug-source">${esc(row.source)}</span><span class="mp-debug-role">${roleLabel(row.role)}</span></span>
-          <span class="mp-debug-snippet">${esc(snippet(row.content) || '（空）')}</span>
-        </span>
-        <span class="mp-debug-num">${formatNumber(row.tokens)} tk</span>
-      </summary>
-      <div class="mp-debug-content">${esc(row.content || '（空）')}</div>
-      <div class="mp-debug-rowmeta">${formatNumber(row.chars)} 字 · ${roleLabel(row.role)}</div>
-    </details>`;
+    <div class="mp-debug-group">
+      <span class="mp-debug-dot mp-debug-dot-${group.key}"></span>
+      <span class="mp-debug-group-name">${esc(group.label)}</span>
+      <span class="mp-debug-group-meta">${formatNumber(group.count)} 条 · ${formatNumber(group.chars)} 字</span>
+      <span class="mp-debug-num">${formatNumber(group.tokens)} tk</span>
+    </div>`;
 }
 
 function debugPanelHtml(ctx, chat, contact, cache, draft) {
@@ -213,12 +198,12 @@ function debugPanelHtml(ctx, chat, contact, cache, draft) {
   return `
     <div class="mp-debug-panel">
       <div class="mp-debug-summary">
-        <div class="mp-debug-summary-main">${want} · ${formatNumber(stats.rows.length)} 条消息${budget ? ` · 上下文 ${budget}` : ''}</div>
+        <div class="mp-debug-summary-main">${want} · ${formatNumber(groups.length)} 组 · ${formatNumber(stats.rows.length)} 条 · ≈ ${formatNumber(stats.total)} tk${budget ? ` · 上下文 ${budget}` : ''}</div>
         <div class="mp-debug-model">${esc(modelName)} · ${esc(preset)}</div>
       </div>
       <div class="mp-debug-share" aria-hidden="true">${bars || '<span class="mp-debug-seg mp-debug-seg-empty" style="width:100%"></span>'}</div>
       ${inputWarn}${budgetWarn}
-      <div class="mp-debug-list">${stats.rows.map(debugRowHtml).join('') || '<div class="mp-debug-empty">这一轮没有可发送的消息。</div>'}</div>
+      <div class="mp-debug-list">${groups.map(debugGroupHtml).join('') || '<div class="mp-debug-empty">这一轮没有可发送的消息。</div>'}</div>
       ${skipped.length ? `
       <details class="mp-debug-more">
         <summary>未进入这一次 · ${skipped.length} 条</summary>

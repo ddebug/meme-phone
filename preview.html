@@ -1324,12 +1324,36 @@ body {
 .mp-debug-seg { display: block; height: 100%; }
 .mp-debug-seg-rule { background: var(--accent); }
 .mp-debug-seg-context { background: #7d9cd8; }
-.mp-debug-seg-history { background: #72b6a3; }
+.mp-debug-seg-tavern { background: #72b6a3; }
+.mp-debug-seg-phone { background: #6fb7cc; }
 .mp-debug-seg-turn { background: #d7a45b; }
 .mp-debug-seg-theater { background: #d984a8; }
 .mp-debug-seg-empty { background: rgba(74, 58, 110, .16); }
 
 .mp-debug-list { display: flex; flex-direction: column; }
+.mp-debug-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(74, 58, 110, .08);
+}
+.mp-debug-group:first-child { border-top: 0; }
+.mp-debug-group-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text);
+}
+.mp-debug-group-meta {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: calc(9.5px * var(--font-scale));
+  color: var(--text-4);
+  font-variant-numeric: tabular-nums;
+}
 .mp-debug-row { border-top: 1px solid rgba(74, 58, 110, .08); }
 .mp-debug-row summary {
   display: grid;
@@ -1349,7 +1373,8 @@ body {
   background: var(--accent);
 }
 .mp-debug-dot-context { background: #7d9cd8; }
-.mp-debug-dot-history { background: #72b6a3; }
+.mp-debug-dot-tavern { background: #72b6a3; }
+.mp-debug-dot-phone { background: #6fb7cc; }
 .mp-debug-dot-turn { background: #d7a45b; }
 .mp-debug-dot-theater { background: #d984a8; }
 .mp-debug-rowmain { min-width: 0; }
@@ -6529,7 +6554,7 @@ body {
   background: rgba(255, 255, 255, .07);
 }
 .mp-root[data-mp-theme="night"] .mp-debug-tk { color: #c3b5ff; }
-.mp-root[data-mp-theme="night"] .mp-debug-row { border-top-color: rgba(255, 255, 255, .08); }
+.mp-root[data-mp-theme="night"] .mp-debug-group { border-top-color: rgba(255, 255, 255, .08); }
 .mp-root[data-mp-theme="night"] .mp-debug-more { border-top-color: rgba(255, 255, 255, .08); }
 .mp-root[data-mp-theme="night"] .mp-debug-share { background: rgba(255, 255, 255, .1); }
 .mp-root[data-mp-theme="night"] .mp-debug-seg-empty { background: rgba(255, 255, 255, .16); }
@@ -6563,7 +6588,7 @@ body {
   box-shadow: 3px 3px 0 #14141a;
 }
 .mp-root[data-mp-art="pixel"] .mp-debug-head { font-weight: 600; }
-.mp-root[data-mp-art="pixel"] .mp-debug-row,
+.mp-root[data-mp-art="pixel"] .mp-debug-group,
 .mp-root[data-mp-art="pixel"] .mp-debug-more { border-top-color: #14141a; }
 .mp-root[data-mp-art="pixel"] .mp-debug-content {
   border-radius: 0;
@@ -6575,7 +6600,7 @@ body {
   border-color: #f4f1e8;
   box-shadow: 3px 3px 0 #f4f1e8;
 }
-.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug-row,
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug-group,
 .mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug-more { border-top-color: rgba(244, 241, 232, .45); }
 .mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug-content {
   background: #1c1c22;
@@ -14746,29 +14771,14 @@ function formatNumber(value) {
   return Number(value || 0).toLocaleString('zh-CN');
 }
 
-function roleLabel(role) {
-  return role === 'user' ? '用户' : role === 'assistant' ? '角色' : '系统';
-}
-
-function snippet(text, limit = 56) {
-  const line = String(text || '').replace(/\s+/g, ' ').trim();
-  return line.length > limit ? `${line.slice(0, limit)}…` : line;
-}
-
-function debugRowHtml(row) {
+function debugGroupHtml(group) {
   return `
-    <details class="mp-debug-row">
-      <summary>
-        <span class="mp-debug-dot mp-debug-dot-${row.group.key}"></span>
-        <span class="mp-debug-rowmain">
-          <span class="mp-debug-rowtop"><span class="mp-debug-source">${esc(row.source)}</span><span class="mp-debug-role">${roleLabel(row.role)}</span></span>
-          <span class="mp-debug-snippet">${esc(snippet(row.content) || '（空）')}</span>
-        </span>
-        <span class="mp-debug-num">${formatNumber(row.tokens)} tk</span>
-      </summary>
-      <div class="mp-debug-content">${esc(row.content || '（空）')}</div>
-      <div class="mp-debug-rowmeta">${formatNumber(row.chars)} 字 · ${roleLabel(row.role)}</div>
-    </details>`;
+    <div class="mp-debug-group">
+      <span class="mp-debug-dot mp-debug-dot-${group.key}"></span>
+      <span class="mp-debug-group-name">${esc(group.label)}</span>
+      <span class="mp-debug-group-meta">${formatNumber(group.count)} 条 · ${formatNumber(group.chars)} 字</span>
+      <span class="mp-debug-num">${formatNumber(group.tokens)} tk</span>
+    </div>`;
 }
 
 function debugPanelHtml(ctx, chat, contact, cache, draft) {
@@ -14790,12 +14800,12 @@ function debugPanelHtml(ctx, chat, contact, cache, draft) {
   return `
     <div class="mp-debug-panel">
       <div class="mp-debug-summary">
-        <div class="mp-debug-summary-main">${want} · ${formatNumber(stats.rows.length)} 条消息${budget ? ` · 上下文 ${budget}` : ''}</div>
+        <div class="mp-debug-summary-main">${want} · ${formatNumber(groups.length)} 组 · ${formatNumber(stats.rows.length)} 条 · ≈ ${formatNumber(stats.total)} tk${budget ? ` · 上下文 ${budget}` : ''}</div>
         <div class="mp-debug-model">${esc(modelName)} · ${esc(preset)}</div>
       </div>
       <div class="mp-debug-share" aria-hidden="true">${bars || '<span class="mp-debug-seg mp-debug-seg-empty" style="width:100%"></span>'}</div>
       ${inputWarn}${budgetWarn}
-      <div class="mp-debug-list">${stats.rows.map(debugRowHtml).join('') || '<div class="mp-debug-empty">这一轮没有可发送的消息。</div>'}</div>
+      <div class="mp-debug-list">${groups.map(debugGroupHtml).join('') || '<div class="mp-debug-empty">这一轮没有可发送的消息。</div>'}</div>
       ${skipped.length ? `
       <details class="mp-debug-more">
         <summary>未进入这一次 · ${skipped.length} 条</summary>
@@ -25336,18 +25346,32 @@ function estimateTokens(input) {
   return tokens;
 }
 
+const REQUEST_GROUP_LABELS = {
+  rule: '规则',
+  context: '设定',
+  tavern: '酒馆历史',
+  phone: '小手机历史',
+  turn: '本轮',
+  theater: '小剧场',
+};
+
 function requestGroup(message) {
+  const explicit = String(message?.group || '');
+  if (REQUEST_GROUP_LABELS[explicit]) return { key: explicit, label: REQUEST_GROUP_LABELS[explicit] };
   const source = String(message?.source || '');
   if (source === '小剧场') return { key: 'theater', label: '小剧场' };
-  if (source === '回复要求' || source === '场景提示') return { key: 'rule', label: '规则' };
-  if (source === '最后一条聊天' || source === '主动消息占位') return { key: 'turn', label: '本条' };
-  if (source.includes('聊天记录') || source.includes('历史小手机') || source.includes('历史酒馆') || source.includes('酒馆记忆')) {
-    return { key: 'history', label: '记录' };
+  if (source === '回复要求' || source === '场景提示' || source === '行为提示') return { key: 'rule', label: '规则' };
+  if (source === '最后一条聊天' || source === '主动消息占位') return { key: 'turn', label: '本轮' };
+  if (source.includes('历史酒馆') || source.includes('酒馆记忆') || source.includes('酒馆总结') || source.includes('酒馆聊天')) {
+    return { key: 'tavern', label: '酒馆历史' };
+  }
+  if (source.includes('历史小手机') || source.includes('聊天记录') || source.includes('小手机消息')) {
+    return { key: 'phone', label: '小手机历史' };
   }
   return { key: 'context', label: '设定' };
 }
 
-/** 把组装好的 messages 变成调试栏要展示的逐条统计。 */
+/** 把组装好的 messages 变成调试栏要展示的分组统计。 */
 function requestStats(messages) {
   const rows = (Array.isArray(messages) ? messages : []).map((message, index) => {
     const content = String(message?.content || '');
@@ -25362,17 +25386,25 @@ function requestStats(messages) {
       group,
     };
   });
-  const order = ['rule', 'context', 'history', 'turn', 'theater'];
+  const order = ['rule', 'context', 'tavern', 'phone', 'turn', 'theater'];
   const groupMap = new Map();
   rows.forEach(row => {
-    const item = groupMap.get(row.group.key) || { key: row.group.key, label: row.group.label, tokens: 0, count: 0 };
+    const item = groupMap.get(row.group.key) || {
+      key: row.group.key,
+      label: row.group.label,
+      tokens: 0,
+      chars: 0,
+      count: 0,
+    };
     item.tokens += row.tokens;
+    item.chars += row.chars;
     item.count += 1;
     groupMap.set(row.group.key, item);
   });
   return {
     rows,
     total: rows.reduce((sum, row) => sum + row.tokens, 0),
+    totalChars: rows.reduce((sum, row) => sum + row.chars, 0),
     groups: [...groupMap.values()].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)),
   };
 }
@@ -25739,7 +25771,7 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
   }
   const memoryText = String(options.memoryText || '');
 
-  if (options.lead) messages.push({ role: 'system', content: options.lead, source: '场景提示' });
+  if (options.lead) messages.push({ role: 'system', content: options.lead, source: '场景提示', group: 'rule' });
 
   const seen = new Set();
   let used = 0;
@@ -25801,23 +25833,26 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
 
     seen.add(key);
     used += content.length;
-    messages.push({ role: item.role || 'system', content, source: item.label, id: item.id });
+    const group = item.kind === 'context'
+      ? (item.auto === 'memory' ? 'tavern' : item.auto === 'history' ? 'phone' : 'context')
+      : 'rule';
+    messages.push({ role: item.role || 'system', content, source: item.label, id: item.id, group });
     reportItems.push({ ...base, status: 'injected', chars: content.length, reason: block.reason || '' });
   }
 
   /* 行为标签：只把当前打开的转账 / 计划 / 会员等写进系统提示，关掉的就不教模型。 */
-  if (options.behaviorPrompt) messages.push({ role: 'system', content: String(options.behaviorPrompt), source: '行为提示' });
+  if (options.behaviorPrompt) messages.push({ role: 'system', content: String(options.behaviorPrompt), source: '行为提示', group: 'rule' });
 
   /* 小剧场放在全部预设条目之后、最后一条聊天之前，避免被前面的回复格式/行为条目盖掉。 */
-  if (options.extraPrompt) messages.push({ role: 'system', content: String(options.extraPrompt), source: '小剧场' });
+  if (options.extraPrompt) messages.push({ role: 'system', content: String(options.extraPrompt), source: '小剧场', group: 'theater' });
 
   let lastUserText = '';
   if (pendingUserText) {
     lastUserText = pendingUserText;
-    messages.push({ role: 'user', content: `${messageWho(state, contact, lastMessage)}：${pendingUserText}`, source: '最后一条聊天' });
+    messages.push({ role: 'user', content: `${messageWho(state, contact, lastMessage)}：${pendingUserText}`, source: '最后一条聊天', group: 'turn' });
   }
   if (options.proactive && !messages.some(message => message.role === 'user')) {
-    messages.push({ role: 'user', content: '（现在没有新消息，主动发一条。）', source: '主动消息占位' });
+    messages.push({ role: 'user', content: '（现在没有新消息，主动发一条。）', source: '主动消息占位', group: 'turn' });
   }
 
   const charTotal = messages.reduce((sum, message) => sum + String(message?.content || '').length, 0);

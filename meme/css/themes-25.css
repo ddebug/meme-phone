@@ -967,7 +967,7 @@
   background: rgba(255, 255, 255, .07);
 }
 .mp-root[data-mp-theme="night"] .mp-debug-tk { color: #c3b5ff; }
-.mp-root[data-mp-theme="night"] .mp-debug-row { border-top-color: rgba(255, 255, 255, .08); }
+.mp-root[data-mp-theme="night"] .mp-debug-group { border-top-color: rgba(255, 255, 255, .08); }
 .mp-root[data-mp-theme="night"] .mp-debug-more { border-top-color: rgba(255, 255, 255, .08); }
 .mp-root[data-mp-theme="night"] .mp-debug-share { background: rgba(255, 255, 255, .1); }
 .mp-root[data-mp-theme="night"] .mp-debug-seg-empty { background: rgba(255, 255, 255, .16); }
@@ -1001,7 +1001,7 @@
   box-shadow: 3px 3px 0 #14141a;
 }
 .mp-root[data-mp-art="pixel"] .mp-debug-head { font-weight: 600; }
-.mp-root[data-mp-art="pixel"] .mp-debug-row,
+.mp-root[data-mp-art="pixel"] .mp-debug-group,
 .mp-root[data-mp-art="pixel"] .mp-debug-more { border-top-color: #14141a; }
 .mp-root[data-mp-art="pixel"] .mp-debug-content {
   border-radius: 0;
@@ -1013,7 +1013,7 @@
   border-color: #f4f1e8;
   box-shadow: 3px 3px 0 #f4f1e8;
 }
-.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug-row,
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug-group,
 .mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug-more { border-top-color: rgba(244, 241, 232, .45); }
 .mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug-content {
   background: #1c1c22;

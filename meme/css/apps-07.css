@@ -419,12 +419,36 @@
 .mp-debug-seg { display: block; height: 100%; }
 .mp-debug-seg-rule { background: var(--accent); }
 .mp-debug-seg-context { background: #7d9cd8; }
-.mp-debug-seg-history { background: #72b6a3; }
+.mp-debug-seg-tavern { background: #72b6a3; }
+.mp-debug-seg-phone { background: #6fb7cc; }
 .mp-debug-seg-turn { background: #d7a45b; }
 .mp-debug-seg-theater { background: #d984a8; }
 .mp-debug-seg-empty { background: rgba(74, 58, 110, .16); }
 
 .mp-debug-list { display: flex; flex-direction: column; }
+.mp-debug-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(74, 58, 110, .08);
+}
+.mp-debug-group:first-child { border-top: 0; }
+.mp-debug-group-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text);
+}
+.mp-debug-group-meta {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: calc(9.5px * var(--font-scale));
+  color: var(--text-4);
+  font-variant-numeric: tabular-nums;
+}
 .mp-debug-row { border-top: 1px solid rgba(74, 58, 110, .08); }
 .mp-debug-row summary {
   display: grid;
@@ -444,7 +468,8 @@
   background: var(--accent);
 }
 .mp-debug-dot-context { background: #7d9cd8; }
-.mp-debug-dot-history { background: #72b6a3; }
+.mp-debug-dot-tavern { background: #72b6a3; }
+.mp-debug-dot-phone { background: #6fb7cc; }
 .mp-debug-dot-turn { background: #d7a45b; }
 .mp-debug-dot-theater { background: #d984a8; }
 .mp-debug-rowmain { min-width: 0; }

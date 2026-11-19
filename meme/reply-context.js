@@ -52,18 +52,32 @@ export function estimateTokens(input) {
   return tokens;
 }
 
+const REQUEST_GROUP_LABELS = {
+  rule: '规则',
+  context: '设定',
+  tavern: '酒馆历史',
+  phone: '小手机历史',
+  turn: '本轮',
+  theater: '小剧场',
+};
+
 function requestGroup(message) {
+  const explicit = String(message?.group || '');
+  if (REQUEST_GROUP_LABELS[explicit]) return { key: explicit, label: REQUEST_GROUP_LABELS[explicit] };
   const source = String(message?.source || '');
   if (source === '小剧场') return { key: 'theater', label: '小剧场' };
-  if (source === '回复要求' || source === '场景提示') return { key: 'rule', label: '规则' };
-  if (source === '最后一条聊天' || source === '主动消息占位') return { key: 'turn', label: '本条' };
-  if (source.includes('聊天记录') || source.includes('历史小手机') || source.includes('历史酒馆') || source.includes('酒馆记忆')) {
-    return { key: 'history', label: '记录' };
+  if (source === '回复要求' || source === '场景提示' || source === '行为提示') return { key: 'rule', label: '规则' };
+  if (source === '最后一条聊天' || source === '主动消息占位') return { key: 'turn', label: '本轮' };
+  if (source.includes('历史酒馆') || source.includes('酒馆记忆') || source.includes('酒馆总结') || source.includes('酒馆聊天')) {
+    return { key: 'tavern', label: '酒馆历史' };
+  }
+  if (source.includes('历史小手机') || source.includes('聊天记录') || source.includes('小手机消息')) {
+    return { key: 'phone', label: '小手机历史' };
   }
   return { key: 'context', label: '设定' };
 }
 
-/** 把组装好的 messages 变成调试栏要展示的逐条统计。 */
+/** 把组装好的 messages 变成调试栏要展示的分组统计。 */
 export function requestStats(messages) {
   const rows = (Array.isArray(messages) ? messages : []).map((message, index) => {
     const content = String(message?.content || '');
@@ -78,17 +92,25 @@ export function requestStats(messages) {
       group,
     };
   });
-  const order = ['rule', 'context', 'history', 'turn', 'theater'];
+  const order = ['rule', 'context', 'tavern', 'phone', 'turn', 'theater'];
   const groupMap = new Map();
   rows.forEach(row => {
-    const item = groupMap.get(row.group.key) || { key: row.group.key, label: row.group.label, tokens: 0, count: 0 };
+    const item = groupMap.get(row.group.key) || {
+      key: row.group.key,
+      label: row.group.label,
+      tokens: 0,
+      chars: 0,
+      count: 0,
+    };
     item.tokens += row.tokens;
+    item.chars += row.chars;
     item.count += 1;
     groupMap.set(row.group.key, item);
   });
   return {
     rows,
     total: rows.reduce((sum, row) => sum + row.tokens, 0),
+    totalChars: rows.reduce((sum, row) => sum + row.chars, 0),
     groups: [...groupMap.values()].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)),
   };
 }
@@ -455,7 +477,7 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
   }
   const memoryText = String(options.memoryText || '');
 
-  if (options.lead) messages.push({ role: 'system', content: options.lead, source: '场景提示' });
+  if (options.lead) messages.push({ role: 'system', content: options.lead, source: '场景提示', group: 'rule' });
 
   const seen = new Set();
   let used = 0;
@@ -517,23 +539,26 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
 
     seen.add(key);
     used += content.length;
-    messages.push({ role: item.role || 'system', content, source: item.label, id: item.id });
+    const group = item.kind === 'context'
+      ? (item.auto === 'memory' ? 'tavern' : item.auto === 'history' ? 'phone' : 'context')
+      : 'rule';
+    messages.push({ role: item.role || 'system', content, source: item.label, id: item.id, group });
     reportItems.push({ ...base, status: 'injected', chars: content.length, reason: block.reason || '' });
   }
 
   /* 行为标签：只把当前打开的转账 / 计划 / 会员等写进系统提示，关掉的就不教模型。 */
-  if (options.behaviorPrompt) messages.push({ role: 'system', content: String(options.behaviorPrompt), source: '行为提示' });
+  if (options.behaviorPrompt) messages.push({ role: 'system', content: String(options.behaviorPrompt), source: '行为提示', group: 'rule' });
 
   /* 小剧场放在全部预设条目之后、最后一条聊天之前，避免被前面的回复格式/行为条目盖掉。 */
-  if (options.extraPrompt) messages.push({ role: 'system', content: String(options.extraPrompt), source: '小剧场' });
+  if (options.extraPrompt) messages.push({ role: 'system', content: String(options.extraPrompt), source: '小剧场', group: 'theater' });
 
   let lastUserText = '';
   if (pendingUserText) {
     lastUserText = pendingUserText;
-    messages.push({ role: 'user', content: `${messageWho(state, contact, lastMessage)}：${pendingUserText}`, source: '最后一条聊天' });
+    messages.push({ role: 'user', content: `${messageWho(state, contact, lastMessage)}：${pendingUserText}`, source: '最后一条聊天', group: 'turn' });
   }
   if (options.proactive && !messages.some(message => message.role === 'user')) {
-    messages.push({ role: 'user', content: '（现在没有新消息，主动发一条。）', source: '主动消息占位' });
+    messages.push({ role: 'user', content: '（现在没有新消息，主动发一条。）', source: '主动消息占位', group: 'turn' });
   }
 
   const charTotal = messages.reduce((sum, message) => sum + String(message?.content || '').length, 0);

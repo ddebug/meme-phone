@@ -57,7 +57,17 @@
 - 聚合入口：`meme/meme.css` 只含按 `order.json` 顺序的 `@import url("css/<段文件>");`。
 - 预览打包：`scripts/build_preview.py` 读 `order.json` 顺序拼接段文件，做 `url("../assets/` → `url("assets/` 替换后内联进 `preview.html`；指纹写入 `preview.stamp.json`。
 
-## 后续待办（下一轮，需浏览器可截图复核后再做）
+## 离线截图复核流程（已打通，不依赖浏览器自动化后端）
+
+浏览器自动化后端（CDP）不可用时，可用系统 Edge 的 headless 模式直接渲染本地 `preview.html` 做逐页像素比对：
+
+- **渲染参数**：`--headless --disable-gpu --hide-scrollbars --window-size=430,900 --force-device-scale-factor=1 --force-prefers-reduced-motion --virtual-time-budget=3000 --screenshot=<out.png> <url>`。
+  - `--force-prefers-reduced-motion` + `--virtual-time-budget` 用来跳过入场过渡动画，避免截到不同动画帧；固定缩放因子保证两次渲染 DPI 一致。
+- **按视图取页**：`preview.html?view=<app-id>`，夜间态追加 `#night`。主页面 app-id：`app-chat / app-contacts / app-diary / app-settings / app-extras / app-music / app-draw / app-plans / app-dress / app-presets / app-api`，桌面页不带 view。子页面（thread / contact / memory-presets / character-card / p-charphone / p-chatphone / user-item / extra-detail / photo-view / app-wallet / thread-settings / thread-diary）需在 URL 里补对应参数，当前基线未覆盖。
+- **比对阈值**：同一份代码重截两次，设备右缘抗锯齿有固定抖动，实测每张约 90 px（集中在 x402–410、y50–61）；单张差异 ≤100 px 视为无视觉变化，超出即需人工看图定位。状态栏右上角时钟是动态的，比对时掩码排除。
+- **门禁顺序**：动 CSS 前先截基线集 → 改规则 → `python scripts/build_preview.py` 重建 `preview.html` 与指纹 → `npm test` 全绿 → 重截比对基线集 → 每张 ≤100 px 才提交。
+
+## 后续待办（需覆盖全状态后再做跨层归位）
 
 ### 审计现状
 

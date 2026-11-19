@@ -478,7 +478,7 @@ function presetDetail(ctx, store, preset) {
     ? ''
     : inTavern
       ? '<div class="mp-api-field-hint">Key 留在酒馆里，这里不填也能用</div>'
-      : `<div class="mp-api-field-hint">${draft.key ? 'Key 已填，默认掩码显示' : '还没填 Key'}</div>`;
+      : `<div class="mp-api-field-hint">${draft.key ? 'Key 已填，显示时打码' : '还没填 Key'}</div>`;
   const engineOptions = ENGINES.filter(item => item.value !== 'tavern').map(item => `
     <option value="${item.value}"${item.value === draft.engine ? ' selected' : ''}>${esc(item.label)}</option>`).join('');
   const modelPicker = `<div class="mp-api-model-slot" data-api-model-slot>${modelPickerHtml(preset, draft)}</div>`;
@@ -563,7 +563,7 @@ function deleteConfirm(state, store) {
     if (!scheme) return '';
     return `
       <div class="mp-api-delete">
-        <div class="mp-api-delete-title">删除方案「${esc(scheme.name || '未命名')}」？</div>
+        <div class="mp-api-delete-title">删除方案「${esc(schemeLabel(state, scheme))}」？</div>
         <div class="mp-api-delete-sub">只删这套「接口 + 回复预设」的组合，接口和回复预设都还在。至少会留一套方案。</div>
         <div class="mp-api-actions">
           <button class="mp-api-btn is-danger" data-act="api-scheme-del-confirm" type="button">确认删除方案</button>
@@ -893,7 +893,7 @@ export const apiListApp = {
       schemeEdit = null;
       ctx.save();
       redraw(ctx);
-      say(ctx, `已保存到方案「${scheme.name || '未命名'}」`);
+      say(ctx, `已保存到方案「${schemeLabel(ctx.state, scheme)}」`);
       return true;
     }
 
@@ -909,7 +909,7 @@ export const apiListApp = {
 
     if (act === 'api-scheme-rename') {
       if (!scheme) { say(ctx, '先选一套整体方案'); return true; }
-      schemeEdit = { mode: 'rename', value: scheme.name || '' };
+      schemeEdit = { mode: 'rename', value: schemeLabel(ctx.state, scheme) };
       redraw(ctx);
       return true;
     }
@@ -942,7 +942,7 @@ export const apiListApp = {
       if (!scheme) { say(ctx, '先选一套整体方案'); return true; }
       const copy = {
         id: newId('lsch'),
-        name: `${scheme.name || '方案'} 副本`.slice(0, 20),
+        name: `${schemeLabel(ctx.state, scheme) || '方案'} 副本`.slice(0, 20),
         apiId: scheme.apiId,
         replyId: scheme.replyId,
       };

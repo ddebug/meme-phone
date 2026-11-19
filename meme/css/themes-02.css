@@ -1,0 +1,27 @@
+.mp-root[data-mp-theme="night"] {
+  --text: #ece9f7;
+  --text-2: rgba(236, 233, 247, .66);
+  --text-3: rgba(236, 233, 247, .52);
+  --text-4: rgba(236, 233, 247, .32);
+  --line: rgba(255, 255, 255, .08);
+  --line-soft: rgba(255, 255, 255, .04);
+
+  --page: #14121f;
+  --page-2: #100e19;
+  --glass: rgba(28, 25, 44, .62);
+  --glass-strong: rgba(34, 30, 52, .82);
+  --card: rgba(255, 255, 255, .05);
+  --field-bg: rgba(255, 255, 255, .10);
+  --field-solid: #2b2640;
+  --field-border: rgba(255, 255, 255, .16);
+
+  --accent: #a795ff;
+  --accent-deep: #8b76f2;
+
+  --shadow-s: 0 4px 14px rgba(0, 0, 0, .28);
+  --shadow-m: 0 10px 26px rgba(0, 0, 0, .34);
+  --shadow-l: 0 22px 50px rgba(0, 0, 0, .44);
+
+  --wallpaper: var(--wall-night);
+}
+

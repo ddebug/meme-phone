@@ -13588,13 +13588,21 @@ const { chatMemorySummary, summaryText } = __req("meme/book.js");
 const { readLatestTavernChat, readTavernContext } = __req("meme/host.js");
 
 const MEMORY_MODES = [
-  { value: 'auto', label: '自动', hint: '有总结先用总结，没有就取最近几层原文' },
+  { value: 'auto', label: '总结优先', hint: '有总结先用总结，没有就取最近几层原文' },
   { value: 'summary', label: '只用总结', hint: '只注入酒馆总结' },
   { value: 'recent', label: '只看原文', hint: '只注入最近几层酒馆聊天' },
 ];
 
 function memoryModeLabel(mode) {
-  return MEMORY_MODES.find(item => item.value === mode)?.label || '自动';
+  return MEMORY_MODES.find(item => item.value === mode)?.label || '总结优先';
+}
+
+/** 方案名兜底：旧存档里叫「默认 / 自动」的，直接换成实际读法。 */
+function memoryPresetTitle(preset) {
+  const raw = String(preset?.name || '').trim();
+  if (raw && !['默认', '默认方案', '自动', '跟随'].includes(raw)) return raw;
+  return preset?.mode === 'summary' ? '只用总结'
+    : preset?.mode === 'recent' ? '只看原文' : '总结优先';
 }
 
 /** 一行说明，给聊天设置和预设页共用。 */
@@ -13801,6 +13809,7 @@ async function buildMemoryContext(state, chat, limit = 1200) {
 
 exports["MEMORY_MODES"] = MEMORY_MODES;
 exports["memoryModeLabel"] = memoryModeLabel;
+exports["memoryPresetTitle"] = memoryPresetTitle;
 exports["memoryPresetSummary"] = memoryPresetSummary;
 exports["activeMemoryPreset"] = activeMemoryPreset;
 exports["buildMemoryContext"] = buildMemoryContext;
@@ -14204,11 +14213,11 @@ const { icon } = __req("meme/icons.js");
 const {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
   wakeAllowed, messagePreview, addExtrasEntry, theaterKindFor, THEATER_KINDS, theaterKindById,
-  apiPresetsOf, memoryPresetsOf, memoryPresetFor, memoryReadModeFor,
+  apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, replyContextFor, normalizeReplyItems,
   chatHistoryFor, effectiveTavernHistory,
 } = __req("meme/data.js");
-const { memoryPresetSummary } = __req("meme/memory.js");
+const { memoryPresetSummary, memoryPresetTitle } = __req("meme/memory.js");
 const { requestStats, estimateTokens, proactiveLead } = __req("meme/reply-context.js");
 const { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } = __req("meme/chat-transfer.js");
 const { avatarHtml, chatAvatarHtml, esc, shortText, timeText } = __req("meme/shell.js");
@@ -14231,6 +14240,13 @@ function poolFor(contact) {
 }
 
 function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+
+/** 设置里不显示「默认 / 跟随」这类占位名，直接给真正生效的名字。 */
+function settingName(name, fallback) {
+  const raw = String(name || '').trim();
+  if (!raw || ['默认', '默认方案', '默认回复方式', '跟随', '自动'].includes(raw)) return fallback;
+  return raw;
+}
 
 /* --------------------------------------------------------- 请求调试栏 */
 
@@ -14620,53 +14636,49 @@ function settingsBody(ctx, chatId) {
   const presets = apiPresetsOf(state);
   const ownPreset = presets.find(item => item.id === chat.llmPresetId) || null;
   const globalPreset = presets.find(item => item.id === state.settings.api?.activeChat) || presets[0] || null;
-  const llmSub = ownPreset
-    ? `只对这个会话 · ${ownPreset.name || '未命名方案'}`
-    : `跟随手机 · ${globalPreset?.name || '酒馆 API'}`;
+  const activePreset = ownPreset || globalPreset;
+  const llmName = settingName(activePreset?.name, '酒馆 API');
+  const llmSub = [activePreset?.model, activePreset?.url].filter(Boolean).join(' · ') || '借酒馆自己的模型';
   const memoryPresets = memoryPresetsOf(state);
   const ownMemory = memoryPresets.find(item => item.id === chat.memoryPresetId) || null;
   const globalMemory = memoryPresetFor(state, null);
-  const memorySub = ownMemory
-    ? `只对这个会话 · ${memoryPresetSummary(ownMemory)}`
-    : `跟随手机 · ${memoryPresetSummary(globalMemory)}`;
+  const activeMemory = ownMemory || globalMemory;
+  const memoryName = memoryPresetTitle(activeMemory);
+  const memorySub = memoryPresetSummary(activeMemory);
   const replyPresets = replyPresetsOf(state);
   const ownReply = replyPresets.find(item => item.id === chat.replyPresetId) || null;
   const globalReply = replyPresetFor(state, null);
   const activeReply = ownReply || globalReply;
+  const replyName = settingName(activeReply?.name, '自然发消息');
   const replyItems = normalizeReplyItems(activeReply?.items, activeReply?.context);
   const replyItemCount = replyItems.filter(item => item.kind === 'chat').length;
   const replyAppCount = replyItems.filter(item => item.kind === 'app').length;
   const injectedCount = replyItems.filter(item => item.kind === 'context' && item.enabled).length;
-  const replySub = `${ownReply ? `只对这个会话 · ${ownReply.name || '未命名'}` : `跟随手机 · ${globalReply?.name || '默认回复方式'}`} · ${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
+  const replySub = `${replyName} · ${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
   const behavior = behaviorSettings(state, chat);
   const historyConfig = chatHistoryFor(chat);
   const tavern = effectiveTavernHistory(state, chat, memoryPresetFor(state, chat));
-  const followTavernMode = memoryReadModeFor(state, chat.contactId, memoryPresetFor(state, chat));
   const tavernValue = tavern.mode === 'summary'
     ? '全部总结'
-    : tavern.mode === 'recent' ? `最近 ${tavern.floors} 层`
-      : followTavernMode === 'summary' ? '方案 · 总结'
-        : followTavernMode === 'recent' ? `方案 · 原文 ${tavern.floors} 层`
-          : `自动 · ${tavern.floors} 层`;
+    : tavern.mode === 'recent' ? `最近 ${tavern.floors} 层原文`
+      : `总结优先 · ${tavern.floors} 层原文`;
   const phoneFollowLimit = replyContextFor(state, chat).historyLimit;
-  const tavernSub = [
-    '只改这个角色',
-    historyConfig.tavernMode || historyConfig.tavernFloors ? '已单独设置' : '跟随记忆方案',
-  ].join(' · ');
+  const tavernSub = '只改这个角色 · 设置读取方式和层数';
   const tavernFloorSub = [
     '最近原文层数',
-    historyConfig.tavernFloors ? '已单独设置' : `空着跟随记忆方案 · ${tavern.floors} 层`,
-    '填数字后自动切到最近原文',
+    tavern.mode === 'summary' ? '现在读全部总结，层数暂不生效' : `现在按 ${tavern.floors} 层读`,
+    '填数字后会切到最近原文',
   ].join(' · ');
   const phoneNumberSub = [
     '最近几条',
-    historyConfig.phoneLimit ? '已单独设置' : `空着跟随回复预设 · ${phoneFollowLimit} 条`,
+    `现在读 ${historyConfig.phoneLimit || phoneFollowLimit} 条`,
+    '只改这个角色',
   ].join(' · ');
 
   const effectiveLines = [
-    ['用哪个模型', `${ownPreset ? ownPreset.name || '未命名方案' : `${globalPreset?.name || '酒馆 API'}（跟随手机）`}`],
-    ['怎么回复', `${activeReply?.name || '默认回复方式'}${ownReply ? '（这个会话单独设）' : '（跟随手机）'}`],
-    ['参考什么', `酒馆记忆 ${memoryPresetSummary(memoryPresetFor(state, chat))}${ownMemory ? '（这个会话单独设）' : '（跟随手机）'} · 小手机历史 ${chatHistoryFor(chat).phoneLimit || phoneFollowLimit} 条`],
+    ['用哪个模型', llmName],
+    ['怎么回复', replyName],
+    ['参考什么', `酒馆记忆 ${memoryPresetSummary(activeMemory)} · 小手机历史 ${chatHistoryFor(chat).phoneLimit || phoneFollowLimit} 条`],
   ];
 
   return `
@@ -14685,7 +14697,7 @@ function settingsBody(ctx, chatId) {
       <div class="mp-card" style="margin-top:12px">
         <div class="mp-card-title">这条会话实际用到的</div>
         ${effectiveLines.map(([label, value]) => `<div class="mp-card-sub">${esc(label)}：${esc(value)}</div>`).join('')}
-        <div class="mp-card-sub" style="color:var(--text-4)">下面每一行写着「跟随」就是用手机的，写着「单独」就是这条会话自己设的。</div>
+        <div class="mp-card-sub" style="color:var(--text-4)">这里就是现在生效的组合；下面的设置可以直接改这个会话。</div>
       </div>
 
       <div class="mp-group" style="margin-top:16px">
@@ -14701,7 +14713,7 @@ function settingsBody(ctx, chatId) {
         <div class="mp-group-box">
           ${chatSetRow(chat.id, {
             iconName: 'spark', title: '这个聊天的 LLM',
-            sub: llmSub, act: 'ts-llm', value: ownPreset ? '单独' : '跟随',
+            sub: llmSub, act: 'ts-llm', value: llmName,
           })}
         </div>
       </div>
@@ -14711,7 +14723,7 @@ function settingsBody(ctx, chatId) {
         <div class="mp-group-box">
           ${chatSetRow(chat.id, {
             iconName: 'reply', title: '回复预设',
-            sub: replySub, act: 'ts-reply', value: ownReply ? '单独' : '跟随',
+            sub: replySub, act: 'ts-reply', value: replyName,
           })}
         </div>
       </div>
@@ -14738,16 +14750,17 @@ function settingsBody(ctx, chatId) {
           ${chatNumberRow(chat.id, {
             iconName: 'book', title: '酒馆原文层数',
             sub: tavernFloorSub, act: 'ts-tavern-floors',
-            value: historyConfig.tavernFloors || '', placeholder: String(tavern.floors),
+            value: historyConfig.tavernFloors || (tavern.mode === 'summary' ? '' : tavern.floors),
+            placeholder: tavern.mode === 'summary' ? '未使用' : String(tavern.floors),
           })}
           ${chatNumberRow(chat.id, {
             iconName: 'chat', title: '历史小手机消息',
             sub: phoneNumberSub, act: 'ts-phone-history',
-            value: historyConfig.phoneLimit || '', placeholder: String(phoneFollowLimit), max: null,
+            value: historyConfig.phoneLimit || phoneFollowLimit, placeholder: String(phoneFollowLimit), max: null,
           })}
           ${chatSetRow(chat.id, {
             iconName: 'book', title: '酒馆记忆方案',
-            sub: memorySub, act: 'ts-memory', value: ownMemory ? '单独' : '跟随',
+            sub: memorySub, act: 'ts-memory', value: memoryName,
           })}
         </div>
       </div>
@@ -15480,30 +15493,22 @@ const threadSettingsApp = {
     if (act === 'ts-llm') {
       const presets = apiPresetsOf(ctx.state);
       const globalPreset = presets.find(item => item.id === ctx.state.settings.api?.activeChat) || presets[0] || null;
+      const activePreset = presets.find(item => item.id === chat.llmPresetId) || globalPreset;
       ctx.openSheet({
         title: '这个聊天的 LLM',
-        items: [
-          { label: '跟随手机', value: 'follow', note: `现在用「${globalPreset?.name || '酒馆 API'}」` },
-          ...presets.map(item => ({
-            label: item.name || '未命名方案',
-            value: item.id,
-            note: [item.model, item.url].filter(Boolean).join(' · ') || '借酒馆自己的模型',
-          })),
-        ],
+        note: `现在用「${settingName(activePreset?.name, '酒馆 API')}」`,
+        items: presets.map(item => ({
+          label: settingName(item.name, '酒馆 API'),
+          value: item.id,
+          note: [item.model, item.url].filter(Boolean).join(' · ') || '借酒馆自己的模型',
+        })),
         onPick: (value) => {
-          if (value === 'follow') {
-            chat.llmPresetId = '';
-            ctx.save();
-            ctx.rerender();
-            ctx.toast('已跟随手机的 LLM 方案');
-            return;
-          }
           const preset = presets.find(item => item.id === value);
           if (!preset) return;
-          chat.llmPresetId = preset.id;
+          chat.llmPresetId = preset.id === globalPreset?.id ? '' : preset.id;
           ctx.save();
           ctx.rerender();
-          ctx.toast(`这个会话改用「${preset.name || '未命名方案'}」`);
+          ctx.toast(`这个会话现在用「${settingName(preset.name, '酒馆 API')}」`);
         },
       });
       return true;
@@ -15512,35 +15517,29 @@ const threadSettingsApp = {
     if (act === 'ts-reply') {
       const presets = replyPresetsOf(ctx.state);
       const globalPreset = replyPresetFor(ctx.state, null);
+      const activePreset = presets.find(item => item.id === chat.replyPresetId) || globalPreset;
       ctx.openSheet({
         title: '这个会话怎么回消息',
+        note: `现在用「${settingName(activePreset?.name, '自然发消息')}」`,
         items: [
-          { label: '跟随手机', value: 'follow', note: `现在用「${globalPreset?.name || '默认'}」` },
           ...presets.map(item => ({
-            label: item.name || '未命名预设',
+            label: settingName(item.name, '自然发消息'),
             value: item.id,
             note: String(item.text || '').slice(0, 38) || '空指令',
           })),
-          { label: '管理回复预设', value: 'manage', note: '新建、改指令、设为手机默认' },
+          { label: '管理回复预设', value: 'manage', note: '新建、改指令、设为手机当前方案' },
         ],
         onPick: (value) => {
-          if (value === 'follow') {
-            chat.replyPresetId = '';
-            ctx.save();
-            ctx.rerender();
-            ctx.toast('这个会话已跟随手机的回复预设');
-            return;
-          }
           if (value === 'manage') {
             ctx.go('app-presets');
             return;
           }
           const preset = presets.find(item => item.id === value);
           if (!preset) return;
-          chat.replyPresetId = preset.id;
+          chat.replyPresetId = preset.id === globalPreset?.id ? '' : preset.id;
           ctx.save();
           ctx.rerender();
-          ctx.toast(`这个会话改用「${preset.name || '未命名预设'}」`);
+          ctx.toast(`这个会话现在用「${settingName(preset.name, '自然发消息')}」`);
         },
       });
       return true;
@@ -15549,6 +15548,8 @@ const threadSettingsApp = {
     if (act === 'ts-tavern-history') {
       const preset = memoryPresetFor(ctx.state, chat);
       const current = effectiveTavernHistory(ctx.state, chat, preset);
+      const schemeValue = current.mode === 'summary' ? '全部总结'
+        : current.mode === 'recent' ? `最近 ${current.floors} 层原文` : '总结优先';
       const applyHistory = (patch, message) => {
         chat.history = { ...chatHistoryFor(chat), ...patch };
         ctx.ai?.clearPreview?.(chat.id);
@@ -15560,16 +15561,16 @@ const threadSettingsApp = {
       ctx.openSheet({
         kind: 'pick',
         title: '历史酒馆消息',
-        note: '层数不在这里选，回设置页直接填数字。',
+        note: `现在用「${schemeValue}」；层数回设置页直接填。`,
         items: [
-          { label: '跟随记忆方案', value: 'follow', icon: 'book', note: `现在 ${memoryPresetSummary(preset)}` },
-          { label: '全部总结', value: 'summary', icon: 'book', note: current.mode === 'summary' ? '现在用的' : '没有总结时不会补原文' },
+          { label: `记忆方案 · ${schemeValue}`, value: 'follow', icon: 'book', note: '现在生效，按记忆方案读取' },
+          { label: '全部总结', value: 'summary', icon: 'book', note: current.mode === 'summary' ? '现在用' : '没有总结时不会补原文' },
           { label: '最近原文', value: 'recent', icon: 'clock', note: current.mode === 'recent' ? `现在最近 ${current.floors} 层` : '层数回设置页填数字' },
           { label: '管理记忆方案', value: 'manage', icon: 'settings', note: '新建方案、改全局层数' },
         ],
         onPick: value => {
           if (value === 'follow') {
-            applyHistory({ tavernMode: '', tavernFloors: 0 }, '历史酒馆消息已跟随记忆方案');
+            applyHistory({ tavernMode: '', tavernFloors: 0 }, `历史酒馆消息按记忆方案用「${schemeValue}」`);
             return;
           }
           if (value === 'summary') {
@@ -15596,7 +15597,8 @@ const threadSettingsApp = {
         ctx.shell.debugPreview = null;
         ctx.save();
         ctx.rerender();
-        ctx.toast('酒馆原文层数已跟随记忆方案');
+        const effective = effectiveTavernHistory(ctx.state, chat, memoryPresetFor(ctx.state, chat));
+        ctx.toast(`酒馆原文层数按记忆方案读 ${effective.floors} 层`);
         return true;
       }
       const floors = Number(raw);
@@ -15622,7 +15624,7 @@ const threadSettingsApp = {
         ctx.shell.debugPreview = null;
         ctx.save();
         ctx.rerender();
-        ctx.toast('历史小手机消息已跟随回复预设');
+        ctx.toast(`历史小手机消息按回复预设读 ${replyContextFor(ctx.state, chat).historyLimit} 条`);
         return true;
       }
       const count = Number(raw);
@@ -15643,35 +15645,29 @@ const threadSettingsApp = {
     if (act === 'ts-memory') {
       const presets = memoryPresetsOf(ctx.state);
       const globalPreset = memoryPresetFor(ctx.state, null);
+      const activePreset = presets.find(item => item.id === chat.memoryPresetId) || globalPreset;
       ctx.openSheet({
         title: '酒馆记忆',
+        note: `现在用「${memoryPresetTitle(activePreset)}」`,
         items: [
-          { label: '跟随手机', value: 'follow', note: `现在用「${globalPreset?.name || '默认'}」` },
           ...presets.map(item => ({
-            label: item.name,
+            label: memoryPresetTitle(item),
             value: item.id,
             note: memoryPresetSummary(item),
           })),
           { label: '管理记忆方案', value: 'manage', note: '新建、改名、改层数' },
         ],
         onPick: (value) => {
-          if (value === 'follow') {
-            chat.memoryPresetId = '';
-            ctx.save();
-            ctx.rerender();
-            ctx.toast('已跟随手机的酒馆记忆');
-            return;
-          }
           if (value === 'manage') {
             ctx.go('memory-presets');
             return;
           }
           const preset = presets.find(item => item.id === value);
           if (!preset) return;
-          chat.memoryPresetId = preset.id;
+          chat.memoryPresetId = preset.id === globalPreset?.id ? '' : preset.id;
           ctx.save();
           ctx.rerender();
-          ctx.toast(`这个会话改用「${preset.name}」`);
+          ctx.toast(`这个会话现在用「${memoryPresetTitle(preset)}」`);
         },
       });
       return true;
@@ -17002,7 +16998,7 @@ const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">身份与外观</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'contacts', title: '用户', sub: `${state.settings.userMode === 'pin' ? '固定' : '跟随酒馆'} · ${state.settings.user.name}`, act: 'set-open', app: 'user' })}
+            ${row(ctx, { iconName: 'contacts', title: '用户', sub: `${state.settings.user.name || '还没选'} · 点击换人`, act: 'set-open', app: 'user' })}
             ${row(ctx, { iconName: 'brush', title: '装扮与主题', sub: `${wallLabel} · ${state.settings.theme === 'night' ? '夜间' : '日间'} · 字体与图标`, act: 'set-open-dress' })}
           </div>
         </div>
@@ -17026,7 +17022,7 @@ const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">AI 设置 · 参考什么材料</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'book', title: '默认读总结', sub: state.settings.memory.readMode === 'recent' ? '关着：没单独设置的角色读最近原文' : '开着：有柏宝书总结就先读总结，没有才读原文', act: 'set-toggle-memory-read', toggle: state.settings.memory.readMode !== 'recent' })}
+            ${row(ctx, { iconName: 'book', title: '手机读法', sub: state.settings.memory.readMode === 'recent' ? '现在只读最近原文' : '现在有总结先读总结，没有就读最近原文', act: 'set-toggle-memory-read', toggle: state.settings.memory.readMode !== 'recent' })}
             ${row(ctx, { iconName: 'search', title: '酒馆角色', sub: (state.charactersFromTavern ? `酒馆里 ${state.characters.length} 张角色卡，看设定或加进已添加` : '看酒馆里每张角色卡的设定'), act: 'set-open-cards' })}
           </div>
         </div>
@@ -17043,7 +17039,7 @@ const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">数据与备份</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'copy', title: '导出备份', sub: '一份 json，默认不含接口 Key', act: 'set-export' })}
+            ${row(ctx, { iconName: 'copy', title: '导出备份', sub: '一份 json，导出时不带接口 Key', act: 'set-export' })}
             ${row(ctx, { iconName: 'upload', title: '从备份恢复', sub: '先预检数量，确认后覆盖当前数据', act: 'set-import' })}
             ${row(ctx, { iconName: 'trash', title: '清空手机数据', sub: '联系方式、聊天、日记全部清掉', act: 'set-wipe' })}
           </div>
@@ -17054,7 +17050,7 @@ const settingsApp = {
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'clock', title: '空发送时参考沉默多久', sub: '写进主动开口的提示，不会自己定时发消息', act: 'set-idle', value: `${state.settings.proactive.idleMinutes} 分钟` })}
             ${row(ctx, { iconName: 'bell', title: '消息提醒', sub: '有新消息时在图标上显示红点', act: 'set-toggle-remind', toggle: state.settings.chat.remind !== false })}
-            ${row(ctx, { iconName: 'code', title: '请求调试栏', sub: '在输入框上方显示预计 token 与请求构成；默认关着', act: 'set-toggle-debug', toggle: state.settings.chat.debugBar === true })}
+            ${row(ctx, { iconName: 'code', title: '请求调试栏', sub: state.settings.chat.debugBar ? '现在开着：输入框上方会显示 token 与请求构成' : '现在关着：需要时再打开', act: 'set-toggle-debug', toggle: state.settings.chat.debugBar === true })}
             ${row(ctx, { iconName: 'help', title: '帮助', sub: '怎么用、快捷键、常见问题', act: 'set-open', app: 'help' })}
             ${row(ctx, { iconName: 'help', title: '关于 meme-phone', sub: `${contacts} 位联系人 · ${chatsOf(state).length} 个会话 · ${unreadTotal(state)} 条未读`, act: 'set-about' })}
           </div>
@@ -17096,8 +17092,8 @@ const settingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(store.readMode === 'recent'
-        ? '默认改成读原文；按角色单独切过的仍然按开关'
-        : '默认改回读总结；没有总结时自动读原文');
+        ? '手机读法改成最近原文；按角色单独切过的仍然按开关'
+        : '手机读法改成总结优先；没有总结时读最近原文');
       return true;
     }
 
@@ -19464,6 +19460,14 @@ function replyNameFor(state, id) {
   return item ? (item.name || '未命名') : '没选';
 }
 
+/** 方案选择里不显示「默认方案」，旧名直接换成当前接口 + 回复预设。 */
+function schemeLabel(state, scheme) {
+  const raw = String(scheme?.name || '').trim();
+  if (raw && !['默认', '默认方案', '跟随', '自动'].includes(raw)) return raw;
+  const store = state.settings.api || { presets: [] };
+  return `${presetName(store, scheme?.apiId)} · ${replyNameFor(state, scheme?.replyId)}`.slice(0, 20);
+}
+
 /* 复制一套做模板：地址 / Key / 模型 / 引擎整套带走，只换名字和 id */
 function clonePreset(source, suffix = ' 副本') {
   return {
@@ -19497,11 +19501,12 @@ function api(state) {
   /* 整体方案只存 API + 回复预设；第一次进来没有方案时补一套当前搭配 */
   if (!Array.isArray(store.chatSchemes)) store.chatSchemes = [];
   if (!store.chatSchemes.length) {
+    const reply = replyPresetsOf(state)[0];
     store.chatSchemes.push({
       id: newId('lsch'),
-      name: '默认方案',
+      name: `${presetName(store, store.activeChat)} · ${reply?.name || '回复预设'}`.slice(0, 20),
       apiId: store.activeChat,
-      replyId: replyPresetsOf(state)[0]?.id || '',
+      replyId: reply?.id || '',
     });
   }
   if (!store.chatSchemes.some(item => item.id === store.chatSchemeId)) {
@@ -19885,7 +19890,12 @@ function deleteApiPreset(ctx, store, pending, withSchemes) {
     const kept = chatSchemesOf(ctx.state).filter(item => item.apiId !== pending.id);
     if (!kept.length) {
       const reply = replyPresetFor(ctx.state, null);
-      const scheme = { id: newId('lsch'), name: '默认', apiId: fallback.id, replyId: reply?.id || '' };
+      const scheme = {
+        id: newId('lsch'),
+        name: `${presetName(store, fallback.id)} · ${reply?.name || '回复预设'}`.slice(0, 20),
+        apiId: fallback.id,
+        replyId: reply?.id || '',
+      };
       store.chatSchemes = [scheme];
       store.chatSchemeId = scheme.id;
       fallbackCreated = true;
@@ -19949,7 +19959,7 @@ const apiListApp = {
     const schemeDirty = Boolean(scheme && (scheme.apiId !== store.activeChat || scheme.replyId !== currentReply?.id));
     const schemeReplyName = scheme ? replyNameFor(ctx.state, scheme.replyId) : '没选';
     const schemeOptions = schemes.length
-      ? schemes.map(item => ({ value: item.id, label: item.name || '未命名' }))
+      ? schemes.map(item => ({ value: item.id, label: schemeLabel(ctx.state, item) }))
       : [{ value: '', label: '未选方案' }];
     const apiOptions = store.presets.map(preset => ({ value: preset.id, label: preset.name || '未命名' }));
     const replyOptions = replyPresetsOf(ctx.state).map(item => ({ value: item.id, label: item.name || '未命名' }));
@@ -20516,11 +20526,11 @@ const userListApp = {
           <div class="mp-group-label">小手机用谁</div>
           <div class="mp-select-wrap">
             <select data-act="user-mode">
-              <option value="follow"${mode === 'follow' ? ' selected' : ''}>跟随酒馆切换</option>
+              <option value="follow"${mode === 'follow' ? ' selected' : ''}>酒馆当前用户</option>
               <option value="pin"${mode === 'pin' ? ' selected' : ''}>固定一位${pinned ? ` · ${esc(pinned.name)}` : ''}</option>
             </select>${icon('chevron')}
           </div>
-          <div class="mp-subtitle" style="margin-top:6px;font-size:calc(11px * var(--font-scale))">${mode === 'follow' ? '酒馆换用户，小手机也跟着换。' : (pinned ? `已固定 ${esc(pinned.name)}，酒馆换人也不跟着动。` : '挑一个人钉在这里。')}</div>
+          <div class="mp-subtitle" style="margin-top:6px;font-size:calc(11px * var(--font-scale))">${mode === 'follow' ? '酒馆换用户，小手机也会换。' : (pinned ? `现在固定用 ${esc(pinned.name)}，酒馆换人也不动。` : '挑一个人固定用。')}</div>
         </div>
 
         <div class="mp-group">
@@ -22739,7 +22749,7 @@ const {
   newId, memoryPresetsOf, contactById, chatsOf, memoryPresetFor, memoryReadModeFor, memoryGlobalReadMode,
 } = __req("meme/data.js");
 const { esc } = __req("meme/shell.js");
-const { memoryModeLabel, memoryPresetSummary, buildMemoryContext } = __req("meme/memory.js");
+const { memoryModeLabel, memoryPresetSummary, memoryPresetTitle, buildMemoryContext } = __req("meme/memory.js");
 
 let memoryChosen = '';
 let memoryView = {
@@ -22844,7 +22854,7 @@ function row(state, preset) {
   return `
     <button class="mp-set-row" data-act="mem-edit" data-id="${esc(preset.id)}" type="button">
       <span class="mp-set-ico">${icon('book')}</span>
-      <span class="mp-set-name">${esc(preset.name)}<small>${esc(memoryPresetSummary(preset))}</small></span>
+      <span class="mp-set-name">${esc(memoryPresetTitle(preset))}<small>${esc(memoryPresetSummary(preset))}</small></span>
       ${active ? '<span class="mp-set-value">使用中</span>' : ''}
       <span style="color:var(--text-4)">${icon('chevron')}</span>
     </button>`;
@@ -22867,7 +22877,7 @@ function statusCard(ctx, chosen, view, preset) {
       : [];
   const label = source === 'summary' ? '总结' : source === 'recent' ? '原文' : '没有记忆';
   const foot = [
-    `方案「${preset?.name || '默认'}」`,
+    `方案「${memoryPresetTitle(preset)}」`,
     view.file ? String(view.file).replace(/\.jsonl$/i, '') : '',
     view.demo ? '演示数据' : '',
   ].filter(Boolean).join(' · ');
@@ -22895,11 +22905,11 @@ function presetPanel(ctx, preset) {
   const state = ctx.state;
   const active = state.settings.memory?.activeId === preset.id;
   const modeNote = preset.mode === 'auto'
-    ? '方案来源：跟随上面的开关'
-    : `方案来源：${memoryModeLabel(preset.mode)}（按角色的开关优先）`;
+    ? '读取方式：总结优先，没有总结时读最近原文'
+    : `读取方式：${memoryModeLabel(preset.mode)}`;
   return `
     <div class="mp-card mp-mem-edit">
-      <div class="mp-card-title">${esc(preset.name)}${active ? '<span class="mp-api-tag">使用中</span>' : ''}</div>
+      <div class="mp-card-title">${esc(memoryPresetTitle(preset))}${active ? '<span class="mp-api-tag">使用中</span>' : ''}</div>
       <label class="mp-api-field">
         <span>保留层数</span>
         <input id="mem-floors-input" class="mp-api-input" type="text" value="${esc(String(preset.floors || 10))}"
@@ -22911,20 +22921,20 @@ function presetPanel(ctx, preset) {
         <span class="mp-switch${preset.skipFirstFloor ? ' on' : ''}"></span>
       </button>
       <div class="mp-draw-actions">
-        ${active ? '' : `<button class="mp-draw-action is-primary" data-act="mem-use" data-id="${esc(preset.id)}" type="button">设为手机默认方案</button>`}
+        ${active ? '' : `<button class="mp-draw-action is-primary" data-act="mem-use" data-id="${esc(preset.id)}" type="button">设为手机当前方案</button>`}
         <button class="mp-draw-action" data-act="mem-rename-open" data-id="${esc(preset.id)}" type="button">改名</button>
         <button class="mp-draw-action" data-act="mem-clone" data-id="${esc(preset.id)}" type="button">复制一套</button>
         <button class="mp-draw-action is-danger" data-act="mem-del" data-id="${esc(preset.id)}" type="button">删除这套</button>
       </div>
       ${memRename ? `
       <div class="mp-api-name-edit">
-        <input id="mem-rename-input" class="mp-api-input" type="text" maxlength="20" value="${esc(preset.name)}" placeholder="方案名字">
+        <input id="mem-rename-input" class="mp-api-input" type="text" maxlength="20" value="${esc(memoryPresetTitle(preset))}" placeholder="方案名字">
         <button class="mp-draw-side is-primary" data-act="mem-rename-save" data-id="${esc(preset.id)}" type="button">确定</button>
         <button class="mp-draw-side" data-act="mem-rename-cancel" type="button">取消</button>
       </div>` : ''}
       ${memDelete === preset.id ? `
       <div class="mp-api-delete">
-        <div class="mp-api-delete-title">删除「${esc(preset.name)}」？</div>
+        <div class="mp-api-delete-title">删除「${esc(memoryPresetTitle(preset))}」？</div>
         <div class="mp-api-delete-sub">只删这套记忆方案；正在用它时，手机会改用剩下第一套。至少留一套。</div>
         <div class="mp-draw-actions">
           <button class="mp-draw-action is-danger" data-act="mem-del-confirm" data-id="${esc(preset.id)}" type="button">确认删除</button>
@@ -23003,7 +23013,7 @@ function renderPage(ctx) {
       <div class="mp-group-box">
         <button class="mp-set-row" data-act="mem-new" type="button">
           <span class="mp-set-ico">${icon('plus')}</span>
-          <span class="mp-set-name">新建一套<small>在「${esc(active?.name || '默认')}」的基础上改</small></span>
+          <span class="mp-set-name">新建一套<small>在「${esc(memoryPresetTitle(active))}」的基础上改</small></span>
           <span style="color:var(--text-4)">${icon('chevron')}</span>
         </button>
       </div>
@@ -23012,8 +23022,8 @@ function renderPage(ctx) {
       <div class="mp-card">
         <div class="mp-card-title">层数</div>
         <div class="mp-card-sub">一层就是酒馆里的一条消息。层数越多，模型记得越远，但占的上下文也越多。</div>
-        <div class="mp-card-title" style="margin-top:12px">默认</div>
-        <div class="mp-card-sub">手机默认读${memoryGlobalReadMode(state) === 'recent' ? '原文' : '总结'}（在「设置 · 记忆」里改）；这位角色单独切过就按开关。</div>
+        <div class="mp-card-title" style="margin-top:12px">手机读法</div>
+        <div class="mp-card-sub">手机现在${memoryGlobalReadMode(state) === 'recent' ? '只读最近原文' : '总结优先，没有总结时读最近原文'}；这位角色单独切过的仍按上面的开关。</div>
       </div>
     </div>`;
 }
@@ -23118,7 +23128,7 @@ function handle(ctx, act, data) {
     ctx.state.settings.memory.activeId = live.id;
     ctx.save();
     redraw(ctx);
-    say(ctx, `手机默认记忆方案改成「${live.name}」`);
+    say(ctx, `手机记忆方案改成「${memoryPresetTitle(live)}」`);
     return true;
   }
 
@@ -23784,7 +23794,7 @@ const presetsApp = {
           <button class="mp-draw-side" data-act="reply-import-cancel" type="button">取消</button>
         </div>` : ''}
 
-        <div class="mp-group-label" style="margin-top:14px">手机默认 · ${list.length} 套</div>
+        <div class="mp-group-label" style="margin-top:14px">全部预设 · ${list.length} 套</div>
         <div class="mp-group-box">
           ${rows || '<div class="mp-empty">还没有回复预设，点右上角新建一套。</div>'}
         </div>
@@ -23944,7 +23954,7 @@ const replyPresetApp = {
         <button class="mp-icon-btn" data-act="reply-del" type="button" title="删除">${icon('trash')}</button>
       </div>
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">回复预设 · 条目按顺序拼进模型消息 · ${isActive ? '手机现在默认用这套' : '只在聊天设置里选中它时生效'}</div>
+        <div class="mp-subtitle" style="margin-top:0">回复预设 · 条目按顺序拼进模型消息 · ${isActive ? '手机现在用这套' : '只在聊天设置里选中它时生效'}</div>
 
         ${deleting ? `
         <div class="mp-group mp-api-inline is-danger" style="margin-top:12px">
@@ -24005,7 +24015,7 @@ const replyPresetApp = {
         <div class="mp-group-label" style="margin-top:16px">用在</div>
         <div class="mp-api-use">
           <button class="mp-api-use-btn${isActive ? ' is-on' : ''}" data-act="reply-use" type="button">
-            ${icon('reply')}<span>${isActive ? '手机正在用' : '设为手机默认'}</span>
+            ${icon('reply')}<span>${isActive ? '手机正在用' : '设为手机当前预设'}</span>
           </button>
         </div>
 
@@ -24497,7 +24507,7 @@ const replyPresetApp = {
       editingId = preset.id;
       ctx.save();
       ctx.rerender();
-      ctx.toast(`手机默认改用「${preset.name}」`);
+      ctx.toast(`手机当前回复预设改成「${preset.name}」`);
       return true;
     }
 

@@ -1,0 +1,43 @@
+/* -------------------------------------------------------------- 夜间 */
+
+.mp-root[data-mp-theme="night"] .mp-draw-desc,
+.mp-root[data-mp-theme="night"] .mp-draw-param,
+.mp-root[data-mp-theme="night"] .mp-draw-card,
+.mp-root[data-mp-theme="night"] .mp-api-card,
+.mp-root[data-mp-theme="night"] .mp-api-use-btn {
+  background: rgba(34, 30, 52, .78);
+  box-shadow: none;
+}
+.mp-root[data-mp-theme="night"] .mp-api-card {
+  background: linear-gradient(150deg, rgba(40, 35, 62, .82), rgba(28, 25, 44, .86));
+}
+.mp-root[data-mp-theme="night"] .mp-api-use-btn.is-on {
+  background: linear-gradient(120deg, #7b68e0, #6a55d8);
+}
+.mp-root[data-mp-theme="night"] .mp-draw-run {
+  box-shadow: 0 12px 26px rgba(0, 0, 0, .34);
+}
+.mp-root[data-mp-theme="night"] .mp-draw-state {
+  background: rgba(233, 177, 92, .16);
+  color: #e2c188;
+}
+.mp-root[data-mp-theme="night"] .mp-draw-state.is-on {
+  background: rgba(127, 210, 188, .18);
+  color: #9ee4cd;
+}
+.mp-root[data-mp-theme="night"] .mp-draw-state-btn {
+  background: rgba(255, 255, 255, .10);
+}
+.mp-root[data-mp-theme="night"] .mp-api-card-value,
+.mp-root[data-mp-theme="night"] .mp-draw-desc-text { color: #f2effb; }
+.mp-root .mp-api-value {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: calc(12.5px * var(--font-scale));
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mp-root .mp-api-value.is-empty { color: var(--text-3); }

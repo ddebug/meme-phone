@@ -1,0 +1,64 @@
+# CSS 分层映射说明
+
+## 背景与原则
+
+`meme/meme.css` 原为单文件（拆分前 7389 行，SHA256 `EFE3AC68…C3E`）。本轮按五层做**物理拆分**，原则是：
+
+- **只搬不改**：规则文本、选择器、声明、注释、块间空白与换行全部原样保留，不重排、不顺手优化。
+- **保序拼接**：段文件按 `meme/css/order.json` 的顺序加载，顺序与拆分前单文件完全一致。层叠覆盖依赖这个顺序（文件后段的皮肤/夜间规则靠顺序覆盖前面的同名规则），**不要手工调换 import 行或段文件顺序**。
+- **字节一致校验**：拆分工具把段文件按顺序拼回，与基线哈希逐字节比对通过后才落盘；`build_preview.py` 同样按 `order.json` 顺序拼接内联进 `preview.html`。
+
+## 五层定义
+
+| 层 | 目录/前缀 | 职责 |
+| --- | --- | --- |
+| tokens | `tokens-*.css` | 设计变量：颜色、文字层级、线、纸面、玻璃、强调、阴影、圆角、字体、输入框、壁纸 |
+| shell | `shell-*.css` | 手机外壳与骨架：overlay/device/screen、壁纸层、状态栏、桌面、资料卡、图标网格、Dock、页面容器、导航栏、返回键、缩放适配 |
+| components | `components-*.css` | 通用控件：列表行、头像、圆点、胶囊、计数角标、卡片、按钮、分组、空态、弹层/Toast、开关、下拉框、输入框、引用行、标签、图标磁贴 |
+| apps | `apps-*.css` | 业务页：聊天、日记、设置、绘图/接口、预设、记忆、用户、角色、查 TA 手机、音乐、装扮、小剧场、行为消息/钱包 |
+| themes | `themes-*.css` | 夜间模式、frost/pixel 皮肤覆盖、皮肤 token、内联色归一、各页主题适配 |
+
+## 段清单（行号为拆分前单文件行号）
+
+| 段文件 | 层 | 原行号 | 归属 |
+| --- | --- | --- | --- |
+| tokens-01.css | tokens | 1–55 | `.mp-root` 设计变量 |
+| themes-02.css | themes | 57–82 | 夜间变量覆写 |
+| shell-03.css | shell | 84–747 | 外壳/壁纸/状态栏/桌面/资料卡/图标网格/Dock/页面容器/标题副标题 |
+| components-04.css | components | 749–764 | 图标按钮 |
+| shell-05.css | shell | 766–780 | 返回栏 |
+| components-06.css | components | 782–887 | 列表行/头像/圆点/胶囊/计数角标 |
+| apps-07.css | apps | 889–1745 | 聊天设置页头、会话页、气泡、看大图、输入区、调试栏、日记页、设置页 |
+| components-08.css | components | 1747–1984 | 通用卡片/按钮、空态、弹层/提示 |
+| themes-09.css | themes | 1986–2045 | 夜间模式整段覆写 |
+| shell-10.css | shell | 2047–2054 | 缩放适配（减弱动效） |
+| components-11.css | components | 2056–2176 | 图标尺寸/层级/快捷动作/引用行/修正二 |
+| themes-12.css | themes | 2178–2198 | 修正三：夜间主题快捷条与机身 |
+| shell-13.css | shell | 2200–2301 | 透明背景/四种背景/素色底/回桌面操作条/小横条 |
+| apps-14.css | apps | 2303–2406 | 外观主题胶囊、会话胶囊、绘图+接口 |
+| components-15.css | components | 2408–2467 | iOS 胶囊按钮 |
+| apps-16.css | apps | 2468–3401 | 预设行操作、接口/LLM 方案、聊天模型三段式、预设页、酒馆记忆页 |
+| components-17.css | components | 3403–3630 | 置灰开关行 |
+| themes-18.css | themes | 3632–3674 | 夜间适配 |
+| components-19.css | components | 3675–3740 | 图标毛玻璃磁贴 |
+| apps-20.css | apps | 3742–4619 | 装扮图标预览、用户管理、查角色、世界书、查 TA 手机、日程表、预设即 API、换 API |
+| themes-21.css | themes | 4621–4644 | 壁纸透进页面、白卡变薄 |
+| apps-22.css | apps | 4646–5004 | 音乐、装扮字体/灵动岛/图标 |
+| components-23.css | components | 5006–5085 | 输入框统一底色、iOS 下拉框 |
+| apps-24.css | apps | 5087–5412 | 自定义图标铺图 |
+| themes-25.css | themes | 5414–6441 | 白色磨砂气泡、frost/pixel 皮肤全站基座、调试栏主题适配 |
+| apps-26.css | apps | 6443–6935 | 小剧场类型与美化页、骨架差异、18+ 门页 |
+| themes-27.css | themes | 6937–6976 | 主题适配：纸张/梦境夜间变体 |
+| apps-28.css | apps | 6978–7395 | 聊天加号小剧场弹窗、行为消息/钱 |
+
+## 引入链
+
+- 宿主：`style.css` 首行 `@import url("meme/meme.css");`（未改）。
+- 聚合入口：`meme/meme.css` 只含按 `order.json` 顺序的 `@import url("css/<段文件>");`。
+- 预览打包：`scripts/build_preview.py` 读 `order.json` 顺序拼接段文件，做 `url("../assets/` → `url("assets/` 替换后内联进 `preview.html`；指纹写入 `preview.stamp.json`。
+
+## 后续待办（下一轮，需逐页肉眼复核）
+
+1. **跨层规则归位**：`apps-07/16/20` 等段里仍混有通用控件规则（气泡、按钮、输入框），下一轮把它们抽到对应 `components-*`；移动前必须确认不破坏层叠顺序。
+2. **themes 集中**：夜间/皮肤覆盖目前散落在 `themes-02/09/12/18/21/25/27`，待确认每条覆盖不依赖中段顺序后，再按主题归并。
+3. 每动一层：重建 `preview.html` → `npm test` 全绿 → 逐页截图与拆分前比对，确认像素级无变化再进下一层。

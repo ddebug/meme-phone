@@ -1,0 +1,16 @@
+/* 顶部返回栏 */
+.mp-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px 6px 4px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--accent-deep);
+  font-size: calc(14px * var(--font-scale));
+  cursor: pointer;
+}
+
+.mp-back .mp-i { width: 19px; height: 19px; }
+

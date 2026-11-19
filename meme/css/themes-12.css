@@ -1,0 +1,22 @@
+/* 修正三：夜间主题的快捷条与机身 */
+.mp-root[data-mp-theme="night"] .mp-quick-btn {
+  background: rgba(255, 255, 255, .10);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16), 0 6px 16px rgba(0, 0, 0, .34);
+}
+
+.mp-root[data-mp-theme="night"] .mp-quick-btn .mp-i { color: #c9bcfb; }
+
+.mp-root[data-mp-theme="night"] .mp-app .mp-app-label {
+  color: #efeaff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .45);
+}
+
+.mp-root[data-mp-theme="night"] .mp-device {
+  background: linear-gradient(160deg, #3a3454, #221d38 58%, #36304f);
+  box-shadow:
+    0 40px 90px rgba(20, 12, 40, .55),
+    0 0 0 1px rgba(255, 255, 255, .10),
+    inset 0 0 0 1px rgba(255, 255, 255, .08);
+}
+

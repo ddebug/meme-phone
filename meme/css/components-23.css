@@ -1,0 +1,81 @@
+/* 所有输入框统一底色：日间浅底深字，夜间深底浅字；不再让透明紫底叠成黑块 */
+.mp-root input:not([type="range"]):not([type="file"]),
+.mp-root textarea,
+.mp-root select {
+  color: var(--text) !important;
+  -webkit-text-fill-color: var(--text);
+  background-color: var(--field-solid) !important;
+  border-color: var(--field-border) !important;
+  caret-color: var(--accent);
+}
+.mp-root input::placeholder,
+.mp-root textarea::placeholder { color: var(--text-4) !important; opacity: 1; }
+.mp-root input:-webkit-autofill,
+.mp-root textarea:-webkit-autofill {
+  -webkit-text-fill-color: var(--text) !important;
+  box-shadow: 0 0 0 1000px var(--field-solid) inset !important;
+}
+.mp-root input[type="range"] { accent-color: var(--accent); background: transparent; border: 0; }
+.mp-root input[type="file"] { background: transparent; border: 0; }
+
+/* iOS 风格下拉框：胶囊圆角、无原生箭头、右侧统一箭头 */
+.mp-select-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+.mp-root .mp-select-wrap select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 11px 36px 11px 13px;
+  border-radius: 14px;
+  border: 1px solid var(--field-border);
+  background: var(--field-solid);
+  color: var(--text);
+  font: inherit;
+  font-size: calc(13.5px * var(--font-scale));
+  line-height: calc(1.25 * var(--line-scale));
+  outline: none;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+.mp-root .mp-select-wrap select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(142, 123, 242, .13);
+}
+.mp-select-wrap .mp-i {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 15px;
+  height: 15px;
+  transform: translateY(-50%);
+  color: var(--text-3);
+  pointer-events: none;
+}
+.mp-root[data-mp-theme="night"] .mp-select-wrap select {
+  background: var(--field-solid);
+  border-color: rgba(255, 255, 255, .16);
+}
+
+.mp-sheet-textarea {
+  display: block;
+  width: 100%;
+  height: 150px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  padding: 12px 13px;
+  font: inherit;
+  line-height: calc(1.72 * var(--line-scale));
+  color: var(--text);
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
+  outline: none;
+  resize: none;
+  font-family: var(--font-serif);
+}
+

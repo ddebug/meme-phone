@@ -1,0 +1,665 @@
+/* --------------------------------------------------------------- 外壳 */
+.mp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  /* 手机壳外完全透明：酒馆自己的背景直接透出来 */
+  background: transparent;
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+
+@keyframes mp-fade {
+  from { opacity: .001; }
+  to { opacity: 1; }
+}
+
+.mp-device {
+  position: relative;
+  width: 390px;
+  height: 844px;
+  border-radius: 54px;
+  padding: 10px;
+  background: linear-gradient(160deg, #ffffff, #efeaf8 60%, #ffffff);
+  box-shadow:
+    0 40px 90px rgba(120, 110, 170, .26),
+    0 0 0 1px rgba(255, 255, 255, .9),
+    inset 0 0 0 1px rgba(255, 255, 255, .7);
+  transform-origin: center;
+}
+
+.mp-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 46px;
+  overflow: hidden;
+  background: var(--page);
+  isolation: isolate;
+}
+
+/* 壁纸层：只在桌面与页面边缘透出来 */
+.mp-wallpaper {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: var(--wallpaper);
+  background-size: cover;
+  background-position: center 18%;
+  transform: scale(1.04);
+  transition: opacity .3s ease;
+}
+
+.mp-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 250, 253, .18) 0%, rgba(255, 255, 255, 0) 26%, rgba(245, 241, 255, .10) 58%, rgba(238, 249, 245, .26) 100%);
+}
+
+/* ---------------------------------------------------------- 状态栏 */
+.mp-status {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 54px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 30px;
+  font-size: calc(14px * var(--font-scale));
+  font-weight: 600;
+  letter-spacing: .01em;
+  color: var(--text);
+  pointer-events: none;
+}
+
+.mp-island {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  width: 104px;
+  height: 30px;
+  border-radius: 20px;
+  background: #1b1830;
+  box-shadow: 0 3px 12px rgba(90, 80, 130, .22);
+  transform: translateX(-50%);
+}
+
+.mp-status .mp-status-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-status-left {
+  display: flex;
+  align-items: center;
+  min-width: 34px;
+}
+
+.mp-status-back {
+  pointer-events: auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .58);
+  color: var(--accent-deep);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .78), var(--shadow-s);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.mp-status-back:active { transform: scale(.94); }
+.mp-status .mp-status-back .mp-i { width: 19px; height: 19px; }
+
+/* 返回键统一放到状态栏左边，页面里的旧返回键不再重复显示 */
+.mp-nav .mp-back[data-act="back"],
+.mp-thread-head .mp-back[data-act="back"],
+.mp-root .mp-back[data-act="back"] { display: none; }
+
+/* 返回键改到状态栏后，聊天页头像让出左上角的位置 */
+.mp-thread-head { padding-left: 52px; }
+
+/* 顶部中间：拖动手机壳 */
+.mp-drag-handle {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 128px;
+  height: 42px;
+  z-index: 46;
+  transform: translateX(-50%);
+  border-radius: 24px;
+  cursor: grab;
+  touch-action: none;
+}
+.mp-drag-handle:active { cursor: grabbing; }
+.mp-device.is-dragging { transition: none; }
+.mp-device { transition: transform .26s cubic-bezier(.22, .68, .38, 1); will-change: transform; }
+
+/* ------------------------------------------------------------- 桌面 */
+.mp-desktop {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  padding: 54px 18px 16px;
+  overflow: hidden;
+}
+
+.mp-widget {
+  position: relative;
+  flex: 0 0 auto;
+  border-radius: var(--r-xl);
+  padding: 17px 18px 14px;
+  background: linear-gradient(168deg, rgba(255, 255, 255, .86), rgba(255, 255, 255, .58));
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  box-shadow: 0 18px 42px rgba(120, 108, 180, .16), inset 0 0 0 1px rgba(255, 255, 255, .78);
+  cursor: pointer;
+  transition: transform .22s cubic-bezier(.22, .68, .38, 1);
+}
+
+.mp-widget:active { transform: scale(.985); }
+
+.mp-widget-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.mp-clock {
+  font-size: calc(46px * var(--font-scale));
+  line-height: calc(1 * var(--line-scale));
+  font-weight: 600;
+  letter-spacing: -.05em;
+  color: var(--text);
+}
+
+.mp-date {
+  text-align: right;
+  font-size: calc(12px * var(--font-scale));
+  line-height: calc(1.55 * var(--line-scale));
+  color: var(--text-3);
+  padding-top: 3px;
+}
+
+.mp-di-card {
+  margin-top: 13px;
+  padding: 11px 12px 10px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .68);
+  border: 1px solid rgba(255, 255, 255, .76);
+}
+
+.mp-di-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: calc(11px * var(--font-scale));
+  letter-spacing: .02em;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+
+.mp-di-text {
+  font-family: var(--font-serif);
+  font-size: calc(13.5px * var(--font-scale));
+  line-height: calc(1.62 * var(--line-scale));
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mp-recent {
+  margin-top: 9px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.mp-recent .mp-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  font-size: calc(12px * var(--font-scale));
+}
+
+.mp-recent-body { flex: 1; min-width: 0; }
+
+.mp-recent-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: calc(12.5px * var(--font-scale));
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mp-recent-msg {
+  font-size: calc(11.5px * var(--font-scale));
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+/* ------------------------------------------------------ 桌面资料卡 */
+.mp-profile {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+  width: 100%;
+  padding: 0 0 12px;
+  border: 0;
+  border-radius: 28px;
+  overflow: hidden;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  -webkit-tap-highlight-color: transparent;
+  background: linear-gradient(168deg, rgba(255, 255, 255, .96), rgba(255, 255, 255, .86));
+  backdrop-filter: blur(24px) saturate(155%);
+  -webkit-backdrop-filter: blur(24px) saturate(155%);
+  box-shadow: 0 18px 40px rgba(120, 108, 180, .16), inset 0 0 0 1px rgba(255, 255, 255, .86);
+  transition: transform .22s cubic-bezier(.22, .68, .38, 1);
+}
+
+.mp-profile-banner { cursor: pointer; }
+
+.mp-profile-banner {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 86px;
+  overflow: hidden;
+  background:
+    radial-gradient(110% 150% at 8% 0%, rgba(255, 190, 218, .94), transparent 58%),
+    radial-gradient(110% 140% at 100% 10%, rgba(188, 226, 255, .9), transparent 62%),
+    linear-gradient(135deg, #ffe3ef, #e8e1ff 52%, #ddf7ee);
+}
+
+.mp-profile-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--wall-custom, none);
+  background-size: cover;
+  background-position: center;
+  opacity: .42;
+  filter: saturate(1.08);
+}
+
+.mp-profile-banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .26), transparent 40%, rgba(255, 255, 255, .34));
+}
+
+.mp-profile-stamp {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 12px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .62);
+  color: rgba(48, 42, 72, .62);
+  font-size: calc(10.5px * var(--font-scale));
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.mp-profile-avatar {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: -32px auto 0;
+  cursor: pointer;
+  color: #fff;
+  font-size: calc(21px * var(--font-scale));
+  font-weight: 600;
+  text-transform: uppercase;
+  border: 2.5px solid rgba(255, 255, 255, .96);
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 8px 18px rgba(95, 80, 140, .2), inset 0 0 0 1px rgba(255, 255, 255, .3);
+}
+
+.mp-profile-avatar.is-empty {
+  background: linear-gradient(150deg, #b9c8f2, #cdb7ef);
+  color: #fff;
+}
+
+.mp-profile-name {
+  position: relative;
+  z-index: 2;
+  margin-top: 6px;
+  color: var(--text);
+  font-size: calc(16.5px * var(--font-scale));
+  font-weight: 650;
+  letter-spacing: -.01em;
+}
+
+.mp-profile-handle {
+  position: relative;
+  z-index: 2;
+  margin-top: 0;
+  color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale));
+}
+
+.mp-profile-banner.is-custom::before { display: none; }
+
+.mp-profile-bio {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  max-width: 300px;
+  margin-top: 5px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: calc(12px * var(--font-scale));
+  line-height: calc(1.45 * var(--line-scale));
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mp-profile-bio > span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mp-profile-bio .mp-i {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  opacity: .55;
+}
+
+.mp-profile-bio:active { background: rgba(255, 255, 255, .5); }
+
+.mp-profile-bio-edit {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 32px);
+  margin-top: 6px;
+}
+
+.mp-profile-bio-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .78);
+  box-shadow: inset 0 0 0 1px rgba(140, 130, 190, .2);
+  color: var(--text);
+  font: inherit;
+  font-size: calc(12px * var(--font-scale));
+}
+
+.mp-profile-mini {
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .7);
+  color: var(--text-2);
+  font: inherit;
+  font-size: calc(11.5px * var(--font-scale));
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(140, 130, 190, .16);
+}
+
+.mp-profile-mini.is-primary {
+  background: linear-gradient(150deg, #9583f2, #7f6ce9);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(140, 116, 224, .24);
+}
+
+
+.mp-profile-loc {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .62);
+  color: var(--text-3);
+  font-size: calc(10px * var(--font-scale));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .58);
+}
+
+.mp-profile-loc .mp-i { width: 12px; height: 12px; }
+
+/* ------------------------------------------------------ 桌面图标网格 */
+.mp-apps {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  justify-items: center;
+  align-content: start;
+  row-gap: 8px;
+  padding: 14px 0 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.mp-apps::-webkit-scrollbar { display: none; }
+
+.mp-app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mp-app .mp-tile {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  border-radius: 17px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 18px rgba(120, 110, 170, .22), inset 0 0 0 1px rgba(255, 255, 255, .55);
+  transition: transform .18s cubic-bezier(.22, .68, .38, 1);
+}
+
+.mp-app .mp-tile::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .36), rgba(255, 255, 255, 0) 46%);
+}
+
+.mp-app .mp-tile .mp-i {
+  position: relative;
+  z-index: 1;
+  width: 25px;
+  height: 25px;
+  color: #fff;
+  filter: drop-shadow(0 1px 1px rgba(90, 70, 120, .18));
+}
+
+.mp-app:active .mp-tile { transform: scale(.93); }
+
+.mp-app .mp-app-label {
+  font-size: calc(11px * var(--font-scale));
+  font-weight: 500;
+  color: var(--text);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .45);
+}
+
+.mp-app .mp-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #ff7a8a;
+  color: #fff;
+  font-size: calc(10px * var(--font-scale));
+  font-weight: 600;
+  line-height: 17px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(255, 90, 120, .35);
+  z-index: 2;
+}
+
+/* --------------------------------------------------------------- Dock */
+.mp-dock {
+  flex: 0 0 auto;
+  margin-top: 12px;
+  padding: 9px 10px;
+  border-radius: 26px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .88), rgba(246, 242, 255, .70));
+  backdrop-filter: blur(26px) saturate(160%);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .92), 0 16px 34px rgba(120, 108, 180, .22);
+}
+
+.mp-dock .mp-app .mp-tile {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  box-shadow: 0 6px 14px rgba(120, 110, 170, .20), inset 0 0 0 1px rgba(255, 255, 255, .5);
+}
+
+.mp-dock .mp-app .mp-app-label { display: none; }
+
+.mp-home-bar {
+  position: absolute;
+  bottom: 7px;
+  left: 50%;
+  width: 118px;
+  height: 4px;
+  border-radius: 3px;
+  background: rgba(43, 41, 55, .26);
+  transform: translateX(-50%);
+  z-index: 40;
+  cursor: pointer;
+}
+
+/* --------------------------------------------------------- 页面通用 */
+.mp-page {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, rgba(251, 249, 254, .955), rgba(246, 243, 251, .97));
+  backdrop-filter: blur(26px) saturate(130%);
+  -webkit-backdrop-filter: blur(26px) saturate(130%);
+}
+
+@keyframes mp-in {
+  from { transform: translateX(12px) scale(.99); }
+  to { transform: none; }
+}
+
+.mp-nav {
+  flex: 0 0 auto;
+  height: 52px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+/* 预设详情：操作按钮落到状态栏下方，避开右上角时钟 */
+.mp-root .mp-nav.mp-preset-nav {
+  height: 34px;
+  margin-top: 54px;
+  margin-bottom: 10px;
+}
+
+.mp-page-body {
+  padding-bottom: 14px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 18px 26px;
+  scrollbar-width: none;
+}
+
+.mp-page-body::-webkit-scrollbar { display: none; }
+
+.mp-title {
+  font-size: calc(31px * var(--font-scale));
+  font-weight: 600;
+  letter-spacing: -.038em;
+  line-height: calc(1.16 * var(--line-scale));
+  margin: 2px 0 3px;
+}
+
+.mp-subtitle {
+  font-size: calc(12px * var(--font-scale));
+  color: var(--text-3);
+  margin-bottom: 16px;
+}
+

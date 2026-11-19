@@ -1,0 +1,122 @@
+/* =========================================================================
+   修正块：图标默认尺寸 / 状态栏层级 / 页面顶部让位
+   —— 这一组放在最后，靠顺序覆盖上面的同名规则（不改原有声明）。
+   ========================================================================= */
+
+/* svg 默认按字号走，避免在没有尺寸约束的容器里撑成一大块 */
+.mp-i {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+}
+
+.mp-status .mp-i { width: 15px; height: 15px; }
+.mp-di-label .mp-i { width: 13px; height: 13px; }
+
+/* 状态栏与灵动岛永远在页面之上 */
+.mp-status { z-index: 44; }
+.mp-island { z-index: 45; }
+
+/* 页面从状态栏下面开始，别把时钟压在导航上 */
+.mp-page
+.mp-thread {
+  padding-top: 44px;
+  box-sizing: border-box;
+}
+
+/* ---- 收尾：快捷动作 / 引用行 ---- */
+
+/* 桌面图标与 Dock 之间的快捷动作，填掉中间的空档 */
+.mp-quick {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  padding: 14px 0 4px;
+}
+
+.mp-quick-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .66);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .8), 0 6px 16px rgba(120, 108, 180, .12);
+  color: var(--text);
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 500;
+  letter-spacing: .01em;
+  cursor: pointer;
+  transition: transform .16s ease;
+}
+
+.mp-quick-btn .mp-i { width: 15px; height: 15px; color: var(--accent-deep); }
+.mp-quick-btn:active { transform: scale(.96); }
+
+/* 引用：一条淡紫细线 + 两个字号的缩进，不抢气泡 */
+.mp-quote-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 0 2px 4px;
+  padding-left: 8px;
+  border-left: 2px solid rgba(142, 123, 242, .5);
+  font-size: calc(11.5px * var(--font-scale));
+  line-height: calc(1.5 * var(--line-scale));
+  color: var(--text-3);
+}
+
+.mp-quote-line .mp-i { width: 11px; height: 11px; margin-top: 2px; opacity: .7; }
+.mp-quote-line span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.mp-extra-source {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 11px 13px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .56);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7);
+  font-size: calc(12.5px * var(--font-scale));
+  line-height: calc(1.7 * var(--line-scale));
+  color: var(--text-2);
+}
+.mp-extra-source .mp-i { flex: none; width: 13px; height: 13px; margin-top: 3px; opacity: .55; }
+.mp-extra-source span { min-width: 0; }
+
+/* 修正二：时间分割线居中 / 桌面图标略放大 / 日记卡三行 */
+.mp-time {
+  align-self: center;
+  text-align: center;
+  margin: 6px 0 2px;
+  font-size: calc(10.5px * var(--font-scale));
+  letter-spacing: .02em;
+  color: var(--text-3);
+}
+
+.mp-app .mp-tile {
+  width: 58px;
+  height: 58px;
+  border-radius: 17px;
+}
+
+.mp-app .mp-tile .mp-i { width: 25px; height: 25px; }
+
+.mp-app .mp-app-label {
+  font-size: calc(11px * var(--font-scale));
+  margin-top: 4px;
+}
+
+.mp-apps {
+  gap: 7px 0;
+  padding-top: 12px;
+}
+
+.mp-di-text { -webkit-line-clamp: 3; }
+

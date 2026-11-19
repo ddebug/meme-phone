@@ -1,0 +1,107 @@
+/* ------------------------------------------------------------- 列表 */
+.mp-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 14px;
+  border-radius: var(--r-m);
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+  cursor: pointer;
+  border: 0;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mp-row:active { transform: scale(.988); }
+.mp-row + .mp-row { margin-top: 8px; }
+
+.mp-row-main { flex: 1; min-width: 0; }
+
+.mp-row-name {
+  font-size: calc(14.5px * var(--font-scale));
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mp-row-sub {
+  display: block;
+  font-size: calc(11.5px * var(--font-scale));
+  color: var(--text-3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-row-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text-3);
+}
+
+.mp-avatar {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  font-size: calc(14px * var(--font-scale));
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(150deg, var(--lav), var(--lav-deep));
+  text-shadow: 0 1px 2px rgba(60, 40, 90, .2);
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+}
+
+.mp-avatar.lg { width: 64px; height: 64px; border-radius: 20px; font-size: calc(20px * var(--font-scale)); }
+
+.mp-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--ok);
+  flex: 0 0 auto;
+}
+
+.mp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 9px;
+  font-size: calc(10.5px * var(--font-scale));
+  font-weight: 500;
+  background: rgba(142, 123, 242, .10);
+  color: var(--accent-deep);
+  border: 1px solid rgba(142, 123, 242, .22);
+}
+
+.mp-pill.mint { background: rgba(127, 210, 188, .16); color: #1c8f70; border-color: rgba(127, 210, 188, .38); }
+.mp-pill.pink { background: rgba(242, 160, 194, .16); color: #c55e88; border-color: rgba(242, 160, 194, .38); }
+.mp-pill.plain { background: rgba(43, 41, 55, .05); color: var(--text-2); border-color: transparent; }
+
+.mp-badge-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: calc(10.5px * var(--font-scale));
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+

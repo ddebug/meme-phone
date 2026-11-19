@@ -1,0 +1,1029 @@
+/* 白色磨砂：聊天气泡统一成无光白玻璃，收发都用自己的白气泡 */
+.mp-root[data-mp-skin="frost"] .mp-bubble,
+.mp-root[data-mp-skin="frost"] .mp-msg.me .mp-bubble {
+  padding: 7px 15px;
+  border: 1px solid rgba(255, 255, 255, .34);
+  border-radius: 15px;
+  background: linear-gradient(145deg, rgba(230, 230, 230, .72) 10%, rgba(240, 240, 240, .62) 40%, rgba(250, 250, 250, .52) 80%);
+  backdrop-filter: blur(10px) saturate(150%);
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  color: #000;
+  box-shadow: 0 8px 25px rgba(220, 220, 220, .38);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-msg.me .mp-bubble {
+  color: #000;
+}
+
+/* =========================================================================
+   皮肤全站基座
+   frost：白色磨砂、无光、单色纸张
+   pixel：冷白纸 + 黑色硬边 + 像素式硬投影
+   这一组放在文件最后，整屏接管页面、卡片、列表、弹层和控件。
+   ========================================================================= */
+
+/* ---------------------------------------------------------- 1. 皮肤 token */
+.mp-root[data-mp-skin="frost"] {
+  --lav: #8e8e93;
+  --lav-deep: #3a3a3c;
+  --pink: #c7c7cc;
+  --mint: #d1d1d6;
+  --honey: #e5e5ea;
+  --sky: #aeaeb2;
+
+  --text: #1c1c1e;
+  --text-2: rgba(28, 28, 30, .66);
+  --text-3: rgba(28, 28, 30, .46);
+  --text-4: rgba(28, 28, 30, .28);
+  --line: rgba(60, 60, 67, .14);
+  --line-soft: rgba(60, 60, 67, .07);
+
+  --page: #efeff1;
+  --page-2: #e8e8ea;
+  --glass: rgba(250, 250, 251, .78);
+  --glass-strong: rgba(255, 255, 255, .92);
+  --card: rgba(251, 251, 252, .84);
+
+  --accent: #2c2c2e;
+  --accent-deep: #000;
+  --ok: #248a3d;
+  --warn: #8a6a33;
+
+  --shadow-s: 0 2px 10px rgba(0, 0, 0, .055);
+  --shadow-m: 0 10px 28px rgba(0, 0, 0, .08);
+  --shadow-l: 0 24px 56px rgba(0, 0, 0, .14);
+
+  --r-s: 10px;
+  --r-m: 15px;
+  --r-l: 18px;
+  --r-xl: 22px;
+  --r-card: 16px;
+
+  --field-bg: rgba(255, 255, 255, .70);
+  --field-solid: rgba(255, 255, 255, .92);
+  --field-border: rgba(60, 60, 67, .18);
+}
+
+/* ---------------------------------------------------- 2. 机身 / 壁纸 / 页面 */
+.mp-root[data-mp-skin="frost"] .mp-device {
+  background: linear-gradient(160deg, #f8f8f9, #e6e6e9 58%, #fdfdfd);
+  box-shadow:
+    0 40px 90px rgba(0, 0, 0, .18),
+    0 0 0 1px rgba(255, 255, 255, .9),
+    inset 0 0 0 1px rgba(255, 255, 255, .72);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-wallpaper {
+  filter: grayscale(.88) brightness(1.09) contrast(.9);
+  opacity: .94;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-scrim {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .56), rgba(255, 255, 255, .20) 42%, rgba(244, 244, 246, .56));
+}
+
+.mp-root[data-mp-skin="frost"] .mp-screen {
+  background: #eeeeef;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-page,
+.mp-root[data-mp-skin="frost"] .mp-thread {
+  background: linear-gradient(180deg, rgba(250, 250, 251, .84), rgba(241, 241, 243, .91));
+  backdrop-filter: blur(30px) saturate(.62);
+  -webkit-backdrop-filter: blur(30px) saturate(.62);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-page-body {
+  background: transparent;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-composer {
+  background: rgba(246, 246, 247, .78);
+  border-top-color: rgba(60, 60, 67, .12);
+  backdrop-filter: blur(24px) saturate(.6);
+  -webkit-backdrop-filter: blur(24px) saturate(.6);
+}
+
+/* 状态栏与顶部操作 */
+.mp-root[data-mp-skin="frost"] .mp-status-back,
+.mp-root[data-mp-skin="frost"] .mp-icon-btn {
+  background: rgba(250, 250, 251, .78);
+  color: #1c1c1e;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .82), 0 2px 10px rgba(0, 0, 0, .06);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-island {
+  background: #1b1b1d;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, .18);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-home-bar {
+  background: rgba(28, 28, 30, .30);
+}
+
+/* ------------------------------------------------ 3. 桌面 / 面板 / 列表底 */
+.mp-root[data-mp-skin="frost"] :is(
+  .mp-widget, .mp-profile, .mp-di-card,
+  .mp-row, .mp-group-box, .mp-card, .mp-diary-hero, .mp-diary-card,
+  .mp-chat-set-head, .mp-extra-source, .mp-quote-chip, .mp-sheet,
+  .mp-theme-card, .mp-dress-hero, .mp-dress-toggle, .mp-dress-app-grid,
+  .mp-icon-preview, .mp-icon-grid, .mp-music-card, .mp-music-empty,
+  .mp-music-player, .mp-draw-desc, .mp-draw-param, .mp-draw-card,
+  .mp-ios-card, .mp-api-card, .mp-api-clone, .mp-cp-shell,
+  .mp-char-block, .mp-wi-note
+) {
+  background: rgba(251, 251, 252, .78);
+  border-radius: 18px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, .74),
+    0 8px 24px rgba(0, 0, 0, .052);
+  backdrop-filter: blur(20px) saturate(.55);
+  -webkit-backdrop-filter: blur(20px) saturate(.55);
+}
+
+.mp-root[data-mp-skin="frost"] :is(.mp-widget, .mp-profile, .mp-sheet, .mp-music-player, .mp-dress-hero, .mp-ios-card, .mp-icon-preview) {
+  border-radius: 22px;
+}
+
+/* 列表组自己是一张玻璃卡，行只做分隔；嵌套 backdrop-filter 在部分浏览器会把行文字吃掉 */
+.mp-root[data-mp-skin="frost"] .mp-group-box {
+  background: rgba(251, 251, 252, .93);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.mp-root[data-mp-skin="frost"] .mp-group-box .mp-row {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.mp-root[data-mp-skin="frost"] .mp-group-box .mp-row + .mp-row {
+  margin-top: 0;
+  border-top: 1px solid rgba(60, 60, 67, .09);
+}
+
+.mp-root[data-mp-skin="frost"] :is(
+  .mp-btn, .mp-btn.ghost, .mp-quick-btn, .mp-action-btn, .mp-chip-btn,
+  .mp-sq-btn, .mp-draw-action, .mp-draw-side, .mp-ios-add, .mp-ios-memory-row,
+  .mp-music-next, .mp-music-card-play, .mp-api-card-swap, .mp-sheet-cancel,
+  .mp-draw-state-btn
+) {
+  background: rgba(252, 252, 253, .80);
+  color: #1c1c1e;
+  border-radius: 12px;
+  box-shadow:
+    inset 0 0 0 1px rgba(60, 60, 67, .10),
+    0 3px 10px rgba(0, 0, 0, .04);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-chip-btn.is-on {
+  background: rgba(28, 28, 30, .075);
+  box-shadow:
+    inset 0 0 0 1px rgba(28, 28, 30, .22),
+    0 3px 10px rgba(0, 0, 0, .04);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-chip-btn.is-on .mp-set-ico,
+.mp-root[data-mp-skin="frost"] .mp-set-ico {
+  background: rgba(28, 28, 30, .065);
+  color: #2c2c2e;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-dock {
+  background: rgba(249, 249, 250, .76);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, .82),
+    0 14px 30px rgba(0, 0, 0, .09);
+  backdrop-filter: blur(26px) saturate(.58);
+  -webkit-backdrop-filter: blur(26px) saturate(.58);
+}
+
+.mp-root[data-mp-skin="frost"] :is(.mp-app .mp-tile:not(.mp-tile-image), .mp-glass-ico) {
+  background: linear-gradient(155deg, rgba(255, 255, 255, .90), rgba(232, 232, 234, .72));
+  color: #3a3a3c;
+  border-radius: 16px;
+  backdrop-filter: blur(18px) saturate(.5);
+  -webkit-backdrop-filter: blur(18px) saturate(.5);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, .075),
+    inset 0 0 0 1px rgba(255, 255, 255, .86);
+}
+
+.mp-root[data-mp-skin="frost"] :is(.mp-app .mp-tile:not(.mp-tile-image) .mp-i, .mp-glass-ico .mp-i) {
+  color: #3a3a3c;
+  filter: none;
+  opacity: .88;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-app .mp-tile::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .34), rgba(255, 255, 255, 0) 48%);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-app .mp-app-label {
+  color: #1c1c1e;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .72);
+}
+
+/* 桌面资料卡：磨砂做无光灰，像素保留主题横幅 */
+.mp-root[data-mp-skin="frost"] .mp-profile-banner {
+  background:
+    radial-gradient(110% 150% at 8% 0%, rgba(255, 255, 255, .92), transparent 58%),
+    radial-gradient(110% 140% at 100% 10%, rgba(218, 218, 221, .86), transparent 62%),
+    linear-gradient(135deg, #dedee1, #f7f7f8 52%, #d2d2d5);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-profile-banner::before {
+  opacity: .18;
+  filter: grayscale(1) contrast(.9);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-profile-banner::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .28), transparent 42%, rgba(255, 255, 255, .52));
+}
+
+.mp-root[data-mp-skin="frost"] :is(.mp-profile-stamp, .mp-profile-loc) {
+  background: rgba(255, 255, 255, .78);
+  color: rgba(28, 28, 30, .56);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .9);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-profile-avatar {
+  border-color: rgba(255, 255, 255, .96);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .12);
+}
+
+/* ------------------------------------------------------ 4. 聊天 / 日记 / 设置 */
+.mp-root[data-mp-skin="frost"] .mp-bubble,
+.mp-root[data-mp-skin="frost"] .mp-msg.me .mp-bubble {
+  background: rgba(255, 255, 255, .74);
+  border: 1px solid rgba(60, 60, 67, .12);
+  border-radius: 15px;
+  color: #1c1c1e;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .055);
+  backdrop-filter: blur(12px) saturate(.6);
+  -webkit-backdrop-filter: blur(12px) saturate(.6);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-msg.me .mp-bubble {
+  background: rgba(230, 230, 233, .84);
+  border-color: rgba(60, 60, 67, .10);
+}
+
+.mp-root[data-mp-skin="frost"] :is(.mp-typing, .mp-quote-chip) {
+  background: rgba(255, 255, 255, .78);
+  border: 1px solid rgba(60, 60, 67, .10);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .04);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-compose-box {
+  background: rgba(255, 255, 255, .88);
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 1px rgba(60, 60, 67, .13);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-send {
+  background: rgba(28, 28, 30, .07);
+  color: #3a3a3c;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-send.is-text {
+  background: #1c1c1e;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .16);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-send.is-wake {
+  background: rgba(28, 28, 30, .08);
+  color: #1c1c1e;
+  box-shadow: inset 0 0 0 1px rgba(28, 28, 30, .16);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-sys {
+  background: rgba(28, 28, 30, .05);
+  color: rgba(28, 28, 30, .50);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-quote {
+  background: rgba(28, 28, 30, .045);
+  border-left-color: rgba(28, 28, 30, .26);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-msg.me .mp-quote {
+  background: rgba(28, 28, 30, .06);
+  border-left-color: rgba(28, 28, 30, .24);
+  color: rgba(28, 28, 30, .60);
+}
+
+/* 日历 / 日记 */
+.mp-root[data-mp-skin="frost"] .mp-cal button.sel {
+  background: rgba(28, 28, 30, .08);
+  color: #1c1c1e;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-cal button .mark {
+  background: #3a3a3c;
+}
+
+/* 设置行 / 分组 / 图标 */
+.mp-root[data-mp-skin="frost"] .mp-set-row {
+  background: transparent;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-set-row:active {
+  background: rgba(28, 28, 30, .045);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-set-row.is-on {
+  background: rgba(28, 28, 30, .04);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-set-row.is-danger .mp-set-name {
+  color: #c0392b;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-set-row.is-danger .mp-set-ico {
+  color: #c0392b;
+  background: rgba(192, 57, 43, .08);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-switch {
+  background: #e6e6e8;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .04);
+}
+
+/* 统一 iOS 下拉框 */
+.mp-root[data-mp-skin="frost"] .mp-select-wrap select {
+  background: rgba(255, 255, 255, .88);
+  border: 1px solid rgba(60, 60, 67, .18);
+  border-radius: 14px;
+  color: #1c1c1e;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-select-wrap select:focus {
+  border-color: #2c2c2e;
+  box-shadow: 0 0 0 3px rgba(28, 28, 30, .10);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-sheet-input,
+.mp-root[data-mp-skin="frost"] .mp-sheet-textarea {
+  background: rgba(255, 255, 255, .90);
+  border-color: rgba(60, 60, 67, .18);
+  border-radius: 13px;
+}
+
+/* 弹层 / 遮罩 / toast */
+.mp-root[data-mp-skin="frost"] .mp-mask {
+  background: rgba(24, 24, 26, .30);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-sheet {
+  background: rgba(252, 252, 253, .94);
+  box-shadow:
+    0 22px 50px rgba(0, 0, 0, .16),
+    inset 0 0 0 1px rgba(255, 255, 255, .92);
+}
+
+.mp-root[data-mp-skin="frost"] :is(.mp-toast, .mp-draw-state) {
+  background: rgba(28, 28, 30, .90);
+  color: #fff;
+}
+
+/* -------------------------------------- 5. 强调色 / 标签 / 按钮 / 各行状态 */
+.mp-root[data-mp-skin="frost"] :is(
+  .mp-pill, .mp-user-tag, .mp-api-tag, .mp-music-source, .mp-music-track-side,
+  .mp-char-tag, .mp-cp-badge, .mp-cp-count, .mp-preset-tag:not(.is-context):not(.is-app),
+  .mp-draw-mini, .mp-char-query, .mp-wi-scan, .mp-wi-retry, .mp-ios-edit-reply
+) {
+  background: rgba(28, 28, 30, .065);
+  border-color: rgba(28, 28, 30, .14);
+  color: #2c2c2e;
+}
+
+.mp-root[data-mp-skin="frost"] :is(.mp-pill.mint, .mp-pill.pink) {
+  background: rgba(28, 28, 30, .075);
+  border-color: rgba(28, 28, 30, .16);
+  color: #2c2c2e;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-pill.plain {
+  background: rgba(28, 28, 30, .045);
+  border-color: transparent;
+  color: rgba(28, 28, 30, .58);
+}
+
+.mp-root[data-mp-skin="frost"] :is(.mp-cp-comment, .mp-preset-item.is-context) {
+  background: rgba(28, 28, 30, .035);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-preset-tag.is-context {
+  background: rgba(46, 125, 74, .10);
+  color: #2e7d4a;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-preset-tag.is-app {
+  background: rgba(28, 28, 30, .055);
+  color: rgba(28, 28, 30, .52);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-tag-proactive {
+  background: rgba(46, 125, 74, .10);
+  color: #2e7d4a;
+  border-color: rgba(46, 125, 74, .22);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-badge-count {
+  background: #2c2c2e;
+  color: #fff;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-btn.accent {
+  background: #1c1c1e;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .14);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-btn.ghost {
+  background: rgba(28, 28, 30, .045);
+  color: #1c1c1e;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-seg {
+  background: rgba(28, 28, 30, .055);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-seg button.on {
+  background: #fff;
+  color: #1c1c1e;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-back {
+  color: #1c1c1e;
+}
+
+/* 绘图 / 接口 */
+.mp-root[data-mp-skin="frost"] :is(.mp-draw-action.is-primary, .mp-draw-side.is-primary, .mp-api-use-btn.is-on) {
+  background: rgba(28, 28, 30, .075);
+  border-color: rgba(28, 28, 30, .24);
+  color: #1c1c1e;
+  font-weight: 600;
+}
+
+.mp-root[data-mp-skin="frost"] :is(.mp-draw-action.is-danger, .mp-draw-side.is-danger, .mp-sheet-item.danger) {
+  color: #c0392b;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-sheet-item.danger .mp-i {
+  color: #c0392b;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-draw-run {
+  background: #1c1c1e;
+  color: #fff;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .18);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-draw-desc .mp-i {
+  color: #3a3a3c;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-ios-add {
+  color: #1c1c1e;
+}
+
+/* 音乐 */
+.mp-root[data-mp-skin="frost"] .mp-music-card.is-on {
+  background: rgba(227, 227, 230, .82);
+  box-shadow: inset 0 0 0 1px rgba(28, 28, 30, .12);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-music-player {
+  background: rgba(251, 251, 252, .86);
+}
+
+.mp-root[data-mp-skin="frost"] :is(.mp-music-cover, .mp-music-cover.is-empty) {
+  background: linear-gradient(150deg, #d8d8db, #a8a8ad);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-music-empty-art {
+  background: rgba(28, 28, 30, .07);
+  color: #2c2c2e;
+  box-shadow: inset 0 0 0 1px rgba(28, 28, 30, .10);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-music-play {
+  background: #1c1c1e;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .18);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-music-progress {
+  background: rgba(28, 28, 30, .12);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-music-progress i {
+  background: #1c1c1e;
+}
+
+/* 查 TA 的手机 / 角色 / 世界书 */
+.mp-root[data-mp-skin="frost"] .mp-cp-bubble-row.is-me .mp-cp-bubble {
+  background: #1c1c1e;
+  color: #fff;
+}
+
+/* 装扮 / 主题卡 / 壁纸 / 图标 */
+.mp-root[data-mp-skin="frost"] .mp-dress-aa {
+  background: rgba(28, 28, 30, .07);
+  color: #1c1c1e;
+  box-shadow: inset 0 0 0 1px rgba(28, 28, 30, .10);
+}
+
+.mp-root[data-mp-skin="frost"] :is(.mp-dress-choice, .mp-icon-choice) {
+  background: rgba(28, 28, 30, .05);
+  color: #1c1c1e;
+}
+
+.mp-root[data-mp-skin="frost"] :is(.mp-dress-choice.is-on, .mp-icon-choice.is-on) {
+  background: rgba(28, 28, 30, .12);
+  color: #1c1c1e;
+  box-shadow: inset 0 0 0 1px rgba(28, 28, 30, .24);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-dress-choice.is-on b {
+  color: #1c1c1e;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-theme-preview {
+  border-radius: 13px;
+  box-shadow: inset 0 0 0 1px rgba(28, 28, 30, .12);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-theme-card.is-on {
+  box-shadow:
+    inset 0 0 0 1.5px rgba(124, 111, 255, .45),
+    0 10px 22px rgba(124, 111, 255, .14);
+}
+
+/* ---------------------------------------------- 6. 遗漏控件 / 状态 / 文字层级 */
+/* iOS 开关保持原形，只换轨道底色；开启仍用系统绿 */
+.mp-root[data-mp-skin="frost"] .mp-switch.on{
+  background: #34c759;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .04);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-action-btn.primary {
+  background: #1c1c1e;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .14);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-quick-btn .mp-i {
+  color: #3a3a3c;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-music-track.is-on {
+  background: rgba(28, 28, 30, .07);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-music-track:active {
+  background: rgba(28, 28, 30, .05);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-draw-ph {
+  color: rgba(28, 28, 30, .38);
+}
+
+.mp-root[data-mp-skin="frost"] :is(.mp-dress-tile:not(.has-image), .mp-icon-preview .mp-dress-tile:not(.has-image)) {
+  background: linear-gradient(155deg, rgba(255, 255, 255, .88), rgba(230, 230, 233, .74));
+  color: #3a3a3c;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, .06), inset 0 0 0 1px rgba(255, 255, 255, .82);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-user-tag.is-dirty {
+  background: rgba(138, 106, 51, .12);
+  color: #8a6a33;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-ios-edit-reply{
+  background: transparent;
+  border: 0;
+  color: #1c1c1e;
+  padding: 4px 2px;
+  box-shadow: none;
+}
+
+.mp-root[data-mp-skin="frost"] .mp-api-status .mp-row-sub.is-ok {
+  color: #2e7d4a;
+}
+
+/* 文本层级：标题、说明、摘要在两套皮肤里保持同一关系 */
+.mp-root[data-mp-skin="frost"] .mp-title {
+  letter-spacing: -.036em;
+}
+
+/* ------------------------------------------------ 7. 皮肤 + 夜间（深色变体） */
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] {
+  --text: #f2f2f7;
+  --text-2: rgba(235, 235, 245, .66);
+  --text-3: rgba(235, 235, 245, .52);
+  --text-4: rgba(235, 235, 245, .32);
+  --line: rgba(235, 235, 245, .16);
+  --line-soft: rgba(235, 235, 245, .08);
+
+  --page: #1c1c1e;
+  --page-2: #141416;
+  --glass: rgba(38, 38, 40, .78);
+  --glass-strong: rgba(58, 58, 60, .90);
+  --card: rgba(44, 44, 46, .78);
+
+  --accent: #f2f2f7;
+  --accent-deep: #fff;
+  --ok: #7fd8a0;
+  --warn: #e5c07b;
+
+  --shadow-s: 0 2px 10px rgba(0, 0, 0, .28);
+  --shadow-m: 0 10px 28px rgba(0, 0, 0, .38);
+  --shadow-l: 0 24px 56px rgba(0, 0, 0, .52);
+
+  --field-bg: rgba(44, 44, 46, .60);
+  --field-solid: #2c2c2e;
+  --field-border: rgba(235, 235, 245, .18);
+}
+
+/* frost 夜间外壳 */
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-device {
+  background: linear-gradient(160deg, #2a2a2c, #141416 58%, #232325);
+  box-shadow: 0 40px 90px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .10);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-wallpaper {
+  filter: grayscale(.92) brightness(.44) contrast(1.02);
+  opacity: .68;
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-scrim {
+  background: linear-gradient(180deg, rgba(0, 0, 0, .34), rgba(0, 0, 0, .52) 40%, rgba(0, 0, 0, .66));
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-screen {
+  background: #111;
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] :is(.mp-page, .mp-thread) {
+  background: linear-gradient(180deg, rgba(26, 26, 28, .88), rgba(16, 16, 18, .94));
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-composer {
+  background: rgba(24, 24, 26, .84);
+  border-top-color: rgba(255, 255, 255, .08);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] :is(.mp-status-back, .mp-icon-btn) {
+  background: rgba(58, 58, 60, .78);
+  color: #f2f2f7;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .10), 0 2px 10px rgba(0, 0, 0, .28);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-island {
+  background: #000;
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-home-bar {
+  background: rgba(255, 255, 255, .42);
+}
+
+/* frost 夜间面板与按钮 */
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] :is(
+  .mp-widget, .mp-profile, .mp-di-card,
+  .mp-row, .mp-group-box, .mp-card, .mp-diary-hero, .mp-diary-card,
+  .mp-chat-set-head, .mp-extra-source, .mp-quote-chip, .mp-sheet,
+  .mp-theme-card, .mp-dress-hero, .mp-dress-toggle, .mp-dress-app-grid,
+  .mp-icon-preview, .mp-icon-grid, .mp-music-card, .mp-music-empty,
+  .mp-music-player, .mp-draw-desc, .mp-draw-param, .mp-draw-card,
+  .mp-ios-card, .mp-api-card, .mp-api-clone, .mp-cp-shell,
+  .mp-char-block, .mp-wi-note
+) {
+  background: rgba(44, 44, 46, .72);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, .08),
+    0 8px 24px rgba(0, 0, 0, .26);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] :is(
+  .mp-btn, .mp-btn.ghost, .mp-quick-btn, .mp-action-btn, .mp-chip-btn,
+  .mp-sq-btn, .mp-draw-action, .mp-draw-side, .mp-ios-add, .mp-ios-memory-row,
+  .mp-music-next, .mp-music-card-play, .mp-api-card-swap, .mp-sheet-cancel,
+  .mp-draw-state-btn
+) {
+  background: rgba(58, 58, 60, .78);
+  color: #f2f2f7;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .10);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-chip-btn.is-on {
+  background: rgba(255, 255, 255, .14);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .26);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] :is(.mp-set-ico, .mp-chip-btn.is-on .mp-set-ico) {
+  background: rgba(255, 255, 255, .10);
+  color: #f2f2f7;
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-dock {
+  background: rgba(44, 44, 46, .74);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .10), 0 14px 30px rgba(0, 0, 0, .38);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] :is(.mp-app .mp-tile:not(.mp-tile-image), .mp-glass-ico) {
+  background: linear-gradient(155deg, rgba(78, 78, 82, .82), rgba(42, 42, 45, .82));
+  color: #f2f2f7;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), 0 8px 18px rgba(0, 0, 0, .28);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] :is(.mp-app .mp-tile:not(.mp-tile-image) .mp-i, .mp-glass-ico .mp-i) {
+  color: #f2f2f7;
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-app .mp-app-label {
+  color: #f2f2f7;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .55);
+}
+
+/* frost 夜间聊天与弹层 */
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-bubble {
+  background: rgba(58, 58, 60, .78);
+  border-color: rgba(255, 255, 255, .10);
+  color: #f2f2f7;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .24);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-msg.me .mp-bubble {
+  background: rgba(88, 88, 92, .72);
+  color: #f2f2f7;
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-compose-box {
+  background: #343436;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-send {
+  background: rgba(255, 255, 255, .12);
+  color: #f2f2f7;
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-sys {
+  background: rgba(255, 255, 255, .08);
+  color: rgba(235, 235, 245, .60);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-quote {
+  background: rgba(255, 255, 255, .07);
+  border-left-color: rgba(255, 255, 255, .34);
+  color: rgba(255, 255, 255, .74);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] :is(.mp-sheet, .mp-sheet-cancel) {
+  background: rgba(44, 44, 46, .96);
+  color: #f2f2f7;
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-mask {
+  background: rgba(0, 0, 0, .56);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-toast {
+  background: rgba(242, 242, 247, .92);
+  color: #1c1c1e;
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-select-wrap select {
+  background: #2c2c2e;
+  border-color: rgba(255, 255, 255, .18);
+  color: #f2f2f7;
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-switch:not(.on) {
+  background: #39393d;
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-seg {
+  background: rgba(255, 255, 255, .10);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-seg button.on {
+  background: rgba(255, 255, 255, .18);
+  color: #fff;
+}
+
+/* frost 夜间强调按钮与彩色强调全部收成浅色 */
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] :is(
+  .mp-btn.accent, .mp-action-btn.primary, .mp-send.is-text, .mp-draw-run,
+  .mp-music-play, .mp-api-use-btn.is-on, .mp-cp-bubble-row.is-me .mp-cp-bubble
+) {
+  background: #f2f2f7;
+  color: #111;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .34);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] :is(.mp-pill, .mp-user-tag, .mp-api-tag, .mp-music-source, .mp-music-track-side, .mp-char-tag, .mp-cp-badge, .mp-cp-count, .mp-draw-mini, .mp-char-query, .mp-wi-scan, .mp-wi-retry) {
+  background: rgba(255, 255, 255, .10);
+  border-color: rgba(255, 255, 255, .16);
+  color: #f2f2f7;
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-profile-banner {
+  background: linear-gradient(135deg, #2b2b2e, #4a4a4d 52%, #1e1e20);
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-profile-banner::before {
+  opacity: .12;
+}
+
+/* --------------------------------------------- 8. 运行时内联色的皮肤归一 */
+/* 头像没有图片时只带 is-tint，内联紫渐变必须在这里压掉 */
+.mp-root[data-mp-skin="frost"] .is-tint {
+  background-image: none !important;
+  background-color: #d9d9dc !important;
+  color: #3a3a3c;
+  font-weight: 500;
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .is-tint {
+  background-color: #3a3a3c !important;
+  color: #f2f2f7;
+}
+
+/* 音乐封面：保留图片，收成黑白；空封面的内联彩色底改为皮肤底色 */
+.mp-root[data-mp-skin="frost"] .mp-music-cover {
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(60, 60, 67, .16);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-music-cover img {
+  filter: grayscale(1) contrast(.96) brightness(1.04);
+}
+
+.mp-root[data-mp-skin="frost"] .mp-music-cover.is-empty {
+  background: linear-gradient(150deg, #dedee1, #bcbcbf) !important;
+  color: #1c1c1e;
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-music-cover.is-empty {
+  background: linear-gradient(150deg, #4a4a4d, #2c2c2e) !important;
+  color: #f2f2f7;
+}
+
+/* 夜间资料横幅：压掉浅色覆层，保证标题与印章可读 */
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-profile-banner::after {
+  background: linear-gradient(180deg, rgba(0, 0, 0, .12), transparent 40%, rgba(0, 0, 0, .42));
+}
+
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] :is(.mp-profile-stamp, .mp-profile-loc) {
+  background: rgba(255, 255, 255, .08);
+  color: rgba(242, 242, 247, .70);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12);
+}
+
+/* =========================================================================
+   像素小兔 · 毛玻璃版
+   组件整体沿用 frost 的白玻璃 token，只把小兔的壁纸、横幅和头像框留作美术层。
+   ========================================================================= */
+.mp-root[data-mp-art="pixel"] .mp-wallpaper {
+  background-image: var(--wall-theme);
+  background-position: center;
+  background-size: cover;
+}
+
+.mp-root[data-mp-art="pixel"] .mp-profile-banner {
+  height: 98px;
+}
+
+.mp-root[data-mp-art="pixel"] .mp-apps {
+  padding-top: 7px;
+  row-gap: 5px;
+}
+
+.mp-root[data-mp-art="pixel"] .mp-profile-banner::before {
+  display: block;
+  background-image: var(--theme-banner, none);
+  background-size: cover;
+  background-position: center;
+  opacity: .9;
+  filter: grayscale(1) brightness(.86) contrast(1.1);
+  mix-blend-mode: multiply;
+}
+
+.mp-root[data-mp-art="pixel"] .mp-profile-banner::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .30), rgba(255, 255, 255, .08) 45%, rgba(255, 255, 255, .38));
+  backdrop-filter: blur(6px) saturate(.7);
+  -webkit-backdrop-filter: blur(6px) saturate(.7);
+}
+
+.mp-root[data-mp-art="pixel"] .mp-profile-stamp {
+  display: none;
+}
+
+.mp-root[data-mp-art="pixel"] .mp-profile-avatar::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background-image: var(--theme-frame);
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 3;
+  opacity: .82;
+}
+
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-profile-banner {
+  background: linear-gradient(135deg, #26262a, #46464a 52%, #1c1c1f);
+}
+
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-profile-banner::before {
+  opacity: .26;
+  filter: invert(1) grayscale(1);
+  mix-blend-mode: screen;
+}
+
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-profile-banner::after {
+  background: linear-gradient(180deg, rgba(0, 0, 0, .22), transparent 42%, rgba(0, 0, 0, .48));
+}
+
+/* ---- 请求调试栏：主题适配 ---- */
+.mp-root[data-mp-theme="night"] .mp-debug {
+  background: rgba(255, 255, 255, .045);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .09);
+}
+.mp-root[data-mp-theme="night"] .mp-debug.is-open {
+  background: rgba(255, 255, 255, .07);
+}
+.mp-root[data-mp-theme="night"] .mp-debug-tk { color: #c3b5ff; }
+.mp-root[data-mp-theme="night"] .mp-debug-row { border-top-color: rgba(255, 255, 255, .08); }
+.mp-root[data-mp-theme="night"] .mp-debug-more { border-top-color: rgba(255, 255, 255, .08); }
+.mp-root[data-mp-theme="night"] .mp-debug-share { background: rgba(255, 255, 255, .1); }
+.mp-root[data-mp-theme="night"] .mp-debug-seg-empty { background: rgba(255, 255, 255, .16); }
+.mp-root[data-mp-theme="night"] .mp-debug-content {
+  background: rgba(255, 255, 255, .06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
+}
+.mp-root[data-mp-theme="night"] .mp-debug-role {
+  background: rgba(255, 255, 255, .08);
+}
+.mp-root[data-mp-theme="night"] .mp-debug-retry { background: rgba(255, 255, 255, .1); color: #ece9f7; }
+
+.mp-root[data-mp-skin="frost"] .mp-debug {
+  background: rgba(255, 255, 255, .62);
+  box-shadow: inset 0 0 0 1px rgba(60, 60, 67, .12);
+  backdrop-filter: blur(18px) saturate(.6);
+  -webkit-backdrop-filter: blur(18px) saturate(.6);
+}
+.mp-root[data-mp-skin="frost"] .mp-debug.is-open { background: rgba(255, 255, 255, .74); }
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-debug {
+  background: rgba(255, 255, 255, .05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
+}
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-debug.is-open { background: rgba(255, 255, 255, .075); }
+.mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-debug-content { background: rgba(255, 255, 255, .06); }
+
+.mp-root[data-mp-art="pixel"] .mp-debug {
+  border-radius: 0;
+  border: 1px solid #14141a;
+  background: #fff;
+  box-shadow: 3px 3px 0 #14141a;
+}
+.mp-root[data-mp-art="pixel"] .mp-debug-head { font-weight: 600; }
+.mp-root[data-mp-art="pixel"] .mp-debug-row,
+.mp-root[data-mp-art="pixel"] .mp-debug-more { border-top-color: #14141a; }
+.mp-root[data-mp-art="pixel"] .mp-debug-content {
+  border-radius: 0;
+  background: #f5f3ee;
+  box-shadow: inset 0 0 0 1px #14141a;
+}
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug {
+  background: #111116;
+  border-color: #f4f1e8;
+  box-shadow: 3px 3px 0 #f4f1e8;
+}
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug-row,
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug-more { border-top-color: rgba(244, 241, 232, .45); }
+.mp-root[data-mp-art="pixel"][data-mp-theme="night"] .mp-debug-content {
+  background: #1c1c22;
+  box-shadow: inset 0 0 0 1px rgba(244, 241, 232, .55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mp-debug,
+  .mp-debug-caret {
+    transition: none;
+  }
+}
+

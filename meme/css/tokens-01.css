@@ -1,0 +1,56 @@
+/* ==========================================================================
+   meme-phone · 界面样式
+   晨光粉彩 + 三层玻璃（壁纸 / 磨砂玻璃 / 实色卡片）
+   ========================================================================== */
+
+/* ------------------------------------------------------------- 设计变量 */
+.mp-root {
+  --lav: #8e7bf2;
+  --lav-deep: #6a55d8;
+  --pink: #f2a0c2;
+  --mint: #7fd2bc;
+  --honey: #f5c27a;
+  --sky: #8fb9f2;
+
+  --text: #2b2937;
+  --text-2: rgba(43, 41, 55, .62);
+  --text-3: rgba(43, 41, 55, .40);
+  --text-4: rgba(43, 41, 55, .26);
+  --line: rgba(43, 41, 55, .07);
+  --line-soft: rgba(43, 41, 55, .04);
+
+  --page: #fbf9fe;
+  --page-2: #f6f3fb;
+  --glass: rgba(255, 255, 255, .78);
+  --glass-strong: rgba(255, 255, 255, .92);
+  --card: #fff;
+
+  --accent: var(--lav);
+  --accent-deep: var(--lav-deep);
+  --ok: #37b98b;
+  --warn: #e9b15c;
+
+  --shadow-s: 0 4px 14px rgba(120, 108, 180, .10);
+  --shadow-m: 0 10px 26px rgba(120, 108, 180, .13);
+  --shadow-l: 0 22px 50px rgba(120, 108, 180, .20);
+
+  --r-s: 12px;
+  --r-m: 18px;
+  --r-l: 22px;
+  --r-xl: 30px;
+
+  --font-ui: -apple-system, "SF Pro Text", "PingFang SC", "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-serif: "Songti SC", "Noto Serif SC", "Source Han Serif SC", SimSun, serif;
+  --font-scale: 1;
+  --line-scale: 1;
+  --font-weight: 400;
+  --field-bg: rgba(255, 255, 255, .86);
+  --field-solid: #ffffff;
+  --field-border: rgba(43, 41, 55, .12);
+
+  --wall-day: linear-gradient(160deg, #fbf7ff 0%, #f2f5fd 48%, #f6faf5 100%);
+  --wall-night: linear-gradient(160deg, #191627 0%, #141222 52%, #0f141a 100%);
+  --wall-custom: var(--wall-day);
+  --wallpaper: var(--wall-day);
+}
+

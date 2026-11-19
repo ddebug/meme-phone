@@ -1,0 +1,105 @@
+/* 外观页的主题小胶囊按钮 */
+.mp-chip-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 16px;
+  font: inherit;
+  color: var(--text);
+  background: rgba(255, 255, 255, .72);
+  box-shadow: inset 0 0 0 1px rgba(142, 123, 242, .14), 0 6px 16px rgba(120, 108, 180, .10);
+  cursor: pointer;
+}
+
+.mp-chip-btn.is-on {
+  background: rgba(142, 123, 242, .12);
+  box-shadow: inset 0 0 0 1.5px rgba(142, 123, 242, .42), 0 6px 16px rgba(120, 108, 180, .12);
+}
+
+.mp-root[data-mp-theme="night"] .mp-chip-btn {
+  background: rgba(255, 255, 255, .08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12);
+}
+
+.mp-root[data-mp-theme="night"] .mp-chip-btn.is-on {
+  background: rgba(142, 123, 242, .22);
+  box-shadow: inset 0 0 0 1.5px rgba(160, 140, 250, .5);
+}
+
+/* 会话类页面：浮在输入框上方的小胶囊，不挡消息 */
+/* 操作条浮在底部，正文让出它的高度，最后一行不会被压住 */
+.mp-page .mp-page-body {
+  padding-bottom: 30px;
+}
+
+
+/* ============================ 绘图 + 接口（本段新增） ============================ */
+
+.mp-root .mp-draw-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 14px;
+  background: rgba(233, 177, 92, .12);
+  color: #8a6a33;
+  font-size: calc(12px * var(--font-scale));
+  line-height: calc(1.5 * var(--line-scale));
+}
+.mp-root .mp-draw-state.is-on {
+  background: rgba(127, 210, 188, .16);
+  color: #2c7f68;
+}
+.mp-root .mp-draw-state .mp-i {
+  width: 15px; height: 15px; flex: none;
+  opacity: .8;
+}
+.mp-root .mp-draw-state span { flex: 1; min-width: 0; }
+.mp-root .mp-draw-state-btn {
+  flex: none;
+  border: 0;
+  background: rgba(255, 255, 255, .7);
+  color: inherit;
+  font: inherit;
+  font-size: calc(11.5px * var(--font-scale));
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.mp-root .mp-draw-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 0 4px;
+  scrollbar-width: none;
+}
+.mp-root .mp-draw-chips::-webkit-scrollbar { display: none; }
+
+.mp-root .mp-draw-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  margin-bottom: 6px;
+}
+
+.mp-root .mp-draw-group-head .mp-group-label {
+  margin: 0;
+}
+
+.mp-root .mp-draw-mini {
+  flex: 0 0 auto;
+  border: 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(142, 123, 242, .1);
+  color: var(--accent-deep);
+  font-family: var(--font-ui);
+  font-size: calc(11.5px * var(--font-scale));
+  cursor: pointer;
+}
+

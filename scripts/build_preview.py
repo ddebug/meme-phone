@@ -45,6 +45,22 @@ MODULES = [
 ]
 ENTRY = "meme/index.js"
 
+CSS_DIR = os.path.join(ROOT, "meme", "css")
+
+
+def css_order() -> list:
+    """分层段文件的加载顺序（order.json 由拆分工具生成，顺序即原 meme.css 的规则顺序）。"""
+    with open(os.path.join(CSS_DIR, "order.json"), "r", encoding="utf-8") as handle:
+        return json.load(handle)["files"]
+
+
+def read_css() -> str:
+    parts = []
+    for name in css_order():
+        with open(os.path.join(CSS_DIR, name), "r", encoding="utf-8") as handle:
+            parts.append(handle.read())
+    return "".join(parts).replace('url("../assets/', 'url("assets/')
+
 IMPORT_RE = re.compile(
     r"import\s+(?:\{([^}]*)\}|\*\s+as\s+(\w+)|(\w+))\s+from\s+['\"]([^'\"]+)['\"]\s*;",
     re.S,
@@ -166,8 +182,7 @@ def build() -> str:
 }})();
 """
 
-    with open(os.path.join(ROOT, "meme", "meme.css"), "r", encoding="utf-8") as handle:
-        css = handle.read().replace('url("../assets/', 'url("assets/')
+    css = read_css()
 
     html = f"""<!doctype html>
 <html lang="zh-CN">
@@ -205,7 +220,8 @@ body {{
 def write_stamp() -> None:
     """记下这次打包用到的每个源文件的指纹，check.mjs 靠它判断预览是不是过期。"""
     files = {}
-    for rel in MODULES + ["meme/meme.css"]:
+    css_files = ["meme/css/order.json"] + [f"meme/css/{name}" for name in css_order()]
+    for rel in MODULES + css_files:
         path = os.path.join(ROOT, rel.replace("/", os.sep))
         with open(path, "rb") as handle:
             files[rel] = hashlib.sha256(handle.read()).hexdigest()

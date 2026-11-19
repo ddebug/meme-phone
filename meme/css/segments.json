@@ -1,0 +1,170 @@
+[
+  {
+    "file": "tokens-01.css",
+    "layer": "tokens",
+    "start": 1,
+    "end": 55
+  },
+  {
+    "file": "themes-02.css",
+    "layer": "themes",
+    "start": 57,
+    "end": 82
+  },
+  {
+    "file": "shell-03.css",
+    "layer": "shell",
+    "start": 84,
+    "end": 747
+  },
+  {
+    "file": "components-04.css",
+    "layer": "components",
+    "start": 749,
+    "end": 764
+  },
+  {
+    "file": "shell-05.css",
+    "layer": "shell",
+    "start": 766,
+    "end": 780
+  },
+  {
+    "file": "components-06.css",
+    "layer": "components",
+    "start": 782,
+    "end": 887
+  },
+  {
+    "file": "apps-07.css",
+    "layer": "apps",
+    "start": 889,
+    "end": 1745
+  },
+  {
+    "file": "components-08.css",
+    "layer": "components",
+    "start": 1747,
+    "end": 1984
+  },
+  {
+    "file": "themes-09.css",
+    "layer": "themes",
+    "start": 1986,
+    "end": 2045
+  },
+  {
+    "file": "shell-10.css",
+    "layer": "shell",
+    "start": 2047,
+    "end": 2054
+  },
+  {
+    "file": "components-11.css",
+    "layer": "components",
+    "start": 2056,
+    "end": 2176
+  },
+  {
+    "file": "themes-12.css",
+    "layer": "themes",
+    "start": 2178,
+    "end": 2198
+  },
+  {
+    "file": "shell-13.css",
+    "layer": "shell",
+    "start": 2200,
+    "end": 2301
+  },
+  {
+    "file": "apps-14.css",
+    "layer": "apps",
+    "start": 2303,
+    "end": 2406
+  },
+  {
+    "file": "components-15.css",
+    "layer": "components",
+    "start": 2408,
+    "end": 2467
+  },
+  {
+    "file": "apps-16.css",
+    "layer": "apps",
+    "start": 2468,
+    "end": 3401
+  },
+  {
+    "file": "components-17.css",
+    "layer": "components",
+    "start": 3403,
+    "end": 3630
+  },
+  {
+    "file": "themes-18.css",
+    "layer": "themes",
+    "start": 3632,
+    "end": 3674
+  },
+  {
+    "file": "components-19.css",
+    "layer": "components",
+    "start": 3675,
+    "end": 3740
+  },
+  {
+    "file": "apps-20.css",
+    "layer": "apps",
+    "start": 3742,
+    "end": 4619
+  },
+  {
+    "file": "themes-21.css",
+    "layer": "themes",
+    "start": 4621,
+    "end": 4644
+  },
+  {
+    "file": "apps-22.css",
+    "layer": "apps",
+    "start": 4646,
+    "end": 5004
+  },
+  {
+    "file": "components-23.css",
+    "layer": "components",
+    "start": 5006,
+    "end": 5085
+  },
+  {
+    "file": "apps-24.css",
+    "layer": "apps",
+    "start": 5087,
+    "end": 5412
+  },
+  {
+    "file": "themes-25.css",
+    "layer": "themes",
+    "start": 5414,
+    "end": 6441
+  },
+  {
+    "file": "apps-26.css",
+    "layer": "apps",
+    "start": 6443,
+    "end": 6935
+  },
+  {
+    "file": "themes-27.css",
+    "layer": "themes",
+    "start": 6937,
+    "end": 6976
+  },
+  {
+    "file": "apps-28.css",
+    "layer": "apps",
+    "start": 6978,
+    "end": 7395
+  }
+]

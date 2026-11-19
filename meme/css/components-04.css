@@ -1,0 +1,17 @@
+.mp-icon-btn {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 0;
+  background: rgba(255, 255, 255, .82);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .9), var(--shadow-s);
+}
+
+.mp-icon-btn .mp-i { width: 18px; height: 18px; }
+.mp-icon-btn:active { transform: scale(.94); }
+

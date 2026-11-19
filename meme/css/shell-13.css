@@ -1,0 +1,103 @@
+/* ======================================================= 透明背景 + 回桌面 */
+
+/* 背景四种：none 透明 / day 晨光素色 / night 夜色素色 / custom 用户图片 */
+.mp-root[data-mp-wall="day"] .mp-wallpaper {
+  background-image: var(--wall-day);
+}
+
+.mp-root[data-mp-wall="night"] .mp-wallpaper {
+  background-image: var(--wall-night);
+}
+
+.mp-root[data-mp-wall="custom"] .mp-wallpaper {
+  background-image: var(--wall-custom);
+  background-position: center;
+}
+
+/* 素色底：手机壳外始终透明，只有屏幕里换成干净的浅色纸，绝不再透酒馆 */
+.mp-root[data-mp-wall="none"] .mp-wallpaper,
+.mp-root[data-mp-wall="none"] .mp-scrim {
+  display: none;
+}
+
+.mp-root[data-mp-wall="none"] .mp-device {
+  background: rgba(255, 255, 255, .12);
+  box-shadow:
+    0 30px 70px rgba(74, 62, 110, .20),
+    inset 0 0 0 1px rgba(255, 255, 255, .55);
+}
+
+.mp-root[data-mp-wall="none"] .mp-screen {
+  background: var(--page);
+}
+
+.mp-root[data-mp-wall="none"] .mp-page,
+.mp-root[data-mp-wall="none"] .mp-thread,
+.mp-root[data-mp-wall="none"] .mp-page-body {
+  background: var(--page);
+}
+
+.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-device {
+  background: rgba(18, 14, 30, .52);
+  box-shadow: 0 30px 70px rgba(10, 8, 20, .42), inset 0 0 0 1px rgba(255, 255, 255, .16);
+}
+
+.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-screen {
+  background: #12101a;
+}
+
+.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-page,
+.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-thread {
+  background: linear-gradient(180deg, #161222, #100c18);
+}
+
+/* 回桌面：底部操作条 */
+.mp-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 13px;
+  font: inherit;
+  font-size: calc(12px * var(--font-scale));
+  color: var(--text-2);
+  background: rgba(255, 255, 255, .78);
+  box-shadow: inset 0 0 0 1px rgba(142, 123, 242, .16), 0 6px 16px rgba(120, 108, 180, .14);
+  cursor: pointer;
+  transition: transform .14s ease, box-shadow .14s ease;
+}
+
+.mp-action-btn .mp-i {
+  width: 15px;
+  height: 15px;
+}
+
+.mp-action-btn:hover {
+  transform: translateY(-1px);
+}
+
+.mp-action-btn.primary {
+  color: #fff;
+  background: linear-gradient(150deg, var(--lav), var(--lav-deep));
+  box-shadow: 0 8px 18px rgba(120, 102, 230, .30);
+}
+
+/* 底部小横条：加宽点击区，也可上滑 */
+.mp-home-bar {
+  width: 132px;
+  height: 5px;
+  bottom: 6px;
+}
+
+.mp-home-bar::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  transform: translateX(-50%);
+  width: 190px;
+  height: 44px;
+}
+

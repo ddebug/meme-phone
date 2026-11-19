@@ -123,14 +123,32 @@ export function transcript(state, chat, limit = 10, options = {}) {
   const contact = state.contacts?.[chat.contactId];
   const omitId = options.omitId || '';
   const day = options.day || '';
+  const maxChars = Math.max(0, Number(options.maxChars) || 0);
   const valid = (chat.messages || [])
     .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded)
     .filter(message => message.id !== omitId)
     .filter(message => !day || dayKey(new Date(Number(message.at) || Date.now())) === day);
-  return valid.slice(-Math.max(1, limit)).map(message => {
+  const lines = valid.slice(-Math.max(1, limit)).map(message => {
     const text = serializeMessage(message);
     return text ? `${messageWho(state, contact, message)}：${text}` : '';
-  }).filter(Boolean).join('\n');
+  }).filter(Boolean);
+
+  if (!maxChars) return lines.join('\n');
+
+  /* 按字数预算从新到旧装入：保留最近的话，装不下就停；至少留最新一条，避免整段历史全丢。 */
+  const kept = [];
+  let used = 0;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    const cost = line.length + (kept.length ? 1 : 0);
+    if (used + cost > maxChars) {
+      if (!kept.length) kept.unshift(line.slice(0, maxChars) + '…');
+      break;
+    }
+    kept.unshift(line);
+    used += cost;
+  }
+  return kept.join('\n');
 }
 
 export function characterBlock(state, contact) {
@@ -322,7 +340,7 @@ async function contextBlockFor(item, state, chat, contact, context, memoryText, 
   if (key === 'history') {
     const limit = effectivePhoneHistoryLimit(chat, context);
     const lastId = ctxOpts.omitLast ? (chat.messages?.[chat.messages.length - 1]?.id || '') : '';
-    const text = transcript(state, chat, limit, { omitId: lastId });
+    const text = transcript(state, chat, limit, { omitId: lastId, maxChars: ctxOpts.historyMaxChars });
     return {
       text: text ? `【历史小手机消息】\n${text}` : '',
       status: text ? 'injected' : 'empty',
@@ -364,6 +382,18 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
   const seen = new Set();
   let used = 0;
   const charBudget = Math.max(2000, Number(context.charBudget) || 8000);
+  /* 给模型回复预留的篇幅；这里只是字数口径的估算，不是精确 token，UI 带 ≈。 */
+  const outputReserve = 1200;
+
+  /* 先算出这一轮的当前输入（不注入但先占预算），历史只能吃剩下的空间 */
+  const omitIds = new Set(options.omitIds || []);
+  const lastMessage = chat?.messages?.[chat.messages.length - 1];
+  const pendingUserText = (chat && !options.omitLastUser && !options.proactive && lastMessage
+    && !lastMessage.excluded && !omitIds.has(lastMessage.id))
+    ? serializeMessage(lastMessage)
+    : '';
+  const pendingExtraChars = [options.behaviorPrompt, options.extraPrompt]
+    .reduce((sum, text) => sum + String(text || '').length, 0);
 
   for (const item of items) {
     const base = { id: item.id, label: item.label, kind: item.kind };
@@ -382,7 +412,11 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
 
     let block;
     if (item.kind === 'context') {
-      block = await contextBlockFor(item, state, chat, contact, context, memoryText, { omitLast: !options.proactive });
+      const historyMaxChars = Math.max(0, charBudget - used - pendingUserText.length - pendingExtraChars - outputReserve - 24);
+      block = await contextBlockFor(item, state, chat, contact, context, memoryText, {
+        omitLast: !options.proactive,
+        historyMaxChars,
+      });
     } else {
       const text = fillPromptTokens(item.content, state, chat).trim();
       block = { text, status: text ? 'injected' : 'empty', reason: text ? '' : '条目内容是空的' };
@@ -416,24 +450,15 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
   if (options.extraPrompt) messages.push({ role: 'system', content: String(options.extraPrompt), source: '小剧场' });
 
   let lastUserText = '';
-  if (chat && !options.omitLastUser) {
-    const last = chat.messages?.[chat.messages.length - 1];
-    const omitIds = new Set(options.omitIds || []);
-    if (last && !options.proactive && !last.excluded && !omitIds.has(last.id)) {
-      const text = serializeMessage(last);
-      if (text) {
-        lastUserText = text;
-        messages.push({ role: 'user', content: `${messageWho(state, contact, last)}：${text}`, source: '最后一条聊天' });
-      }
-    }
+  if (pendingUserText) {
+    lastUserText = pendingUserText;
+    messages.push({ role: 'user', content: `${messageWho(state, contact, lastMessage)}：${pendingUserText}`, source: '最后一条聊天' });
   }
   if (options.proactive && !messages.some(message => message.role === 'user')) {
     messages.push({ role: 'user', content: '（现在没有新消息，主动发一条。）', source: '主动消息占位' });
   }
 
   const charTotal = messages.reduce((sum, message) => sum + String(message?.content || '').length, 0);
-  /* 给模型回复预留的篇幅；这里只是字数口径的估算，不是精确 token，UI 带 ≈。 */
-  const outputReserve = 1200;
 
   return {
     messages,

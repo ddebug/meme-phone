@@ -49,6 +49,19 @@ test('C2：历史记录与最后一条聊天不与历史记录重复注入', asy
   assert.equal(hits[0].source, '最后一条聊天');
 });
 
+test('C2：历史按字数预算从新到旧装入，装不下就停但至少留最新一条', () => {
+  const state = demoState();
+  const { chat } = seedChat(state, [
+    { id: 'b1', from: 'them', kind: 'text', text: '很早的一句话'.repeat(4) },
+    { id: 'b2', from: 'me', kind: 'text', text: '中间的话'.repeat(4) },
+    { id: 'b3', from: 'them', kind: 'text', text: '最新的一句'.repeat(4) },
+  ]);
+  const packed = transcript(state, chat, 30, { maxChars: 30 });
+  assert.ok(packed.includes('最新的一句'));
+  assert.ok(!packed.includes('很早的一句话'));
+  assert.ok(packed.length <= 30);
+});
+
 test('C2：预算报告标记输入超限与整体超限，口径为估算', async () => {
   const state = demoState();
   const { chat, contact } = seedChat(state, [

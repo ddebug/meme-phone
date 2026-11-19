@@ -364,6 +364,11 @@ export function createShell(options) {
 
     restoreLive();
     shell.improveSendState();
+    /* 文字弹层打开后把光标放进去，键盘能直接输入；不抢正在编辑的输入框焦点 */
+    if (shell.sheet?.kind === 'text') {
+      const node = root.querySelector('#mpSheetText');
+      if (node) node.focus();
+    }
     if (prevScroll > 0 && (shell.stack[shell.stack.length - 1]?.view || '') === prevView) {
       const box = root.querySelector('.mp-page-body');
       if (box) box.scrollTop = prevScroll;
@@ -664,6 +669,8 @@ export function createShell(options) {
   }, true);
 
   root.addEventListener('keydown', event => {
+    /* 中文输入法正在组词时，Enter/Escape 是在选词上屏或取消候选，不作为快捷键 */
+    if (event.isComposing || event.keyCode === 229) return;
     if (event.key === 'Escape') {
       if (shell.sheet) { ctx.closeSheet(); return; }
       if (shell.stack.length) { ctx.back(); return; }

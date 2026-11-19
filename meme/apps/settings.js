@@ -204,8 +204,7 @@ export const settingsApp = {
         items: [{ label: '我想清空', value: 'yes', icon: 'trash', danger: true }],
         onPick: async (value) => {
           if (value !== 'yes') return;
-          ctx.reset();
-          ctx.toast('已经清空');
+          await ctx.reset();
         },
       });
       return true;

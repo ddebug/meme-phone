@@ -9735,6 +9735,25 @@ function normalizeSignaturesState(raw) {
   return { byContact };
 }
 
+/** 收藏：只剔除确实无效的条目（没 id、且既无文字也无图片），合法收藏原样保留、缺字段补齐。 */
+function normalizeFavorites(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isPlainRecord).map((item, index) => {
+    const id = String(item.id || `f_${index + 1}`).slice(0, 48);
+    const text = String(item.text || '');
+    const image = String(item.image || '');
+    return {
+      id,
+      chatId: String(item.chatId || '').slice(0, 60),
+      contactName: String(item.contactName || 'TA').slice(0, 40),
+      from: item.from === 'me' ? 'me' : 'them',
+      text: text.slice(0, 4000),
+      image,
+      at: Number(item.at) || Date.now(),
+    };
+  }).filter(item => item.id && (item.text || item.image));
+}
+
 /** 读取旧文件时补齐缺失字段，永远不因为缺字段白屏。 */
 function normalize(raw) {
   const base = emptyState();
@@ -9759,7 +9778,6 @@ function normalize(raw) {
     ...base.settings.chat.behavior,
     ...(merged.settings.chat.behavior && typeof merged.settings.chat.behavior === 'object' ? merged.settings.chat.behavior : {}),
   };
-  delete merged.favorites;
   for (const [contactId, entries] of Object.entries(raw.diary?.contacts || {})) {
     if (!contactId || !entries || typeof entries !== 'object' || Array.isArray(entries)) continue;
     merged.diary.contacts[contactId] = {};
@@ -10010,7 +10028,7 @@ function normalize(raw) {
     ]))
     : {};
   merged.extrasOn = Array.isArray(merged.extrasOn) ? merged.extrasOn.map(String) : [];
-  merged.favorites = Array.isArray(merged.favorites) ? merged.favorites : [];
+  merged.favorites = normalizeFavorites(raw.favorites);
   merged.wallet = normalizeWalletState(raw.wallet);
   merged.membership = normalizeMembershipState(raw.membership);
   merged.appointments = normalizeAppointmentsState(raw.appointments);
@@ -10683,7 +10701,16 @@ __mods["meme/store.js"] = function(module, exports, __req){
  *   1. 酒馆里：/user/files/meme-phone.json（GET 读，/api/files/upload 写，写完回读校验）
  *   2. 单独打开预览页：localStorage
  *
- * 只有一处写入口（flush），保存失败会留在 dirty 状态并抛错，绝不静默丢数据。
+ * 只有一处写入口。可靠性口径：
+ *   - 单写者队列：同一时刻只有一轮持久化在跑；保存期间又被改动，写完后自动再存一版。
+ *   - changeSeq / savedSeq：每次改动领一个序号，等待者等到覆盖自己序号的那轮保存才结束。
+ *   - 写入用不可变快照，不把仍在变动的 live state 直接序列化进请求。
+ *   - 失败保留 dirty 与当前内存，不清用户编辑；可重试、可导出备份。
+ *   - 状态区分：待保存 / 保存中 / 已保存 / 失败 / 结果不确定。
+ *
+ * 多标签边界：宿主文件接口没有提供条件写入（按 revision 比较再覆盖），
+ * 这里只能靠写完回读校验；无法在提交前排除另一标签刚好同时写同一文件。
+ * 因此不宣称“GET 回读”解决了所有竞争，真出现双写时以回读到的远端为准并提示不确定。
  */
 
 const DEFAULT_FILE = 'meme-phone.json';
@@ -10699,6 +10726,15 @@ function utf8ToBase64(text) {
   return btoa(binary);
 }
 
+function clone(value) {
+  if (typeof structuredClone === 'function') return structuredClone(value);
+  return JSON.parse(JSON.stringify(value));
+}
+
+function genRevision() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function createStore(options = {}) {
   const {
     fileName = DEFAULT_FILE,
@@ -10706,21 +10742,48 @@ function createStore(options = {}) {
     getHeaders = async () => ({}),
     fetchImpl = (...args) => globalThis.fetch(...args),
     onStatus = () => {},
-    debounceMs = 700,
   } = options;
 
   let state = null;
   let dirty = false;
   let saving = false;
+  let savePromise = null;
   let lastError = null;
-  let timer = 0;
+  let uncertain = false;
   let revision = '';
+  /* changeSeq：领号的改动序号；savedSeq：已确认落盘到的序号。 */
+  let changeSeq = 0;
+  let savedSeq = 0;
+  let waiters = [];
 
   function status() {
-    return { ready: Boolean(state), dirty, saving, error: lastError, path: useLocalStorage ? `localStorage:${LS_KEY}` : `/user/files/${fileName}` };
+    return {
+      ready: Boolean(state),
+      dirty,
+      saving,
+      error: lastError,
+      uncertain,
+      changeSeq,
+      savedSeq,
+      path: useLocalStorage ? `localStorage:${LS_KEY}` : `/user/files/${fileName}`,
+    };
   }
 
   function emit() { try { onStatus(status()); } catch { /* 状态广播不该影响主流程 */ } }
+
+  function settleWaiters(error, persistedSeq = 0) {
+    const due = [];
+    const rest = [];
+    for (const waiter of waiters) {
+      if (error || waiter.seq <= persistedSeq) due.push(waiter);
+      else rest.push(waiter);
+    }
+    waiters = rest;
+    for (const waiter of due) {
+      if (error) waiter.reject(error);
+      else waiter.resolve();
+    }
+  }
 
   async function readRemote() {
     if (useLocalStorage) {
@@ -10755,6 +10818,46 @@ function createStore(options = {}) {
     }
   }
 
+  /* 单 worker 循环：同一时刻只有一轮持久化在跑；保存期间又有改动，本轮结束后按序号再存一版。 */
+  async function worker() {
+    saving = true;
+    emit();
+    try {
+      while (state && dirty) {
+        const snapshotSeq = changeSeq;
+        /* 落盘的是此刻的不可变快照：写入过程中 live state 再怎么改，也不会混进这一版请求。 */
+        const payload = { format: 'meme-phone', revision: genRevision(), meme: clone(state) };
+        try {
+          await writeRemote(payload);
+          revision = payload.revision;
+          savedSeq = changeSeq;
+          lastError = null;
+          settleWaiters(null, savedSeq);
+        } catch (error) {
+          lastError = error.message || String(error);
+          uncertain = /回读|不确定/.test(lastError);
+          /* 保留 dirty 与内存内容；等待者收到失败，但编辑不会被清掉，下次 touch/flush 会重试。 */
+          settleWaiters(new Error(lastError));
+          break;
+        }
+        /* 这一轮保存期间又有新改动：序号对不上，继续存下一版；否则收尾清掉 dirty。 */
+        if (changeSeq === snapshotSeq) {
+          dirty = false;
+          break;
+        }
+      }
+    } finally {
+      saving = false;
+      emit();
+      if (state && dirty) schedule();
+    }
+  }
+
+  function schedule() {
+    if (saving || savePromise) return;
+    savePromise = worker().finally(() => { savePromise = null; });
+  }
+
   const api = {
     status,
 
@@ -10764,10 +10867,14 @@ function createStore(options = {}) {
         const remote = await readRemote();
         revision = remote?.revision || '';
         state = remote?.meme || remote || null;
+        changeSeq = 0;
+        savedSeq = 0;
         lastError = null;
+        uncertain = false;
       } catch (error) {
         state = null;
         lastError = error.message || String(error);
+        uncertain = true;
         emit();
         throw error;
       }
@@ -10777,38 +10884,42 @@ function createStore(options = {}) {
 
     get() { return state; },
 
-    replace(next) { state = next; dirty = true; emit(); },
-
-    /** 标记改动并排队落盘。返回的 promise 在真正写完时 resolve。 */
-    touch() {
+    /** 整份替换状态（导入 / 清空）。旧等待者按“状态已替换”结算，避免旧保存结果绑到新状态上。 */
+    replace(next) {
+      settleWaiters(new Error('状态已替换'));
+      state = next;
       dirty = true;
+      changeSeq += 1;
+      uncertain = false;
       emit();
-      return new Promise((resolve, reject) => {
-        const flushNow = () => { api.flush().then(resolve, reject); };
-        clearTimeout(timer);
-        timer = setTimeout(flushNow, debounceMs);
-      });
+      schedule();
     },
 
-    async flush() {
-      if (!state || !dirty) return state;
-      if (saving) return state;
-      saving = true;
+    /** 标记改动并排队落盘。返回的 promise 等到覆盖本次改动序号的保存成功才 resolve。 */
+    touch() {
+      dirty = true;
+      const seq = ++changeSeq;
       emit();
-      const payload = { format: 'meme-phone', revision: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, meme: state };
-      try {
-        await writeRemote(payload);
-        revision = payload.revision;
-        dirty = false;
-        lastError = null;
-      } catch (error) {
-        lastError = error.message || String(error);
-        throw error;
-      } finally {
-        saving = false;
-        emit();
-      }
+      const promise = new Promise((resolve, reject) => {
+        waiters.push({ seq, resolve, reject });
+      });
+      schedule();
+      return promise;
+    },
+
+    /** 立即把当前版本落盘；失败抛错并保留 dirty。可作为重试入口。 */
+    async flush() {
+      if (!state) return state;
+      if (!dirty) return state;
+      schedule();
+      await savePromise;
+      if (lastError) throw new Error(lastError);
       return state;
+    },
+
+    /** 失败后手动重试一轮。 */
+    retry() {
+      return api.flush();
     },
 
     /** 导出当前内存状态（设置面板与「设置 → 数据」共用）。 */
@@ -16541,8 +16652,7 @@ const settingsApp = {
         items: [{ label: '我想清空', value: 'yes', icon: 'trash', danger: true }],
         onPick: async (value) => {
           if (value !== 'yes') return;
-          ctx.reset();
-          ctx.toast('已经清空');
+          await ctx.reset();
         },
       });
       return true;
@@ -24303,12 +24413,16 @@ let rootEl = null;
 let initPromise = null;
 let followTimer = 0;
 let draftDebugTimer = 0;
+/* 状态代次：每次整份替换（导入 / 清空）自增；旧任务据此判断自己是否已经失效。 */
+let stateEpoch = 0;
+
+const getCurrentState = () => store?.get() || null;
 
 /* ------------------------------------------------------------ 模型调用 */
 
-function makeAi(state) {
+function makeAi(getState) {
   /* 手机聊天 / 日记的背景走「酒馆记忆」：有酒馆总结先用总结，没有就读最近几层酒馆聊天 */
-  function story(chat, limit = 1200) {
+  function story(state, chat, limit = 1200) {
     return buildMemoryContext(state, chat, limit);
   }
 
@@ -24316,9 +24430,10 @@ function makeAi(state) {
 
   /** 真实回复与调试预览共用这一套组装，保证看到的就是要发出去的。 */
   async function compose(chat, contact, options = {}) {
+    const state = getState();
     const ctxSettings = replyContextFor(state, chat);
     const memoryLimit = options.proactive ? 900 : 1200;
-    const storyBlock = ctxSettings.memory ? await story(chat, memoryLimit) : { text: '' };
+    const storyBlock = ctxSettings.memory ? await story(state, chat, memoryLimit) : { text: '' };
     const theaterKind = theaterKindFor(state);
     const wantsTheater = !options.proactive && extrasEnabledFor(state, contact?.id);
     const built = await buildReplyMessages(state, chat, contact, {
@@ -24334,6 +24449,7 @@ function makeAi(state) {
 
   return {
     async reply(context, chat, contact, demoReply) {
+      const state = getState();
       const { built, wantsTheater, theaterKind } = await compose(chat, contact);
       const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
       const content = wantsTheater ? splitTheaterBlocks(result.text, contact?.name).text : result.text;
@@ -24355,6 +24471,7 @@ function makeAi(state) {
      * 这样输入时只重算 token，不用重复读记忆和世界书。
      */
     async preview(chat, contact) {
+      const state = getState();
       const last = chat?.messages?.[chat.messages.length - 1];
       const key = [
         chat?.id || '',
@@ -24395,6 +24512,7 @@ function makeAi(state) {
     },
 
     async proactive(context, chat, contact, demoReply) {
+      const state = getState();
       const { built } = await compose(chat, contact, { proactive: true });
       const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
       return result.text;
@@ -24402,6 +24520,7 @@ function makeAi(state) {
 
     /* 查 TA 的手机：让模型按人设现编一份聊天 / 通讯录 / 朋友圈 */
     async lookup(context, contact, local) {
+      const state = getState();
       const card = (state.characters || []).find(item => item.name === contact?.name);
       const prompt = [
         `你在给「${contact?.name || 'TA'}」这台手机写内容。`,
@@ -24471,6 +24590,7 @@ function makeAi(state) {
     },
 
     async diary(context, payload) {
+      const state = getState();
       const chat = payload.chat;
       const day = payload.day || new Date().toISOString().slice(0, 10);
       let material = '';
@@ -24479,7 +24599,7 @@ function makeAi(state) {
         const chats = Object.values(state.chats);
         material = chats.map(item => transcript(state, item, 10)).join('\n');
       }
-      const storyBlock = await story(chat, 900);
+      const storyBlock = await story(state, chat, 900);
       const prompt = [
         state.diary.prompt || '写一段当天的日记。',
         `日期：${day}`,
@@ -24601,7 +24721,7 @@ async function openMemePhone(options = {}) {
     return result;
   };
 
-  const ai = makeAi(state);
+  const ai = makeAi(getCurrentState);
   const host = {
     probe: probeHost,
     readCharacters: readTavernCharacters,
@@ -24625,16 +24745,25 @@ async function openMemePhone(options = {}) {
     store,
     ai,
     host,
+    epoch: () => stateEpoch,
     save: () => {
       return store.touch().then(() => true).catch(error => {
         ctx.toast?.(error.message || '保存失败，先去设置里导出备份');
         return false;
       });
     },
-    reset: () => {
+    reset: async () => {
       const next = emptyState();
+      stateEpoch += 1;
       store.replace(next);
       ctx.state = next;
+      ctx.ai = makeAi(getCurrentState);
+      try {
+        await store.flush();
+        ctx.toast?.('已经清空');
+      } catch (error) {
+        ctx.toast?.('清空后保存失败，先导出备份再刷新');
+      }
       ctx.rerender?.();
     },
     onDraft: (entry, value) => {
@@ -24852,19 +24981,20 @@ async function openMemePhone(options = {}) {
   /* 跟随模式：酒馆那边换用户，这边跟着换 */
   clearInterval(followTimer);
   followTimer = setInterval(async () => {
-    if (!rootEl || state.settings.userMode === 'pin') return;
+    const live = getCurrentState();
+    if (!rootEl || !live || live.settings.userMode === 'pin') return;
     try {
       const result = await readTavernPersonas();
       if (!result.available) return;
       const key = String(result.current || '');
-      if (!key || key === state.settings.user.key) return;
+      if (!key || key === live.settings.user.key) return;
       /* 这位可能在名单里被筛掉（没设显示名），名字退回酒馆里的 name1，头像按文件名取 */
       const current = result.list.find(user => user.key === key) || null;
-      state.users = result.list;
-      state.usersFromTavern = true;
-      state.settings.user.key = key;
-      state.settings.user.name = String(current?.name || result.currentName || '我');
-      state.settings.user.avatar = String(current?.avatarUrl || result.currentAvatar || '');
+      live.users = result.list;
+      live.usersFromTavern = true;
+      live.settings.user.key = key;
+      live.settings.user.name = String(current?.name || result.currentName || '我');
+      live.settings.user.avatar = String(current?.avatarUrl || result.currentAvatar || '');
       store.touch();
       shellApi?.render();
     } catch { /* 换不过来就算了，等下次打开 */ }
@@ -24937,15 +25067,44 @@ function goView(view, params = {}) {
   ctx.go(view, payload);
 }
 
-/** 导入一份备份（设置面板用）：只替换 meme-phone 自己的数据。 */
+/** 导入一份备份（设置面板用）：先在独立对象上校验，失败不动当前状态。 */
+function normalizeBackup(raw) {
+  let source = raw;
+  if (typeof source === 'string') {
+    source = JSON.parse(source);
+  }
+  if (!source || typeof source !== 'object') throw new Error('备份不是对象');
+  const inner = source.meme && typeof source.meme === 'object' ? source.meme : source;
+  const next = normalize(inner);
+  if (!next || typeof next !== 'object' || !next.chats || typeof next.chats !== 'object') {
+    throw new Error('备份缺少必要结构');
+  }
+  return next;
+}
+
 async function importState(raw) {
   await initMemePhone();
-  const next = normalize(raw);
+  let next;
+  try {
+    next = normalizeBackup(raw);
+  } catch (error) {
+    return { ok: false, error: error.message || '备份格式不对，当前数据未改动' };
+  }
+  stateEpoch += 1;
   store.replace(next);
-  if (ctx) ctx.state = next;
-  await store.flush();
+  if (ctx) {
+    ctx.state = next;
+    ctx.ai = makeAi(getCurrentState);
+  }
+  try {
+    await store.flush();
+  } catch (error) {
+    /* 持久化结果不确定：内存保留新状态以便导出备份，不宣称恢复成功，也不自动覆盖远端。 */
+    shellApi?.render();
+    return { ok: false, uncertain: true, error: error.message || '保存结果不确定', state: next };
+  }
   shellApi?.render();
-  return next;
+  return { ok: true, state: next };
 }
 
 exports["chatFor"] = chatFor;

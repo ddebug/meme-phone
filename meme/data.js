@@ -1440,6 +1440,25 @@ function normalizeSignaturesState(raw) {
   return { byContact };
 }
 
+/** 收藏：只剔除确实无效的条目（没 id、且既无文字也无图片），合法收藏原样保留、缺字段补齐。 */
+function normalizeFavorites(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isPlainRecord).map((item, index) => {
+    const id = String(item.id || `f_${index + 1}`).slice(0, 48);
+    const text = String(item.text || '');
+    const image = String(item.image || '');
+    return {
+      id,
+      chatId: String(item.chatId || '').slice(0, 60),
+      contactName: String(item.contactName || 'TA').slice(0, 40),
+      from: item.from === 'me' ? 'me' : 'them',
+      text: text.slice(0, 4000),
+      image,
+      at: Number(item.at) || Date.now(),
+    };
+  }).filter(item => item.id && (item.text || item.image));
+}
+
 /** 读取旧文件时补齐缺失字段，永远不因为缺字段白屏。 */
 export function normalize(raw) {
   const base = emptyState();
@@ -1464,7 +1483,6 @@ export function normalize(raw) {
     ...base.settings.chat.behavior,
     ...(merged.settings.chat.behavior && typeof merged.settings.chat.behavior === 'object' ? merged.settings.chat.behavior : {}),
   };
-  delete merged.favorites;
   for (const [contactId, entries] of Object.entries(raw.diary?.contacts || {})) {
     if (!contactId || !entries || typeof entries !== 'object' || Array.isArray(entries)) continue;
     merged.diary.contacts[contactId] = {};
@@ -1715,7 +1733,7 @@ export function normalize(raw) {
     ]))
     : {};
   merged.extrasOn = Array.isArray(merged.extrasOn) ? merged.extrasOn.map(String) : [];
-  merged.favorites = Array.isArray(merged.favorites) ? merged.favorites : [];
+  merged.favorites = normalizeFavorites(raw.favorites);
   merged.wallet = normalizeWalletState(raw.wallet);
   merged.membership = normalizeMembershipState(raw.membership);
   merged.appointments = normalizeAppointmentsState(raw.appointments);

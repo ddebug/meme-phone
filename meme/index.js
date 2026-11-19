@@ -91,12 +91,16 @@ let rootEl = null;
 let initPromise = null;
 let followTimer = 0;
 let draftDebugTimer = 0;
+/* 状态代次：每次整份替换（导入 / 清空）自增；旧任务据此判断自己是否已经失效。 */
+let stateEpoch = 0;
+
+const getCurrentState = () => store?.get() || null;
 
 /* ------------------------------------------------------------ 模型调用 */
 
-function makeAi(state) {
+function makeAi(getState) {
   /* 手机聊天 / 日记的背景走「酒馆记忆」：有酒馆总结先用总结，没有就读最近几层酒馆聊天 */
-  function story(chat, limit = 1200) {
+  function story(state, chat, limit = 1200) {
     return buildMemoryContext(state, chat, limit);
   }
 
@@ -104,9 +108,10 @@ function makeAi(state) {
 
   /** 真实回复与调试预览共用这一套组装，保证看到的就是要发出去的。 */
   async function compose(chat, contact, options = {}) {
+    const state = getState();
     const ctxSettings = replyContextFor(state, chat);
     const memoryLimit = options.proactive ? 900 : 1200;
-    const storyBlock = ctxSettings.memory ? await story(chat, memoryLimit) : { text: '' };
+    const storyBlock = ctxSettings.memory ? await story(state, chat, memoryLimit) : { text: '' };
     const theaterKind = theaterKindFor(state);
     const wantsTheater = !options.proactive && extrasEnabledFor(state, contact?.id);
     const built = await buildReplyMessages(state, chat, contact, {
@@ -122,6 +127,7 @@ function makeAi(state) {
 
   return {
     async reply(context, chat, contact, demoReply) {
+      const state = getState();
       const { built, wantsTheater, theaterKind } = await compose(chat, contact);
       const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
       const content = wantsTheater ? splitTheaterBlocks(result.text, contact?.name).text : result.text;
@@ -143,6 +149,7 @@ function makeAi(state) {
      * 这样输入时只重算 token，不用重复读记忆和世界书。
      */
     async preview(chat, contact) {
+      const state = getState();
       const last = chat?.messages?.[chat.messages.length - 1];
       const key = [
         chat?.id || '',
@@ -183,6 +190,7 @@ function makeAi(state) {
     },
 
     async proactive(context, chat, contact, demoReply) {
+      const state = getState();
       const { built } = await compose(chat, contact, { proactive: true });
       const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
       return result.text;
@@ -190,6 +198,7 @@ function makeAi(state) {
 
     /* 查 TA 的手机：让模型按人设现编一份聊天 / 通讯录 / 朋友圈 */
     async lookup(context, contact, local) {
+      const state = getState();
       const card = (state.characters || []).find(item => item.name === contact?.name);
       const prompt = [
         `你在给「${contact?.name || 'TA'}」这台手机写内容。`,
@@ -259,6 +268,7 @@ function makeAi(state) {
     },
 
     async diary(context, payload) {
+      const state = getState();
       const chat = payload.chat;
       const day = payload.day || new Date().toISOString().slice(0, 10);
       let material = '';
@@ -267,7 +277,7 @@ function makeAi(state) {
         const chats = Object.values(state.chats);
         material = chats.map(item => transcript(state, item, 10)).join('\n');
       }
-      const storyBlock = await story(chat, 900);
+      const storyBlock = await story(state, chat, 900);
       const prompt = [
         state.diary.prompt || '写一段当天的日记。',
         `日期：${day}`,
@@ -389,7 +399,7 @@ export async function openMemePhone(options = {}) {
     return result;
   };
 
-  const ai = makeAi(state);
+  const ai = makeAi(getCurrentState);
   const host = {
     probe: probeHost,
     readCharacters: readTavernCharacters,
@@ -413,16 +423,25 @@ export async function openMemePhone(options = {}) {
     store,
     ai,
     host,
+    epoch: () => stateEpoch,
     save: () => {
       return store.touch().then(() => true).catch(error => {
         ctx.toast?.(error.message || '保存失败，先去设置里导出备份');
         return false;
       });
     },
-    reset: () => {
+    reset: async () => {
       const next = emptyState();
+      stateEpoch += 1;
       store.replace(next);
       ctx.state = next;
+      ctx.ai = makeAi(getCurrentState);
+      try {
+        await store.flush();
+        ctx.toast?.('已经清空');
+      } catch (error) {
+        ctx.toast?.('清空后保存失败，先导出备份再刷新');
+      }
       ctx.rerender?.();
     },
     onDraft: (entry, value) => {
@@ -640,19 +659,20 @@ export async function openMemePhone(options = {}) {
   /* 跟随模式：酒馆那边换用户，这边跟着换 */
   clearInterval(followTimer);
   followTimer = setInterval(async () => {
-    if (!rootEl || state.settings.userMode === 'pin') return;
+    const live = getCurrentState();
+    if (!rootEl || !live || live.settings.userMode === 'pin') return;
     try {
       const result = await readTavernPersonas();
       if (!result.available) return;
       const key = String(result.current || '');
-      if (!key || key === state.settings.user.key) return;
+      if (!key || key === live.settings.user.key) return;
       /* 这位可能在名单里被筛掉（没设显示名），名字退回酒馆里的 name1，头像按文件名取 */
       const current = result.list.find(user => user.key === key) || null;
-      state.users = result.list;
-      state.usersFromTavern = true;
-      state.settings.user.key = key;
-      state.settings.user.name = String(current?.name || result.currentName || '我');
-      state.settings.user.avatar = String(current?.avatarUrl || result.currentAvatar || '');
+      live.users = result.list;
+      live.usersFromTavern = true;
+      live.settings.user.key = key;
+      live.settings.user.name = String(current?.name || result.currentName || '我');
+      live.settings.user.avatar = String(current?.avatarUrl || result.currentAvatar || '');
       store.touch();
       shellApi?.render();
     } catch { /* 换不过来就算了，等下次打开 */ }
@@ -725,13 +745,42 @@ export function goView(view, params = {}) {
   ctx.go(view, payload);
 }
 
-/** 导入一份备份（设置面板用）：只替换 meme-phone 自己的数据。 */
+/** 导入一份备份（设置面板用）：先在独立对象上校验，失败不动当前状态。 */
+function normalizeBackup(raw) {
+  let source = raw;
+  if (typeof source === 'string') {
+    source = JSON.parse(source);
+  }
+  if (!source || typeof source !== 'object') throw new Error('备份不是对象');
+  const inner = source.meme && typeof source.meme === 'object' ? source.meme : source;
+  const next = normalize(inner);
+  if (!next || typeof next !== 'object' || !next.chats || typeof next.chats !== 'object') {
+    throw new Error('备份缺少必要结构');
+  }
+  return next;
+}
+
 export async function importState(raw) {
   await initMemePhone();
-  const next = normalize(raw);
+  let next;
+  try {
+    next = normalizeBackup(raw);
+  } catch (error) {
+    return { ok: false, error: error.message || '备份格式不对，当前数据未改动' };
+  }
+  stateEpoch += 1;
   store.replace(next);
-  if (ctx) ctx.state = next;
-  await store.flush();
+  if (ctx) {
+    ctx.state = next;
+    ctx.ai = makeAi(getCurrentState);
+  }
+  try {
+    await store.flush();
+  } catch (error) {
+    /* 持久化结果不确定：内存保留新状态以便导出备份，不宣称恢复成功，也不自动覆盖远端。 */
+    shellApi?.render();
+    return { ok: false, uncertain: true, error: error.message || '保存结果不确定', state: next };
+  }
   shellApi?.render();
-  return next;
+  return { ok: true, state: next };
 }

@@ -57,8 +57,21 @@
 - 聚合入口：`meme/meme.css` 只含按 `order.json` 顺序的 `@import url("css/<段文件>");`。
 - 预览打包：`scripts/build_preview.py` 读 `order.json` 顺序拼接段文件，做 `url("../assets/` → `url("assets/` 替换后内联进 `preview.html`；指纹写入 `preview.stamp.json`。
 
-## 后续待办（下一轮，需逐页肉眼复核）
+## 后续待办（下一轮，需浏览器可截图复核后再做）
 
-1. **跨层规则归位**：`apps-07/16/20` 等段里仍混有通用控件规则（气泡、按钮、输入框），下一轮把它们抽到对应 `components-*`；移动前必须确认不破坏层叠顺序。
-2. **themes 集中**：夜间/皮肤覆盖目前散落在 `themes-02/09/12/18/21/25/27`，待确认每条覆盖不依赖中段顺序后，再按主题归并。
-3. 每动一层：重建 `preview.html` → `npm test` 全绿 → 逐页截图与拆分前比对，确认像素级无变化再进下一层。
+### 审计现状
+
+按选择器前缀做过一次静态审计，274 条规则的“前缀标准层”与“当前段层”不一致。**这些大多是边界模糊或审计误判，不能据此直接移动规则**，分类如下：
+
+- **可候选归位 components（apps 段里的通用控件）**：`set-row / set-ico / set-name / set-value / switch / quote / msg-meta / msg-more / tag-proactive / avatar-btn / group / chip-btn / glass-ico / mini-btn` 等，主要在 `apps-07/14/20/28`。
+- **可候选归位 themes（散落在业务段里的覆写）**：选择器带 `data-mp-theme="night"` / `data-mp-skin="frost"` 的规则，紧跟在对应基础规则后面；它们是否能挪到 themes 末尾，要逐条确认不被顺序反盖。
+- **边界模糊（暂不动）**：`components-17` 里的 `preset-item / api-use / item-mini` 等是预设/接口页业务组件，归 components 或 apps 都说得通；复合选择器（`.mp-set-row.is-danger .mp-set-name`）按首段类名推断会误判归属。
+- **审计误判**：`.mp-root` 前缀、状态修饰符、`@media`/`@keyframes` 块不代表业务归属。
+
+### 归位纪律
+
+1. 一次只移一小类规则，移完重建 `preview.html` → `npm test` 全绿 → 逐页截图与拆分前基线比对，确认像素级无变化再继续。
+2. 夜间/皮肤覆写优先确认顺序依赖：把一条覆写挪到 themes 末尾前，先核对它在原位置是否正是“靠就近顺序压住前面同名规则”。
+3. 任何移动都不允许顺手改声明、改选择器或合并规则；只改文件归属。
+4. 浏览器复核手段不可用时，只做只读审计和文档沉淀，不做跨层移动。
+

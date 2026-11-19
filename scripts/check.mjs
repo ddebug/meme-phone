@@ -2,12 +2,14 @@
 /**
  * meme-phone 轻量自检（npm run check）
  *
- * 只查三件能靠脚本查出来的事：
+ * 只查能靠脚本查出来的事：
  *   1. 所有 JS 语法能过（按 module 解析）
  *   2. 扩展清单、入口、打包产物这些必备文件都在，manifest 是合法 JSON
- *   3. preview.html 比 meme/ 下的源码新——不然双击看到的是旧界面
+ *   3. preview.html 与源码指纹一致——不然双击看到的是旧界面
+ *   4. 入口可达模块图的相对 import 路径都能解析
+ *   5. CSS 分层段文件与 order.json 一一对应、括号配平
  *
- * 不查样式、不查渲染、不联网，也不替代真机点一遍。
+ * 不查样式生效、不查渲染、不联网，也不替代真机点一遍。
  */
 
 import { readdir, readFile, stat, writeFile, mkdtemp, rm } from 'node:fs/promises';
@@ -161,6 +163,48 @@ async function checkImports() {
   }
 }
 
+/* 5. CSS 分层段文件一致性：order.json 与磁盘一一对应，每段括号配平 */
+async function checkCss() {
+  const cssDir = path.join(ROOT, 'meme', 'css');
+  let order = [];
+  try {
+    const manifest = JSON.parse(await readFile(path.join(cssDir, 'order.json'), 'utf8'));
+    order = Array.isArray(manifest.files) ? manifest.files : [];
+  } catch {
+    problems.push('meme/css/order.json 读不出来或格式不对');
+    return;
+  }
+  for (const name of order) {
+    try {
+      await stat(path.join(cssDir, name));
+    } catch {
+      problems.push(`CSS 段文件缺失：meme/css/${name}`);
+    }
+  }
+  let entries = [];
+  try {
+    entries = await readdir(cssDir);
+  } catch {
+    entries = [];
+  }
+  const listed = new Set(order);
+  for (const entry of entries) {
+    if (entry.endsWith('.css') && !listed.has(entry)) {
+      problems.push(`meme/css/${entry} 未列入 order.json（段文件要么进 order，要么删掉）`);
+    }
+  }
+  for (const name of order) {
+    try {
+      const text = await readFile(path.join(cssDir, name), 'utf8');
+      const open = (text.match(/{/g) || []).length;
+      const close = (text.match(/}/g) || []).length;
+      if (open !== close) problems.push(`CSS 段文件括号不配平：${name}（{ ${open} } ${close}）`);
+    } catch {
+      /* 缺失已在上面报过 */
+    }
+  }
+}
+
 async function main() {
   const jsFiles = [
     path.join(ROOT, 'index.js'),
@@ -171,6 +215,7 @@ async function main() {
   await checkFiles();
   await checkPreviewFresh();
   await checkImports();
+  await checkCss();
 
   console.log(`检查了 ${jsFiles.length} 个 JS 文件`);
   for (const note of notes) console.log(`· ${note}`);

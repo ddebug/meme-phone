@@ -19763,7 +19763,7 @@ function presetDetail(ctx, store, preset) {
     ? ''
     : inTavern
       ? '<div class="mp-api-field-hint">Key 留在酒馆里，这里不填也能用</div>'
-      : `<div class="mp-api-field-hint">${draft.key ? 'Key 已填，默认掩码显示' : '还没填 Key'}</div>`;
+      : `<div class="mp-api-field-hint">${draft.key ? 'Key 已填，显示时打码' : '还没填 Key'}</div>`;
   const engineOptions = ENGINES.filter(item => item.value !== 'tavern').map(item => `
     <option value="${item.value}"${item.value === draft.engine ? ' selected' : ''}>${esc(item.label)}</option>`).join('');
   const modelPicker = `<div class="mp-api-model-slot" data-api-model-slot>${modelPickerHtml(preset, draft)}</div>`;
@@ -19848,7 +19848,7 @@ function deleteConfirm(state, store) {
     if (!scheme) return '';
     return `
       <div class="mp-api-delete">
-        <div class="mp-api-delete-title">删除方案「${esc(scheme.name || '未命名')}」？</div>
+        <div class="mp-api-delete-title">删除方案「${esc(schemeLabel(state, scheme))}」？</div>
         <div class="mp-api-delete-sub">只删这套「接口 + 回复预设」的组合，接口和回复预设都还在。至少会留一套方案。</div>
         <div class="mp-api-actions">
           <button class="mp-api-btn is-danger" data-act="api-scheme-del-confirm" type="button">确认删除方案</button>
@@ -19867,7 +19867,7 @@ function deleteConfirm(state, store) {
       <div class="mp-api-delete-sub">
         删除后不能恢复。${linked.length ? `${linked.length} 套方案还在引用它，要先处理这些引用。` : '没有方案引用它。'}
         ${store.activeChat === preset.id ? '当前聊天正在用它。' : ''}
-        ${chats.length ? `${chats.length} 个单独引用它的会话会恢复跟随手机。` : ''}
+        ${chats.length ? `${chats.length} 个单独引用它的会话会回到手机当前的聊天方案。` : ''}
         ${linked.length ? '只删接口时，这些方案会改指兜底接口；也可以连方案一起删。' : ''}
       </div>
       <div class="mp-api-actions">
@@ -19922,10 +19922,10 @@ function deleteApiPreset(ctx, store, pending, withSchemes) {
   ctx.save();
   redraw(ctx);
   const parts = [`接口「${pending.name || '未命名'}」删掉了`];
-  if (fallbackCreated) parts.push('方案删空，补了一套「默认」');
+  if (fallbackCreated) parts.push('方案删空，补了一套当前方案');
   else if (withSchemes && linkedCount) parts.push(`${linkedCount} 套方案一起删了`);
   else if (linkedCount) parts.push(`${linkedCount} 套方案已改指兜底`);
-  if (chatCount) parts.push(`${chatCount} 个会话恢复跟随手机`);
+  if (chatCount) parts.push(`${chatCount} 个会话回到手机当前的聊天方案`);
   say(ctx, parts.join('，'));
 }
 
@@ -20178,7 +20178,7 @@ const apiListApp = {
       schemeEdit = null;
       ctx.save();
       redraw(ctx);
-      say(ctx, `已保存到方案「${scheme.name || '未命名'}」`);
+      say(ctx, `已保存到方案「${schemeLabel(ctx.state, scheme)}」`);
       return true;
     }
 
@@ -20194,7 +20194,7 @@ const apiListApp = {
 
     if (act === 'api-scheme-rename') {
       if (!scheme) { say(ctx, '先选一套整体方案'); return true; }
-      schemeEdit = { mode: 'rename', value: scheme.name || '' };
+      schemeEdit = { mode: 'rename', value: schemeLabel(ctx.state, scheme) };
       redraw(ctx);
       return true;
     }
@@ -20227,7 +20227,7 @@ const apiListApp = {
       if (!scheme) { say(ctx, '先选一套整体方案'); return true; }
       const copy = {
         id: newId('lsch'),
-        name: `${scheme.name || '方案'} 副本`.slice(0, 20),
+        name: `${schemeLabel(ctx.state, scheme) || '方案'} 副本`.slice(0, 20),
         apiId: scheme.apiId,
         replyId: scheme.replyId,
       };

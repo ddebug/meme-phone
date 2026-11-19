@@ -563,7 +563,7 @@ export function createShell(options) {
     device.classList.add('is-dragging');
     handle.setPointerCapture?.(event.pointerId);
   });
-  window.addEventListener('pointermove', event => {
+  const onPhoneDragMove = event => {
     if (!phoneDrag || event.pointerId !== phoneDrag.id) return;
     const device = root.querySelector('.mp-device');
     if (!device) return;
@@ -574,7 +574,8 @@ export function createShell(options) {
     shell.deviceOffset = next;
     device.style.transform = deviceTransform();
     event.preventDefault();
-  }, { passive: false });
+  };
+  window.addEventListener('pointermove', onPhoneDragMove, { passive: false });
   const endPhoneDrag = event => {
     if (!phoneDrag || event.pointerId !== phoneDrag.id) return;
     phoneDrag = null;
@@ -582,11 +583,12 @@ export function createShell(options) {
   };
   window.addEventListener('pointerup', endPhoneDrag);
   window.addEventListener('pointercancel', endPhoneDrag);
-  window.addEventListener('resize', () => {
+  const onWindowResize = () => {
     shell.deviceOffset = clampDeviceOffset(shell.deviceOffset?.x || 0, shell.deviceOffset?.y || 0);
     const device = root.querySelector('.mp-device');
     if (device) device.style.transform = deviceTransform();
-  });
+  };
+  window.addEventListener('resize', onWindowResize);
 
   /* 上滑：页面里快速上滑一段就回桌面 */
   let swipe = null;
@@ -692,7 +694,16 @@ export function createShell(options) {
   return {
     shell,
     render,
-    destroy() { clearInterval(timer); clearTimeout(shell.toastTimer); if (root) root.innerHTML = ''; },
+    /* 关手机时把挂在 window 上的监听和计时器一起收掉，反复开关不累积 */
+    destroy() {
+      clearInterval(timer);
+      clearTimeout(shell.toastTimer);
+      window.removeEventListener('pointermove', onPhoneDragMove);
+      window.removeEventListener('pointerup', endPhoneDrag);
+      window.removeEventListener('pointercancel', endPhoneDrag);
+      window.removeEventListener('resize', onWindowResize);
+      if (root) root.innerHTML = '';
+    },
   };
 }
 

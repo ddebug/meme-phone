@@ -91,6 +91,9 @@ let rootEl = null;
 let initPromise = null;
 let followTimer = 0;
 let draftDebugTimer = 0;
+/* document 上的 change 兜底监听：关手机时按引用移除，不在页面里越积越多 */
+let docChangeTarget = null;
+let docChangeHandler = null;
 /* 状态代次：每次整份替换（导入 / 清空）自增；旧任务据此判断自己是否已经失效。 */
 let stateEpoch = 0;
 /* 是否演示模式：只有演示模式才允许返回演示文案，正式宿主断连不写假回复。 */
@@ -638,7 +641,7 @@ export async function openMemePhone(options = {}) {
   });
   /* 顶栏背景图 / 聊天照片的 input 藏在页面里，个别 WebView 不冒泡 change，补一道捕获监听 */
   const docRef = rootEl.ownerDocument;
-  docRef?.addEventListener('change', event => {
+  const onDocChange = event => {
     const id = event.target?.id;
     if (id !== 'mpProfileBanner' && id !== 'mpMsgPhoto') return;
     const file = event.target.files?.[0];
@@ -647,7 +650,10 @@ export async function openMemePhone(options = {}) {
     if (!file) return;
     if (id === 'mpProfileBanner') useCustomBanner(file).catch(error => ctx.toast(error.message || '换背景图失败'));
     if (id === 'mpMsgPhoto') useMessagePhoto(file, chatId).catch(error => ctx.toast(error.message || '照片没发出去'));
-  }, true);
+  };
+  docRef?.addEventListener('change', onDocChange, true);
+  docChangeTarget = docRef || null;
+  docChangeHandler = onDocChange;
 
   /* 用户头像（酒馆里有 persona 头像） */
   try {
@@ -704,6 +710,13 @@ export function closeMemePhone() {
   stopMusic();
   clearInterval(followTimer);
   followTimer = 0;
+  clearTimeout(draftDebugTimer);
+  draftDebugTimer = 0;
+  if (docChangeTarget && docChangeHandler) {
+    docChangeTarget.removeEventListener('change', docChangeHandler, true);
+  }
+  docChangeTarget = null;
+  docChangeHandler = null;
   shellApi?.destroy();
   rootEl.remove();
   rootEl = null;

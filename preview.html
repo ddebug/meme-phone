@@ -14766,6 +14766,7 @@ function threadBody(ctx, chatId) {
           <div class="mp-compose-box">
             <input type="text" placeholder="发消息…" value="${esc(ctx.shell.live.inputValue || '')}" aria-label="输入消息">
           </div>
+          <button class="mp-sq-btn" data-act="say-first" data-chat="${chat.id}" type="button" aria-label="让 TA 先说" title="让 TA 主动开口">${icon('reply')}</button>
           <button class="mp-send" data-act="send" data-chat="${chat.id}" type="button" aria-label="发送">${icon('send')}</button>
         </div>
         <input id="mpMsgPhoto" type="file" accept="image/*" data-chat="${chat.id}" style="position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0">
@@ -15566,6 +15567,15 @@ const threadApp = {
     }
 
     if (act === 'send') { doSend(ctx, chatId); return true; }
+
+    if (act === 'say-first') {
+      const chat = chatById(ctx.state, chatId);
+      if (!chat) return true;
+      const busy = activeGenerations.get(chatId);
+      if (busy && !busy.done) { ctx.toast('正在回复这条会话，稍等一下'); return true; }
+      runGeneration(ctx, chat, contactById(ctx.state, chat.contactId), { kind: 'proactive' });
+      return true;
+    }
 
     if (act === 'retry-turn') {
       const chat = chatById(ctx.state, chatId);

@@ -1811,7 +1811,7 @@ body {
 .mp-set-ico .mp-i { width: 16px; height: 16px; }
 
 .mp-set-name { flex: 1; min-width: 0; font-size: calc(13.5px * var(--font-scale)); }
-.mp-set-name small { display: block; font-size: calc(10.5px * var(--font-scale)); color: var(--text-4); margin-top: 1px; }
+.mp-set-name small { display: block; font-size: calc(10.5px * var(--font-scale)); line-height: 1.5; color: var(--text-4); margin-top: 1px; }
 .mp-set-value { font-size: calc(12px * var(--font-scale)); color: var(--text-3); }
 
 /* 数字设置行：像 acsus 一样在行内直接填，change 时保存 */
@@ -10004,6 +10004,7 @@ function normalize(raw) {
       ...base.diary,
       ...(raw.diary || {}),
       enabled: raw.diary?.enabled !== false,
+      prompt: String(raw.diary?.prompt || '').trim() ? raw.diary.prompt : base.diary.prompt,
       entries: { ...(raw.diary?.entries || {}) },
       contacts: {},
     },
@@ -17031,12 +17032,29 @@ function renderThreadPage(ctx, contactId) {
   const statuses = diaryDayStatuses(state, chat);
   const latestDate = statuses.length ? statuses[statuses.length - 1].date : '';
   if (!statuses.some(item => item.date === st.sel) && statuses.length) {
-    const latest = statuses[statuses.length - 1].date;
-    if (latest.slice(0, 7) === st.month) st.sel = latest;
+    st.sel = latestDate;
+    if (st.month !== latestDate.slice(0, 7)) st.month = latestDate.slice(0, 7);
   }
   const selected = statuses.find(item => item.date === st.sel) || null;
   const enabled = state.diary?.enabled !== false;
   const busy = ctx.shell.threadDiaryBusy === contactId;
+  if (!statuses.length) {
+    return `
+      <div class="mp-page-body">
+        <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记 · 按天整理聊天，只在这个角色里保存</div>
+        <div class="mp-group-box" style="margin-top:10px">
+          <button class="mp-set-row" data-act="td-toggle-replace" type="button">
+            <span class="mp-set-ico">${icon('book')}</span>
+            <span class="mp-set-name">用日记替换聊天<small>${enabled ? '现在开启：旧日期用日记替换原文；最近一天仍读原文' : '现在关闭：聊天上下文全部读原文'}</small></span>
+            <span class="mp-switch${enabled ? ' on' : ''}"></span>
+          </button>
+        </div>
+        <div class="mp-td-toolbar">
+          <button class="mp-btn ghost" data-act="td-prompt" type="button">${icon('brush')}日记提示词</button>
+        </div>
+        <div class="mp-empty">这个角色还没有聊天记录。先聊过几天，再回来按日期整理。</div>
+      </div>`;
+  }
   const target = parseMonth(st.month);
   return `
     <div class="mp-page-body">
@@ -17189,16 +17207,17 @@ function handleThreadDiary(ctx, act, data, event) {
       onText: (text) => {
         const content = String(text || '').trim();
         if (!content) { ctx.toast('正文为空，没有保存'); return; }
+        const dayMessages = diaryDayGroups(chat).get(date) || [];
         saveDiaryEntry(state, contactId, {
           date,
           content,
           auto: false,
           tags: entry?.tags || [contact.name],
-          sourceFingerprint: entry?.sourceFingerprint || '',
-          paramsFingerprint: entry?.paramsFingerprint || '',
-          fromTime: entry?.fromTime ?? null,
-          toTime: entry?.toTime ?? null,
-          messageCount: entry?.messageCount ?? null,
+          sourceFingerprint: dayMessages.length > DIARY_SKIP_THRESHOLD ? diaryFingerprint(dayMessages) : '',
+          paramsFingerprint: diaryParamsFingerprint(state, chat),
+          fromTime: dayMessages[0]?.at ?? null,
+          toTime: dayMessages[dayMessages.length - 1]?.at ?? null,
+          messageCount: dayMessages.length || null,
         });
         ctx.save();
         ctx.rerender();

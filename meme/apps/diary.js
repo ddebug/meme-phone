@@ -522,16 +522,17 @@ function handleThreadDiary(ctx, act, data, event) {
       onText: (text) => {
         const content = String(text || '').trim();
         if (!content) { ctx.toast('正文为空，没有保存'); return; }
+        const dayMessages = diaryDayGroups(chat).get(date) || [];
         saveDiaryEntry(state, contactId, {
           date,
           content,
           auto: false,
           tags: entry?.tags || [contact.name],
-          sourceFingerprint: entry?.sourceFingerprint || '',
-          paramsFingerprint: entry?.paramsFingerprint || '',
-          fromTime: entry?.fromTime ?? null,
-          toTime: entry?.toTime ?? null,
-          messageCount: entry?.messageCount ?? null,
+          sourceFingerprint: dayMessages.length > DIARY_SKIP_THRESHOLD ? diaryFingerprint(dayMessages) : '',
+          paramsFingerprint: diaryParamsFingerprint(state, chat),
+          fromTime: dayMessages[0]?.at ?? null,
+          toTime: dayMessages[dayMessages.length - 1]?.at ?? null,
+          messageCount: dayMessages.length || null,
         });
         ctx.save();
         ctx.rerender();

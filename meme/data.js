@@ -1554,6 +1554,7 @@ export function normalize(raw) {
       ...base.diary,
       ...(raw.diary || {}),
       enabled: raw.diary?.enabled !== false,
+      prompt: String(raw.diary?.prompt || '').trim() ? raw.diary.prompt : base.diary.prompt,
       entries: { ...(raw.diary?.entries || {}) },
       contacts: {},
     },

@@ -5,6 +5,8 @@
 """
 
 import base64
+import hashlib
+import json
 import os
 import re
 
@@ -196,7 +198,20 @@ body {{
     out = os.path.join(ROOT, "preview.html")
     with open(out, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(html)
+    write_stamp()
     return out
+
+
+def write_stamp() -> None:
+    """记下这次打包用到的每个源文件的指纹，check.mjs 靠它判断预览是不是过期。"""
+    files = {}
+    for rel in MODULES + ["meme/meme.css"]:
+        path = os.path.join(ROOT, rel.replace("/", os.sep))
+        with open(path, "rb") as handle:
+            files[rel] = hashlib.sha256(handle.read()).hexdigest()
+    with open(os.path.join(ROOT, "preview.stamp.json"), "w", encoding="utf-8", newline="\n") as handle:
+        json.dump({"files": files}, handle, ensure_ascii=False, indent=2, sort_keys=True)
+        handle.write("\n")
 
 
 if __name__ == "__main__":

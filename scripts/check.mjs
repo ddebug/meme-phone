@@ -11,6 +11,7 @@
  */
 
 import { readdir, readFile, stat, writeFile, mkdtemp, rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import os from 'node:os';
@@ -100,24 +101,63 @@ async function checkFiles() {
   }
 }
 
-/* 3. preview.html 是不是比源码旧 */
+/* 3. preview.html 是不是比源码旧：按 preview.stamp.json 里的指纹逐个比对，不依赖 mtime */
 async function checkPreviewFresh() {
-  const preview = path.join(ROOT, 'preview.html');
-  let previewTime = 0;
+  const stampPath = path.join(ROOT, 'preview.stamp.json');
+  let stamp = null;
   try {
-    previewTime = (await stat(preview)).mtimeMs;
+    stamp = JSON.parse(await readFile(stampPath, 'utf8'));
   } catch {
-    return;   // 缺文件上面已经报过了
+    problems.push('没有 preview.stamp.json（或读不出来），跑一下 python scripts/build_preview.py');
+    return;
   }
-  const sources = await listFiles(path.join(ROOT, 'meme'), name => name.endsWith('.js') || name.endsWith('.css'));
-  const assets = await listFiles(path.join(ROOT, 'assets'), () => true);
+  const files = stamp?.files && typeof stamp.files === 'object' ? stamp.files : null;
+  if (!files) {
+    problems.push('preview.stamp.json 格式不对，跑一下 python scripts/build_preview.py 重新生成');
+    return;
+  }
   const stale = [];
-  for (const file of [...sources, ...assets]) {
-    const info = await stat(file);
-    if (info.mtimeMs > previewTime + 1000) stale.push(path.relative(ROOT, file));
+  for (const [rel, digest] of Object.entries(files)) {
+    try {
+      const now = await readFile(path.join(ROOT, rel));
+      const actual = createHash('sha256').update(now).digest('hex');
+      if (actual !== digest) stale.push(rel);
+    } catch {
+      stale.push(`${rel}（文件读不出来）`);
+    }
   }
   if (stale.length) {
-    notes.push(`preview.html 比源码旧（${stale.slice(0, 5).join('、')}${stale.length > 5 ? ' 等' : ''}），跑一下 python scripts/build_preview.py`);
+    problems.push(`preview.html 与源码不一致（${stale.slice(0, 5).join('、')}${stale.length > 5 ? ' 等' : ''}），先跑 python scripts/build_preview.py 再提交`);
+  }
+}
+
+/* 4. import 路径能不能解析：只走真实入口可达的模块图，未接入的草稿文件不参与 */
+async function checkImports() {
+  const entry = path.join(ROOT, 'meme', 'index.js');
+  const seen = new Set();
+  const queue = [entry];
+  while (queue.length) {
+    const file = queue.shift();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    let source = '';
+    try {
+      source = await readFile(file, 'utf8');
+    } catch {
+      continue;
+    }
+    const specs = [...source.matchAll(/from\s*['"](\.[^'"]+)['"]/g)].map(match => match[1]);
+    for (const spec of specs) {
+      const target = path.resolve(path.dirname(file), spec);
+      let ok = true;
+      try {
+        await stat(target);
+      } catch {
+        ok = false;
+        problems.push(`import 路径解析不到：${path.relative(ROOT, file)} → ${spec}`);
+      }
+      if (ok && target.endsWith('.js') && !seen.has(target)) queue.push(target);
+    }
   }
 }
 
@@ -130,6 +170,7 @@ async function main() {
   await checkSyntax(jsFiles);
   await checkFiles();
   await checkPreviewFresh();
+  await checkImports();
 
   console.log(`检查了 ${jsFiles.length} 个 JS 文件`);
   for (const note of notes) console.log(`· ${note}`);
@@ -138,7 +179,7 @@ async function main() {
     console.log(`\n${problems.length} 处问题`);
     process.exit(1);
   }
-  console.log('✓ 语法、必备文件、预览产物都正常');
+  console.log('✓ 语法、必备文件、导入路径、预览一致性都正常');
 }
 
 main().catch(error => {

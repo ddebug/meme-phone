@@ -557,7 +557,7 @@ function settingsBody(ctx, chatId) {
         <div class="mp-group-label">记录</div>
         <div class="mp-group-box">
           ${chatSetRow(chat.id, { iconName: 'download', title: '导出这段聊天', sub: '存成 json；换手机或导入别的会话时用', act: 'ts-export-chat' })}
-          ${chatSetRow(chat.id, { iconName: 'upload', title: '导入聊天记录', sub: '合并到这段聊天，重复消息自动跳过', act: 'ts-import-chat' })}
+          ${chatSetRow(chat.id, { iconName: 'upload', title: '导入聊天记录', sub: '合并到这段聊天，重复消息自动跳过；只带正文，excluded 之类标记不识别', act: 'ts-import-chat' })}
           ${chatSetRow(chat.id, { iconName: 'trash', title: '清空这个会话的消息', sub: '只删聊天记录，联系人和角色卡都还在', act: 'ts-clear', danger: true })}
           ${chatSetRow(chat.id, { iconName: 'close', title: '删除这个会话', sub: '连同会话设置一起删掉', act: 'ts-delete', danger: true })}
         </div>

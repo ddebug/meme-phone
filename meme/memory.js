@@ -13,13 +13,21 @@ import { chatMemorySummary, summaryText } from './book.js';
 import { readLatestTavernChat, readTavernContext } from './host.js';
 
 export const MEMORY_MODES = [
-  { value: 'auto', label: '自动', hint: '有总结先用总结，没有就取最近几层原文' },
+  { value: 'auto', label: '总结优先', hint: '有总结先用总结，没有就取最近几层原文' },
   { value: 'summary', label: '只用总结', hint: '只注入酒馆总结' },
   { value: 'recent', label: '只看原文', hint: '只注入最近几层酒馆聊天' },
 ];
 
 export function memoryModeLabel(mode) {
-  return MEMORY_MODES.find(item => item.value === mode)?.label || '自动';
+  return MEMORY_MODES.find(item => item.value === mode)?.label || '总结优先';
+}
+
+/** 方案名兜底：旧存档里叫「默认 / 自动」的，直接换成实际读法。 */
+export function memoryPresetTitle(preset) {
+  const raw = String(preset?.name || '').trim();
+  if (raw && !['默认', '默认方案', '自动', '跟随'].includes(raw)) return raw;
+  return preset?.mode === 'summary' ? '只用总结'
+    : preset?.mode === 'recent' ? '只看原文' : '总结优先';
 }
 
 /** 一行说明，给聊天设置和预设页共用。 */

@@ -7,11 +7,11 @@ import { icon } from '../icons.js';
 import {
   chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
   wakeAllowed, messagePreview, addExtrasEntry, theaterKindFor, THEATER_KINDS, theaterKindById,
-  apiPresetsOf, memoryPresetsOf, memoryPresetFor, memoryReadModeFor,
+  apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, replyContextFor, normalizeReplyItems,
   chatHistoryFor, effectiveTavernHistory,
 } from '../data.js';
-import { memoryPresetSummary } from '../memory.js';
+import { memoryPresetSummary, memoryPresetTitle } from '../memory.js';
 import { requestStats, estimateTokens, proactiveLead } from '../reply-context.js';
 import { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } from '../chat-transfer.js';
 import { avatarHtml, chatAvatarHtml, esc, shortText, timeText } from '../shell.js';
@@ -34,6 +34,13 @@ function poolFor(contact) {
 }
 
 function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+
+/** 设置里不显示「默认 / 跟随」这类占位名，直接给真正生效的名字。 */
+function settingName(name, fallback) {
+  const raw = String(name || '').trim();
+  if (!raw || ['默认', '默认方案', '默认回复方式', '跟随', '自动'].includes(raw)) return fallback;
+  return raw;
+}
 
 /* --------------------------------------------------------- 请求调试栏 */
 
@@ -423,53 +430,49 @@ function settingsBody(ctx, chatId) {
   const presets = apiPresetsOf(state);
   const ownPreset = presets.find(item => item.id === chat.llmPresetId) || null;
   const globalPreset = presets.find(item => item.id === state.settings.api?.activeChat) || presets[0] || null;
-  const llmSub = ownPreset
-    ? `只对这个会话 · ${ownPreset.name || '未命名方案'}`
-    : `跟随手机 · ${globalPreset?.name || '酒馆 API'}`;
+  const activePreset = ownPreset || globalPreset;
+  const llmName = settingName(activePreset?.name, '酒馆 API');
+  const llmSub = [activePreset?.model, activePreset?.url].filter(Boolean).join(' · ') || '借酒馆自己的模型';
   const memoryPresets = memoryPresetsOf(state);
   const ownMemory = memoryPresets.find(item => item.id === chat.memoryPresetId) || null;
   const globalMemory = memoryPresetFor(state, null);
-  const memorySub = ownMemory
-    ? `只对这个会话 · ${memoryPresetSummary(ownMemory)}`
-    : `跟随手机 · ${memoryPresetSummary(globalMemory)}`;
+  const activeMemory = ownMemory || globalMemory;
+  const memoryName = memoryPresetTitle(activeMemory);
+  const memorySub = memoryPresetSummary(activeMemory);
   const replyPresets = replyPresetsOf(state);
   const ownReply = replyPresets.find(item => item.id === chat.replyPresetId) || null;
   const globalReply = replyPresetFor(state, null);
   const activeReply = ownReply || globalReply;
+  const replyName = settingName(activeReply?.name, '自然发消息');
   const replyItems = normalizeReplyItems(activeReply?.items, activeReply?.context);
   const replyItemCount = replyItems.filter(item => item.kind === 'chat').length;
   const replyAppCount = replyItems.filter(item => item.kind === 'app').length;
   const injectedCount = replyItems.filter(item => item.kind === 'context' && item.enabled).length;
-  const replySub = `${ownReply ? `只对这个会话 · ${ownReply.name || '未命名'}` : `跟随手机 · ${globalReply?.name || '默认回复方式'}`} · ${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
+  const replySub = `${replyName} · ${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
   const behavior = behaviorSettings(state, chat);
   const historyConfig = chatHistoryFor(chat);
   const tavern = effectiveTavernHistory(state, chat, memoryPresetFor(state, chat));
-  const followTavernMode = memoryReadModeFor(state, chat.contactId, memoryPresetFor(state, chat));
   const tavernValue = tavern.mode === 'summary'
     ? '全部总结'
-    : tavern.mode === 'recent' ? `最近 ${tavern.floors} 层`
-      : followTavernMode === 'summary' ? '方案 · 总结'
-        : followTavernMode === 'recent' ? `方案 · 原文 ${tavern.floors} 层`
-          : `自动 · ${tavern.floors} 层`;
+    : tavern.mode === 'recent' ? `最近 ${tavern.floors} 层原文`
+      : `总结优先 · ${tavern.floors} 层原文`;
   const phoneFollowLimit = replyContextFor(state, chat).historyLimit;
-  const tavernSub = [
-    '只改这个角色',
-    historyConfig.tavernMode || historyConfig.tavernFloors ? '已单独设置' : '跟随记忆方案',
-  ].join(' · ');
+  const tavernSub = '只改这个角色 · 设置读取方式和层数';
   const tavernFloorSub = [
     '最近原文层数',
-    historyConfig.tavernFloors ? '已单独设置' : `空着跟随记忆方案 · ${tavern.floors} 层`,
-    '填数字后自动切到最近原文',
+    tavern.mode === 'summary' ? '现在读全部总结，层数暂不生效' : `现在按 ${tavern.floors} 层读`,
+    '填数字后会切到最近原文',
   ].join(' · ');
   const phoneNumberSub = [
     '最近几条',
-    historyConfig.phoneLimit ? '已单独设置' : `空着跟随回复预设 · ${phoneFollowLimit} 条`,
+    `现在读 ${historyConfig.phoneLimit || phoneFollowLimit} 条`,
+    '只改这个角色',
   ].join(' · ');
 
   const effectiveLines = [
-    ['用哪个模型', `${ownPreset ? ownPreset.name || '未命名方案' : `${globalPreset?.name || '酒馆 API'}（跟随手机）`}`],
-    ['怎么回复', `${activeReply?.name || '默认回复方式'}${ownReply ? '（这个会话单独设）' : '（跟随手机）'}`],
-    ['参考什么', `酒馆记忆 ${memoryPresetSummary(memoryPresetFor(state, chat))}${ownMemory ? '（这个会话单独设）' : '（跟随手机）'} · 小手机历史 ${chatHistoryFor(chat).phoneLimit || phoneFollowLimit} 条`],
+    ['用哪个模型', llmName],
+    ['怎么回复', replyName],
+    ['参考什么', `酒馆记忆 ${memoryPresetSummary(activeMemory)} · 小手机历史 ${chatHistoryFor(chat).phoneLimit || phoneFollowLimit} 条`],
   ];
 
   return `
@@ -488,7 +491,7 @@ function settingsBody(ctx, chatId) {
       <div class="mp-card" style="margin-top:12px">
         <div class="mp-card-title">这条会话实际用到的</div>
         ${effectiveLines.map(([label, value]) => `<div class="mp-card-sub">${esc(label)}：${esc(value)}</div>`).join('')}
-        <div class="mp-card-sub" style="color:var(--text-4)">下面每一行写着「跟随」就是用手机的，写着「单独」就是这条会话自己设的。</div>
+        <div class="mp-card-sub" style="color:var(--text-4)">这里就是现在生效的组合；下面的设置可以直接改这个会话。</div>
       </div>
 
       <div class="mp-group" style="margin-top:16px">
@@ -504,7 +507,7 @@ function settingsBody(ctx, chatId) {
         <div class="mp-group-box">
           ${chatSetRow(chat.id, {
             iconName: 'spark', title: '这个聊天的 LLM',
-            sub: llmSub, act: 'ts-llm', value: ownPreset ? '单独' : '跟随',
+            sub: llmSub, act: 'ts-llm', value: llmName,
           })}
         </div>
       </div>
@@ -514,7 +517,7 @@ function settingsBody(ctx, chatId) {
         <div class="mp-group-box">
           ${chatSetRow(chat.id, {
             iconName: 'reply', title: '回复预设',
-            sub: replySub, act: 'ts-reply', value: ownReply ? '单独' : '跟随',
+            sub: replySub, act: 'ts-reply', value: replyName,
           })}
         </div>
       </div>
@@ -541,16 +544,17 @@ function settingsBody(ctx, chatId) {
           ${chatNumberRow(chat.id, {
             iconName: 'book', title: '酒馆原文层数',
             sub: tavernFloorSub, act: 'ts-tavern-floors',
-            value: historyConfig.tavernFloors || '', placeholder: String(tavern.floors),
+            value: historyConfig.tavernFloors || (tavern.mode === 'summary' ? '' : tavern.floors),
+            placeholder: tavern.mode === 'summary' ? '未使用' : String(tavern.floors),
           })}
           ${chatNumberRow(chat.id, {
             iconName: 'chat', title: '历史小手机消息',
             sub: phoneNumberSub, act: 'ts-phone-history',
-            value: historyConfig.phoneLimit || '', placeholder: String(phoneFollowLimit), max: null,
+            value: historyConfig.phoneLimit || phoneFollowLimit, placeholder: String(phoneFollowLimit), max: null,
           })}
           ${chatSetRow(chat.id, {
             iconName: 'book', title: '酒馆记忆方案',
-            sub: memorySub, act: 'ts-memory', value: ownMemory ? '单独' : '跟随',
+            sub: memorySub, act: 'ts-memory', value: memoryName,
           })}
         </div>
       </div>
@@ -1283,30 +1287,22 @@ export const threadSettingsApp = {
     if (act === 'ts-llm') {
       const presets = apiPresetsOf(ctx.state);
       const globalPreset = presets.find(item => item.id === ctx.state.settings.api?.activeChat) || presets[0] || null;
+      const activePreset = presets.find(item => item.id === chat.llmPresetId) || globalPreset;
       ctx.openSheet({
         title: '这个聊天的 LLM',
-        items: [
-          { label: '跟随手机', value: 'follow', note: `现在用「${globalPreset?.name || '酒馆 API'}」` },
-          ...presets.map(item => ({
-            label: item.name || '未命名方案',
-            value: item.id,
-            note: [item.model, item.url].filter(Boolean).join(' · ') || '借酒馆自己的模型',
-          })),
-        ],
+        note: `现在用「${settingName(activePreset?.name, '酒馆 API')}」`,
+        items: presets.map(item => ({
+          label: settingName(item.name, '酒馆 API'),
+          value: item.id,
+          note: [item.model, item.url].filter(Boolean).join(' · ') || '借酒馆自己的模型',
+        })),
         onPick: (value) => {
-          if (value === 'follow') {
-            chat.llmPresetId = '';
-            ctx.save();
-            ctx.rerender();
-            ctx.toast('已跟随手机的 LLM 方案');
-            return;
-          }
           const preset = presets.find(item => item.id === value);
           if (!preset) return;
-          chat.llmPresetId = preset.id;
+          chat.llmPresetId = preset.id === globalPreset?.id ? '' : preset.id;
           ctx.save();
           ctx.rerender();
-          ctx.toast(`这个会话改用「${preset.name || '未命名方案'}」`);
+          ctx.toast(`这个会话现在用「${settingName(preset.name, '酒馆 API')}」`);
         },
       });
       return true;
@@ -1315,35 +1311,29 @@ export const threadSettingsApp = {
     if (act === 'ts-reply') {
       const presets = replyPresetsOf(ctx.state);
       const globalPreset = replyPresetFor(ctx.state, null);
+      const activePreset = presets.find(item => item.id === chat.replyPresetId) || globalPreset;
       ctx.openSheet({
         title: '这个会话怎么回消息',
+        note: `现在用「${settingName(activePreset?.name, '自然发消息')}」`,
         items: [
-          { label: '跟随手机', value: 'follow', note: `现在用「${globalPreset?.name || '默认'}」` },
           ...presets.map(item => ({
-            label: item.name || '未命名预设',
+            label: settingName(item.name, '自然发消息'),
             value: item.id,
             note: String(item.text || '').slice(0, 38) || '空指令',
           })),
-          { label: '管理回复预设', value: 'manage', note: '新建、改指令、设为手机默认' },
+          { label: '管理回复预设', value: 'manage', note: '新建、改指令、设为手机当前方案' },
         ],
         onPick: (value) => {
-          if (value === 'follow') {
-            chat.replyPresetId = '';
-            ctx.save();
-            ctx.rerender();
-            ctx.toast('这个会话已跟随手机的回复预设');
-            return;
-          }
           if (value === 'manage') {
             ctx.go('app-presets');
             return;
           }
           const preset = presets.find(item => item.id === value);
           if (!preset) return;
-          chat.replyPresetId = preset.id;
+          chat.replyPresetId = preset.id === globalPreset?.id ? '' : preset.id;
           ctx.save();
           ctx.rerender();
-          ctx.toast(`这个会话改用「${preset.name || '未命名预设'}」`);
+          ctx.toast(`这个会话现在用「${settingName(preset.name, '自然发消息')}」`);
         },
       });
       return true;
@@ -1352,6 +1342,8 @@ export const threadSettingsApp = {
     if (act === 'ts-tavern-history') {
       const preset = memoryPresetFor(ctx.state, chat);
       const current = effectiveTavernHistory(ctx.state, chat, preset);
+      const schemeValue = current.mode === 'summary' ? '全部总结'
+        : current.mode === 'recent' ? `最近 ${current.floors} 层原文` : '总结优先';
       const applyHistory = (patch, message) => {
         chat.history = { ...chatHistoryFor(chat), ...patch };
         ctx.ai?.clearPreview?.(chat.id);
@@ -1363,16 +1355,16 @@ export const threadSettingsApp = {
       ctx.openSheet({
         kind: 'pick',
         title: '历史酒馆消息',
-        note: '层数不在这里选，回设置页直接填数字。',
+        note: `现在用「${schemeValue}」；层数回设置页直接填。`,
         items: [
-          { label: '跟随记忆方案', value: 'follow', icon: 'book', note: `现在 ${memoryPresetSummary(preset)}` },
-          { label: '全部总结', value: 'summary', icon: 'book', note: current.mode === 'summary' ? '现在用的' : '没有总结时不会补原文' },
+          { label: `记忆方案 · ${schemeValue}`, value: 'follow', icon: 'book', note: '现在生效，按记忆方案读取' },
+          { label: '全部总结', value: 'summary', icon: 'book', note: current.mode === 'summary' ? '现在用' : '没有总结时不会补原文' },
           { label: '最近原文', value: 'recent', icon: 'clock', note: current.mode === 'recent' ? `现在最近 ${current.floors} 层` : '层数回设置页填数字' },
           { label: '管理记忆方案', value: 'manage', icon: 'settings', note: '新建方案、改全局层数' },
         ],
         onPick: value => {
           if (value === 'follow') {
-            applyHistory({ tavernMode: '', tavernFloors: 0 }, '历史酒馆消息已跟随记忆方案');
+            applyHistory({ tavernMode: '', tavernFloors: 0 }, `历史酒馆消息按记忆方案用「${schemeValue}」`);
             return;
           }
           if (value === 'summary') {
@@ -1399,7 +1391,8 @@ export const threadSettingsApp = {
         ctx.shell.debugPreview = null;
         ctx.save();
         ctx.rerender();
-        ctx.toast('酒馆原文层数已跟随记忆方案');
+        const effective = effectiveTavernHistory(ctx.state, chat, memoryPresetFor(ctx.state, chat));
+        ctx.toast(`酒馆原文层数按记忆方案读 ${effective.floors} 层`);
         return true;
       }
       const floors = Number(raw);
@@ -1425,7 +1418,7 @@ export const threadSettingsApp = {
         ctx.shell.debugPreview = null;
         ctx.save();
         ctx.rerender();
-        ctx.toast('历史小手机消息已跟随回复预设');
+        ctx.toast(`历史小手机消息按回复预设读 ${replyContextFor(ctx.state, chat).historyLimit} 条`);
         return true;
       }
       const count = Number(raw);
@@ -1446,35 +1439,29 @@ export const threadSettingsApp = {
     if (act === 'ts-memory') {
       const presets = memoryPresetsOf(ctx.state);
       const globalPreset = memoryPresetFor(ctx.state, null);
+      const activePreset = presets.find(item => item.id === chat.memoryPresetId) || globalPreset;
       ctx.openSheet({
         title: '酒馆记忆',
+        note: `现在用「${memoryPresetTitle(activePreset)}」`,
         items: [
-          { label: '跟随手机', value: 'follow', note: `现在用「${globalPreset?.name || '默认'}」` },
           ...presets.map(item => ({
-            label: item.name,
+            label: memoryPresetTitle(item),
             value: item.id,
             note: memoryPresetSummary(item),
           })),
           { label: '管理记忆方案', value: 'manage', note: '新建、改名、改层数' },
         ],
         onPick: (value) => {
-          if (value === 'follow') {
-            chat.memoryPresetId = '';
-            ctx.save();
-            ctx.rerender();
-            ctx.toast('已跟随手机的酒馆记忆');
-            return;
-          }
           if (value === 'manage') {
             ctx.go('memory-presets');
             return;
           }
           const preset = presets.find(item => item.id === value);
           if (!preset) return;
-          chat.memoryPresetId = preset.id;
+          chat.memoryPresetId = preset.id === globalPreset?.id ? '' : preset.id;
           ctx.save();
           ctx.rerender();
-          ctx.toast(`这个会话改用「${preset.name}」`);
+          ctx.toast(`这个会话现在用「${memoryPresetTitle(preset)}」`);
         },
       });
       return true;

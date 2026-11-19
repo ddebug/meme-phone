@@ -72,7 +72,7 @@ export const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">身份与外观</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'contacts', title: '用户', sub: `${state.settings.userMode === 'pin' ? '固定' : '跟随酒馆'} · ${state.settings.user.name}`, act: 'set-open', app: 'user' })}
+            ${row(ctx, { iconName: 'contacts', title: '用户', sub: `${state.settings.user.name || '还没选'} · 点击换人`, act: 'set-open', app: 'user' })}
             ${row(ctx, { iconName: 'brush', title: '装扮与主题', sub: `${wallLabel} · ${state.settings.theme === 'night' ? '夜间' : '日间'} · 字体与图标`, act: 'set-open-dress' })}
           </div>
         </div>
@@ -96,7 +96,7 @@ export const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">AI 设置 · 参考什么材料</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'book', title: '默认读总结', sub: state.settings.memory.readMode === 'recent' ? '关着：没单独设置的角色读最近原文' : '开着：有柏宝书总结就先读总结，没有才读原文', act: 'set-toggle-memory-read', toggle: state.settings.memory.readMode !== 'recent' })}
+            ${row(ctx, { iconName: 'book', title: '手机读法', sub: state.settings.memory.readMode === 'recent' ? '现在只读最近原文' : '现在有总结先读总结，没有就读最近原文', act: 'set-toggle-memory-read', toggle: state.settings.memory.readMode !== 'recent' })}
             ${row(ctx, { iconName: 'search', title: '酒馆角色', sub: (state.charactersFromTavern ? `酒馆里 ${state.characters.length} 张角色卡，看设定或加进已添加` : '看酒馆里每张角色卡的设定'), act: 'set-open-cards' })}
           </div>
         </div>
@@ -113,7 +113,7 @@ export const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">数据与备份</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'copy', title: '导出备份', sub: '一份 json，默认不含接口 Key', act: 'set-export' })}
+            ${row(ctx, { iconName: 'copy', title: '导出备份', sub: '一份 json，导出时不带接口 Key', act: 'set-export' })}
             ${row(ctx, { iconName: 'upload', title: '从备份恢复', sub: '先预检数量，确认后覆盖当前数据', act: 'set-import' })}
             ${row(ctx, { iconName: 'trash', title: '清空手机数据', sub: '联系方式、聊天、日记全部清掉', act: 'set-wipe' })}
           </div>
@@ -124,7 +124,7 @@ export const settingsApp = {
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'clock', title: '空发送时参考沉默多久', sub: '写进主动开口的提示，不会自己定时发消息', act: 'set-idle', value: `${state.settings.proactive.idleMinutes} 分钟` })}
             ${row(ctx, { iconName: 'bell', title: '消息提醒', sub: '有新消息时在图标上显示红点', act: 'set-toggle-remind', toggle: state.settings.chat.remind !== false })}
-            ${row(ctx, { iconName: 'code', title: '请求调试栏', sub: '在输入框上方显示预计 token 与请求构成；默认关着', act: 'set-toggle-debug', toggle: state.settings.chat.debugBar === true })}
+            ${row(ctx, { iconName: 'code', title: '请求调试栏', sub: state.settings.chat.debugBar ? '现在开着：输入框上方会显示 token 与请求构成' : '现在关着：需要时再打开', act: 'set-toggle-debug', toggle: state.settings.chat.debugBar === true })}
             ${row(ctx, { iconName: 'help', title: '帮助', sub: '怎么用、快捷键、常见问题', act: 'set-open', app: 'help' })}
             ${row(ctx, { iconName: 'help', title: '关于 meme-phone', sub: `${contacts} 位联系人 · ${chatsOf(state).length} 个会话 · ${unreadTotal(state)} 条未读`, act: 'set-about' })}
           </div>
@@ -166,8 +166,8 @@ export const settingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(store.readMode === 'recent'
-        ? '默认改成读原文；按角色单独切过的仍然按开关'
-        : '默认改回读总结；没有总结时自动读原文');
+        ? '手机读法改成最近原文；按角色单独切过的仍然按开关'
+        : '手机读法改成总结优先；没有总结时读最近原文');
       return true;
     }
 

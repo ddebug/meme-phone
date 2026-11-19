@@ -8,7 +8,7 @@
  * 手机默认一套方案，某个会话可以单独换一套。
  */
 
-import { contactById, memoryPresetFor, effectiveTavernHistory } from './data.js';
+import { contactById, memoryPresetFor, memoryReadModeFor, effectiveTavernHistory } from './data.js';
 import { chatMemorySummary, summaryText } from './book.js';
 import { readLatestTavernChat, readTavernContext } from './host.js';
 
@@ -38,6 +38,20 @@ export function memoryPresetSummary(preset) {
   if (preset.mode === 'summary') return `${memoryModeLabel(preset.mode)}${first}`;
   if (preset.mode === 'recent') return `${memoryModeLabel(preset.mode)} · 最近 ${floors} 层${first}`;
   return `${memoryModeLabel(preset.mode)} · 有总结先用，否则 ${floors} 层${first}`;
+}
+
+/**
+ * 实际生效的读法：方案模式会被角色单独设置和手机读法覆盖，
+ * 所以界面不再直接抄方案配置，而是先算最终用哪一种。
+ */
+export function memoryEffectiveSummary(state, contactId, preset) {
+  if (!preset) return '还没设记忆方案';
+  const mode = memoryReadModeFor(state, contactId, preset);
+  const floors = Math.max(1, Math.min(50, Number(preset.floors) || 10));
+  const first = preset.skipFirstFloor ? ' · 首楼用原文' : '';
+  if (mode === 'summary') return `只用总结${first}`;
+  if (mode === 'recent') return `只看最近 ${floors} 层原文${first}`;
+  return `有总结看总结，没有就看最近 ${floors} 层原文${first}`;
 }
 
 export function activeMemoryPreset(state, chat) {

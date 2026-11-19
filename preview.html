@@ -13609,7 +13609,7 @@ __mods["meme/memory.js"] = function(module, exports, __req){
  * 手机默认一套方案，某个会话可以单独换一套。
  */
 
-const { contactById, memoryPresetFor, effectiveTavernHistory } = __req("meme/data.js");
+const { contactById, memoryPresetFor, memoryReadModeFor, effectiveTavernHistory } = __req("meme/data.js");
 const { chatMemorySummary, summaryText } = __req("meme/book.js");
 const { readLatestTavernChat, readTavernContext } = __req("meme/host.js");
 
@@ -13639,6 +13639,20 @@ function memoryPresetSummary(preset) {
   if (preset.mode === 'summary') return `${memoryModeLabel(preset.mode)}${first}`;
   if (preset.mode === 'recent') return `${memoryModeLabel(preset.mode)} · 最近 ${floors} 层${first}`;
   return `${memoryModeLabel(preset.mode)} · 有总结先用，否则 ${floors} 层${first}`;
+}
+
+/**
+ * 实际生效的读法：方案模式会被角色单独设置和手机读法覆盖，
+ * 所以界面不再直接抄方案配置，而是先算最终用哪一种。
+ */
+function memoryEffectiveSummary(state, contactId, preset) {
+  if (!preset) return '还没设记忆方案';
+  const mode = memoryReadModeFor(state, contactId, preset);
+  const floors = Math.max(1, Math.min(50, Number(preset.floors) || 10));
+  const first = preset.skipFirstFloor ? ' · 首楼用原文' : '';
+  if (mode === 'summary') return `只用总结${first}`;
+  if (mode === 'recent') return `只看最近 ${floors} 层原文${first}`;
+  return `有总结看总结，没有就看最近 ${floors} 层原文${first}`;
 }
 
 function activeMemoryPreset(state, chat) {
@@ -13837,6 +13851,7 @@ exports["MEMORY_MODES"] = MEMORY_MODES;
 exports["memoryModeLabel"] = memoryModeLabel;
 exports["memoryPresetTitle"] = memoryPresetTitle;
 exports["memoryPresetSummary"] = memoryPresetSummary;
+exports["memoryEffectiveSummary"] = memoryEffectiveSummary;
 exports["activeMemoryPreset"] = activeMemoryPreset;
 exports["buildMemoryContext"] = buildMemoryContext;
 };
@@ -14243,7 +14258,7 @@ const {
   replyPresetsOf, replyPresetFor, replyContextFor, normalizeReplyItems,
   chatHistoryFor, effectiveTavernHistory,
 } = __req("meme/data.js");
-const { memoryPresetSummary, memoryPresetTitle } = __req("meme/memory.js");
+const { memoryEffectiveSummary, memoryPresetTitle } = __req("meme/memory.js");
 const { requestStats, estimateTokens, proactiveLead } = __req("meme/reply-context.js");
 const { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } = __req("meme/chat-transfer.js");
 const { avatarHtml, chatAvatarHtml, esc, shortText, timeText } = __req("meme/shell.js");
@@ -14670,7 +14685,7 @@ function settingsBody(ctx, chatId) {
   const globalMemory = memoryPresetFor(state, null);
   const activeMemory = ownMemory || globalMemory;
   const memoryName = memoryPresetTitle(activeMemory);
-  const memorySub = memoryPresetSummary(activeMemory);
+  const memorySub = memoryEffectiveSummary(state, chat.contactId, activeMemory);
   const replyPresets = replyPresetsOf(state);
   const ownReply = replyPresets.find(item => item.id === chat.replyPresetId) || null;
   const globalReply = replyPresetFor(state, null);
@@ -14704,7 +14719,7 @@ function settingsBody(ctx, chatId) {
   const effectiveLines = [
     ['用哪个模型', llmName],
     ['怎么回复', replyName],
-    ['参考什么', `酒馆记忆 ${memoryPresetSummary(activeMemory)} · 小手机历史 ${chatHistoryFor(chat).phoneLimit || phoneFollowLimit} 条`],
+    ['参考什么', `酒馆记忆 ${memoryEffectiveSummary(state, chat.contactId, activeMemory)} · 小手机历史 ${chatHistoryFor(chat).phoneLimit || phoneFollowLimit} 条`],
   ];
 
   return `
@@ -15676,11 +15691,14 @@ const threadSettingsApp = {
         title: '酒馆记忆',
         note: `现在用「${memoryPresetTitle(activePreset)}」`,
         items: [
-          ...presets.map(item => ({
-            label: memoryPresetTitle(item),
-            value: item.id,
-            note: memoryPresetSummary(item),
-          })),
+          ...presets.map(item => {
+            const current = item.id === (activePreset?.id || '');
+            return {
+              label: `${memoryPresetTitle(item)}${current ? '（当前）' : ''}`,
+              value: item.id,
+              note: `${current ? '现在实际' : '切过去后'}：${memoryEffectiveSummary(ctx.state, chat.contactId, item)}`,
+            };
+          }),
           { label: '管理记忆方案', value: 'manage', note: '新建、改名、改层数' },
         ],
         onPick: (value) => {
@@ -22782,7 +22800,7 @@ const {
   newId, memoryPresetsOf, contactById, chatsOf, memoryPresetFor, memoryReadModeFor, memoryGlobalReadMode,
 } = __req("meme/data.js");
 const { esc } = __req("meme/shell.js");
-const { memoryModeLabel, memoryPresetSummary, memoryPresetTitle, buildMemoryContext } = __req("meme/memory.js");
+const { memoryPresetSummary, memoryEffectiveSummary, memoryPresetTitle, buildMemoryContext } = __req("meme/memory.js");
 
 let memoryChosen = '';
 let memoryView = {
@@ -22882,12 +22900,15 @@ function presetById(state, id) {
   return memoryPresetsOf(state).find(item => item.id === id) || null;
 }
 
-function row(state, preset) {
+function row(state, preset, contact) {
   const active = state.settings.memory?.activeId === preset.id;
+  const summary = active && contact
+    ? `现在实际：${memoryEffectiveSummary(state, contact.id, preset)}`
+    : memoryPresetSummary(preset);
   return `
     <button class="mp-set-row" data-act="mem-edit" data-id="${esc(preset.id)}" type="button">
       <span class="mp-set-ico">${icon('book')}</span>
-      <span class="mp-set-name">${esc(memoryPresetTitle(preset))}<small>${esc(memoryPresetSummary(preset))}</small></span>
+      <span class="mp-set-name">${esc(memoryPresetTitle(preset))}<small>${esc(summary)}</small></span>
       ${active ? '<span class="mp-set-value">使用中</span>' : ''}
       <span style="color:var(--text-4)">${icon('chevron')}</span>
     </button>`;
@@ -22934,12 +22955,16 @@ function statusCard(ctx, chosen, view, preset) {
 }
 
 /* 方案管理不再走弹窗：在当前列表里展开，改完就地保存 */
-function presetPanel(ctx, preset) {
+function presetPanel(ctx, preset, contact) {
   const state = ctx.state;
   const active = state.settings.memory?.activeId === preset.id;
-  const modeNote = preset.mode === 'auto'
-    ? '读取方式：总结优先，没有总结时读最近原文'
-    : `读取方式：${memoryModeLabel(preset.mode)}`;
+  const modeNote = contact
+    ? `现在实际：${memoryEffectiveSummary(state, contact.id, preset)}`
+    : `方案配置：${memoryPresetSummary(preset)}`;
+  const ownRead = contact?.id ? state.settings.memory?.byContact?.[contact.id] : '';
+  const overrideNote = ownRead === 'recent' || ownRead === 'auto'
+    ? (ownRead === preset.mode ? '' : '这位角色单独切过读取方式，方案里的模式先不生效。')
+    : '';
   return `
     <div class="mp-card mp-mem-edit">
       <div class="mp-card-title">${esc(memoryPresetTitle(preset))}${active ? '<span class="mp-api-tag">使用中</span>' : ''}</div>
@@ -22948,7 +22973,7 @@ function presetPanel(ctx, preset) {
         <input id="mem-floors-input" class="mp-api-input" type="text" value="${esc(String(preset.floors || 10))}"
           placeholder="1 到 50" inputmode="numeric" data-act="mem-floors" data-id="${esc(preset.id)}">
       </label>
-      <div class="mp-mem-panel-note">${esc(modeNote)} · 最近 ${preset.floors || 10} 层 · ${preset.skipFirstFloor ? '首楼用原文' : '首楼用总结'}</div>
+      <div class="mp-mem-panel-note">${esc(modeNote)}${overrideNote ? ` · ${esc(overrideNote)}` : ''}</div>
       <button class="mp-set-row mp-mem-first" data-act="mem-first" data-id="${esc(preset.id)}" type="button">
         <span class="mp-set-name">首楼用原文<small>首楼总结丢东西时再开</small></span>
         <span class="mp-switch${preset.skipFirstFloor ? ' on' : ''}"></span>
@@ -23041,7 +23066,7 @@ function renderPage(ctx) {
 
       <div class="mp-group-label" style="margin-top:16px">记忆方案</div>
       <div class="mp-group-box">
-        ${presets.map(item => `${row(state, item)}${memEdit === item.id ? presetPanel(ctx, item) : ''}`).join('') || '<div class="mp-empty">还没有方案。</div>'}
+        ${presets.map(item => `${row(state, item, chosen)}${memEdit === item.id ? presetPanel(ctx, item, chosen) : ''}`).join('') || '<div class="mp-empty">还没有方案。</div>'}
       </div>
       <div class="mp-group-box">
         <button class="mp-set-row" data-act="mem-new" type="button">

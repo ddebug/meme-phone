@@ -11,7 +11,7 @@ import {
   newId, memoryPresetsOf, contactById, chatsOf, memoryPresetFor, memoryReadModeFor, memoryGlobalReadMode,
 } from '../data.js';
 import { esc } from '../shell.js';
-import { memoryModeLabel, memoryPresetSummary, memoryPresetTitle, buildMemoryContext } from '../memory.js';
+import { memoryPresetSummary, memoryEffectiveSummary, memoryPresetTitle, buildMemoryContext } from '../memory.js';
 
 let memoryChosen = '';
 let memoryView = {
@@ -111,12 +111,15 @@ function presetById(state, id) {
   return memoryPresetsOf(state).find(item => item.id === id) || null;
 }
 
-function row(state, preset) {
+function row(state, preset, contact) {
   const active = state.settings.memory?.activeId === preset.id;
+  const summary = active && contact
+    ? `现在实际：${memoryEffectiveSummary(state, contact.id, preset)}`
+    : memoryPresetSummary(preset);
   return `
     <button class="mp-set-row" data-act="mem-edit" data-id="${esc(preset.id)}" type="button">
       <span class="mp-set-ico">${icon('book')}</span>
-      <span class="mp-set-name">${esc(memoryPresetTitle(preset))}<small>${esc(memoryPresetSummary(preset))}</small></span>
+      <span class="mp-set-name">${esc(memoryPresetTitle(preset))}<small>${esc(summary)}</small></span>
       ${active ? '<span class="mp-set-value">使用中</span>' : ''}
       <span style="color:var(--text-4)">${icon('chevron')}</span>
     </button>`;
@@ -163,12 +166,16 @@ function statusCard(ctx, chosen, view, preset) {
 }
 
 /* 方案管理不再走弹窗：在当前列表里展开，改完就地保存 */
-function presetPanel(ctx, preset) {
+function presetPanel(ctx, preset, contact) {
   const state = ctx.state;
   const active = state.settings.memory?.activeId === preset.id;
-  const modeNote = preset.mode === 'auto'
-    ? '读取方式：总结优先，没有总结时读最近原文'
-    : `读取方式：${memoryModeLabel(preset.mode)}`;
+  const modeNote = contact
+    ? `现在实际：${memoryEffectiveSummary(state, contact.id, preset)}`
+    : `方案配置：${memoryPresetSummary(preset)}`;
+  const ownRead = contact?.id ? state.settings.memory?.byContact?.[contact.id] : '';
+  const overrideNote = ownRead === 'recent' || ownRead === 'auto'
+    ? (ownRead === preset.mode ? '' : '这位角色单独切过读取方式，方案里的模式先不生效。')
+    : '';
   return `
     <div class="mp-card mp-mem-edit">
       <div class="mp-card-title">${esc(memoryPresetTitle(preset))}${active ? '<span class="mp-api-tag">使用中</span>' : ''}</div>
@@ -177,7 +184,7 @@ function presetPanel(ctx, preset) {
         <input id="mem-floors-input" class="mp-api-input" type="text" value="${esc(String(preset.floors || 10))}"
           placeholder="1 到 50" inputmode="numeric" data-act="mem-floors" data-id="${esc(preset.id)}">
       </label>
-      <div class="mp-mem-panel-note">${esc(modeNote)} · 最近 ${preset.floors || 10} 层 · ${preset.skipFirstFloor ? '首楼用原文' : '首楼用总结'}</div>
+      <div class="mp-mem-panel-note">${esc(modeNote)}${overrideNote ? ` · ${esc(overrideNote)}` : ''}</div>
       <button class="mp-set-row mp-mem-first" data-act="mem-first" data-id="${esc(preset.id)}" type="button">
         <span class="mp-set-name">首楼用原文<small>首楼总结丢东西时再开</small></span>
         <span class="mp-switch${preset.skipFirstFloor ? ' on' : ''}"></span>
@@ -270,7 +277,7 @@ function renderPage(ctx) {
 
       <div class="mp-group-label" style="margin-top:16px">记忆方案</div>
       <div class="mp-group-box">
-        ${presets.map(item => `${row(state, item)}${memEdit === item.id ? presetPanel(ctx, item) : ''}`).join('') || '<div class="mp-empty">还没有方案。</div>'}
+        ${presets.map(item => `${row(state, item, chosen)}${memEdit === item.id ? presetPanel(ctx, item, chosen) : ''}`).join('') || '<div class="mp-empty">还没有方案。</div>'}
       </div>
       <div class="mp-group-box">
         <button class="mp-set-row" data-act="mem-new" type="button">

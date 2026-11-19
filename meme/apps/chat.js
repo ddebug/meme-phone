@@ -11,7 +11,7 @@ import {
   replyPresetsOf, replyPresetFor, replyContextFor, normalizeReplyItems,
   chatHistoryFor, effectiveTavernHistory,
 } from '../data.js';
-import { memoryPresetSummary, memoryPresetTitle } from '../memory.js';
+import { memoryEffectiveSummary, memoryPresetTitle } from '../memory.js';
 import { requestStats, estimateTokens, proactiveLead } from '../reply-context.js';
 import { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } from '../chat-transfer.js';
 import { avatarHtml, chatAvatarHtml, esc, shortText, timeText } from '../shell.js';
@@ -438,7 +438,7 @@ function settingsBody(ctx, chatId) {
   const globalMemory = memoryPresetFor(state, null);
   const activeMemory = ownMemory || globalMemory;
   const memoryName = memoryPresetTitle(activeMemory);
-  const memorySub = memoryPresetSummary(activeMemory);
+  const memorySub = memoryEffectiveSummary(state, chat.contactId, activeMemory);
   const replyPresets = replyPresetsOf(state);
   const ownReply = replyPresets.find(item => item.id === chat.replyPresetId) || null;
   const globalReply = replyPresetFor(state, null);
@@ -472,7 +472,7 @@ function settingsBody(ctx, chatId) {
   const effectiveLines = [
     ['用哪个模型', llmName],
     ['怎么回复', replyName],
-    ['参考什么', `酒馆记忆 ${memoryPresetSummary(activeMemory)} · 小手机历史 ${chatHistoryFor(chat).phoneLimit || phoneFollowLimit} 条`],
+    ['参考什么', `酒馆记忆 ${memoryEffectiveSummary(state, chat.contactId, activeMemory)} · 小手机历史 ${chatHistoryFor(chat).phoneLimit || phoneFollowLimit} 条`],
   ];
 
   return `
@@ -1444,11 +1444,14 @@ export const threadSettingsApp = {
         title: '酒馆记忆',
         note: `现在用「${memoryPresetTitle(activePreset)}」`,
         items: [
-          ...presets.map(item => ({
-            label: memoryPresetTitle(item),
-            value: item.id,
-            note: memoryPresetSummary(item),
-          })),
+          ...presets.map(item => {
+            const current = item.id === (activePreset?.id || '');
+            return {
+              label: `${memoryPresetTitle(item)}${current ? '（当前）' : ''}`,
+              value: item.id,
+              note: `${current ? '现在实际' : '切过去后'}：${memoryEffectiveSummary(ctx.state, chat.contactId, item)}`,
+            };
+          }),
           { label: '管理记忆方案', value: 'manage', note: '新建、改名、改层数' },
         ],
         onPick: (value) => {

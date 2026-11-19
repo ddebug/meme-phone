@@ -175,7 +175,8 @@ export function charactersHandle(ctx, act, data) {
         const previous = cardsOf(state);
         state.characters = cards.map(card => {
           const old = previous.find(item => item.name === card.name);
-          return old?.description ? { ...card, description: old.description } : card;
+          /* 同步以酒馆最新卡片为准；本地若另有覆盖字段，应单独保存并标记，这里不再拿旧 description 盖掉新版。 */
+          return old?.localOverrides ? { ...card, localOverrides: old.localOverrides } : card;
         });
         state.charactersFromTavern = true;
         ctx.save();

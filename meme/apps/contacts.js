@@ -64,16 +64,16 @@ export const contactsApp = {
             ? `<button class="mp-icon-btn" data-act="char-search" type="button" aria-label="查角色">${icon('search')}</button>`
             : `<button class="mp-icon-btn" data-act="contact-add" type="button" aria-label="添加">${icon('plus')}</button>`}
         </div>
-        <div class="mp-subtitle">${tab === 'cards' ? '查角色 · 酒馆里的角色卡，按卡片原样看' : `通讯录 · ${contacts.length} 位 · 只有在这里的人才会出现在聊天里`}</div>
+        <div class="mp-subtitle">${tab === 'cards' ? '酒馆角色 · 酒馆里的角色卡，按卡片原样看；加进已添加就能开始聊天' : `已添加 · ${contacts.length} 位 · 只有这里的人才会出现在聊天里`}</div>
 
         <div class="mp-seg" style="margin:2px 0 12px">
-          <button class="${tab === 'contacts' ? 'on' : ''}" data-act="contacts-tab" data-tab="contacts" type="button">通讯录</button>
-          <button class="${tab === 'cards' ? 'on' : ''}" data-act="contacts-tab" data-tab="cards" type="button">查角色</button>
+          <button class="${tab === 'contacts' ? 'on' : ''}" data-act="contacts-tab" data-tab="contacts" type="button">已添加</button>
+          <button class="${tab === 'cards' ? 'on' : ''}" data-act="contacts-tab" data-tab="cards" type="button">酒馆角色</button>
         </div>
 
         ${tab === 'cards'
           ? charactersPanel(ctx)
-          : (pendingBlock + (body || '<div class="mp-empty">通讯录还是空的。<br>点右上角，把酒馆里的角色同步过来。</div>'))}
+          : (pendingBlock + (body || '<div class="mp-empty">还没有添加任何人。<br>右上角同步酒馆角色，或者手动写一个。</div>'))}
       </div>`;
   },
 

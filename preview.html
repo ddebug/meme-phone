@@ -16512,16 +16512,16 @@ const contactsApp = {
             ? `<button class="mp-icon-btn" data-act="char-search" type="button" aria-label="查角色">${icon('search')}</button>`
             : `<button class="mp-icon-btn" data-act="contact-add" type="button" aria-label="添加">${icon('plus')}</button>`}
         </div>
-        <div class="mp-subtitle">${tab === 'cards' ? '查角色 · 酒馆里的角色卡，按卡片原样看' : `通讯录 · ${contacts.length} 位 · 只有在这里的人才会出现在聊天里`}</div>
+        <div class="mp-subtitle">${tab === 'cards' ? '酒馆角色 · 酒馆里的角色卡，按卡片原样看；加进已添加就能开始聊天' : `已添加 · ${contacts.length} 位 · 只有这里的人才会出现在聊天里`}</div>
 
         <div class="mp-seg" style="margin:2px 0 12px">
-          <button class="${tab === 'contacts' ? 'on' : ''}" data-act="contacts-tab" data-tab="contacts" type="button">通讯录</button>
-          <button class="${tab === 'cards' ? 'on' : ''}" data-act="contacts-tab" data-tab="cards" type="button">查角色</button>
+          <button class="${tab === 'contacts' ? 'on' : ''}" data-act="contacts-tab" data-tab="contacts" type="button">已添加</button>
+          <button class="${tab === 'cards' ? 'on' : ''}" data-act="contacts-tab" data-tab="cards" type="button">酒馆角色</button>
         </div>
 
         ${tab === 'cards'
           ? charactersPanel(ctx)
-          : (pendingBlock + (body || '<div class="mp-empty">通讯录还是空的。<br>点右上角，把酒馆里的角色同步过来。</div>'))}
+          : (pendingBlock + (body || '<div class="mp-empty">还没有添加任何人。<br>右上角同步酒馆角色，或者手动写一个。</div>'))}
       </div>`;
   },
 
@@ -16897,7 +16897,7 @@ const settingsApp = {
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'image', title: '绘图', sub: imageReady ? `${imageLabel} · ${image.model || '模型没填'}` : `${imageLabel} · 还没填${image.engine === 'custom' ? '地址' : ' Key'}`, act: 'set-open', app: 'draw' })}
             ${row(ctx, { iconName: 'code', title: '聊天接口与预设', sub: '每套 = 地址 + Key + 模型，只影响聊天', act: 'set-open', app: 'api' })}
-            ${row(ctx, { iconName: 'search', title: '查角色', sub: (state.charactersFromTavern ? `酒馆里 ${state.characters.length} 张角色卡` : '看酒馆里每张角色卡的设定'), act: 'set-open-cards' })}
+            ${row(ctx, { iconName: 'search', title: '酒馆角色', sub: (state.charactersFromTavern ? `酒馆里 ${state.characters.length} 张角色卡，看设定或加进已添加` : '看酒馆里每张角色卡的设定'), act: 'set-open-cards' })}
             ${row(ctx, { iconName: 'smile', title: '表情包', sub: '表情面板里那些贴纸', act: 'set-open', app: 'emoji' })}
             ${row(ctx, { iconName: 'bookmark', title: '收藏', sub: `${(state.favorites || []).length} 条从聊天里存下来的消息`, act: 'set-open', app: 'favorites' })}
             ${row(ctx, { iconName: 'help', title: '帮助', sub: '怎么用、快捷键、常见问题', act: 'set-open', app: 'help' })}
@@ -22777,7 +22777,8 @@ function renderPage(ctx) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-subtitle" style="margin-top:0">酒馆记忆：读角色最新聊天文件；有总结可切总结，没有就读最近原文</div>
+      <div class="mp-subtitle" style="margin-top:0">酒馆记忆：读角色最新的酒馆聊天文件，有总结可切总结，没有就读最近原文</div>
+      <div class="mp-card-sub" style="padding:0 2px 2px">这一页只回答「从酒馆里拿什么给它看」。小手机自己的聊天历史在「AI 设置 · 上下文」，收藏和日记是另外两块，互不混用。</div>
 
       <div class="mp-group-head" style="margin-top:16px">
         <div class="mp-group-label">当前读取</div>

@@ -242,7 +242,8 @@ function renderPage(ctx) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-subtitle" style="margin-top:0">酒馆记忆：读角色最新聊天文件；有总结可切总结，没有就读最近原文</div>
+      <div class="mp-subtitle" style="margin-top:0">酒馆记忆：读角色最新的酒馆聊天文件，有总结可切总结，没有就读最近原文</div>
+      <div class="mp-card-sub" style="padding:0 2px 2px">这一页只回答「从酒馆里拿什么给它看」。小手机自己的聊天历史在「AI 设置 · 上下文」，收藏和日记是另外两块，互不混用。</div>
 
       <div class="mp-group-head" style="margin-top:16px">
         <div class="mp-group-label">当前读取</div>

@@ -559,7 +559,7 @@ export const presetsApp = {
           <button class="mp-draw-side" data-act="reply-import-cancel" type="button">取消</button>
         </div>` : ''}
 
-        <div class="mp-group-label" style="margin-top:14px">手机默认 · ${list.length} 套</div>
+        <div class="mp-group-label" style="margin-top:14px">全部预设 · ${list.length} 套</div>
         <div class="mp-group-box">
           ${rows || '<div class="mp-empty">还没有回复预设，点右上角新建一套。</div>'}
         </div>
@@ -719,7 +719,7 @@ export const replyPresetApp = {
         <button class="mp-icon-btn" data-act="reply-del" type="button" title="删除">${icon('trash')}</button>
       </div>
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">回复预设 · 条目按顺序拼进模型消息 · ${isActive ? '手机现在默认用这套' : '只在聊天设置里选中它时生效'}</div>
+        <div class="mp-subtitle" style="margin-top:0">回复预设 · 条目按顺序拼进模型消息 · ${isActive ? '手机现在用这套' : '只在聊天设置里选中它时生效'}</div>
 
         ${deleting ? `
         <div class="mp-group mp-api-inline is-danger" style="margin-top:12px">
@@ -780,7 +780,7 @@ export const replyPresetApp = {
         <div class="mp-group-label" style="margin-top:16px">用在</div>
         <div class="mp-api-use">
           <button class="mp-api-use-btn${isActive ? ' is-on' : ''}" data-act="reply-use" type="button">
-            ${icon('reply')}<span>${isActive ? '手机正在用' : '设为手机默认'}</span>
+            ${icon('reply')}<span>${isActive ? '手机正在用' : '设为手机当前预设'}</span>
           </button>
         </div>
 
@@ -1272,7 +1272,7 @@ export const replyPresetApp = {
       editingId = preset.id;
       ctx.save();
       ctx.rerender();
-      ctx.toast(`手机默认改用「${preset.name}」`);
+      ctx.toast(`手机当前回复预设改成「${preset.name}」`);
       return true;
     }
 

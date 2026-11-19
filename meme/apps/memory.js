@@ -11,7 +11,7 @@ import {
   newId, memoryPresetsOf, contactById, chatsOf, memoryPresetFor, memoryReadModeFor, memoryGlobalReadMode,
 } from '../data.js';
 import { esc } from '../shell.js';
-import { memoryModeLabel, memoryPresetSummary, buildMemoryContext } from '../memory.js';
+import { memoryModeLabel, memoryPresetSummary, memoryPresetTitle, buildMemoryContext } from '../memory.js';
 
 let memoryChosen = '';
 let memoryView = {
@@ -116,7 +116,7 @@ function row(state, preset) {
   return `
     <button class="mp-set-row" data-act="mem-edit" data-id="${esc(preset.id)}" type="button">
       <span class="mp-set-ico">${icon('book')}</span>
-      <span class="mp-set-name">${esc(preset.name)}<small>${esc(memoryPresetSummary(preset))}</small></span>
+      <span class="mp-set-name">${esc(memoryPresetTitle(preset))}<small>${esc(memoryPresetSummary(preset))}</small></span>
       ${active ? '<span class="mp-set-value">使用中</span>' : ''}
       <span style="color:var(--text-4)">${icon('chevron')}</span>
     </button>`;
@@ -139,7 +139,7 @@ function statusCard(ctx, chosen, view, preset) {
       : [];
   const label = source === 'summary' ? '总结' : source === 'recent' ? '原文' : '没有记忆';
   const foot = [
-    `方案「${preset?.name || '默认'}」`,
+    `方案「${memoryPresetTitle(preset)}」`,
     view.file ? String(view.file).replace(/\.jsonl$/i, '') : '',
     view.demo ? '演示数据' : '',
   ].filter(Boolean).join(' · ');
@@ -167,11 +167,11 @@ function presetPanel(ctx, preset) {
   const state = ctx.state;
   const active = state.settings.memory?.activeId === preset.id;
   const modeNote = preset.mode === 'auto'
-    ? '方案来源：跟随上面的开关'
-    : `方案来源：${memoryModeLabel(preset.mode)}（按角色的开关优先）`;
+    ? '读取方式：总结优先，没有总结时读最近原文'
+    : `读取方式：${memoryModeLabel(preset.mode)}`;
   return `
     <div class="mp-card mp-mem-edit">
-      <div class="mp-card-title">${esc(preset.name)}${active ? '<span class="mp-api-tag">使用中</span>' : ''}</div>
+      <div class="mp-card-title">${esc(memoryPresetTitle(preset))}${active ? '<span class="mp-api-tag">使用中</span>' : ''}</div>
       <label class="mp-api-field">
         <span>保留层数</span>
         <input id="mem-floors-input" class="mp-api-input" type="text" value="${esc(String(preset.floors || 10))}"
@@ -183,20 +183,20 @@ function presetPanel(ctx, preset) {
         <span class="mp-switch${preset.skipFirstFloor ? ' on' : ''}"></span>
       </button>
       <div class="mp-draw-actions">
-        ${active ? '' : `<button class="mp-draw-action is-primary" data-act="mem-use" data-id="${esc(preset.id)}" type="button">设为手机默认方案</button>`}
+        ${active ? '' : `<button class="mp-draw-action is-primary" data-act="mem-use" data-id="${esc(preset.id)}" type="button">设为手机当前方案</button>`}
         <button class="mp-draw-action" data-act="mem-rename-open" data-id="${esc(preset.id)}" type="button">改名</button>
         <button class="mp-draw-action" data-act="mem-clone" data-id="${esc(preset.id)}" type="button">复制一套</button>
         <button class="mp-draw-action is-danger" data-act="mem-del" data-id="${esc(preset.id)}" type="button">删除这套</button>
       </div>
       ${memRename ? `
       <div class="mp-api-name-edit">
-        <input id="mem-rename-input" class="mp-api-input" type="text" maxlength="20" value="${esc(preset.name)}" placeholder="方案名字">
+        <input id="mem-rename-input" class="mp-api-input" type="text" maxlength="20" value="${esc(memoryPresetTitle(preset))}" placeholder="方案名字">
         <button class="mp-draw-side is-primary" data-act="mem-rename-save" data-id="${esc(preset.id)}" type="button">确定</button>
         <button class="mp-draw-side" data-act="mem-rename-cancel" type="button">取消</button>
       </div>` : ''}
       ${memDelete === preset.id ? `
       <div class="mp-api-delete">
-        <div class="mp-api-delete-title">删除「${esc(preset.name)}」？</div>
+        <div class="mp-api-delete-title">删除「${esc(memoryPresetTitle(preset))}」？</div>
         <div class="mp-api-delete-sub">只删这套记忆方案；正在用它时，手机会改用剩下第一套。至少留一套。</div>
         <div class="mp-draw-actions">
           <button class="mp-draw-action is-danger" data-act="mem-del-confirm" data-id="${esc(preset.id)}" type="button">确认删除</button>
@@ -275,7 +275,7 @@ function renderPage(ctx) {
       <div class="mp-group-box">
         <button class="mp-set-row" data-act="mem-new" type="button">
           <span class="mp-set-ico">${icon('plus')}</span>
-          <span class="mp-set-name">新建一套<small>在「${esc(active?.name || '默认')}」的基础上改</small></span>
+          <span class="mp-set-name">新建一套<small>在「${esc(memoryPresetTitle(active))}」的基础上改</small></span>
           <span style="color:var(--text-4)">${icon('chevron')}</span>
         </button>
       </div>
@@ -284,8 +284,8 @@ function renderPage(ctx) {
       <div class="mp-card">
         <div class="mp-card-title">层数</div>
         <div class="mp-card-sub">一层就是酒馆里的一条消息。层数越多，模型记得越远，但占的上下文也越多。</div>
-        <div class="mp-card-title" style="margin-top:12px">默认</div>
-        <div class="mp-card-sub">手机默认读${memoryGlobalReadMode(state) === 'recent' ? '原文' : '总结'}（在「设置 · 记忆」里改）；这位角色单独切过就按开关。</div>
+        <div class="mp-card-title" style="margin-top:12px">手机读法</div>
+        <div class="mp-card-sub">手机现在${memoryGlobalReadMode(state) === 'recent' ? '只读最近原文' : '总结优先，没有总结时读最近原文'}；这位角色单独切过的仍按上面的开关。</div>
       </div>
     </div>`;
 }
@@ -390,7 +390,7 @@ function handle(ctx, act, data) {
     ctx.state.settings.memory.activeId = live.id;
     ctx.save();
     redraw(ctx);
-    say(ctx, `手机默认记忆方案改成「${live.name}」`);
+    say(ctx, `手机记忆方案改成「${memoryPresetTitle(live)}」`);
     return true;
   }
 

@@ -175,6 +175,14 @@ function replyNameFor(state, id) {
   return item ? (item.name || '未命名') : '没选';
 }
 
+/** 方案选择里不显示「默认方案」，旧名直接换成当前接口 + 回复预设。 */
+function schemeLabel(state, scheme) {
+  const raw = String(scheme?.name || '').trim();
+  if (raw && !['默认', '默认方案', '跟随', '自动'].includes(raw)) return raw;
+  const store = state.settings.api || { presets: [] };
+  return `${presetName(store, scheme?.apiId)} · ${replyNameFor(state, scheme?.replyId)}`.slice(0, 20);
+}
+
 /* 复制一套做模板：地址 / Key / 模型 / 引擎整套带走，只换名字和 id */
 export function clonePreset(source, suffix = ' 副本') {
   return {
@@ -208,11 +216,12 @@ function api(state) {
   /* 整体方案只存 API + 回复预设；第一次进来没有方案时补一套当前搭配 */
   if (!Array.isArray(store.chatSchemes)) store.chatSchemes = [];
   if (!store.chatSchemes.length) {
+    const reply = replyPresetsOf(state)[0];
     store.chatSchemes.push({
       id: newId('lsch'),
-      name: '默认方案',
+      name: `${presetName(store, store.activeChat)} · ${reply?.name || '回复预设'}`.slice(0, 20),
       apiId: store.activeChat,
-      replyId: replyPresetsOf(state)[0]?.id || '',
+      replyId: reply?.id || '',
     });
   }
   if (!store.chatSchemes.some(item => item.id === store.chatSchemeId)) {
@@ -573,7 +582,7 @@ function deleteConfirm(state, store) {
       <div class="mp-api-delete-sub">
         删除后不能恢复。${linked.length ? `${linked.length} 套方案还在引用它，要先处理这些引用。` : '没有方案引用它。'}
         ${store.activeChat === preset.id ? '当前聊天正在用它。' : ''}
-        ${chats.length ? `${chats.length} 个单独引用它的会话会恢复跟随手机。` : ''}
+        ${chats.length ? `${chats.length} 个单独引用它的会话会回到手机当前的聊天方案。` : ''}
         ${linked.length ? '只删接口时，这些方案会改指兜底接口；也可以连方案一起删。' : ''}
       </div>
       <div class="mp-api-actions">
@@ -596,7 +605,12 @@ function deleteApiPreset(ctx, store, pending, withSchemes) {
     const kept = chatSchemesOf(ctx.state).filter(item => item.apiId !== pending.id);
     if (!kept.length) {
       const reply = replyPresetFor(ctx.state, null);
-      const scheme = { id: newId('lsch'), name: '默认', apiId: fallback.id, replyId: reply?.id || '' };
+      const scheme = {
+        id: newId('lsch'),
+        name: `${presetName(store, fallback.id)} · ${reply?.name || '回复预设'}`.slice(0, 20),
+        apiId: fallback.id,
+        replyId: reply?.id || '',
+      };
       store.chatSchemes = [scheme];
       store.chatSchemeId = scheme.id;
       fallbackCreated = true;
@@ -623,10 +637,10 @@ function deleteApiPreset(ctx, store, pending, withSchemes) {
   ctx.save();
   redraw(ctx);
   const parts = [`接口「${pending.name || '未命名'}」删掉了`];
-  if (fallbackCreated) parts.push('方案删空，补了一套「默认」');
+  if (fallbackCreated) parts.push('方案删空，补了一套当前方案');
   else if (withSchemes && linkedCount) parts.push(`${linkedCount} 套方案一起删了`);
   else if (linkedCount) parts.push(`${linkedCount} 套方案已改指兜底`);
-  if (chatCount) parts.push(`${chatCount} 个会话恢复跟随手机`);
+  if (chatCount) parts.push(`${chatCount} 个会话回到手机当前的聊天方案`);
   say(ctx, parts.join('，'));
 }
 
@@ -660,7 +674,7 @@ export const apiListApp = {
     const schemeDirty = Boolean(scheme && (scheme.apiId !== store.activeChat || scheme.replyId !== currentReply?.id));
     const schemeReplyName = scheme ? replyNameFor(ctx.state, scheme.replyId) : '没选';
     const schemeOptions = schemes.length
-      ? schemes.map(item => ({ value: item.id, label: item.name || '未命名' }))
+      ? schemes.map(item => ({ value: item.id, label: schemeLabel(ctx.state, item) }))
       : [{ value: '', label: '未选方案' }];
     const apiOptions = store.presets.map(preset => ({ value: preset.id, label: preset.name || '未命名' }));
     const replyOptions = replyPresetsOf(ctx.state).map(item => ({ value: item.id, label: item.name || '未命名' }));

@@ -81,11 +81,11 @@ export const userListApp = {
           <div class="mp-group-label">小手机用谁</div>
           <div class="mp-select-wrap">
             <select data-act="user-mode">
-              <option value="follow"${mode === 'follow' ? ' selected' : ''}>跟随酒馆切换</option>
+              <option value="follow"${mode === 'follow' ? ' selected' : ''}>酒馆当前用户</option>
               <option value="pin"${mode === 'pin' ? ' selected' : ''}>固定一位${pinned ? ` · ${esc(pinned.name)}` : ''}</option>
             </select>${icon('chevron')}
           </div>
-          <div class="mp-subtitle" style="margin-top:6px;font-size:calc(11px * var(--font-scale))">${mode === 'follow' ? '酒馆换用户，小手机也跟着换。' : (pinned ? `已固定 ${esc(pinned.name)}，酒馆换人也不跟着动。` : '挑一个人钉在这里。')}</div>
+          <div class="mp-subtitle" style="margin-top:6px;font-size:calc(11px * var(--font-scale))">${mode === 'follow' ? '酒馆换用户，小手机也会换。' : (pinned ? `现在固定用 ${esc(pinned.name)}，酒馆换人也不动。` : '挑一个人固定用。')}</div>
         </div>
 
         <div class="mp-group">

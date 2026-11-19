@@ -23945,11 +23945,10 @@ const replyPresetApp = {
       const isContext = item.kind === 'context';
       const showTag = !groupKind || (item.kind || 'chat') !== groupKind;
       const openAct = isContext ? 'reply-context-open' : 'reply-item-open';
-      const chars = charactersLabel(item);
       const note = item.note ? ` · ${item.note}` : '';
       const sub = isContext
-        ? `${roleLabel(item.role)} · ${item.enabled ? '已启用' : '已关闭'} · ${contextItemNote(item, context)}${chars ? ` · ${chars}` : ''}`
-        : `${roleLabel(item.role)} · ${item.enabled ? '已启用' : '已关闭'} · ${item.content.length} 字${chars ? ` · ${chars}` : ''}${note}`;
+        ? `${roleLabel(item.role)} · ${item.enabled ? '已启用' : '已关闭'} · ${contextItemNote(item, context)}`
+        : `${roleLabel(item.role)} · ${item.enabled ? '已启用' : '已关闭'} · ${item.content.length} 字${note}`;
       return `
       <div class="mp-preset-item${isContext ? ' is-context' : ''}" data-id="${esc(item.id)}">
         <span class="mp-preset-grip" data-preset-grip title="按住拖动排序" aria-hidden="true">${icon('grip')}</span>

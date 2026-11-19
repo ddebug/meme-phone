@@ -38,6 +38,17 @@ function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
 /* --------------------------------------------------------- 请求调试栏 */
 
 let activeThreadId = '';
+
+/* 聊天一页渲染多少条：只影响屏幕，不影响发给模型的历史条数。 */
+export const THREAD_PAGE = 80;
+
+/** 取聊天要渲染的那一页；返回起始下标和可见消息。 */
+export function threadWindow(messages, shown = THREAD_PAGE) {
+  const list = Array.isArray(messages) ? messages : [];
+  const page = Math.max(1, Number(shown) || THREAD_PAGE);
+  const startIndex = Math.max(0, list.length - page);
+  return { startIndex, visible: list.slice(startIndex) };
+}
 let debugPendingKey = '';
 let debugSeq = 0;
 
@@ -611,13 +622,23 @@ function threadBody(ctx, chatId) {
   const messages = chat.messages || [];
   const quote = ctx.shell.quote?.[chatId] || null;
 
+  /* 显示窗口：只渲染最近一页，往上翻再加载更早的。
+     注意这里只管屏幕上的 DOM 数量，发给模型的历史仍按上下文预算从完整 messages 里取。 */
+  const PAGE = THREAD_PAGE;
+  if (!ctx.shell.msgWindow) ctx.shell.msgWindow = {};
+  const shown = Math.max(PAGE, Number(ctx.shell.msgWindow[chatId]) || PAGE);
+  const { startIndex, visible } = threadWindow(messages, shown);
+
   const blocks = [];
-  let lastAt = 0;
+  if (startIndex > 0) {
+    blocks.push(`<button class="mp-msg-more" data-act="load-older" data-chat="${chat.id}" type="button">加载更早的 ${startIndex} 条</button>`);
+  }
+  let lastAt = startIndex > 0 ? (messages[startIndex - 1]?.at || 0) : 0;
   const speakerName = (message) => {
     const speaker = message.speaker ? contactById(state, message.speaker) : null;
     return speaker?.name || contact?.name || 'TA';
   };
-  for (const message of messages) {
+  for (const message of visible) {
     const startGroup = message.at - lastAt > 30 * 60 * 1000;
     if (message.kind === 'system' || message.from === 'system' || message.kind === 'recalled' || message.kind === 'poke' || isSystemBehavior(message)) {
       if (startGroup) {
@@ -1498,6 +1519,22 @@ export const threadApp = {
 
     if (act === 'thread-settings') {
       if (chatById(ctx.state, chatId)) ctx.go('thread-settings', { chatId });
+      return true;
+    }
+
+    if (act === 'load-older') {
+      const chat = chatById(ctx.state, chatId);
+      if (!chat) return true;
+      const box = ctx.shell.root?.querySelector?.('.mp-messages');
+      const prevTop = box?.scrollTop || 0;
+      const prevHeight = box?.scrollHeight || 0;
+      const PAGE = THREAD_PAGE;
+      if (!ctx.shell.msgWindow) ctx.shell.msgWindow = {};
+      ctx.shell.msgWindow[chatId] = Math.max(PAGE, Number(ctx.shell.msgWindow[chatId]) || PAGE) + PAGE;
+      ctx.rerender();
+      /* 加载更早的消息后把滚动位置锚在原来那条上，不跳回顶部也不跳到底部 */
+      const next = ctx.shell.root?.querySelector?.('.mp-messages');
+      if (next) next.scrollTop = prevTop + Math.max(0, next.scrollHeight - prevHeight);
       return true;
     }
 

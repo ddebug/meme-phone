@@ -1192,6 +1192,22 @@
   color: var(--text-4);
   margin-bottom: 6px;
 }
+
+/* 聊天只渲染最近一页；这里给往上翻的加载入口 */
+.mp-msg-more {
+  display: block;
+  width: 100%;
+  margin: 4px 0 10px;
+  padding: 7px 0;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .7);
+  color: var(--text-3);
+  font-family: inherit;
+  font-size: calc(11px * var(--font-scale));
+  cursor: pointer;
+}
+.mp-msg-more:active { transform: scale(.99); }
 .mp-composer-tip.is-error {
   color: #d0526b;
   display: flex;

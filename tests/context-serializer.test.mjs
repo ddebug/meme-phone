@@ -49,6 +49,19 @@ test('C2：历史记录与最后一条聊天不与历史记录重复注入', asy
   assert.equal(hits[0].source, '最后一条聊天');
 });
 
+test('C2：预算报告标记输入超限与整体超限，口径为估算', async () => {
+  const state = demoState();
+  const { chat, contact } = seedChat(state, [
+    { id: 'x1', from: 'me', kind: 'text', text: '长'.repeat(3000) },
+  ]);
+  const preset = { id: 'p', name: '预算', context: { charBudget: 2000 }, items: [] };
+  const result = await buildReplyMessages(state, chat, contact, { presetOverride: preset, memoryText: '' });
+  assert.equal(result.report.estimate, true);
+  assert.ok(result.report.outputReserve > 0);
+  assert.equal(result.report.overLimitInput, true);
+  assert.equal(result.report.inputChars, 3000);
+});
+
 test('C2：日记按自然日过滤，别的日子的消息不进当天材料', () => {
   const state = demoState();
   const today = dayKey(new Date());

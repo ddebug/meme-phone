@@ -185,6 +185,8 @@ function debugPanelHtml(ctx, chat, contact, cache, draft) {
   const bars = groups.map(group => `<span class="mp-debug-seg mp-debug-seg-${group.key}" style="width:${Math.max(2, Math.round(group.tokens / total * 100))}%"></span>`).join('');
   const report = cache.report || {};
   const budget = report.charBudget ? `${formatNumber(report.charUsed || 0)} / ${formatNumber(report.charBudget)} 字` : '';
+  const inputWarn = report.overLimitInput ? '<div class="mp-composer-tip is-error">当前这条消息过长，建议缩短后再发送。</div>' : '';
+  const budgetWarn = !report.overLimitInput && report.overBudget ? '<div class="mp-composer-tip is-error">整套上下文已超出预算，部分条目可能不会注入。</div>' : '';
   const preset = cache.replyPreset?.name || '回复预设';
   const model = cache.model;
   const modelName = model ? `${model.name || model.model || '当前接口'}${model.model && model.name ? ` · ${model.model}` : ''}` : '酒馆 API';
@@ -196,6 +198,7 @@ function debugPanelHtml(ctx, chat, contact, cache, draft) {
         <div class="mp-debug-model">${esc(modelName)} · ${esc(preset)}</div>
       </div>
       <div class="mp-debug-share" aria-hidden="true">${bars || '<span class="mp-debug-seg mp-debug-seg-empty" style="width:100%"></span>'}</div>
+      ${inputWarn}${budgetWarn}
       <div class="mp-debug-list">${stats.rows.map(debugRowHtml).join('') || '<div class="mp-debug-empty">这一轮没有可发送的消息。</div>'}</div>
       ${skipped.length ? `
       <details class="mp-debug-more">

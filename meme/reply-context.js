@@ -415,17 +415,25 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
   /* 小剧场放在全部预设条目之后、最后一条聊天之前，避免被前面的回复格式/行为条目盖掉。 */
   if (options.extraPrompt) messages.push({ role: 'system', content: String(options.extraPrompt), source: '小剧场' });
 
+  let lastUserText = '';
   if (chat && !options.omitLastUser) {
     const last = chat.messages?.[chat.messages.length - 1];
     const omitIds = new Set(options.omitIds || []);
     if (last && !options.proactive && !last.excluded && !omitIds.has(last.id)) {
       const text = serializeMessage(last);
-      if (text) messages.push({ role: 'user', content: `${messageWho(state, contact, last)}：${text}`, source: '最后一条聊天' });
+      if (text) {
+        lastUserText = text;
+        messages.push({ role: 'user', content: `${messageWho(state, contact, last)}：${text}`, source: '最后一条聊天' });
+      }
     }
   }
   if (options.proactive && !messages.some(message => message.role === 'user')) {
     messages.push({ role: 'user', content: '（现在没有新消息，主动发一条。）', source: '主动消息占位' });
   }
+
+  const charTotal = messages.reduce((sum, message) => sum + String(message?.content || '').length, 0);
+  /* 给模型回复预留的篇幅；这里只是字数口径的估算，不是精确 token，UI 带 ≈。 */
+  const outputReserve = 1200;
 
   return {
     messages,
@@ -434,9 +442,13 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
       presetName: preset?.name || '',
       modelCount: messages.length,
       charUsed: used,
-      charTotal: messages.reduce((sum, message) => sum + String(message?.content || '').length, 0),
+      charTotal,
       estimate: true,
       charBudget,
+      outputReserve,
+      overBudget: charTotal > charBudget,
+      inputChars: lastUserText.length,
+      overLimitInput: lastUserText.length > charBudget,
       items: reportItems,
       memoryChars: memoryText.length,
       personaBook: String(activePersona(state)?.lorebook || ''),

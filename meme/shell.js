@@ -306,7 +306,7 @@ export function createShell(options) {
     }
 
     const items = (sheet.items || []).map(item => `
-      <button class="mp-sheet-item${item.danger ? ' danger' : ''}" data-act="sheet-pick" data-value="${esc(item.value)}" type="button">
+      <button class="mp-sheet-item${item.danger ? ' danger' : ''}${item.disabled ? ' is-off' : ''}" data-act="sheet-pick" data-value="${esc(item.value)}" type="button"${item.disabled ? ' disabled aria-disabled="true"' : ''}>
         ${item.icon ? ico(item.icon) : ''}<span>${esc(item.label)}</span>
       </button>`).join('');
     return `
@@ -539,7 +539,7 @@ export function createShell(options) {
     const target = event.target.closest('[data-act]');
     if (!target || !root.contains(target)) return;
     const act = target.dataset.act;
-    if (act === 'sheet-pick' && String(target.dataset.value).startsWith('__')) return;
+    /* 不可点的选项用 disabled 字段，不再按 data-value 前缀一刀切，避免把正常取值吞掉 */
     const data = Object.assign({}, target.dataset);
     const entry = shell.stack[shell.stack.length - 1];
     const app = entry ? apps[entry.view] : null;

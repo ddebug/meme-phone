@@ -14,11 +14,17 @@ function groupOf(contact) {
   return '自己加的';
 }
 
+/* 路由参数只在进入这一页时用一次；之后再点页签切换，不会被旧的 params 拽回去 */
+let tabParamUsed = null;
+
 export const contactsApp = {
   id: 'contacts', name: '通讯录', icon: 'contacts',
 
   render(ctx, params = {}) {
-    if (params.tab === 'cards' || params.tab === 'contacts') ctx.shell.contactsTab = params.tab;
+    if ((params.tab === 'cards' || params.tab === 'contacts') && params !== tabParamUsed) {
+      ctx.shell.contactsTab = params.tab;
+      tabParamUsed = params;
+    }
     const tab = ctx.shell.contactsTab === 'cards' ? 'cards' : 'contacts';
     const contacts = contactsOf(ctx.state);
     const groups = ['酒馆角色', '群聊', '自己加的'];

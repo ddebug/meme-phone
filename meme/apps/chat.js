@@ -41,6 +41,69 @@ let activeThreadId = '';
 let debugPendingKey = '';
 let debugSeq = 0;
 
+/* --------------------------------------------------------- 生成任务控制器
+ * 发送 / 主动开口 / 重生成共用：每个会话同一时刻只允许一个有效生成任务，
+ * 其他会话不被全局锁阻塞。任务冻结会话身份与状态代次，提交前后都再校验。 */
+const activeGenerations = new Map(); // chatId -> { reqId, epoch, kind, done, cancelReason }
+let generationSeq = 0;
+
+export function startGeneration(ctx, chatId, kind) {
+  const existing = activeGenerations.get(chatId);
+  if (existing && !existing.done) return null;
+  const task = { reqId: `g${++generationSeq}`, epoch: ctx.epoch(), kind, done: false, cancelReason: '' };
+  activeGenerations.set(chatId, task);
+  return task;
+}
+
+export function generationValid(ctx, task, chatId) {
+  if (!task || task.done) return false;
+  if (task.cancelReason) return false;                 // 已取消：仅忽略结果，不承诺已中止网络
+  if (task.epoch !== ctx.epoch()) return false;        // 导入 / 清空已整份替换状态
+  const chat = chatById(ctx.state, chatId);
+  return Boolean(chat);                                // 会话已被删除
+}
+
+export function finishGeneration(chatId) {
+  const task = activeGenerations.get(chatId);
+  if (task) { task.done = true; activeGenerations.delete(chatId); }
+}
+
+/** 取消会话上的在途任务：仅忽略结果；宿主无法终止服务端生成时，不承诺已停止计费。 */
+export function cancelGeneration(chatId, reason = 'state-replaced') {
+  const task = activeGenerations.get(chatId);
+  if (task) { task.cancelReason = reason; task.done = true; activeGenerations.delete(chatId); }
+}
+
+/** 仅供测试：清空在途任务表。 */
+export function __resetGenerationsForTests() {
+  activeGenerations.clear();
+}
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+/* 找出一条消息所属的完整角色轮次（多气泡整轮）。返回带索引的消息数组。 */
+export function turnMessages(chat, message) {
+  const messages = chat.messages || [];
+  const index = messages.findIndex(item => item.id === message.id);
+  if (index < 0) return [];
+  const turnId = message.turnId;
+  if (turnId) {
+    const group = messages
+      .map((item, i) => ({ item, i }))
+      .filter(entry => entry.item.turnId === turnId && entry.item.from === 'them');
+    if (group.length) return group;
+  }
+  /* 老存档没有 turnId：回退到「上一条 me/system 之后的连续 them 段」。 */
+  let start = index;
+  while (start - 1 >= 0 && messages[start - 1].from === 'them') start -= 1;
+  const group = [];
+  for (let i = start; i <= index; i += 1) {
+    if (messages[i].from === 'them') group.push({ item: messages[i], i });
+  }
+  return group;
+}
+
+
 function debugEnabled(ctx) {
   return ctx.state.settings?.chat?.debugBar !== false;
 }
@@ -629,6 +692,7 @@ function threadBody(ctx, chatId) {
           <span class="mp-quote-chip-text">${esc(quote.text)}</span>
           <button class="mp-sq-btn" data-act="clear-quote" data-chat="${chat.id}" type="button" style="width:26px;height:26px">${icon('close')}</button>
         </div>` : ''}
+        ${chat.failedTurn ? `<div class="mp-composer-tip is-error">${esc(chat.failedTurn.reason || '这一轮没接通')} <button class="mp-mini-btn" data-act="retry-turn" data-chat="${chat.id}" type="button">重试</button></div>` : ''}
         <div class="mp-composer-row">
           <button class="mp-sq-btn" data-act="composer-plus" data-chat="${chat.id}" type="button" aria-label="更多">${icon('plus')}</button>
           <div class="mp-compose-box">
@@ -709,8 +773,11 @@ function doSend(ctx, chatId) {
   if (!chat) return;
   const contact = contactById(ctx.state, chat.contactId);
 
+  const busy = activeGenerations.get(chatId);
+  if (busy && !busy.done) { ctx.toast('正在回复这条会话，稍等一下'); return; }
+
   if (!text) {
-    wake(ctx, chat, contact);
+    runGeneration(ctx, chat, contact, { kind: 'proactive' });
     return;
   }
 
@@ -722,7 +789,7 @@ function doSend(ctx, chatId) {
   ctx.save();
   ctx.rerender();
   scrollToBottom(ctx);
-  reply(ctx, chat, contact);
+  runGeneration(ctx, chat, contact, { kind: 'reply' });
 }
 
 function commitBehaviorMessage(ctx, chat, contact, draft) {
@@ -764,125 +831,153 @@ function rollbackBehavior(ctx, chat, message) {
   return { ok: true };
 }
 
-function reply(ctx, chat, contact, replaceId = '') {
-  chat.typing = true;
-  ctx.rerender();
-  scrollToBottom(ctx);
-
-  const delay = 900 + Math.random() * 700;
-  setTimeout(async () => {
-    let text = '';
-    let sections = [];
-    let kind = '';
-    let bubbles = [];
-    try {
-      const result = await ctx.ai.reply(ctx, chat, contact, pick(poolFor(contact)));
-      text = typeof result === 'string' ? result : String(result?.text || '');
-      sections = Array.isArray(result?.sections) ? result.sections : [];
-      kind = String(result?.kind || '');
-      bubbles = Array.isArray(result?.bubbles) && result.bubbles.length
-        ? result.bubbles
-        : (text ? [{ kind: 'text', text, behavior: null }] : []);
-    } catch {
-      bubbles = [];
-    }
-    chat.typing = false;
-    if (bubbles.length) {
-      let firstSaved = null;
-      const index = replaceId ? chat.messages.findIndex(item => item.id === replaceId) : -1;
-      if (index >= 0) {
-        const old = chat.messages[index];
-        const rolled = rollbackBehavior(ctx, chat, old);
-        if (!rolled.ok) {
-          ctx.toast(rolled.reason || '原来这条关联的状态退不回去，先不重写');
-          ctx.save();
-          ctx.rerender();
-          return;
-        }
-        const first = bubbles[0];
-        chat.messages[index] = {
-          ...old,
-          kind: first.kind || 'text',
-          text: first.text || '',
-          image: first.image || '',
-          emoji: first.emoji || '',
-          forward: first.forward || null,
-          quote: first.quote || null,
-          behavior: first.behavior || null,
-          at: Date.now(),
-        };
-        chat.updatedAt = chat.messages[index].at;
-        firstSaved = chat.messages[index];
-        applyBehaviorMessage(ctx.state, firstSaved, { chatId: chat.id, contactId: chat.contactId, contact });
-      } else {
-        const first = bubbles[0];
-        firstSaved = pushMessage(ctx.state, chat.id, {
-          from: 'them',
-          kind: first.kind || 'text',
-          text: first.text || '',
-          image: first.image || '',
-          emoji: first.emoji || '',
-          forward: first.forward || null,
-          quote: first.quote || null,
-          behavior: first.behavior || null,
-        });
-        if (firstSaved) applyBehaviorMessage(ctx.state, firstSaved, { chatId: chat.id, contactId: chat.contactId, contact });
-      }
-      for (const bubble of bubbles.slice(1)) {
-        const extra = pushMessage(ctx.state, chat.id, {
-          from: 'them',
-          kind: bubble.kind || 'text',
-          text: bubble.text || '',
-          image: bubble.image || '',
-          emoji: bubble.emoji || '',
-          forward: bubble.forward || null,
-          quote: bubble.quote || null,
-          behavior: bubble.behavior || null,
-        });
-        if (extra) applyBehaviorMessage(ctx.state, extra, { chatId: chat.id, contactId: chat.contactId, contact });
-      }
-      if (firstSaved && sections.length) {
-        addExtrasEntry(ctx.state, contact?.id || chat.contactId, sections, {
-          chatId: chat.id,
-          messageId: firstSaved.id,
-          kind: kind || theaterKindFor(ctx.state),
-        });
-        ctx.toast('这轮的小剧场收进 App 了');
-      }
-    } else if (replaceId) {
-      ctx.toast('这次没生成出来，原来那条留着了');
-    }
-    ctx.save();
-    ctx.rerender();
-    scrollToBottom(ctx);
-  }, delay);
+function bubbleEntry(bubble, turnId) {
+  return {
+    from: 'them',
+    turnId,
+    kind: bubble.kind || 'text',
+    text: bubble.text || '',
+    image: bubble.image || '',
+    emoji: bubble.emoji || '',
+    forward: bubble.forward || null,
+    quote: bubble.quote || null,
+    behavior: bubble.behavior || null,
+  };
 }
 
-function wake(ctx, chat, contact) {
-  if (chat.typing) return;
+/** 统一生成任务：发送 / 主动开口 / 重生成都走这里。 */
+async function runGeneration(ctx, chat, contact, options = {}) {
+  const { kind = 'reply', replaceIds = [] } = options;
+  const task = startGeneration(ctx, chat.id, kind);
+  if (!task) { ctx.toast('正在回复这条会话，稍等一下'); return; }
+
   chat.typing = true;
   ctx.rerender();
   scrollToBottom(ctx);
-  ctx.toast('让 TA 主动开口…');
 
-  setTimeout(async () => {
-    let text = '';
-    try {
-      text = await ctx.ai.proactive(ctx, chat, contact, pick(poolFor(contact)));
-    } catch {
-      text = '';
-    }
+  const delay = kind === 'proactive' ? 1500 : 900 + Math.random() * 700;
+  await sleep(delay);
+  if (!generationValid(ctx, task, chat.id)) {
+    finishGeneration(chat.id);
     chat.typing = false;
-    if (text) {
-      pushMessage(ctx.state, chat.id, { from: 'them', text, proactive: true, kind: 'proactive' });
-      chat.unread = Math.max(chat.unread, 0);
+    return;
+  }
+
+  let bubbles = [];
+  let sections = [];
+  let kindOut = '';
+  let error = '';
+  try {
+    if (kind === 'proactive') {
+      const text = await ctx.ai.proactive(ctx, chat, contact, pick(poolFor(contact)));
+      bubbles = text ? [{ kind: 'proactive', text, behavior: null }] : [];
     } else {
-      ctx.toast('模型没接通，先在设置里选一个 API');
+      const result = await ctx.ai.reply(ctx, chat, contact, pick(poolFor(contact)), { omitIds: replaceIds });
+      bubbles = Array.isArray(result?.bubbles) && result.bubbles.length
+        ? result.bubbles
+        : (result?.text ? [{ kind: 'text', text: result.text, behavior: null }] : []);
+      sections = Array.isArray(result?.sections) ? result.sections : [];
+      kindOut = String(result?.kind || '');
     }
+  } catch (err) {
+    error = err?.message || '模型没接通，先在设置里选一个 API';
+  }
+
+  if (!generationValid(ctx, task, chat.id)) {
+    finishGeneration(chat.id);
+    chat.typing = false;
+    return;
+  }
+  chat.typing = false;
+  finishGeneration(chat.id);
+
+  if (error) {
+    /* 保留用户消息与草稿；失败轮记录下来，可原地重试，不重复追加用户原话。 */
+    chat.failedTurn = { kind, replaceIds, reason: error, at: Date.now() };
+    ctx.toast(error);
     ctx.save();
     ctx.rerender();
     scrollToBottom(ctx);
-  }, 1500);
+    return;
+  }
+  chat.failedTurn = null;
+
+  if (!bubbles.length) {
+    if (!replaceIds.length) ctx.toast('这次没生成出来，原来那条留着了');
+    ctx.save();
+    ctx.rerender();
+    scrollToBottom(ctx);
+    return;
+  }
+
+  const turnId = `t${Date.now().toString(36)}${generationSeq}`;
+  let firstSaved = null;
+
+  if (replaceIds.length) {
+    /* 整轮替换：先回滚旧气泡的行为副作用，全部退不回就不改。 */
+    const oldTurn = chat.messages.filter(item => replaceIds.includes(item.id));
+    for (const old of oldTurn) {
+      const rolled = rollbackBehavior(ctx, chat, old);
+      if (!rolled.ok) {
+        ctx.toast(rolled.reason || '原来这条关联的状态退不回去，先不重写');
+        ctx.save();
+        ctx.rerender();
+        return;
+      }
+    }
+    const firstIdx = chat.messages.findIndex(item => item.id === replaceIds[0]);
+    /* 只保留旧首条用于原位替换，其余旧气泡先移除。 */
+    chat.messages = chat.messages.filter(item => !replaceIds.includes(item.id) || item.id === replaceIds[0]);
+    const idx = chat.messages.findIndex(item => item.id === replaceIds[0]);
+    if (idx < 0) { ctx.save(); ctx.rerender(); return; }
+    const first = bubbles[0];
+    const old = chat.messages[idx];
+    chat.messages[idx] = { ...old, ...bubbleEntry(first, turnId), at: Date.now() };
+    firstSaved = chat.messages[idx];
+    applyBehaviorMessage(ctx.state, firstSaved, { chatId: chat.id, contactId: chat.contactId, contact });
+
+    let insertAt = idx + 1;
+    for (const bubble of bubbles.slice(1)) {
+      const extra = pushMessage(ctx.state, chat.id, bubbleEntry(bubble, turnId));
+      if (!extra) continue;
+      chat.messages.pop();
+      chat.messages.splice(insertAt, 0, extra);
+      insertAt += 1;
+      applyBehaviorMessage(ctx.state, extra, { chatId: chat.id, contactId: chat.contactId, contact });
+    }
+    chat.updatedAt = firstSaved.at;
+  } else {
+    const first = bubbles[0];
+    firstSaved = pushMessage(ctx.state, chat.id, bubbleEntry(first, turnId));
+    if (firstSaved) applyBehaviorMessage(ctx.state, firstSaved, { chatId: chat.id, contactId: chat.contactId, contact });
+    for (const bubble of bubbles.slice(1)) {
+      const extra = pushMessage(ctx.state, chat.id, bubbleEntry(bubble, turnId));
+      if (extra) applyBehaviorMessage(ctx.state, extra, { chatId: chat.id, contactId: chat.contactId, contact });
+    }
+  }
+
+  if (firstSaved && sections.length) {
+    addExtrasEntry(ctx.state, contact?.id || chat.contactId, sections, {
+      chatId: chat.id,
+      messageId: firstSaved.id,
+      kind: kindOut || theaterKindFor(ctx.state),
+    });
+    ctx.toast('这轮的小剧场收进 App 了');
+  }
+  ctx.save();
+  ctx.rerender();
+  scrollToBottom(ctx);
+}
+
+/** 失败后原地重试同一轮：不再追加用户原话。 */
+function retryFailedTurn(ctx, chat, contact) {
+  const failed = chat.failedTurn;
+  if (!failed) return;
+  if (failed.kind === 'proactive') {
+    runGeneration(ctx, chat, contact, { kind: 'proactive' });
+  } else {
+    runGeneration(ctx, chat, contact, { kind: 'reply', replaceIds: failed.replaceIds || [] });
+  }
 }
 
 /* ------------------------------------------------------------ 导出 */
@@ -1352,9 +1447,11 @@ export const threadSettingsApp = {
         items: [{ label: '清空聊天记录', value: 'clear', icon: 'trash', danger: true }],
         onPick: (value) => {
           if (value !== 'clear') return;
+          cancelGeneration(chat.id, 'chat-cleared');
           chat.messages = [];
           chat.unread = 0;
           chat.typing = false;
+          chat.failedTurn = null;
           ctx.save();
           ctx.toast('聊天记录已清空');
           ctx.rerender();
@@ -1369,6 +1466,7 @@ export const threadSettingsApp = {
         items: [{ label: '连同会话设置一起删除', value: 'delete', icon: 'trash', danger: true }],
         onPick: (value) => {
           if (value !== 'delete') return;
+          cancelGeneration(chat.id, 'chat-deleted');
           delete ctx.state.chats[chat.id];
           ctx.save();
           ctx.home();
@@ -1400,6 +1498,13 @@ export const threadApp = {
     }
 
     if (act === 'send') { doSend(ctx, chatId); return true; }
+
+    if (act === 'retry-turn') {
+      const chat = chatById(ctx.state, chatId);
+      if (!chat) return true;
+      retryFailedTurn(ctx, chat, contactById(ctx.state, chat.contactId));
+      return true;
+    }
 
     if (act === 'debug-toggle') {
       ctx.shell.debugOpen = ctx.shell.debugOpen || {};
@@ -1497,7 +1602,7 @@ export const threadApp = {
       ctx.rerender();
       scrollToBottom(ctx);
       ctx.toast('发出去了');
-      reply(ctx, chat, contact);
+      runGeneration(ctx, chat, contact, { kind: 'reply' });
       return true;
     }
 
@@ -1609,7 +1714,7 @@ export const threadApp = {
                 ctx.save();
                 ctx.rerender();
                 scrollToBottom(ctx);
-                reply(ctx, chat, contactById(ctx.state, chat.contactId));
+                runGeneration(ctx, chat, contactById(ctx.state, chat.contactId), { kind: 'reply' });
               },
             });
           }
@@ -1713,7 +1818,7 @@ export const threadApp = {
           { label: '转发给…', value: 'forward', icon: 'forward' },
           ...(recallable ? [{ label: '撤回这条', value: 'recall', icon: 'refresh', note: '两分钟内可以撤回' }] : []),
           { label: '存成小剧场', value: 'extra', icon: 'theater' },
-          { label: '让 TA 重新说一次', value: 'regen', icon: 'refresh' },
+          ...(message.from === 'them' ? [{ label: '让 TA 重新说一次', value: 'regen', icon: 'refresh' }] : []),
           { label: '删除这条', value: 'delete', icon: 'trash', danger: true },
         ],
         onPick: (value) => {
@@ -1777,7 +1882,15 @@ export const threadApp = {
             ctx.toast('已存进小剧场');
           }
           if (value === 'regen') {
-            reply(ctx, chat, contact, message.id);
+            const turn = turnMessages(chat, message);
+            if (!turn.length) { ctx.toast('这条没法判定是哪一轮，先不重写'); return; }
+            const replaceIds = turn.map(entry => entry.item.id);
+            const later = chat.messages.slice(turn[turn.length - 1].i + 1);
+            if (later.some(item => item.from === 'me' || item.from === 'them')) {
+              ctx.toast('这一轮不是最近的一轮，先不重写');
+              return;
+            }
+            runGeneration(ctx, chat, contact, { kind: 'reply', replaceIds });
           }
           if (value === 'delete') {
             ctx.openSheet({

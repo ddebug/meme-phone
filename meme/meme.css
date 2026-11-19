@@ -1192,6 +1192,13 @@
   color: var(--text-4);
   margin-bottom: 6px;
 }
+.mp-composer-tip.is-error {
+  color: #d0526b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
 
 /* ---- 请求调试栏：输入框上方的只读请求预览 ---- */
 .mp-debug {

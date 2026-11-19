@@ -29,6 +29,12 @@ export async function loadHostScript() {
   return hostScript;
 }
 
+/** 仅供测试：清空模块级脚本缓存，隔离各用例。 */
+export function __resetHostScriptForTests() {
+  hostScript = null;
+  hostScriptTried = false;
+}
+
 export function isStandalone() {
   return Boolean(globalThis.__MEME_DEMO__) || !hostScript;
 }
@@ -376,21 +382,27 @@ export function tavernQuietPrompt(messages, system = '', prompt = '') {
   ].filter(Boolean).join('\n\n');
 }
 
-export async function generate({ prompt, system = '', messages = null, demoReply = '', preset = null }) {
+export async function generate({ prompt, system = '', messages = null, demoReply = '', preset = null, demo = false }) {
   const script = await loadHostScript();
-  if (script && preset && preset.engine !== 'tavern' && String(preset.url || '').trim()) {
-    try {
-      const text = await presetCompletion(preset, { prompt, system, messages });
-      if (text) return { text, demo: false };
-    } catch { /* 这套接口没接通就退回酒馆自己的模型，别让聊天卡死 */ }
+  const isCustom = Boolean(preset && preset.engine !== 'tavern' && String(preset.url || '').trim());
+
+  /* 自定义接口：失败 / 超时 / 空返回都把原错误抛出来，不静默退回酒馆模型。 */
+  if (isCustom) {
+    const text = await presetCompletion(preset, { prompt, system, messages });
+    if (!text) throw new Error('这套接口没有返回内容');
+    return { text, demo: false, provider: preset.engine || 'custom' };
   }
+
   if (script && typeof script.generateQuietPrompt === 'function') {
     const quiet = tavernQuietPrompt(messages, system, prompt);
     const text = await script.generateQuietPrompt({ quietPrompt: quiet, quietName: '' });
-    if (typeof text === 'string' && text.trim()) return { text: text.trim(), demo: false };
-    return { text: '', demo: false, error: '模型没有返回内容' };
+    if (typeof text === 'string' && text.trim()) return { text: text.trim(), demo: false, provider: 'tavern' };
+    return { text: '', demo: false, error: '模型没有返回内容', provider: 'tavern' };
   }
-  return { text: demoReply, demo: true };
+
+  /* 演示模式才允许返回演示文案；正式宿主断连时不拿假回复冒充真实角色回复。 */
+  if (demo) return { text: demoReply, demo: true, provider: 'demo' };
+  return { text: '', demo: false, error: '宿主不可用，没有可用模型', provider: 'none' };
 }
 
 /** 借酒馆后端请求一套自定义 OpenAI 兼容接口，避开浏览器 CORS。 */

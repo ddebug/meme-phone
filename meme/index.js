@@ -93,6 +93,8 @@ let followTimer = 0;
 let draftDebugTimer = 0;
 /* 状态代次：每次整份替换（导入 / 清空）自增；旧任务据此判断自己是否已经失效。 */
 let stateEpoch = 0;
+/* 是否演示模式：只有演示模式才允许返回演示文案，正式宿主断连不写假回复。 */
+let demoMode = false;
 
 const getCurrentState = () => store?.get() || null;
 
@@ -121,15 +123,17 @@ function makeAi(getState) {
       behaviorPrompt: behaviorPrompt(state, chat),
       proactive: Boolean(options.proactive),
       omitLastUser: Boolean(options.omitLastUser),
+      omitIds: Array.isArray(options.omitIds) ? options.omitIds : [],
     });
     return { built, wantsTheater, theaterKind, ctxSettings };
   }
 
   return {
-    async reply(context, chat, contact, demoReply) {
+    async reply(context, chat, contact, demoReply, options = {}) {
       const state = getState();
-      const { built, wantsTheater, theaterKind } = await compose(chat, contact);
-      const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
+      const { built, wantsTheater, theaterKind } = await compose(chat, contact, options);
+      const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat), demo: demoMode });
+      if (result.error) throw new Error(result.error);
       const content = wantsTheater ? splitTheaterBlocks(result.text, contact?.name).text : result.text;
       const bubbles = parseBehaviorReply(content, {
         from: 'them',
@@ -192,7 +196,8 @@ function makeAi(getState) {
     async proactive(context, chat, contact, demoReply) {
       const state = getState();
       const { built } = await compose(chat, contact, { proactive: true });
-      const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat) });
+      const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat), demo: demoMode });
+      if (result.error) throw new Error(result.error);
       return result.text;
     },
 
@@ -210,7 +215,8 @@ function makeAi(getState) {
         '{"chats":[{"peer":"名字","tag":"家人/朋友/同事/群聊","group":false,"unread":0,"msgs":[{"me":false,"text":"一句话","at":"21:04"}]}],"contacts":[{"name":"","note":""}],"moments":[{"text":"","at":"21:04","likes":3,"comments":[{"who":"","text":""}]}],"schedule":{"week":[{"when":"11月13日 周五","time":"20:00","title":"","note":""}],"month":[{"when":"11月20日","time":"下午","title":"","note":""}],"year":[{"when":"明年春天","title":"","note":""}]}}',
         'chats 4 条（每条 4~6 句，me 表示是不是 TA 自己说的），contacts 6 条，moments 3 条，schedule 的 week/month/year 各 3 条。',
       ].filter(Boolean).join('\n');
-      const result = await generate({ prompt, demoReply: JSON.stringify(local), preset: llmPresetFor(state, null) });
+      const result = await generate({ prompt, demoReply: JSON.stringify(local), preset: llmPresetFor(state, null), demo: demoMode });
+      if (result.error) return local;
       const text = String(result.text || '');
       const start = text.indexOf('{');
       const end = text.lastIndexOf('}');
@@ -290,7 +296,9 @@ function makeAi(getState) {
         prompt,
         demoReply: '今天没什么特别的。\n只是在便利店的灯下坐了一会儿，风从门口进来，吹动了货架上的塑料帘子。\n回去的路上想起白天没回的那条消息，觉得有点迟了。',
         preset: llmPresetFor(state, chat),
+        demo: demoMode,
       });
+      if (result.error) return '';
       return result.text;
     },
   };
@@ -306,6 +314,7 @@ export function initMemePhone(options = {}) {
   if (initPromise) return initPromise;
   initPromise = (async () => {
     const demo = Boolean(globalThis.__MEME_DEMO__) || Boolean(options.demo);
+    demoMode = demo;
     store = createStore({
       getHeaders: options.getHeaders || (async () => ({})),
       useLocalStorage: demo,
@@ -424,6 +433,7 @@ export async function openMemePhone(options = {}) {
     ai,
     host,
     epoch: () => stateEpoch,
+    demo: () => demoMode,
     save: () => {
       return store.touch().then(() => true).catch(error => {
         ctx.toast?.(error.message || '保存失败，先去设置里导出备份');

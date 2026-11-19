@@ -810,6 +810,7 @@ export function pushMessage(state, chatId, message) {
     text: message.text || '',
     at: message.at || Date.now(),
     kind,                              // text | system | extra | proactive | image | emoji | poke | recalled | forwarded | 行为类型
+    turnId: message.turnId || '',      // 同一轮回复的多气泡共用一个轮次 id
     quote: message.quote || null,
     proactive: Boolean(message.proactive),
     pending: Boolean(message.pending),

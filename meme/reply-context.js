@@ -384,7 +384,8 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
 
   if (chat && !options.omitLastUser) {
     const last = chat.messages?.[chat.messages.length - 1];
-    if (last && !options.proactive) {
+    const omitIds = new Set(options.omitIds || []);
+    if (last && !options.proactive && !omitIds.has(last.id)) {
       const who = last.from === 'me' ? (state.settings.user.name || '我') : (contact?.name || '对方');
       messages.push({ role: 'user', content: `${who}：${behaviorContextText(last) || last.text || ''}`, source: '最后一条聊天' });
     }

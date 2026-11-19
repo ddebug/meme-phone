@@ -1149,37 +1149,48 @@ async function run(ctx, prompt) {
   ctx.rerender();
   try {
     let entry = null;
+    let failure = '';
     const ep = imageEndpoint(ctx.state);
     if (endpointReady(ep)) {
-      const result = await novelaiImage({
-        engine: ep.engine,
-        url: joinUrl(ep.url, ep.path),
-        key: ep.key,
-        model: ep.model || cfg.model,
-        width: size.w,
-        height: size.h,
-        steps: Number(cfg.steps) || 28,
-        scale: Number(cfg.scale) || 5,
-        sampler: cfg.sampler,
-        noise: cfg.noise,
-        seed,
-        prompt: positive,
-        negative,
-      });
-      if (result?.url) {
-        entry = { id: newId('img'), prompt, seed, url: result.url, at: Date.now(), width: size.w, height: size.h };
+      try {
+        const result = await novelaiImage({
+          engine: ep.engine,
+          url: joinUrl(ep.url, ep.path),
+          key: ep.key,
+          model: ep.model || cfg.model,
+          width: size.w,
+          height: size.h,
+          steps: Number(cfg.steps) || 28,
+          scale: Number(cfg.scale) || 5,
+          sampler: cfg.sampler,
+          noise: cfg.noise,
+          seed,
+          prompt: positive,
+          negative,
+        });
+        if (result?.url) {
+          entry = { id: newId('img'), prompt, seed, url: result.url, at: Date.now(), width: size.w, height: size.h };
+        } else {
+          failure = '出图接口没有返回图片';
+        }
+      } catch (error) {
+        failure = error?.message || '出图失败';
       }
+    } else {
+      failure = ep.engine === 'custom' ? '还没填自定义接口地址' : `${ep.name} 的 Key 还没填`;
     }
     if (!entry) {
+      /* 正式模式不把占位图当成出图成功存进历史；只有演示预览才给彩色占位。 */
+      if (!ctx.demo()) {
+        ctx.toast(failure || '出图失败，没有生成图片');
+        return;
+      }
       entry = {
         id: newId('img'), prompt, seed, url: '', at: Date.now(),
         width: size.w, height: size.h,
         tint: TINTS[draw.history.length % TINTS.length],
       };
-      ctx.toast(ep.engine === 'novelai'
-        ? '演示出图：绘图接口填上 NovelAI 的 Key 才会真的画'
-        : ep.engine === 'doubao' ? '演示出图：填上火山方舟的 ARK API Key 才会真的画'
-          : '演示出图：绘图接口填上地址才会真的画');
+      ctx.toast(`演示出图：${failure}`);
     }
     draw.history.unshift(entry);
     draw.history = draw.history.slice(0, 18);

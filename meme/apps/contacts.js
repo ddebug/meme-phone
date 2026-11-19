@@ -3,7 +3,7 @@
  */
 
 import { icon } from '../icons.js';
-import { contactsOf, contactById, chatFor, chatById, lastMessage, addContact, syncTavernContacts, linkContactCards } from '../data.js';
+import { contactsOf, contactById, chatFor, chatById, lastMessage, addContact, syncTavernContacts, linkContactCards, characterCardFor } from '../data.js';
 import { avatarHtml, esc, shortText } from '../shell.js';
 import { pendingFriendRequests, respondFriendRequest, contactMembership, membershipLabel, signatureHistory } from '../behavior-domains.js';
 import { charactersPanel, charactersHandle, characterDetailHtml, characterCardHandle } from './characters.js';
@@ -180,7 +180,7 @@ export const contactApp = {
     const chats = Object.values(ctx.state.chats).filter(chat => chat.contactId === contact.id);
     const extras = ctx.state.extras[contact.id] || [];
     const last = chats[0] ? lastMessage(chats[0]) : null;
-    const card = (ctx.state.characters || []).find(item => item.name === contact.name) || null;
+    const card = characterCardFor(ctx.state, contact);
     const member = contactMembership(ctx.state, contact.id);
     const memberActive = member.expireAt > Date.now();
     const signatures = signatureHistory(ctx.state, contact.id).slice(0, 6);
@@ -233,7 +233,12 @@ export const contactApp = {
         </div>
         ${signatures.length ? `<div class="mp-group"><div class="mp-group-label">个签历史</div><div class="mp-group-box">${signatures.map(item => `<div class="mp-set-row is-static"><span class="mp-set-ico">${icon('clock')}</span><span class="mp-set-name">${esc(item.text)}<small>${shortText(item.at)}</small></span></div>`).join('')}</div></div>` : ''}
         ${rows}
-        ${card ? characterDetailHtml(ctx, card) : ''}
+        ${card ? characterDetailHtml(ctx, card) : (contact.kind === 'char' ? `
+        <div class="mp-card" style="margin-top:12px">
+          <div class="mp-card-title">没找到对应的角色卡</div>
+          <div class="mp-card-sub">酒馆里删掉了这张卡，或者卡片改了名/换了头像。聊天记录都在，重新关联一下就能继续读卡和记忆。</div>
+          <button class="mp-btn" data-act="contact-rebind" data-contact="${contact.id}" type="button" style="margin-top:10px">${icon('refresh')}<span>重新关联角色卡</span></button>
+        </div>` : '')}
       </div>`;
   },
 
@@ -268,6 +273,33 @@ export const contactApp = {
     if (act === 'contact-phone') {
       if (!contact) return true;
       ctx.go('p-charphone', { contactId: contact.id });
+      return true;
+    }
+
+    if (act === 'contact-rebind') {
+      if (!contact) return true;
+      const cards = Array.isArray(ctx.state.characters) ? ctx.state.characters : [];
+      if (!cards.length) { ctx.toast('还没同步酒馆角色，先去「酒馆角色」里同步'); return true; }
+      const guess = cards.filter(card => card.name === contact.name || card.name === contact.cardName);
+      const list = (guess.length ? guess : cards).slice(0, 12);
+      ctx.openSheet({
+        title: `把「${contact.name}」关联到哪张卡`,
+        items: list.map(card => ({
+          label: card.name,
+          value: card.avatar || card.name,
+          icon: 'contacts',
+          note: guess.length ? '同名或同备注，优先列出来' : '酒馆里全部角色',
+        })),
+        onPick: (value) => {
+          const card = list.find(item => (item.avatar || item.name) === value);
+          if (!card) return;
+          contact.tavernAvatar = card.avatar || card.name;
+          contact.cardName = card.name;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`已关联到「${card.name}」`);
+        },
+      });
       return true;
     }
 

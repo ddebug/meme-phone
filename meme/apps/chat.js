@@ -465,6 +465,12 @@ function settingsBody(ctx, chatId) {
     historyConfig.phoneLimit ? '已单独设置' : `空着跟随回复预设 · ${phoneFollowLimit} 条`,
   ].join(' · ');
 
+  const effectiveLines = [
+    ['用哪个模型', `${ownPreset ? ownPreset.name || '未命名方案' : `${globalPreset?.name || '酒馆 API'}（跟随手机）`}`],
+    ['怎么回复', `${activeReply?.name || '默认回复方式'}${ownReply ? '（这个会话单独设）' : '（跟随手机）'}`],
+    ['参考什么', `酒馆记忆 ${memoryPresetSummary(memoryPresetFor(state, chat))}${ownMemory ? '（这个会话单独设）' : '（跟随手机）'} · 小手机历史 ${chatHistoryFor(chat).phoneLimit || phoneFollowLimit} 条`],
+  ];
+
   return `
     <div class="mp-page-body">
       <div class="mp-subtitle" style="margin-top:0">聊天设置 · 只改这个会话的开关和引用；角色卡、世界书是全局的，改会写到酒馆</div>
@@ -476,6 +482,12 @@ function settingsBody(ctx, chatId) {
           <div class="mp-chat-set-sub">${esc(status)}</div>
         </div>
         ${chat.pinned ? `<span class="mp-pill">置顶</span>` : ''}
+      </div>
+
+      <div class="mp-card" style="margin-top:12px">
+        <div class="mp-card-title">这条会话实际用到的</div>
+        ${effectiveLines.map(([label, value]) => `<div class="mp-card-sub">${esc(label)}：${esc(value)}</div>`).join('')}
+        <div class="mp-card-sub" style="color:var(--text-4)">下面每一行写着「跟随」就是用手机的，写着「单独」就是这条会话自己设的。</div>
       </div>
 
       <div class="mp-group" style="margin-top:16px">

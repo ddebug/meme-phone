@@ -21,6 +21,13 @@ const SIZES = [
 const SAMPLERS = ['k_euler_ancestral', 'k_euler', 'k_dpmpp_2m', 'k_dpmpp_2s_ancestral', 'k_heun'];
 const NOISES = ['karras', 'native', 'exponential', 'polyexponential'];
 
+/** 旧存档里的「默认方案 / 默认预设」只是占位名，界面直接给当前实际名称。 */
+function drawName(name, fallback) {
+  const raw = String(name || '').trim();
+  if (!raw || ['默认', '默认方案', '默认预设'].includes(raw)) return fallback;
+  return raw;
+}
+
 /* NovelAI 官方不给模型列表接口（/ai/models 一律 404），可选模型是固定的这几款。
    4.5 以下已基本下线，仍留着是为了让老存档能显示、能改回来。 */
 const NAI_MODELS = [
@@ -64,7 +71,7 @@ function ensure(state) {
       size: '832x1216', steps: 28, scale: 5,
       sampler: 'k_euler_ancestral', noise: 'karras', seed: '',
     },
-    presets: [{ id: 'dp_default', name: '默认', pos: '', neg: '' }],
+    presets: [{ id: 'dp_default', name: '基础预设', pos: '', neg: '' }],
     presetIdx: 0,
     schemes: [],
     schemeId: '',
@@ -143,7 +150,7 @@ function ensure(state) {
   if (!state.draw.schemes.length) {
     const first = {
       id: 'ds_default',
-      name: '默认方案',
+      name: '基础方案',
       apiId: image.activeId,
       promptId: state.draw.presets[state.draw.presetIdx]?.id || state.draw.presets[0].id,
     };
@@ -160,7 +167,7 @@ function activeApi(state) {
 
 function activePrompt(state) {
   const draw = state.draw || {};
-  return draw.presets?.[draw.presetIdx] || draw.presets?.[0] || { id: '', name: '默认', pos: '', neg: '' };
+  return draw.presets?.[draw.presetIdx] || draw.presets?.[0] || { id: '', name: '基础预设', pos: '', neg: '' };
 }
 
 function applyScheme(state, scheme) {
@@ -398,13 +405,13 @@ export const drawApp = {
     const busy = Boolean(draw.busy);
 
     const schemeOptions = draw.schemes.map((item, index) => ({
-      value: item.id, label: item.name || `方案 ${index + 1}`,
+      value: item.id, label: drawName(item.name, `方案 ${index + 1}`),
     }));
     const apiOptions = apiPresets.map((item, index) => ({
       value: item.id, label: item.name || `接口 ${index + 1}`,
     }));
     const promptOptions = draw.presets.map((item, index) => ({
-      value: item.id, label: item.name || `预设 ${index + 1}`,
+      value: item.id, label: drawName(item.name, `预设 ${index + 1}`),
     }));
 
     const rows = [
@@ -462,20 +469,20 @@ export const drawApp = {
       const open = p.id === expandedPromptId;
       const deleting = drawDel?.kind === 'preset' && drawDel.id === p.id;
       const editing = drawEdit?.kind === 'preset' && drawEdit.id === p.id;
-      const sub = `${(p.pos || '').slice(0, 22) || '无正向词'} · 反向 ${(p.neg || '').slice(0, 16) || '默认'}`;
+      const sub = `${(p.pos || '').slice(0, 22) || '无正向词'} · 反向 ${(p.neg || '').slice(0, 16) || '无'}`;
       return `
         <div class="mp-api-stack">
           <button class="mp-row mp-api-row${open ? ' is-open' : ''}" data-act="draw-preset-toggle" data-id="${p.id}" type="button" aria-expanded="${open}">
             ${icon('brush')}
             <span class="mp-row-main">
-              <span class="mp-row-name">${esc(p.name || '未命名')}${active ? '<span class="mp-api-chip">当前</span>' : ''}</span>
+              <span class="mp-row-name">${esc(drawName(p.name, '基础预设'))}${active ? '<span class="mp-api-chip">当前</span>' : ''}</span>
               <span class="mp-row-sub">${esc(sub)}</span>
             </span>
             <span class="mp-api-row-side"><span class="mp-api-caret">${icon('chevron')}</span></span>
           </button>
           ${open ? promptDetailMarkup(p) : ''}
           ${editing ? nameEditBlock('preset', drawEdit.value) : ''}
-          ${deleting ? deleteConfirmBlock('preset', `只会删「${p.name || '当前提示词'}」这套提示词，引用它的方案会换回第一套提示词。`) : ''}
+          ${deleting ? deleteConfirmBlock('preset', `只会删「${drawName(p.name, '当前提示词')}」这套提示词，引用它的方案会换回第一套提示词。`) : ''}
         </div>`;
     }).join('');
 
@@ -531,7 +538,7 @@ export const drawApp = {
           </div>
 
           ${drawEdit?.kind === 'scheme' ? nameEditBlock('scheme', drawEdit.value) : ''}
-          ${drawDel?.kind === 'scheme' ? deleteConfirmBlock('scheme', `只会删「${scheme?.name || '当前方案'}」这套组合，接口预设和提示词预设都还在。`) : ''}
+          ${drawDel?.kind === 'scheme' ? deleteConfirmBlock('scheme', `只会删「${drawName(scheme?.name, '当前方案')}」这套组合，接口预设和提示词预设都还在。`) : ''}
         </section>
 
         <div class="mp-api-sec-head">
@@ -628,7 +635,7 @@ export const drawApp = {
       scheme.promptId = activePrompt.id;
       ctx.save();
       ctx.rerender();
-      ctx.toast(`已保存到方案「${scheme.name || '未命名'}」`);
+      ctx.toast(`已保存到方案「${drawName(scheme.name, '基础方案')}」`);
       return true;
     }
 
@@ -648,7 +655,7 @@ export const drawApp = {
       if (!scheme) { ctx.toast('先选一套整体方案'); return true; }
       const copy = {
         id: newId('ds'),
-        name: `${scheme.name || '方案'} 副本`.slice(0, 20),
+        name: `${drawName(scheme.name, '方案')} 副本`.slice(0, 20),
         apiId: scheme.apiId,
         promptId: scheme.promptId,
       };
@@ -665,7 +672,7 @@ export const drawApp = {
 
     if (act === 'draw-scheme-rename') {
       if (!scheme) { ctx.toast('先选一套整体方案'); return true; }
-      drawEdit = { kind: 'scheme', id: scheme.id, value: scheme.name || '' };
+      drawEdit = { kind: 'scheme', id: scheme.id, value: drawName(scheme.name, '基础方案') };
       drawDel = null;
       ctx.rerender();
       return true;
@@ -846,7 +853,7 @@ export const drawApp = {
       ctx.openSheet({
         kind: 'text', title: engine === 'novelai' ? 'NovelAI 地址' : engine === 'doubao' ? '火山方舟地址' : '接口地址',
         placeholder: engine === 'novelai'
-          ? '默认 https://image.novelai.net'
+          ? '例如 https://image.novelai.net'
           : engine === 'doubao' ? 'https://ark.cn-beijing.volces.com/api/v3/images/generations'
             : 'https://你的接口/v1/images/generations',
         value: String(target.url || ''),
@@ -981,7 +988,7 @@ export const drawApp = {
     if (act === 'draw-preset-rename') {
       const target = promptById(data.id);
       if (!target?.id) { ctx.toast('现在还没有提示词预设'); return true; }
-      drawEdit = { kind: 'preset', id: target.id, value: target.name || '' };
+      drawEdit = { kind: 'preset', id: target.id, value: drawName(target.name, '基础预设') };
       drawDel = null;
       ctx.rerender();
       return true;
@@ -1069,7 +1076,7 @@ export const drawApp = {
     if (act === 'draw-steps') {
       ctx.openSheet({
         kind: 'pick', title: '步数',
-        items: [20, 24, 28, 32, 40].map(value => ({ value: String(value), label: `${value} 步${value === 28 ? '（默认）' : ''}` })),
+        items: [20, 24, 28, 32, 40].map(value => ({ value: String(value), label: `${value} 步` })),
         onPick: value => { cfg.steps = Number(value); ctx.save(); ctx.rerender(); },
       });
       return true;
@@ -1078,7 +1085,7 @@ export const drawApp = {
     if (act === 'draw-scale') {
       ctx.openSheet({
         kind: 'pick', title: '引导强度',
-        items: [3, 4, 5, 6, 7].map(value => ({ value: String(value), label: `${value}${value === 5 ? '（默认）' : ''}` })),
+        items: [3, 4, 5, 6, 7].map(value => ({ value: String(value), label: String(value) })),
         onPick: value => { cfg.scale = Number(value); ctx.save(); ctx.rerender(); },
       });
       return true;

@@ -14898,7 +14898,7 @@ function threadBody(ctx, chatId) {
   }
 
   if (chat.typing) {
-    blocks.push(`<div class="mp-msg">${avatarHtml(contact?.name, contact?.avatar)}<div class="mp-msg-body"><div class="mp-typing"><i></i><i></i><i></i></div></div></div>`);
+    blocks.push(`<div class="mp-msg mp-msg-typing">${avatarHtml(contact?.name, contact?.avatar)}<div class="mp-msg-body"><div class="mp-typing"><i></i><i></i><i></i></div></div></div>`);
   }
 
   ensureDebugPreview(ctx, chat, contact);
@@ -15080,21 +15080,45 @@ function bubbleEntry(bubble, turnId) {
   };
 }
 
+/**
+ * 打字气泡的开关。
+ * 正在看这条会话时只动那一颗气泡，不整页重绘——输入框、选区、滚动位置都不会被重建；
+ * 不在这一页（比如切到别的会话后它才回话）才退回整页重绘，让列表的未读跟着更新。
+ */
+function setTyping(ctx, chat, on) {
+  chat.typing = Boolean(on);
+  const box = ctx.shell.root?.querySelector?.('.mp-messages');
+  if (activeThreadId !== chat.id || !box) { ctx.rerender(); return; }
+  try {
+    const existing = box.querySelector('.mp-msg-typing');
+    if (on && !existing) {
+      const contact = ctx.state.contacts?.[chat.contactId] || null;
+      const last = box.querySelector('.mp-msg:last-child');
+      const markup = `<div class="mp-msg mp-msg-typing">${avatarHtml(contact?.name, contact?.avatar)}<div class="mp-msg-body"><div class="mp-typing"><i></i><i></i><i></i></div></div></div>`;
+      if (last) last.insertAdjacentHTML('afterend', markup);
+      else box.insertAdjacentHTML('beforeend', markup);
+      scrollToBottom(ctx);
+    } else if (!on && existing) {
+      existing.remove();
+    }
+  } catch {
+    ctx.rerender();
+  }
+}
+
 /** 统一生成任务：发送 / 主动开口 / 重生成都走这里。 */
 async function runGeneration(ctx, chat, contact, options = {}) {
   const { kind = 'reply', replaceIds = [] } = options;
   const task = startGeneration(ctx, chat.id, kind);
   if (!task) { ctx.toast('正在回复这条会话，稍等一下'); return; }
 
-  chat.typing = true;
-  ctx.rerender();
-  scrollToBottom(ctx);
+  setTyping(ctx, chat, true);
 
   const delay = kind === 'proactive' ? 1500 : 900 + Math.random() * 700;
   await sleep(delay);
   if (!generationValid(ctx, task, chat.id)) {
     finishGeneration(chat.id);
-    chat.typing = false;
+    setTyping(ctx, chat, false);
     return;
   }
 
@@ -15120,10 +15144,10 @@ async function runGeneration(ctx, chat, contact, options = {}) {
 
   if (!generationValid(ctx, task, chat.id)) {
     finishGeneration(chat.id);
-    chat.typing = false;
+    setTyping(ctx, chat, false);
     return;
   }
-  chat.typing = false;
+  setTyping(ctx, chat, false);
   finishGeneration(chat.id);
 
   if (error) {

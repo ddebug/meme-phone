@@ -1620,7 +1620,10 @@ export function normalize(raw) {
       id: String(item.id || `mem_${index + 1}`),
       name: String(item.name).trim().slice(0, 20),
       mode: ['auto', 'summary', 'recent'].includes(item.mode) ? item.mode : 'auto',
-      floors: Math.max(0, Math.min(50, Math.round(Number(item.floors) || 0))),
+      /* 旧默认「总结优先 + 最近 10 层」升级成全部；0 仍表示全部。 */
+      floors: (['auto', 'summary'].includes(item.mode) && Number(item.floors) === 10)
+        ? 0
+        : Math.max(0, Math.min(50, Math.round(Number(item.floors) || 0))),
       skipFirstFloor: Boolean(item.skipFirstFloor),
     }));
   merged.settings.memory = {

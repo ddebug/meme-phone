@@ -1943,6 +1943,25 @@ body {
 .mp-btn .mp-i { width: 15px; height: 15px; }
 .mp-btn:active { transform: scale(.97); }
 
+/* 删除类按钮统一：垃圾桶图标 + 文案，图标不参与换行 */
+.mp-api-btn,
+.mp-api-more-btn,
+.mp-draw-action,
+.mp-draw-side {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.mp-api-btn .mp-i,
+.mp-api-more-btn .mp-i,
+.mp-draw-action .mp-i,
+.mp-draw-side .mp-i {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
 .mp-btn.accent {
   background: linear-gradient(150deg, #9583f2, #7f6ce9);
   color: #fff;
@@ -15407,7 +15426,7 @@ function settingsBody(ctx, chatId) {
           ${chatSetRow(chat.id, { iconName: 'download', title: '导出这段聊天', sub: '存成 json；换手机或导入别的会话时用', act: 'ts-export-chat' })}
           ${chatSetRow(chat.id, { iconName: 'upload', title: '导入聊天记录', sub: '合并到这段聊天，重复消息自动跳过；只带正文，excluded 之类标记不识别', act: 'ts-import-chat' })}
           ${chatSetRow(chat.id, { iconName: 'trash', title: '清空这个会话的消息', sub: '只删聊天记录，联系人和角色卡都还在', act: 'ts-clear', danger: true })}
-          ${chatSetRow(chat.id, { iconName: 'close', title: '删除这个会话', sub: '连同会话设置一起删掉', act: 'ts-delete', danger: true })}
+          ${chatSetRow(chat.id, { iconName: 'trash', title: '删除这个会话', sub: '连同会话设置一起删掉', act: 'ts-delete', danger: true })}
         </div>
       </div>
     </div>`;
@@ -17239,7 +17258,7 @@ function threadHero(ctx, contact, chat, status, latestDate, busy) {
       <div style="display:flex;gap:6px;margin-top:11px;flex-wrap:wrap">
         <button class="mp-btn" data-act="td-generate-one" data-contact="${esc(contact.id)}" data-date="${date}" type="button"${busy || skipped ? ' disabled' : ''}>${icon('spark')}${busy ? '正在整理…' : text ? '重写这一天' : '整理这一天'}</button>
         ${entry ? `<label class="mp-td-inline-check"><input type="checkbox" data-act="td-use-original" data-contact="${esc(contact.id)}" data-date="${date}"${entry.useOriginal ? ' checked' : ''}> 本日上下文用原文</label>` : ''}
-        ${entry ? `<button class="mp-btn ghost" data-act="td-delete" data-contact="${esc(contact.id)}" data-date="${date}" type="button">删日记</button>` : ''}
+        ${entry ? `<button class="mp-btn ghost" data-act="td-delete" data-contact="${esc(contact.id)}" data-date="${date}" type="button">${icon('trash')}<span>删日记</span></button>` : ''}
       </div>
       ${status?.messages?.length ? `<details class="mp-td-original"><summary>查看当天原文（${count} 条）</summary>${status.messages.map(message => `<div>${esc(originalLine(ctx.state, contact, message))}</div>`).join('')}</details>` : ''}
     </div>`;
@@ -17499,7 +17518,7 @@ function handleThreadDiary(ctx, act, data, event) {
       title: '删除这篇日记',
       render: () => `
         <div class="mp-td-note">删除 ${esc(date)} 的日记？原始聊天不会删除。</div>
-        <button class="mp-btn" data-act="td-delete-run" data-contact="${esc(contactId)}" data-date="${esc(date)}" type="button" style="margin-top:12px;background:#e46b7a">删除日记</button>`,
+        <button class="mp-btn" data-act="td-delete-run" data-contact="${esc(contactId)}" data-date="${esc(date)}" type="button" style="margin-top:12px;background:#e46b7a">${icon('trash')}<span>删除日记</span></button>`,
     });
     return true;
   }
@@ -18237,7 +18256,7 @@ const appearanceApp = {
           <button class="mp-btn" data-act="choose-custom-wall" type="button" style="flex:1">
             ${icon('image')}<span style="margin-left:6px">${customWall ? '换一张图' : '从相册选一张'}</span>
           </button>
-          ${customWall ? `<button class="mp-btn" data-act="remove-custom-wall" type="button" style="flex:0 0 auto;padding:0 16px">删除</button>` : ''}
+          ${customWall ? `<button class="mp-btn" data-act="remove-custom-wall" type="button" style="flex:0 0 auto;padding:0 16px">${icon('trash')}<span>删除</span></button>` : ''}
         </div>
         <input id="mpWallFile" type="file" accept="image/*" style="display:none">
         <div class="mp-subtitle" style="margin-top:6px;font-size: calc(11.5px * var(--font-scale))">图片会存进小手机存档，导出备份时一起带走；只铺在屏幕里。</div>
@@ -19339,7 +19358,7 @@ function deleteConfirmBlock(kind, note) {
     <div class="mp-api-note is-warn" style="margin-top:8px">
       ${esc(note)}
       <div class="mp-draw-actions">
-        <button class="mp-draw-action is-danger" data-act="draw-${kind}-del-confirm" type="button">确认删除</button>
+        <button class="mp-draw-action is-danger" data-act="draw-${kind}-del-confirm" type="button">${icon('trash')}<span>确认删除</span></button>
         <button class="mp-draw-action" data-act="draw-${kind}-del-cancel" type="button">取消</button>
       </div>
     </div>`;
@@ -19431,7 +19450,7 @@ function apiDetailMarkup(p) {
       <div class="mp-api-more">
         <button class="mp-api-more-btn" data-act="draw-api-rename" data-id="${p.id}" type="button">改名</button>
         <button class="mp-api-more-btn" data-act="draw-api-new" data-id="${p.id}" type="button">复制接口</button>
-        <button class="mp-api-more-btn is-danger" data-act="draw-api-del" data-id="${p.id}" type="button">删除接口</button>
+        <button class="mp-api-more-btn is-danger" data-act="draw-api-del" data-id="${p.id}" type="button">${icon('trash')}<span>删除接口</span></button>
       </div>
     </div>`;
 }
@@ -19459,7 +19478,7 @@ function promptDetailMarkup(p) {
       <div class="mp-api-more">
         <button class="mp-api-more-btn" data-act="draw-preset-rename" data-id="${p.id}" type="button">改名</button>
         <button class="mp-api-more-btn" data-act="draw-preset-new" data-id="${p.id}" type="button">复制预设</button>
-        <button class="mp-api-more-btn is-danger" data-act="draw-preset-del" data-id="${p.id}" type="button">删除预设</button>
+        <button class="mp-api-more-btn is-danger" data-act="draw-preset-del" data-id="${p.id}" type="button">${icon('trash')}<span>删除预设</span></button>
       </div>
     </div>`;
 }
@@ -19616,7 +19635,7 @@ const drawApp = {
             <button class="mp-api-more-btn" data-act="draw-scheme-new" type="button">新建方案</button>
             <button class="mp-api-more-btn" data-act="draw-scheme-rename" type="button">改名</button>
             <button class="mp-api-more-btn" data-act="draw-scheme-copy" type="button">复制</button>
-            <button class="mp-api-more-btn is-danger" data-act="draw-scheme-del" type="button">删除</button>
+            <button class="mp-api-more-btn is-danger" data-act="draw-scheme-del" type="button">${icon('trash')}<span>删除</span></button>
           </div>
 
           ${drawEdit?.kind === 'scheme' ? nameEditBlock('scheme', drawEdit.value) : ''}
@@ -20846,7 +20865,7 @@ function presetDetail(ctx, store, preset) {
       <button class="mp-api-test" data-act="api-test" data-id="${preset.id}" type="button">${icon('refresh')}<span>测试连接 · 拉取模型</span></button>
       <div class="mp-api-more">
         <button class="mp-api-more-btn" data-act="api-clone" data-id="${preset.id}" type="button">复制接口</button>
-        <button class="mp-api-more-btn is-danger" data-act="api-del" data-id="${preset.id}" type="button">删除接口</button>
+        <button class="mp-api-more-btn is-danger" data-act="api-del" data-id="${preset.id}" type="button">${icon('trash')}<span>删除接口</span></button>
       </div>`}
     </div>`;
 }
@@ -20861,7 +20880,7 @@ function deleteConfirm(state, store) {
         <div class="mp-api-delete-title">删除方案「${esc(schemeLabel(state, scheme))}」？</div>
         <div class="mp-api-delete-sub">只删这套「接口 + 回复预设」的组合，接口和回复预设都还在。至少会留一套方案。</div>
         <div class="mp-api-actions">
-          <button class="mp-api-btn is-danger" data-act="api-scheme-del-confirm" type="button">确认删除方案</button>
+          <button class="mp-api-btn is-danger" data-act="api-scheme-del-confirm" type="button">${icon('trash')}<span>确认删除方案</span></button>
           <button class="mp-api-btn" data-act="api-delete-cancel" type="button">取消</button>
         </div>
       </div>`;
@@ -20881,8 +20900,8 @@ function deleteConfirm(state, store) {
         ${linked.length ? '只删接口时，这些方案会改指兜底接口；也可以连方案一起删。' : ''}
       </div>
       <div class="mp-api-actions">
-        ${linked.length ? `<button class="mp-api-btn is-danger" data-act="api-del-schemes-confirm" type="button">删接口 + ${linked.length} 套方案</button>` : ''}
-        <button class="mp-api-btn${linked.length ? '' : ' is-danger'}" data-act="api-del-confirm" type="button">只删接口</button>
+        ${linked.length ? `<button class="mp-api-btn is-danger" data-act="api-del-schemes-confirm" type="button">${icon('trash')}<span>删接口 + ${linked.length} 套方案</span></button>` : ''}
+        <button class="mp-api-btn${linked.length ? '' : ' is-danger'}" data-act="api-del-confirm" type="button">${icon('trash')}<span>只删接口</span></button>
         <button class="mp-api-btn" data-act="api-delete-cancel" type="button">取消</button>
       </div>
     </div>`;
@@ -21041,7 +21060,7 @@ const apiListApp = {
             <button class="mp-api-more-btn" data-act="api-scheme-new" type="button">新建方案</button>
             <button class="mp-api-more-btn" data-act="api-scheme-rename" type="button">改名</button>
             <button class="mp-api-more-btn" data-act="api-scheme-copy" type="button">复制</button>
-            <button class="mp-api-more-btn is-danger" data-act="api-scheme-del" type="button">删除</button>
+            <button class="mp-api-more-btn is-danger" data-act="api-scheme-del" type="button">${icon('trash')}<span>删除</span></button>
           </div>
 
           ${schemeEdit ? `
@@ -23721,7 +23740,7 @@ const musicPlaylistApp = {
       if (!playlist) return true;
       ctx.openSheet({
         title: '删除歌单？',
-        items: [{ label: '删除这张歌单', value: 'yes', danger: true }],
+        items: [{ label: '删除这张歌单', value: 'yes', icon: 'trash', danger: true }],
         onPick: value => {
           if (value !== 'yes') return;
           const music = musicOf(ctx.state);
@@ -23941,7 +23960,7 @@ function presetPanel(ctx, preset, contact) {
         ${active ? '' : `<button class="mp-draw-action is-primary" data-act="mem-use" data-id="${esc(preset.id)}" type="button">设为手机当前方案</button>`}
         <button class="mp-draw-action" data-act="mem-rename-open" data-id="${esc(preset.id)}" type="button">改名</button>
         <button class="mp-draw-action" data-act="mem-clone" data-id="${esc(preset.id)}" type="button">复制一套</button>
-        <button class="mp-draw-action is-danger" data-act="mem-del" data-id="${esc(preset.id)}" type="button">删除这套</button>
+        <button class="mp-draw-action is-danger" data-act="mem-del" data-id="${esc(preset.id)}" type="button">${icon('trash')}<span>删除这套</span></button>
       </div>
       ${memRename ? `
       <div class="mp-api-name-edit">
@@ -23954,7 +23973,7 @@ function presetPanel(ctx, preset, contact) {
         <div class="mp-api-delete-title">删除「${esc(memoryPresetTitle(preset))}」？</div>
         <div class="mp-api-delete-sub">只删这套记忆方案；正在用它时，手机会改用剩下第一套。至少留一套。</div>
         <div class="mp-draw-actions">
-          <button class="mp-draw-action is-danger" data-act="mem-del-confirm" data-id="${esc(preset.id)}" type="button">确认删除</button>
+          <button class="mp-draw-action is-danger" data-act="mem-del-confirm" data-id="${esc(preset.id)}" type="button">${icon('trash')}<span>确认删除</span></button>
           <button class="mp-draw-action" data-act="mem-del-cancel" type="button">取消</button>
         </div>
       </div>` : ''}
@@ -24974,7 +24993,7 @@ const replyPresetApp = {
         ${deleting ? `
         <div class="mp-group mp-api-inline is-danger" style="margin-top:12px">
           <span class="mp-row-name" style="flex:1">删掉「${esc(preset.name || '这套预设')}」？</span>
-          <button class="mp-draw-side is-danger" data-act="reply-del-confirm" type="button">删除</button>
+          <button class="mp-draw-side is-danger" data-act="reply-del-confirm" type="button">${icon('trash')}<span>删除</span></button>
           <button class="mp-draw-side" data-act="reply-del-cancel" type="button">取消</button>
         </div>` : ''}
 

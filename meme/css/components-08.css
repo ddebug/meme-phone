@@ -41,6 +41,25 @@
 .mp-btn .mp-i { width: 15px; height: 15px; }
 .mp-btn:active { transform: scale(.97); }
 
+/* 删除类按钮统一：垃圾桶图标 + 文案，图标不参与换行 */
+.mp-api-btn,
+.mp-api-more-btn,
+.mp-draw-action,
+.mp-draw-side {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.mp-api-btn .mp-i,
+.mp-api-more-btn .mp-i,
+.mp-draw-action .mp-i,
+.mp-draw-side .mp-i {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
 .mp-btn.accent {
   background: linear-gradient(150deg, #9583f2, #7f6ce9);
   color: #fff;

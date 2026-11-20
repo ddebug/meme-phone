@@ -549,7 +549,7 @@ function presetDetail(ctx, store, preset) {
       <button class="mp-api-test" data-act="api-test" data-id="${preset.id}" type="button">${icon('refresh')}<span>测试连接 · 拉取模型</span></button>
       <div class="mp-api-more">
         <button class="mp-api-more-btn" data-act="api-clone" data-id="${preset.id}" type="button">复制接口</button>
-        <button class="mp-api-more-btn is-danger" data-act="api-del" data-id="${preset.id}" type="button">删除接口</button>
+        <button class="mp-api-more-btn is-danger" data-act="api-del" data-id="${preset.id}" type="button">${icon('trash')}<span>删除接口</span></button>
       </div>`}
     </div>`;
 }
@@ -564,7 +564,7 @@ function deleteConfirm(state, store) {
         <div class="mp-api-delete-title">删除方案「${esc(schemeLabel(state, scheme))}」？</div>
         <div class="mp-api-delete-sub">只删这套「接口 + 回复预设」的组合，接口和回复预设都还在。至少会留一套方案。</div>
         <div class="mp-api-actions">
-          <button class="mp-api-btn is-danger" data-act="api-scheme-del-confirm" type="button">确认删除方案</button>
+          <button class="mp-api-btn is-danger" data-act="api-scheme-del-confirm" type="button">${icon('trash')}<span>确认删除方案</span></button>
           <button class="mp-api-btn" data-act="api-delete-cancel" type="button">取消</button>
         </div>
       </div>`;
@@ -584,8 +584,8 @@ function deleteConfirm(state, store) {
         ${linked.length ? '只删接口时，这些方案会改指兜底接口；也可以连方案一起删。' : ''}
       </div>
       <div class="mp-api-actions">
-        ${linked.length ? `<button class="mp-api-btn is-danger" data-act="api-del-schemes-confirm" type="button">删接口 + ${linked.length} 套方案</button>` : ''}
-        <button class="mp-api-btn${linked.length ? '' : ' is-danger'}" data-act="api-del-confirm" type="button">只删接口</button>
+        ${linked.length ? `<button class="mp-api-btn is-danger" data-act="api-del-schemes-confirm" type="button">${icon('trash')}<span>删接口 + ${linked.length} 套方案</span></button>` : ''}
+        <button class="mp-api-btn${linked.length ? '' : ' is-danger'}" data-act="api-del-confirm" type="button">${icon('trash')}<span>只删接口</span></button>
         <button class="mp-api-btn" data-act="api-delete-cancel" type="button">取消</button>
       </div>
     </div>`;
@@ -744,7 +744,7 @@ export const apiListApp = {
             <button class="mp-api-more-btn" data-act="api-scheme-new" type="button">新建方案</button>
             <button class="mp-api-more-btn" data-act="api-scheme-rename" type="button">改名</button>
             <button class="mp-api-more-btn" data-act="api-scheme-copy" type="button">复制</button>
-            <button class="mp-api-more-btn is-danger" data-act="api-scheme-del" type="button">删除</button>
+            <button class="mp-api-more-btn is-danger" data-act="api-scheme-del" type="button">${icon('trash')}<span>删除</span></button>
           </div>
 
           ${schemeEdit ? `

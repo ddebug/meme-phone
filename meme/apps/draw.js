@@ -257,7 +257,7 @@ function deleteConfirmBlock(kind, note) {
     <div class="mp-api-note is-warn" style="margin-top:8px">
       ${esc(note)}
       <div class="mp-draw-actions">
-        <button class="mp-draw-action is-danger" data-act="draw-${kind}-del-confirm" type="button">确认删除</button>
+        <button class="mp-draw-action is-danger" data-act="draw-${kind}-del-confirm" type="button">${icon('trash')}<span>确认删除</span></button>
         <button class="mp-draw-action" data-act="draw-${kind}-del-cancel" type="button">取消</button>
       </div>
     </div>`;
@@ -349,7 +349,7 @@ function apiDetailMarkup(p) {
       <div class="mp-api-more">
         <button class="mp-api-more-btn" data-act="draw-api-rename" data-id="${p.id}" type="button">改名</button>
         <button class="mp-api-more-btn" data-act="draw-api-new" data-id="${p.id}" type="button">复制接口</button>
-        <button class="mp-api-more-btn is-danger" data-act="draw-api-del" data-id="${p.id}" type="button">删除接口</button>
+        <button class="mp-api-more-btn is-danger" data-act="draw-api-del" data-id="${p.id}" type="button">${icon('trash')}<span>删除接口</span></button>
       </div>
     </div>`;
 }
@@ -377,7 +377,7 @@ function promptDetailMarkup(p) {
       <div class="mp-api-more">
         <button class="mp-api-more-btn" data-act="draw-preset-rename" data-id="${p.id}" type="button">改名</button>
         <button class="mp-api-more-btn" data-act="draw-preset-new" data-id="${p.id}" type="button">复制预设</button>
-        <button class="mp-api-more-btn is-danger" data-act="draw-preset-del" data-id="${p.id}" type="button">删除预设</button>
+        <button class="mp-api-more-btn is-danger" data-act="draw-preset-del" data-id="${p.id}" type="button">${icon('trash')}<span>删除预设</span></button>
       </div>
     </div>`;
 }
@@ -534,7 +534,7 @@ export const drawApp = {
             <button class="mp-api-more-btn" data-act="draw-scheme-new" type="button">新建方案</button>
             <button class="mp-api-more-btn" data-act="draw-scheme-rename" type="button">改名</button>
             <button class="mp-api-more-btn" data-act="draw-scheme-copy" type="button">复制</button>
-            <button class="mp-api-more-btn is-danger" data-act="draw-scheme-del" type="button">删除</button>
+            <button class="mp-api-more-btn is-danger" data-act="draw-scheme-del" type="button">${icon('trash')}<span>删除</span></button>
           </div>
 
           ${drawEdit?.kind === 'scheme' ? nameEditBlock('scheme', drawEdit.value) : ''}

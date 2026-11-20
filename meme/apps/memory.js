@@ -193,7 +193,7 @@ function presetPanel(ctx, preset, contact) {
         ${active ? '' : `<button class="mp-draw-action is-primary" data-act="mem-use" data-id="${esc(preset.id)}" type="button">设为手机当前方案</button>`}
         <button class="mp-draw-action" data-act="mem-rename-open" data-id="${esc(preset.id)}" type="button">改名</button>
         <button class="mp-draw-action" data-act="mem-clone" data-id="${esc(preset.id)}" type="button">复制一套</button>
-        <button class="mp-draw-action is-danger" data-act="mem-del" data-id="${esc(preset.id)}" type="button">删除这套</button>
+        <button class="mp-draw-action is-danger" data-act="mem-del" data-id="${esc(preset.id)}" type="button">${icon('trash')}<span>删除这套</span></button>
       </div>
       ${memRename ? `
       <div class="mp-api-name-edit">
@@ -206,7 +206,7 @@ function presetPanel(ctx, preset, contact) {
         <div class="mp-api-delete-title">删除「${esc(memoryPresetTitle(preset))}」？</div>
         <div class="mp-api-delete-sub">只删这套记忆方案；正在用它时，手机会改用剩下第一套。至少留一套。</div>
         <div class="mp-draw-actions">
-          <button class="mp-draw-action is-danger" data-act="mem-del-confirm" data-id="${esc(preset.id)}" type="button">确认删除</button>
+          <button class="mp-draw-action is-danger" data-act="mem-del-confirm" data-id="${esc(preset.id)}" type="button">${icon('trash')}<span>确认删除</span></button>
           <button class="mp-draw-action" data-act="mem-del-cancel" type="button">取消</button>
         </div>
       </div>` : ''}

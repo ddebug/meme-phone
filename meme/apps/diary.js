@@ -298,7 +298,7 @@ function threadHero(ctx, contact, chat, status, latestDate, busy) {
       <div style="display:flex;gap:6px;margin-top:11px;flex-wrap:wrap">
         <button class="mp-btn" data-act="td-generate-one" data-contact="${esc(contact.id)}" data-date="${date}" type="button"${busy || skipped ? ' disabled' : ''}>${icon('spark')}${busy ? '正在整理…' : text ? '重写这一天' : '整理这一天'}</button>
         ${entry ? `<label class="mp-td-inline-check"><input type="checkbox" data-act="td-use-original" data-contact="${esc(contact.id)}" data-date="${date}"${entry.useOriginal ? ' checked' : ''}> 本日上下文用原文</label>` : ''}
-        ${entry ? `<button class="mp-btn ghost" data-act="td-delete" data-contact="${esc(contact.id)}" data-date="${date}" type="button">删日记</button>` : ''}
+        ${entry ? `<button class="mp-btn ghost" data-act="td-delete" data-contact="${esc(contact.id)}" data-date="${date}" type="button">${icon('trash')}<span>删日记</span></button>` : ''}
       </div>
       ${status?.messages?.length ? `<details class="mp-td-original"><summary>查看当天原文（${count} 条）</summary>${status.messages.map(message => `<div>${esc(originalLine(ctx.state, contact, message))}</div>`).join('')}</details>` : ''}
     </div>`;
@@ -558,7 +558,7 @@ function handleThreadDiary(ctx, act, data, event) {
       title: '删除这篇日记',
       render: () => `
         <div class="mp-td-note">删除 ${esc(date)} 的日记？原始聊天不会删除。</div>
-        <button class="mp-btn" data-act="td-delete-run" data-contact="${esc(contactId)}" data-date="${esc(date)}" type="button" style="margin-top:12px;background:#e46b7a">删除日记</button>`,
+        <button class="mp-btn" data-act="td-delete-run" data-contact="${esc(contactId)}" data-date="${esc(date)}" type="button" style="margin-top:12px;background:#e46b7a">${icon('trash')}<span>删除日记</span></button>`,
     });
     return true;
   }

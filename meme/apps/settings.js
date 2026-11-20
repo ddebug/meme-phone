@@ -306,7 +306,7 @@ export const appearanceApp = {
           <button class="mp-btn" data-act="choose-custom-wall" type="button" style="flex:1">
             ${icon('image')}<span style="margin-left:6px">${customWall ? '换一张图' : '从相册选一张'}</span>
           </button>
-          ${customWall ? `<button class="mp-btn" data-act="remove-custom-wall" type="button" style="flex:0 0 auto;padding:0 16px">删除</button>` : ''}
+          ${customWall ? `<button class="mp-btn" data-act="remove-custom-wall" type="button" style="flex:0 0 auto;padding:0 16px">${icon('trash')}<span>删除</span></button>` : ''}
         </div>
         <input id="mpWallFile" type="file" accept="image/*" style="display:none">
         <div class="mp-subtitle" style="margin-top:6px;font-size: calc(11.5px * var(--font-scale))">图片会存进小手机存档，导出备份时一起带走；只铺在屏幕里。</div>

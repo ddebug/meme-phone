@@ -722,7 +722,7 @@ export const replyPresetApp = {
         ${deleting ? `
         <div class="mp-group mp-api-inline is-danger" style="margin-top:12px">
           <span class="mp-row-name" style="flex:1">删掉「${esc(preset.name || '这套预设')}」？</span>
-          <button class="mp-draw-side is-danger" data-act="reply-del-confirm" type="button">删除</button>
+          <button class="mp-draw-side is-danger" data-act="reply-del-confirm" type="button">${icon('trash')}<span>删除</span></button>
           <button class="mp-draw-side" data-act="reply-del-cancel" type="button">取消</button>
         </div>` : ''}
 

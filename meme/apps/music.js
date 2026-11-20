@@ -895,7 +895,7 @@ export const musicPlaylistApp = {
       if (!playlist) return true;
       ctx.openSheet({
         title: '删除歌单？',
-        items: [{ label: '删除这张歌单', value: 'yes', danger: true }],
+        items: [{ label: '删除这张歌单', value: 'yes', icon: 'trash', danger: true }],
         onPick: value => {
           if (value !== 'yes') return;
           const music = musicOf(ctx.state);

@@ -1,19 +1,19 @@
 {
   "files": {
-    "meme/apps/api.js": "845364e3f36cd2d52801cecf8799c8f8549aee7f32f2b02bef47610d802048b3",
+    "meme/apps/api.js": "f4b5ee0fa9ac2a298bacf91b33ec9bf6c02745d33005d576f5cd1554c9c5daa7",
     "meme/apps/characters.js": "f605adcdb9363fab22196c5d9864af81fb1e621f3ed3472d7d1517b895b15c2f",
     "meme/apps/charphone.js": "58d36f63fa6db9d0ec093123bd0c4492849401e9d6999264a10ccf873e6c8966",
-    "meme/apps/chat.js": "cf0c470b9e2edd8a0e62e2c331c1a3741ab9c66966b3167df5216ddf0a57c862",
+    "meme/apps/chat.js": "0710c3a2697a15e3468232e764f1c0a3e63fa01cfa26d3029405d8c7592a605f",
     "meme/apps/contacts.js": "95240e7ac8a08613a9c2f2e76342ae23abd8aeb0eedab89db702f484afe710c8",
-    "meme/apps/diary.js": "9dc906bc16370b806ca7dba9e65f7aecd09678f19b348777bf61a08c6c9d1d17",
-    "meme/apps/draw.js": "a3078ee33d4d4cee2f0880d63548ebc8e43e38e518aa6cec434746513f52389b",
+    "meme/apps/diary.js": "446202fd0a0720a9a7fa0931e3c3992d9df02b6fa66b67770a89a2061c4f95c4",
+    "meme/apps/draw.js": "feabd507645275ef5037f9b208eb2711ff3bce49ea65c5dd584116dc60861c8e",
     "meme/apps/favorites.js": "aea90e6388f2ce96248a390c3c20c81083803584f7d782ed8ab7c2b9d71516ed",
-    "meme/apps/memory.js": "55c691bd6e35426cac8b606d504d026e3c809ca654479e4249ce4a11e52fc012",
+    "meme/apps/memory.js": "cd1fab4f3d5809f475ad7aaefb1a4ae8e89e3566dd75b25ab40304c6b5eee2de",
     "meme/apps/more.js": "e613f64dfb134366eca40bf768f67944c073e7e7b25625e9e42b98da1960550b",
-    "meme/apps/music.js": "e894955d3485f3ee225b686ab27d613b476582daca325c2e8692000e49504a97",
+    "meme/apps/music.js": "d22dc02ed8b755062606cd5fc21e5662ed8b8c70677f3cf5ec6e117bb73eb3d4",
     "meme/apps/photo.js": "768d2de59c92774d522fb1c855a777c5a89bd435f59060cc6c750eb93e1b1abe",
-    "meme/apps/presets.js": "347817a1a27ea30ece5d2444e18d77e60319067ba0648de112e80083dfb8fe43",
-    "meme/apps/settings.js": "ef27e79bbcd418c72aaac2cfc8b1123318137d457d33e53e28152eed756aaae9",
+    "meme/apps/presets.js": "914124c1c4aaaf4a729d1a3c24caec2a1df3a7d8ee3818646f843f60eb58f832",
+    "meme/apps/settings.js": "64a5e1c7d040f8a674772d3f5dbc5a11e1abcc4fc22862069a41780c27d7dc7b",
     "meme/apps/user.js": "9bf5fc4d15bf018b5c66d3c185a2ab13a1a3b5ccd198fd9363701a1a3534959e",
     "meme/apps/wallet.js": "61e010cb23418df022eb08ebc8ab21054864d81f293fc1ab9daebf67669c180e",
     "meme/behavior-domains.js": "aa83382221d370f38cd04adbba421121d51f555555758df971be83612846e9e6",
@@ -30,7 +30,7 @@
     "meme/css/apps-28.css": "c47af1bcb7bc0579e8f7d291f07d21695d0e60044f7dc2ee575417ca367b94fa",
     "meme/css/components-04.css": "558d777b0111c8e5afbfa4ade6db3fa1d632bf30f3964d9d7c5bf21c500adf07",
     "meme/css/components-06.css": "dee5a551e5b1aa9fded22cb08c72beb048105e1e44925e64dd3201961edbd8d9",
-    "meme/css/components-08.css": "83c5983e062e5e871e4fa5b384c5d5911ce3bfdf3ed43892704d5a524566c7a8",
+    "meme/css/components-08.css": "3b147aee34e23265b6e6143a4e8ad1399042870c03f3427cd932f7932be4f34a",
     "meme/css/components-11.css": "3cb97fe2874502ff03797f2545dfbaf10579e3a2ab843477011b6974f3e4e4c2",
     "meme/css/components-15.css": "84afcd2ceb5fe1423395444f3626f457839801786a32b038f7ef091d8361bc60",
     "meme/css/components-17.css": "2a2e59a1a0786c24e115b19234dee899b6cbc0ac7107c5aacede60442327b8e2",
@@ -60,6 +60,6 @@
     "meme/reply-context.js": "6d44a1c31219f83a8e8128e77873493ffa5bd89e6ecdb582f14f303f889b2b51",
     "meme/shell.js": "c88a72cf861560b8bfe7df161761d96020734bd0368da63fb1284b76a0a331ae",
     "meme/store.js": "8b89793e3191ee6974c87d381e4975badb439093a43bf7701288944f9f79ffde",
-    "meme/theme-data.js": "d06502af72bdbeca99841fe07bca1c614db6713665a56a270e682736c1d28ea5"
+    "meme/theme-data.js": "d5731edead86cb6125c3a35e0e5182634d5cc5397b9bf0e68814a5a1befd8f74"
   }
 }

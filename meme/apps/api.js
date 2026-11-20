@@ -515,10 +515,7 @@ function presetDetail(ctx, store, preset) {
             <span>API Base URL</span>
             <input class="mp-api-input" data-api-field="url" type="text" value="${esc(draft.url || '')}" placeholder="https://api.example.com/v1" spellcheck="false">
           </label>
-          <label class="mp-api-field" style="grid-column:1/-1">
-            <span>API Path</span>
-            <input class="mp-api-input" data-api-field="path" type="text" value="${esc(draft.path || '')}" placeholder="/v1/chat/completions" spellcheck="false">
-          </label>
+          <div class="mp-api-field-hint" style="grid-column:1/-1">只填到 /v1，聊天接口路径会自动接上，不用手填 /chat/completions。</div>
           <div class="mp-api-field" style="grid-column:1/-1">
             <span>API Key</span>
             <div class="mp-api-key">

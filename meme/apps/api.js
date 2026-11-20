@@ -306,6 +306,7 @@ async function fetchModels(ctx, preset) {
     try {
       const viaHost = await ctx.host.listModels({
         url: preset.url,
+        path: preset.path,
         key: preset.key,
         tavernSource: preset.tavernSource,
       });

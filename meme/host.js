@@ -409,16 +409,36 @@ export async function generate({ prompt, system = '', messages = null, demoReply
   return { text: '', demo: false, error: '宿主不可用，没有可用模型', provider: 'none' };
 }
 
+/**
+ * 酒馆 custom 源会在 custom_url 后面自己补 /chat/completions，
+ * 这里统一把用户填的 Base URL / Path 收成“只到 /v1”的根，避免拼成
+ * .../v1/chat/completions/chat/completions。
+ */
+export function chatCompletionsRoot(url, path = '') {
+  let base = String(url || '').trim().replace(/\/+$/, '');
+  let route = String(path || '').trim();
+  if (/^https?:\/\//i.test(route)) {
+    base = route.replace(/\/+$/, '');
+    route = '';
+  }
+  base = base
+    .replace(/\/chat\/completions$/i, '')
+    .replace(/\/models$/i, '');
+  route = route
+    .replace(/\/chat\/completions$/i, '')
+    .replace(/\/models$/i, '');
+  if (!base) return route || '/v1';
+  if (!route) route = '/v1';
+  if (base.endsWith(route)) return base;
+  if (route.startsWith('/v1') && /\/v1$/i.test(base)) return base;
+  return `${base}${route.startsWith('/') ? route : `/${route}`}`;
+}
+
 /** 借酒馆后端请求一套自定义 OpenAI 兼容接口，避开浏览器 CORS。 */
 async function presetCompletion(preset, { prompt, system, messages }) {
   const script = await loadHostScript();
   if (!script) return '';
-  const base = String(preset.url || '').trim().replace(/\/+$/, '');
-  const path = String(preset.path || '').trim() || '/v1/chat/completions';
-  const joined = path.startsWith('/v1') && /\/v1$/i.test(base)
-    ? `${base}${path.replace(/^\/v1/, '')}`
-    : (/\/chat\/completions$/i.test(base) ? base : `${base}${path.startsWith('/') ? path : `/${path}`}`);
-  const url = /^https?:/i.test(path) ? path : joined;
+  const root = chatCompletionsRoot(preset.url, preset.path);
   const ctx = globalThis.SillyTavern?.getContext?.() || script.getContext?.() || {};
   const getHeaders = ctx.getRequestHeaders || script.getRequestHeaders;
   const headers = typeof getHeaders === 'function' ? { ...getHeaders() } : {};
@@ -443,9 +463,9 @@ async function presetCompletion(preset, { prompt, system, messages }) {
   }
   const body = {
     chat_completion_source: 'custom',
-    custom_url: url,
-    custom_include_headers: '',
-    reverse_proxy: base,
+    custom_url: root,
+    custom_include_headers: preset.key ? JSON.stringify({ Authorization: `Bearer ${preset.key}` }) : '',
+    reverse_proxy: root,
     proxy_password: String(preset.key || ''),
     model: String(preset.model || ''),
     messages: outgoing,
@@ -1265,6 +1285,7 @@ export async function listTavernModels(preset = {}) {
       || settings.openrouter_key
       || '',
     ).trim();
+    const customRoot = source === 'custom' ? chatCompletionsRoot(url, preset.path) : url;
     const getHeaders = ctx.getRequestHeaders || script.getRequestHeaders;
     const headers = typeof getHeaders === 'function' ? { ...getHeaders() } : {};
     if (!headers['X-CSRF-Token']) {
@@ -1275,12 +1296,14 @@ export async function listTavernModels(preset = {}) {
 
     const body = {
       chat_completion_source: source,
-      reverse_proxy: url,
+      reverse_proxy: customRoot,
       proxy_password: key,
     };
     if (source === 'custom') {
-      body.custom_url = url;
-      body.custom_include_headers = String(settings.custom_include_headers || '');
+      body.custom_url = customRoot;
+      body.custom_include_headers = key
+        ? JSON.stringify({ Authorization: `Bearer ${key}` })
+        : String(settings.custom_include_headers || '');
     }
     const response = await fetch('/api/backends/chat-completions/status', {
       method: 'POST',

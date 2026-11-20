@@ -61,7 +61,8 @@
 
 浏览器自动化后端（CDP）不可用时，可用系统 Edge 的 headless 模式直接渲染本地 `preview.html` 做逐页像素比对：
 
-- **渲染参数**：`--headless --disable-gpu --hide-scrollbars --window-size=430,900 --force-device-scale-factor=1 --force-prefers-reduced-motion --virtual-time-budget=3000 --screenshot=<out.png> <url>`。
+- **渲染参数**：`--headless --disable-gpu --hide-scrollbars --run-all-compositor-stages-before-draw --window-size=430,900 --force-device-scale-factor=1 --force-prefers-reduced-motion --virtual-time-budget=6000 --screenshot=<out.png> <url>`。
+  - `--run-all-compositor-stages-before-draw` 是关键：缺它时入场动画还在推进就截了图，同一份代码会得到整机上下位移的不同结果（桌面页曾出现两态、逐字节不同的“非确定性渲染”假象）。加上它 + 6000 的虚拟时间后，白天/夜间/`wall=none` 三种桌面态各连截三次均逐字节一致。
   - `--force-prefers-reduced-motion` + `--virtual-time-budget` 用来跳过入场过渡动画，避免截到不同动画帧；固定缩放因子保证两次渲染 DPI 一致。
 - **按视图取页**：`preview.html?view=<app-id>`，夜间态追加 `#night`。主页面 app-id：`app-chat / app-contacts / app-diary / app-settings / app-extras / app-music / app-draw / app-plans / app-dress / app-presets / app-api`，桌面页不带 view。子页面（thread / contact / memory-presets / character-card / p-charphone / p-chatphone / user-item / extra-detail / photo-view / app-wallet / thread-settings / thread-diary）需在 URL 里补对应参数，当前基线未覆盖。
 - **比对阈值**：同一份代码重截两次，设备右缘抗锯齿有固定抖动，实测每张约 90 px（集中在 x402–410、y50–61）；单张差异 ≤100 px 视为无视觉变化，超出即需人工看图定位。状态栏右上角时钟是动态的，比对时掩码排除。
@@ -98,9 +99,11 @@
 - `apps-20` → `themes-21`：12 条夜间覆写（`glass-ico`、`user-tag`、`roles-radio`、`wi-scan/wi-retry`、`char-query`、`char-tag`、`cp-badge/comment/bubble`、`api-clone`、`api-card-swap`），相邻块合并后 7 块整搬。比对 12 张白天全 0 px、夜间 11 张全 0 px（桌面夜间页见"已知不稳定"）。
 - `shell-13` → `themes-18`：3 条 `[data-mp-wall="none"][night]` 外壳/屏幕/页面深色背景，整块搬移。为此给预览加了 `wall` / `skin` 参数（`preview.html?view=x#night&wall=none`），`wall=none` 夜间三张图比对 0 px。
 
-### 已知不稳定
+### 截图稳定性
 
-夜间桌面页（`preview.html#night`）在 headless 下渲染非确定：同一份代码连截三次得到三种结果（约 222k / 224k / 238k 字节，两图差异 37.8 万像素）。该页**不纳入像素门禁**，改人工目检；其余 11 个 app 页与白天桌面稳定在 90 px。
+早期同一份代码连截三次得到三种结果（约 222k / 224k / 238k 字节，桌面页两图差异 37.8 万像素），表现为整机上下位移。根因是截图时合层未完成（入场动画仍在推进），不是 CSS 或页面本身不稳。加上 `--run-all-compositor-stages-before-draw` 并把虚拟时间预算提到 6000 后，白天 / 夜间 / `wall=none` 三种桌面态各连截三次均**逐字节一致**，桌面页已恢复正常门禁资格。
+
+另：比对掩码除右上角时钟外，还覆盖右缘 + 状态栏右半的固定抖动带（x≥390、y 44–68）；不加这带时每张会有 90–176 px 的稳定残差。
 
 ### 归位纪律
 

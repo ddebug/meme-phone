@@ -3886,31 +3886,9 @@ body {
     inset 0 0 0 1px rgba(255, 255, 255, .6);
 }
 
-.mp-root[data-mp-theme="night"] .mp-app .mp-tile {
-  background:
-    linear-gradient(155deg, rgba(255, 255, 255, .17), rgba(255, 255, 255, .05) 56%, rgba(150, 132, 235, .18));
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  box-shadow:
-    0 9px 22px rgba(0, 0, 0, .36),
-    inset 0 1px 0 rgba(255, 255, 255, .26),
-    inset 0 -1px 0 rgba(120, 100, 200, .18),
-    inset 0 0 0 1px rgba(255, 255, 255, .14);
-}
-
 .mp-root[data-mp-theme="night"] .mp-app .mp-tile::after {
   background:
     linear-gradient(158deg, rgba(255, 255, 255, .20), rgba(255, 255, 255, .02) 40%, rgba(255, 255, 255, 0) 56%);
-}
-
-.mp-root[data-mp-theme="night"] .mp-app .mp-tile .mp-i {
-  color: #f1ecff;
-  opacity: .94;
-}
-
-.mp-root[data-mp-theme="night"] .mp-dock .mp-app .mp-tile {
-  background:
-    linear-gradient(155deg, rgba(255, 255, 255, .21), rgba(255, 255, 255, .07) 56%, rgba(150, 132, 235, .2));
 }
 
 /* 装扮页的图标预览：与桌面磁贴同一套毛玻璃 */
@@ -4815,6 +4793,28 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, .24),
     inset 0 0 0 1px rgba(255, 255, 255, .14);
   color: #f1ecff;
+}
+
+.mp-root[data-mp-theme="night"] .mp-app .mp-tile .mp-i {
+  color: #f1ecff;
+  opacity: .94;
+}
+
+.mp-root[data-mp-theme="night"] .mp-dock .mp-app .mp-tile {
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, .21), rgba(255, 255, 255, .07) 56%, rgba(150, 132, 235, .2));
+}
+
+.mp-root[data-mp-theme="night"] .mp-app .mp-tile {
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, .17), rgba(255, 255, 255, .05) 56%, rgba(150, 132, 235, .18));
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  box-shadow:
+    0 9px 22px rgba(0, 0, 0, .36),
+    inset 0 1px 0 rgba(255, 255, 255, .26),
+    inset 0 -1px 0 rgba(120, 100, 200, .18),
+    inset 0 0 0 1px rgba(255, 255, 255, .14);
 }
 /* ============================ 音乐 ============================ */
 .mp-music {

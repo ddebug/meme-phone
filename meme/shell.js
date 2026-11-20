@@ -42,6 +42,12 @@ export function viewportForScale(base, next, typing) {
   return next || base;
 }
 
+/* 窄屏（手机 / 竖屏小窗）判定：宽度 ≤768px 时不再套桌面仿真手机的等比缩小，
+   整机改为铺满视口（配合 shell-03.css 的窄屏媒体查询）。纯函数便于校验。 */
+export function isMobileViewport(vw) {
+  return Number.isFinite(vw) && vw > 0 && vw <= 768;
+}
+
 /* 壁纸：none / day / night / custom。自定义图直接作为 CSS 变量铺进壳内 */
 export function applyWall(root, settings) {
   if (!root || !settings) return;
@@ -351,11 +357,16 @@ export function createShell(options) {
   /* 桌面宿主的窗口往往装不下 844 高的手机：按基准视口等比缩小，整机才不会被裁掉。
      基准视口不随打字弹键盘时的可视高度收缩更新（见 onWindowResize）。 */
   function deviceScale() {
-    const base = shell.baseViewport || readViewport();
+    const vp = readViewport();
+    /* 窄屏全屏模式：整机铺满视口，不做桌面仿真手机的等比缩小 */
+    if (isMobileViewport(vp.w)) return 1;
+    const base = shell.baseViewport || vp;
     return computeDeviceScale(base.w, base.h);
   }
 
   function deviceTransform() {
+    const vp = readViewport();
+    if (isMobileViewport(vp.w)) return 'none';
     const offset = shell.deviceOffset || { x: 0, y: 0 };
     return `translate(${Math.round(offset.x || 0)}px, ${Math.round(offset.y || 0)}px) scale(${deviceScale().toFixed(4)})`;
   }
@@ -595,6 +606,8 @@ export function createShell(options) {
   /* 顶部中间拖动手机壳：只在最上面一条区域响应，不影响页面里的滑动 */
   let phoneDrag = null;
   function clampDeviceOffset(x, y) {
+    /* 窄屏全屏模式：整机铺满视口，不允许拖动偏移 */
+    if (isMobileViewport(window.innerWidth || 0)) return { x: 0, y: 0 };
     const scale = deviceScale();
     const maxX = Math.max(0, (window.innerWidth + 390 * scale) / 2 - 90 * scale);
     const maxY = Math.max(0, (window.innerHeight + 844 * scale) / 2 - 120 * scale);

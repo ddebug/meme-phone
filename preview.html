@@ -770,6 +770,38 @@ body {
   margin-bottom: 16px;
 }
 
+/* --------------------------------------------------- 窄屏（手机）全屏铺满
+   宽屏桌面保留中间一台悬浮仿真手机；宽度 ≤768px 时整机铺满视口，去掉外壳边框、
+   圆角、阴影与外边距，不再靠 JS transform 等比缩小（与 shell.js 的 isMobileViewport 同步）。 */
+@media (max-width: 768px) {
+  .mp-root {
+    padding: 0;
+  }
+
+  .mp-overlay {
+    padding: 0;
+    background: transparent;
+  }
+
+  .mp-device {
+    box-sizing: border-box;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .mp-screen {
+    border-radius: 0;
+  }
+
+  .mp-drag-handle {
+    display: none;
+  }
+}
+
 .mp-icon-btn {
   width: 34px;
   height: 34px;
@@ -7594,16 +7626,6 @@ body {
   .mp-bubble-pay, .mp-bubble-member, .mp-bubble-plan, .mp-bubble-friend, .mp-bubble-story { min-width: 0; max-width: 100%; }
   .mp-wallet-balance { font-size: calc(30px * var(--font-scale)); }
 }
-@media (max-width: 460px) {
-  .mp-root { padding: 10px; }
-  .mp-device {
-    width: calc(100vw - 20px);
-    height: min(844px, calc((100vw - 20px) * 2.1641), calc(100vh - 20px));
-    border-radius: 42px;
-    padding: 8px;
-  }
-  .mp-screen { border-radius: 36px; }
-}
 
 </style>
 </head>
@@ -7635,6 +7657,10 @@ const LEGACY_SINGLE_REPLY_FORMAT = '[回复格式要求]\n只输出角色要发�
 const LEGACY_NATURAL_REPLY_INSTRUCTION = '像平时发微信一样回消息：口语、短句，一次只回一两句。不要写旁白、括号里的动作，也不要写成小说段落。';
 const NATURAL_REPLY_INSTRUCTION = '像平时发微信一样聊天：口语、短句，按意思自然分成多个气泡，不把一整轮回复挤在同一条里。通常发2～5条；简单回应也可以只发1条，不为凑数重复或强行追问。每个气泡独占一行，统一放在[消息]与[/消息]之间。不要写旁白、括号动作或小说段落。';
 const MULTI_BUBBLE_REPLY_FORMAT = '[回复格式要求]\n参考即时通讯的发消息方式，一行一个气泡，空行忽略；按语义自然拆分，通常2～5条，简单回应可只发1条，不为凑数重复。\n只输出当前角色这一轮要发的内容，用[消息]和[/消息]包住，例如：\n[消息]\n刚刚忙完\n你吃饭了吗\n[/消息]\n不要添加角色名、时间戳、序号或代码块；不要写旁白、括号动作、场景描写，也不要代替用户或其他角色发言。每条可用的表情或行为标签单独占一行，且只使用本会话已开启的标签。\n[/回复格式要求]';
+
+// 主动开口是空发送触发的单次请求，不是后台定时器；时间变量在请求/预览时统一替换。
+const PROACTIVE_PROMPT_MAX_LENGTH = 4000;
+const DEFAULT_PROACTIVE_PROMPT = '你正在扮演「{{char}}」，与「{{user}}」用手机聊天。\n当前时间：{{当前时间}}。距离用户上次发消息已过去：{{间隔时长}}。\n沉默参考阈值：{{沉默阈值}}，它只是参考，不要把阈值当成实际已过去的时间。\n这次是用户空发送，希望你主动开启一轮聊天。结合角色性格和已有聊天，自然分享近况、接续话题或轻轻问候，不要机械追问，也不要替用户发言。\n内容与气泡数量遵循当前回复预设，可以自然分多条短消息；不要写旁白、动作描写或系统说明。';
 
 const FULL_REPLY_ITEM_DEFS = [
   {
@@ -7834,6 +7860,8 @@ exports["LEGACY_SINGLE_REPLY_FORMAT"] = LEGACY_SINGLE_REPLY_FORMAT;
 exports["LEGACY_NATURAL_REPLY_INSTRUCTION"] = LEGACY_NATURAL_REPLY_INSTRUCTION;
 exports["NATURAL_REPLY_INSTRUCTION"] = NATURAL_REPLY_INSTRUCTION;
 exports["MULTI_BUBBLE_REPLY_FORMAT"] = MULTI_BUBBLE_REPLY_FORMAT;
+exports["PROACTIVE_PROMPT_MAX_LENGTH"] = PROACTIVE_PROMPT_MAX_LENGTH;
+exports["DEFAULT_PROACTIVE_PROMPT"] = DEFAULT_PROACTIVE_PROMPT;
 exports["FULL_REPLY_ITEM_DEFS"] = FULL_REPLY_ITEM_DEFS;
 };
 __mods["meme/behavior.js"] = function(module, exports, __req){
@@ -8527,7 +8555,7 @@ __mods["meme/data.js"] = function(module, exports, __req){
  * 数据结构刻意保持扁平，避免旧版那种「十个模块共享一个巨型对象、谁都改它」的局面。
  */
 
-const { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT } = __req("meme/preset-defaults.js");
+const { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT, DEFAULT_PROACTIVE_PROMPT, PROACTIVE_PROMPT_MAX_LENGTH } = __req("meme/preset-defaults.js");
 const { normalizeBehavior, behaviorPreview } = __req("meme/behavior.js");
 
 const SCHEMA_VERSION = 2;
@@ -8985,7 +9013,7 @@ function emptyState() {
       theater: { kind: 'daily' },
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
-      proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
+      proactive: { enabled: true, idleMinutes: 120, dailyCount: 5, prompt: '' },
       chat: {
         showTime: true, enterToSend: false, remind: true, wake: true, debugBar: false,
         /* 行为标签：默认只放开约定计划和个签，转账/会员/好友申请要自己开 */
@@ -9252,6 +9280,16 @@ function replyContextFor(state, chat) {
 function replyItemsFor(state, chat) {
   const preset = replyPresetFor(state, chat);
   return normalizeReplyItems(preset?.items, normalizeReplyContext(preset?.context));
+}
+
+/** 主动提示词只存覆盖值，空白/原样默认文本表示使用内置默认。 */
+function normalizeProactivePrompt(value) {
+  const text = typeof value === 'string' ? value.trim().slice(0, PROACTIVE_PROMPT_MAX_LENGTH) : '';
+  return text === DEFAULT_PROACTIVE_PROMPT ? '' : text;
+}
+
+function proactivePromptFor(state) {
+  return normalizeProactivePrompt(state?.settings?.proactive?.prompt) || DEFAULT_PROACTIVE_PROMPT;
 }
 
 /** 把条目里的旧版变量换成当前数据；不认识的占位符保留，方便用户自己排查。 */
@@ -10103,6 +10141,13 @@ function normalize(raw) {
     },
   };
   /* 旧存档的 settings.chat 可能没有新字段，这里按默认补一次，避免被浅合并冲掉 */
+  const proactiveRaw = raw.settings?.proactive;
+  const proactiveSource = proactiveRaw && typeof proactiveRaw === 'object' && !Array.isArray(proactiveRaw) ? proactiveRaw : {};
+  merged.settings.proactive = {
+    ...base.settings.proactive,
+    ...proactiveSource,
+    prompt: normalizeProactivePrompt(proactiveSource.prompt),
+  };
   merged.settings.chat = { ...base.settings.chat, ...(merged.settings.chat || {}) };
   merged.settings.chat.behavior = {
     ...base.settings.chat.behavior,
@@ -10486,6 +10531,8 @@ exports["replyPresetFor"] = replyPresetFor;
 exports["replyPromptFor"] = replyPromptFor;
 exports["replyContextFor"] = replyContextFor;
 exports["replyItemsFor"] = replyItemsFor;
+exports["normalizeProactivePrompt"] = normalizeProactivePrompt;
+exports["proactivePromptFor"] = proactivePromptFor;
 exports["fillPromptTokens"] = fillPromptTokens;
 exports["characterCardFor"] = characterCardFor;
 exports["cardNameAmbiguous"] = cardNameAmbiguous;
@@ -13089,6 +13136,12 @@ function viewportForScale(base, next, typing) {
   return next || base;
 }
 
+/* 窄屏（手机 / 竖屏小窗）判定：宽度 ≤768px 时不再套桌面仿真手机的等比缩小，
+   整机改为铺满视口（配合 shell-03.css 的窄屏媒体查询）。纯函数便于校验。 */
+function isMobileViewport(vw) {
+  return Number.isFinite(vw) && vw > 0 && vw <= 768;
+}
+
 /* 壁纸：none / day / night / custom。自定义图直接作为 CSS 变量铺进壳内 */
 function applyWall(root, settings) {
   if (!root || !settings) return;
@@ -13398,11 +13451,16 @@ function createShell(options) {
   /* 桌面宿主的窗口往往装不下 844 高的手机：按基准视口等比缩小，整机才不会被裁掉。
      基准视口不随打字弹键盘时的可视高度收缩更新（见 onWindowResize）。 */
   function deviceScale() {
-    const base = shell.baseViewport || readViewport();
+    const vp = readViewport();
+    /* 窄屏全屏模式：整机铺满视口，不做桌面仿真手机的等比缩小 */
+    if (isMobileViewport(vp.w)) return 1;
+    const base = shell.baseViewport || vp;
     return computeDeviceScale(base.w, base.h);
   }
 
   function deviceTransform() {
+    const vp = readViewport();
+    if (isMobileViewport(vp.w)) return 'none';
     const offset = shell.deviceOffset || { x: 0, y: 0 };
     return `translate(${Math.round(offset.x || 0)}px, ${Math.round(offset.y || 0)}px) scale(${deviceScale().toFixed(4)})`;
   }
@@ -13642,6 +13700,8 @@ function createShell(options) {
   /* 顶部中间拖动手机壳：只在最上面一条区域响应，不影响页面里的滑动 */
   let phoneDrag = null;
   function clampDeviceOffset(x, y) {
+    /* 窄屏全屏模式：整机铺满视口，不允许拖动偏移 */
+    if (isMobileViewport(window.innerWidth || 0)) return { x: 0, y: 0 };
     const scale = deviceScale();
     const maxX = Math.max(0, (window.innerWidth + 390 * scale) / 2 - 90 * scale);
     const maxY = Math.max(0, (window.innerHeight + 844 * scale) / 2 - 120 * scale);
@@ -13857,6 +13917,7 @@ exports["esc"] = esc;
 exports["clockText"] = clockText;
 exports["computeDeviceScale"] = computeDeviceScale;
 exports["viewportForScale"] = viewportForScale;
+exports["isMobileViewport"] = isMobileViewport;
 exports["applyWall"] = applyWall;
 exports["applyLook"] = applyLook;
 exports["dateText"] = dateText;
@@ -15008,7 +15069,7 @@ function debugMessages(ctx, chat, contact, cache, draft) {
   const mode = debugMode(ctx, chat, draft);
   const messages = (cache.messages || []).map(message => ({ ...message }));
   if (mode === 'proactive') {
-    const lead = proactiveLead(ctx.state, contact);
+    const lead = proactiveLead(ctx.state, contact, chat);
     const index = messages.findIndex(message => message.source === '场景提示');
     if (index >= 0) messages[index] = { ...messages[index], content: lead };
     else messages.push({ role: 'system', content: lead, source: '场景提示' });
@@ -17955,7 +18016,8 @@ __mods["meme/apps/settings.js"] = function(module, exports, __req){
 
 const { icon, TINT } = __req("meme/icons.js");
 const { esc, tintStyle } = __req("meme/shell.js");
-const { contactsOf, chatsOf, unreadTotal } = __req("meme/data.js");
+const { contactsOf, chatsOf, unreadTotal, proactivePromptFor, normalizeProactivePrompt } = __req("meme/data.js");
+const { PROACTIVE_PROMPT_MAX_LENGTH } = __req("meme/preset-defaults.js");
 const { imageEndpoint } = __req("meme/apps/draw.js");
 
 function downloadBackup(ctx, includeKeys) {
@@ -17999,6 +18061,44 @@ function row(ctx, { iconName, title, sub, act, value, toggle, app }) {
     </button>`;
 }
 
+async function saveProactivePrompt(ctx, value) {
+  const prompt = normalizeProactivePrompt(value);
+  if (ctx.state.settings.proactive.prompt !== prompt) {
+    ctx.state.settings.proactive.prompt = prompt;
+    ctx.ai?.clearPreview?.();
+  }
+  try { return await ctx.save() !== false; }
+  catch (error) {
+    ctx.toast(error?.message || '保存失败，提示词草稿已保留');
+    return false;
+  }
+}
+
+function openProactivePromptEditor(ctx, draft = proactivePromptFor(ctx.state)) {
+  const custom = Boolean(normalizeProactivePrompt(ctx.state.settings.proactive.prompt));
+  ctx.openSheet({
+    kind: 'form',
+    title: `主动开口提示词 · ${custom ? '自定义' : '默认'}`,
+    confirm: '保存',
+    fields: [{
+      name: 'prompt', type: 'textarea', label: '空着发送时，告诉 TA 怎么主动开口',
+      value: draft, maxLength: PROACTIVE_PROMPT_MAX_LENGTH,
+      placeholder: '留空保存即恢复默认提示词',
+      hint: `可用 {{char}}、{{user}}、{{当前时间}}、{{间隔时长}}、{{沉默阈值}}。间隔时长是最近一条用户消息距今，缺失时为“未知”；沉默阈值仅作参考，不会新增定时消息。最多 ${PROACTIVE_PROMPT_MAX_LENGTH} 字，留空保存即恢复默认。`,
+    }],
+    onForm: async values => {
+      const draft = typeof values.prompt === 'string' ? values.prompt : '';
+      if (!await saveProactivePrompt(ctx, draft)) {
+        // 外壳提交时已关掉表单；保存失败重新打开，保留这次输入供重试。
+        openProactivePromptEditor(ctx, draft);
+        return;
+      }
+      ctx.rerender();
+      ctx.toast(normalizeProactivePrompt(draft) ? '主动开口提示词已保存' : '已使用默认主动开口提示词');
+    },
+  });
+}
+
 const settingsApp = {
   id: 'settings', name: '设置', icon: 'settings',
 
@@ -18007,6 +18107,7 @@ const settingsApp = {
     const host = ctx.shell.hostInfo || {};
     const apiReady = host.hasGenerate;
     const contacts = contactsOf(state).length;
+    const customProactivePrompt = Boolean(normalizeProactivePrompt(state.settings.proactive.prompt));
     const image = imageEndpoint(state);
     const imageLabel = image.engine === 'custom' ? '自定义接口' : image.engine === 'doubao' ? '豆包 · 火山方舟' : 'NovelAI 官方';
     const imageReady = image.engine === 'custom' ? Boolean(image.url) : Boolean(image.url && image.key);
@@ -18044,6 +18145,15 @@ const settingsApp = {
         </div>
 
         <div class="mp-group">
+          <div class="mp-group-label">主动开口</div>
+          <div class="mp-group-box">
+            ${row(ctx, { iconName: 'reply', title: '主动开口提示词', sub: '只在空着发送时使用，不会定时发消息', act: 'set-proactive-prompt', value: customProactivePrompt ? '自定义' : '默认' })}
+            ${row(ctx, { iconName: 'clock', title: '空发送时参考沉默多久', sub: '写进主动开口的提示，仅作参考，不会自己定时发消息', act: 'set-idle', value: `${state.settings.proactive.idleMinutes} 分钟` })}
+            ${customProactivePrompt ? row(ctx, { iconName: 'reply', title: '恢复默认提示词', sub: '只恢复主动开口提示词，其他设置不变', act: 'set-proactive-prompt-reset' }) : ''}
+          </div>
+        </div>
+
+        <div class="mp-group">
           <div class="mp-group-label">AI 设置 · 参考什么材料</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'book', title: '手机读法', sub: state.settings.memory.readMode === 'recent' ? '现在只读最近原文' : '现在有总结先读总结，没有就读最近原文', act: 'set-toggle-memory-read', toggle: state.settings.memory.readMode !== 'recent' })}
@@ -18072,7 +18182,6 @@ const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">高级与帮助</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'clock', title: '空发送时参考沉默多久', sub: '写进主动开口的提示，不会自己定时发消息', act: 'set-idle', value: `${state.settings.proactive.idleMinutes} 分钟` })}
             ${row(ctx, { iconName: 'bell', title: '消息提醒', sub: '有新消息时在图标上显示红点', act: 'set-toggle-remind', toggle: state.settings.chat.remind !== false })}
             ${row(ctx, { iconName: 'code', title: '请求调试栏', sub: state.settings.chat.debugBar ? '现在开着：输入框上方会显示 token 与请求构成' : '现在关着：需要时再打开', act: 'set-toggle-debug', toggle: state.settings.chat.debugBar === true })}
             ${row(ctx, { iconName: 'help', title: '帮助', sub: '怎么用、快捷键、常见问题', act: 'set-open', app: 'help' })}
@@ -18121,13 +18230,37 @@ const settingsApp = {
       return true;
     }
 
+    if (act === 'set-proactive-prompt') {
+      openProactivePromptEditor(ctx);
+      return true;
+    }
+
+    if (act === 'set-proactive-prompt-reset') {
+      if (!normalizeProactivePrompt(ctx.state.settings.proactive.prompt)) return true;
+      ctx.openSheet({
+        title: '恢复默认主动开口提示词？',
+        items: [{ label: '恢复默认提示词', value: 'restore', icon: 'reply', note: '只恢复这段提示词，沉默参考和其他设置都不变。' }],
+        onPick: async value => {
+          if (value !== 'restore') return;
+          if (!await saveProactivePrompt(ctx, '')) {
+            openProactivePromptEditor(ctx);
+            return;
+          }
+          ctx.rerender();
+          ctx.toast('已恢复默认主动开口提示词');
+        },
+      });
+      return true;
+    }
+
     if (act === 'set-idle') {
       ctx.openSheet({
         title: '沉默多久算久',
         items: [30, 60, 120, 240].map(min => ({ label: `${min} 分钟`, value: String(min) })),
-        onPick: (value) => {
-          state.settings.proactive.idleMinutes = Number(value);
-          ctx.save();
+        onPick: async value => {
+          ctx.state.settings.proactive.idleMinutes = Number(value);
+          ctx.ai?.clearPreview?.();
+          await ctx.save();
           ctx.rerender();
         },
       });
@@ -25779,7 +25912,7 @@ __mods["meme/reply-context.js"] = function(module, exports, __req){
  * 旧的独立拼装函数已删除，避免出现两套逻辑。
  */
 
-const { replyContextFor, replyItemsFor, replyPresetFor, normalizeReplyContext, normalizeReplyItems, fillPromptTokens, characterCardFor, itemAppliesToChat, effectivePhoneHistoryLimit, dayKey } = __req("meme/data.js");
+const { replyContextFor, replyItemsFor, replyPresetFor, normalizeReplyContext, normalizeReplyItems, fillPromptTokens, characterCardFor, itemAppliesToChat, effectivePhoneHistoryLimit, dayKey, proactivePromptFor } = __req("meme/data.js");
 const { readWorldBook } = __req("meme/host.js");
 const { buildMemoryContext } = __req("meme/memory.js");
 const { behaviorContextText } = __req("meme/behavior.js");
@@ -25796,10 +25929,28 @@ function replyLead(contact) {
   return `你在扮演「${contact?.name || '对方'}」，用手机自然聊天。按当前回复预设的格式组织这一轮回复，可以分多个气泡，不限于一条；只扮演当前角色。`;
 }
 
-/** 主动开口的场景提示；预览与实际发送共用。 */
-function proactiveLead(state, contact) {
-  const idle = state?.settings?.proactive?.idleMinutes;
-  return `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。距离上次说话已经过去 ${idle} 分钟，你要主动开启这一轮聊天；格式与气泡数量遵循当前回复预设，可以自然分多条发送。`;
+/** 主动开口的场景提示；预览与实际发送共用，阈值与真实沉默时长分开。 */
+function proactiveLead(state, contact, chat = null, now = new Date()) {
+  const at = now.getTime();
+  let lastUserAt = 0;
+  for (const message of chat?.messages || []) {
+    const stamp = Number(message?.at);
+    if (message?.from === 'me' && Number.isFinite(stamp) && stamp > 0 && stamp <= at) {
+      lastUserAt = Math.max(lastUserAt, stamp);
+    }
+  }
+  const idle = Number(state?.settings?.proactive?.idleMinutes);
+  const values = {
+    char: contact?.name || '对方',
+    user: state?.settings?.user?.name || '我',
+    当前时间: now.toLocaleString('zh-CN', {
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+    }),
+    间隔时长: lastUserAt ? `${Math.floor((at - lastUserAt) / 60000)} 分钟` : '未知（当前会话没有有效的用户消息时间）',
+    沉默阈值: `${Number.isFinite(idle) && idle > 0 ? Math.round(idle) : 120} 分钟`,
+  };
+  // 一次替换：用户/角色名里即使包含占位符，也不会被当成新的模板再次展开。
+  return proactivePromptFor(state).replace(/\{\{(char|user|当前时间|间隔时长|沉默阈值)\}\}/g, (_, key) => values[key]);
 }
 
 /**
@@ -26546,7 +26697,7 @@ function makeAi(getState) {
     const built = await buildReplyMessages(state, chat, contact, {
       presetOverride: options.presetOverride,
       memoryText: String(storyBlock?.text || ''),
-      lead: options.proactive ? proactiveLead(state, contact) : replyLead(contact),
+      lead: options.proactive ? proactiveLead(state, contact, chat) : replyLead(contact),
       extraPrompt: wantsTheater ? theaterPrompt(contact?.name, theaterKind) : '',
       behaviorPrompt: behaviorPrompt(state, chat),
       proactive: Boolean(options.proactive),

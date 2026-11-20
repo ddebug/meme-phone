@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { computeDeviceScale, viewportForScale } from '../meme/shell.js';
+import { computeDeviceScale, viewportForScale, isMobileViewport } from '../meme/shell.js';
 
 test('视口充足时整机不放大，缩放封顶 1', () => {
   assert.equal(computeDeviceScale(1200, 900), 1);
@@ -45,4 +45,20 @@ test('按基准视口算缩放：键盘压矮时整机不跟着缩小', () => {
   assert.equal(computeDeviceScale(used.w, used.h), 1);
   /* 若错误地采用被压视口，高度方向会把整机缩到 0.55 上下 */
   assert.notEqual(computeDeviceScale(squeezed.w, squeezed.h), 1);
+});
+
+test('窄屏（≤768px）判定为移动全屏模式，宽屏仍走桌面悬浮缩放', () => {
+  for (const w of [360, 375, 390, 393, 430, 768]) {
+    assert.equal(isMobileViewport(w), true, `宽度 ${w} 应判为窄屏`);
+  }
+  for (const w of [769, 1024, 1280, 1440]) {
+    assert.equal(isMobileViewport(w), false, `宽度 ${w} 应判为宽屏`);
+  }
+});
+
+test('视口缺失或非法时不算窄屏，回退桌面缩放口径', () => {
+  assert.equal(isMobileViewport(0), false);
+  assert.equal(isMobileViewport(NaN), false);
+  assert.equal(isMobileViewport(undefined), false);
+  assert.equal(isMobileViewport(null), false);
 });

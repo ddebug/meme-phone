@@ -406,13 +406,3 @@
   .mp-bubble-pay, .mp-bubble-member, .mp-bubble-plan, .mp-bubble-friend, .mp-bubble-story { min-width: 0; max-width: 100%; }
   .mp-wallet-balance { font-size: calc(30px * var(--font-scale)); }
 }
-@media (max-width: 460px) {
-  .mp-root { padding: 10px; }
-  .mp-device {
-    width: calc(100vw - 20px);
-    height: min(844px, calc((100vw - 20px) * 2.1641), calc(100vh - 20px));
-    border-radius: 42px;
-    padding: 8px;
-  }
-  .mp-screen { border-radius: 36px; }
-}

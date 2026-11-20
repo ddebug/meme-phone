@@ -5408,8 +5408,6 @@ body {
   box-shadow: inset 0 0 0 1px rgba(142, 123, 242, .3);
 }
 .mp-dress-choice.is-on b { color: var(--accent-deep); }
-.mp-root[data-mp-theme="night"] .mp-dress-choice { background: rgba(255, 255, 255, .06); }
-.mp-root[data-mp-theme="night"] .mp-dress-choice.is-on { background: rgba(167, 149, 255, .2); }
 
 .mp-dress-toggle,
 .mp-dress-link {
@@ -5450,7 +5448,6 @@ body {
   box-shadow: none;
 }
 .mp-dress-link .mp-i { width: 15px; height: 15px; }
-.mp-root[data-mp-theme="night"] .mp-dress-toggle { background: rgba(255, 255, 255, .06); }
 
 .mp-dress-wall-row {
   display: grid;
@@ -5479,7 +5476,6 @@ body {
   border: 2px solid transparent;
 }
 .mp-dress-wall-swatch.is-on { border-color: var(--accent); }
-.mp-root[data-mp-theme="night"] .mp-dress-wall-swatch { box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
 
 .mp-dress-app-grid {
   display: grid;
@@ -5516,11 +5512,7 @@ body {
 }
 .mp-dress-tile .mp-i { width: 22px; height: 22px; }
 .mp-dress-tile.has-image { background-size: cover; background-position: center; }
-.mp-root[data-mp-theme="night"] .mp-dress-tile {
-  color: #ece9f7;
-  background: linear-gradient(155deg, rgba(255, 255, 255, .15), rgba(255, 255, 255, .05));
-  box-shadow: 0 6px 14px rgba(0, 0, 0, .3), inset 0 0 0 1px rgba(255, 255, 255, .12);
-}
+
 .mp-dress-note {
   padding: 8px 2px 0;
   font-size: calc(10.5px * var(--font-scale));
@@ -5542,10 +5534,6 @@ body {
 .mp-icon-preview div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .mp-icon-preview b { font-size: calc(15px * var(--font-scale)); }
 .mp-icon-preview span { font-size: calc(11px * var(--font-scale)); color: var(--text-3); }
-.mp-root[data-mp-theme="night"] .mp-icon-preview {
-  background: linear-gradient(155deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .04));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), var(--shadow-s);
-}
 
 .mp-icon-grid {
   display: grid;
@@ -5578,8 +5566,6 @@ body {
   background: rgba(142, 123, 242, .14);
   box-shadow: inset 0 0 0 1px rgba(142, 123, 242, .32);
 }
-.mp-root[data-mp-theme="night"] .mp-icon-choice { background: rgba(255, 255, 255, .06); }
-.mp-root[data-mp-theme="night"] .mp-icon-choice.is-on { background: rgba(167, 149, 255, .2); }
 
 .mp-icon-actions { display: flex; gap: 8px; }
 .mp-icon-actions .mp-btn { flex: 1; }
@@ -6613,6 +6599,26 @@ body {
   }
 }
 
+.mp-root[data-mp-theme="night"] .mp-icon-choice { background: rgba(255, 255, 255, .06); }
+.mp-root[data-mp-theme="night"] .mp-icon-choice.is-on { background: rgba(167, 149, 255, .2); }
+
+.mp-root[data-mp-theme="night"] .mp-icon-preview {
+  background: linear-gradient(155deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .04));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), var(--shadow-s);
+}
+
+.mp-root[data-mp-theme="night"] .mp-dress-tile {
+  color: #ece9f7;
+  background: linear-gradient(155deg, rgba(255, 255, 255, .15), rgba(255, 255, 255, .05));
+  box-shadow: 0 6px 14px rgba(0, 0, 0, .3), inset 0 0 0 1px rgba(255, 255, 255, .12);
+}
+
+.mp-root[data-mp-theme="night"] .mp-dress-wall-swatch { box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
+
+.mp-root[data-mp-theme="night"] .mp-dress-toggle { background: rgba(255, 255, 255, .06); }
+
+.mp-root[data-mp-theme="night"] .mp-dress-choice { background: rgba(255, 255, 255, .06); }
+.mp-root[data-mp-theme="night"] .mp-dress-choice.is-on { background: rgba(167, 149, 255, .2); }
 /* ------------------------------------------------------- 小剧场类型与美化页 */
 .mp-extra-filters {
   display: flex;

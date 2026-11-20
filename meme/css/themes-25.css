@@ -1027,3 +1027,23 @@
   }
 }
 
+.mp-root[data-mp-theme="night"] .mp-icon-choice { background: rgba(255, 255, 255, .06); }
+.mp-root[data-mp-theme="night"] .mp-icon-choice.is-on { background: rgba(167, 149, 255, .2); }
+
+.mp-root[data-mp-theme="night"] .mp-icon-preview {
+  background: linear-gradient(155deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .04));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), var(--shadow-s);
+}
+
+.mp-root[data-mp-theme="night"] .mp-dress-tile {
+  color: #ece9f7;
+  background: linear-gradient(155deg, rgba(255, 255, 255, .15), rgba(255, 255, 255, .05));
+  box-shadow: 0 6px 14px rgba(0, 0, 0, .3), inset 0 0 0 1px rgba(255, 255, 255, .12);
+}
+
+.mp-root[data-mp-theme="night"] .mp-dress-wall-swatch { box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
+
+.mp-root[data-mp-theme="night"] .mp-dress-toggle { background: rgba(255, 255, 255, .06); }
+
+.mp-root[data-mp-theme="night"] .mp-dress-choice { background: rgba(255, 255, 255, .06); }
+.mp-root[data-mp-theme="night"] .mp-dress-choice.is-on { background: rgba(167, 149, 255, .2); }

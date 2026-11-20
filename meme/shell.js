@@ -21,6 +21,15 @@ export function clockText(date = new Date()) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+/* 按宿主窗口可用尺寸等比缩放手机壳；纯函数便于校验。
+ * 高度必须用布局视口 innerHeight，不能用 visualViewport.height：
+ * 软键盘弹起时可视高度会收缩，照它缩放会把整机在打字时误缩小。 */
+export function computeDeviceScale(vw, vh) {
+  if (!vw || !vh) return 1;
+  const fit = Math.min((vw - 48) / 390, (vh - 48) / 844);
+  return Math.max(0.45, Math.min(1, fit));
+}
+
 /* 壁纸：none / day / night / custom。自定义图直接作为 CSS 变量铺进壳内 */
 export function applyWall(root, settings) {
   if (!root || !settings) return;
@@ -326,10 +335,8 @@ export function createShell(options) {
   /* 桌面宿主的窗口往往装不下 844 高的手机：按可用视口等比缩小，整机才不会被裁掉 */
   function deviceScale() {
     const vw = window.visualViewport?.width || window.innerWidth || 0;
-    const vh = window.visualViewport?.height || window.innerHeight || 0;
-    if (!vw || !vh) return 1;
-    const fit = Math.min((vw - 48) / 390, (vh - 48) / 844);
-    return Math.max(0.45, Math.min(1, fit));
+    const vh = window.innerHeight || 0;
+    return computeDeviceScale(vw, vh);
   }
 
   function deviceTransform() {

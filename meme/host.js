@@ -121,7 +121,8 @@ export async function readCharacterBooks(name) {
         const response = await fetch('/api/settings/get', { method: 'POST', headers, body: '{}' });
         if (response.ok) {
           const saved = await response.json();
-          worldInfo = saved.world_info_settings?.world_info || saved.world_info || worldInfo;
+          const savedSettings = savedSettingsObject(saved);
+          worldInfo = savedSettings.world_info_settings?.world_info || savedSettings.world_info || worldInfo;
         }
       } catch { /* 读不到附加书就只读主书 */ }
     }
@@ -680,6 +681,24 @@ async function naiHttpError(resp) {
   return error;
 }
 
+/**
+ * 解析 /api/settings/get 的返回：酒馆把 settings.json 原文塞在 settings 字符串里
+ * （顶层只有 settings、world_names 这些），要 JSON.parse 一次才拿得到 oai_settings / world_info_settings。
+ * 旧版本或注入式的实现在这里直接给对象，所以两种形状都认。
+ */
+export function savedSettingsObject(saved) {
+  const payload = saved && typeof saved === 'object' && 'settings' in saved ? saved.settings : saved;
+  if (typeof payload === 'string') {
+    try {
+      const parsed = JSON.parse(payload);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return payload && typeof payload === 'object' ? payload : {};
+}
+
 function bytesToBase64(bytes) {
   let bin = '';
   const CHUNK = 0x8000;
@@ -1150,7 +1169,8 @@ export async function readTavernApi() {
         });
         if (response.ok) {
           const saved = await response.json();
-          settings = saved.oai_settings || saved.settings?.oai_settings || null;
+          const savedSettings = savedSettingsObject(saved);
+          settings = saved.oai_settings || savedSettings.oai_settings || null;
         }
       } catch { /* 读不到就继续走下面的失败提示 */ }
     }

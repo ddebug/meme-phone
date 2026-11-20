@@ -515,9 +515,12 @@ export async function novelaiImage({
       }
       if (!res.ok) throw await naiHttpError(res);
 
-      const { base64, filename } = await unzipNaiImage(await res.arrayBuffer());
-      const format = (filename.split('.').pop() || 'png').toLowerCase();
-      result = { url: `data:image/${format === 'jpg' ? 'jpeg' : format};base64,${base64}` };
+      const decoded = await decodeImagePayload(
+        await res.arrayBuffer(),
+        res.headers.get('content-type') || '',
+        'NovelAI',
+      );
+      result = { url: decoded.url };
       break;
     } catch (error) {
       if (!naiShouldRetry(error, attempt)) throw error;
@@ -686,6 +689,72 @@ function bytesToBase64(bytes) {
   return btoa(bin);
 }
 
+/** 从 content-type 或文件头判断直出图片的类型；不是图片返回空。 */
+function imageMimeFromResponse(bytes, contentType = '') {
+  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'png';
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'jpeg';
+  if (bytes.length >= 6 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'gif';
+  if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return 'webp';
+  if (bytes.length >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4d) return 'bmp';
+  /* 文件头认不出时才信 content-type；但 JSON/HTML 错误页常常也带错类型，先排除文本。 */
+  const type = String(contentType || '').toLowerCase();
+  if (type.startsWith('image/')) {
+    const textHead = new TextDecoder().decode(bytes.subarray(0, 32)).trimStart();
+    if (textHead.startsWith('{') || textHead.startsWith('[') || textHead.startsWith('<')) return '';
+    const subtype = type.split(';')[0].slice(6).replace('jpg', 'jpeg');
+    if (/^[a-z0-9.+-]+$/.test(subtype)) return subtype;
+  }
+  return '';
+}
+
+function zipSignature(bytes) {
+  return bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b &&
+    ((bytes[2] === 0x03 && bytes[3] === 0x04) || (bytes[2] === 0x05 && bytes[3] === 0x06));
+}
+
+function imageDataUrl(bytes, mime) {
+  return `data:${mime.startsWith('image/') ? mime : `image/${mime}`};base64,${bytesToBase64(bytes)}`;
+}
+
+/**
+ * 统一解包出图接口返回：官方 NovelAI 是 zip，兼容代理可能直出图片或返回 JSON。
+ * 这样错误信息能显示服务端真正的报错，而不是一律说“不是 zip”。
+ */
+export async function decodeImagePayload(buffer, contentType = '', label = '接口') {
+  const bytes = new Uint8Array(buffer);
+  if (!bytes.length) throw new Error(`${label} 返回了空响应`);
+  const type = String(contentType || '').toLowerCase();
+  const rawMime = imageMimeFromResponse(bytes, type);
+  if (rawMime) return { url: imageDataUrl(bytes, rawMime) };
+
+  if (zipSignature(bytes)) {
+    const { base64, filename } = await unzipNaiImage(buffer);
+    const format = (filename.split('.').pop() || 'png').toLowerCase();
+    return { url: `data:image/${format === 'jpg' ? 'jpeg' : format};base64,${base64}` };
+  }
+
+  const text = new TextDecoder().decode(bytes).trim();
+  if (text.startsWith('{') || text.startsWith('[') || type.includes('json')) {
+    let json = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      throw new Error(`${label} 返回了无法解析的内容（${type || '未知类型'}，${bytes.length} 字节）：${text.slice(0, 180) || '空响应'}`);
+    }
+    const b64 = json?.image || json?.data?.[0]?.b64_json || json?.data?.[0]?.image || json?.b64_json || '';
+    if (b64) return { url: String(b64).startsWith('data:') ? String(b64) : `data:image/png;base64,${b64}` };
+    const remote = json?.data?.[0]?.url || json?.url || json?.image_url || '';
+    if (remote) return { url: String(remote) };
+    const detail = json?.error?.message || json?.message || json?.detail || json?.error || '';
+    throw new Error(`${label} 返回错误：${detail ? String(detail).slice(0, 220) : '响应里没有图片'}`);
+  }
+
+  const preview = text.replace(/\s+/g, ' ').slice(0, 180);
+  throw new Error(`${label} 返回了无法识别的内容（${type || '未知类型'}，${bytes.length} 字节）${preview ? `：${preview}` : ''}`);
+}
+
+
 async function inflateRaw(bytes) {
   if (typeof DecompressionStream === 'undefined') {
     throw new Error('当前环境不支持解压 NovelAI 返回的 zip 包');
@@ -701,7 +770,7 @@ async function readZipEntries(buffer) {
   let centralCount = 0;
 
   for (let i = Math.max(0, bytes.length - 22); i >= 0; i -= 1) {
-    if (bytes[i] === 0x50 && bytes[i + 1] === 0x4b && bytes[i + 2] === 0x05 && bytes[i + 3] === 0x06) {
+    if (bytes[i] === 0x50 && bytes[i + 1] === 0x4b && bytes[i + 2] === 0x05 && bytes[i + 3] === 0x06 && i + 22 <= bytes.length) {
       const eocd = new DataView(bytes.buffer, bytes.byteOffset + i);
       centralCount = eocd.getUint16(10, true);
       centralOffset = eocd.getUint32(16, true);
@@ -709,9 +778,10 @@ async function readZipEntries(buffer) {
     }
   }
 
-  if (centralOffset >= 0) {
+  if (centralOffset >= 0 && centralOffset + 46 <= bytes.length) {
     let cursor = centralOffset;
     for (let index = 0; index < centralCount; index += 1) {
+      if (cursor + 46 > bytes.length) break;
       if (bytes[cursor] !== 0x50 || bytes[cursor + 1] !== 0x4b || bytes[cursor + 2] !== 0x02 || bytes[cursor + 3] !== 0x03) break;
       const central = new DataView(bytes.buffer, bytes.byteOffset + cursor);
       const method = central.getUint16(10, true);
@@ -722,13 +792,15 @@ async function readZipEntries(buffer) {
       const localOffset = central.getUint32(42, true);
       const name = new TextDecoder().decode(bytes.subarray(cursor + 46, cursor + 46 + nameLength));
 
+      if (localOffset + 30 > bytes.length) break;
       const local = new DataView(bytes.buffer, bytes.byteOffset + localOffset);
       const localNameLength = local.getUint16(26, true);
       const localExtraLength = local.getUint16(28, true);
       const localCompressedSize = local.getUint32(18, true);
       const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+      if (dataStart > bytes.length) break;
       const size = compressedSize || localCompressedSize;
-      const raw = bytes.subarray(dataStart, dataStart + size);
+      const raw = bytes.subarray(dataStart, Math.min(bytes.length, dataStart + size));
       entries[name] = method === 8 ? await inflateRaw(raw) : raw;
       cursor += 46 + nameLength + extraLength + commentLength;
     }
@@ -743,9 +815,10 @@ async function readZipEntries(buffer) {
       const compressedSize = local.getUint32(18, true);
       const nameLength = local.getUint16(26, true);
       const extraLength = local.getUint16(28, true);
+      if (offset + 30 + nameLength + extraLength > bytes.length) break;
       const name = new TextDecoder().decode(bytes.subarray(offset + 30, offset + 30 + nameLength));
       const dataStart = offset + 30 + nameLength + extraLength;
-      const raw = bytes.subarray(dataStart, dataStart + compressedSize);
+      const raw = bytes.subarray(dataStart, Math.min(bytes.length, dataStart + compressedSize));
       entries[name] = method === 8 ? await inflateRaw(raw) : raw;
       offset = dataStart + compressedSize;
     }
@@ -755,15 +828,18 @@ async function readZipEntries(buffer) {
 }
 
 export async function unzipNaiImage(buffer) {
+  const bytes = new Uint8Array(buffer);
+  if (!bytes.length) throw new Error('NovelAI 返回了空响应');
   let entries;
   try {
     entries = await readZipEntries(buffer);
   } catch (error) {
-    throw new Error(`NovelAI 返回不是有效的 zip 包：${error.message}`);
+    throw new Error(`NovelAI 返回的 ZIP 解不开（${bytes.length} 字节）：${error.message}`);
   }
   const names = Object.keys(entries);
   const name = names.find(item => /\.(png|jpe?g|webp)$/i.test(item)) || names[0];
-  if (!name) throw new Error('NovelAI 返回的 zip 包里没有图片');
+  if (!name) throw new Error(`NovelAI 返回的 ZIP 包里没有图片（${names.length} 个条目）`);
+  if (!entries[name]?.length) throw new Error(`NovelAI 返回的图片是空文件：${name}`);
   return { base64: bytesToBase64(entries[name]), filename: name };
 }
 
@@ -927,20 +1003,11 @@ async function customImage({ base, token, model, width, height, seed, prompt }) 
 }
 
 async function imageFromResponse(res, label) {
-  const type = res.headers.get('content-type') || '';
-  if (type.includes('application/json')) {
-    const json = await res.json().catch(() => null);
-    const b64 = json?.image || json?.data?.[0]?.b64_json || json?.data?.[0]?.image || json?.b64_json || '';
-    if (b64) return { url: b64.startsWith('data:') ? b64 : `data:image/png;base64,${b64}` };
-    const remote = json?.data?.[0]?.url || json?.url || json?.image_url || '';
-    if (remote) return { url: remote };
-    throw new Error(`${label} 返回里没有图`);
-  }
-  if (type.includes('image/')) {
-    const blob = await res.blob();
-    return { url: URL.createObjectURL(blob) };
-  }
-  throw new Error(`${label} 返回了压缩包，当前只支持直出图片的接口`);
+  return decodeImagePayload(
+    await res.arrayBuffer(),
+    res.headers.get('content-type') || '',
+    label,
+  );
 }
 
 /**

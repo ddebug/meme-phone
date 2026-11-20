@@ -3936,18 +3936,6 @@ body {
   opacity: .92;
 }
 
-.mp-root[data-mp-theme="night"] .mp-glass-ico {
-  background:
-    radial-gradient(130% 115% at 16% 6%, rgba(255, 150, 200, .16), rgba(255, 255, 255, 0) 62%),
-    radial-gradient(135% 120% at 90% 98%, rgba(120, 200, 190, .14), rgba(255, 255, 255, 0) 64%),
-    linear-gradient(155deg, rgba(255, 255, 255, .17), rgba(255, 255, 255, .05) 58%);
-  box-shadow:
-    0 6px 16px rgba(0, 0, 0, .34),
-    inset 0 1px 0 rgba(255, 255, 255, .24),
-    inset 0 0 0 1px rgba(255, 255, 255, .14);
-  color: #f1ecff;
-}
-
 /* ===================== 用户管理（本段） ===================== */
 .mp-user-list {
   padding: 4px 12px;
@@ -4092,11 +4080,6 @@ body {
   color: var(--text-4);
 }
 
-.mp-root[data-mp-theme="night"] .mp-user-tag {
-  color: #cbbffb;
-  background: rgba(150, 132, 235, .22);
-}
-
 .mp-root[data-mp-theme="night"] .mp-user-tag.is-dirty {
   color: #f0c284;
   background: rgba(233, 177, 92, .2);
@@ -4104,14 +4087,6 @@ body {
 
 .mp-root[data-mp-theme="night"] .mp-set-row.is-on {
   background: rgba(150, 132, 235, .10);
-}
-
-.mp-root[data-mp-theme="night"] .mp-roles-radio {
-  box-shadow: inset 0 0 0 1.5px rgba(190, 176, 250, .35);
-}
-
-.mp-root[data-mp-theme="night"] .mp-roles-radio.is-on {
-  box-shadow: inset 0 0 0 5px #a897f2;
 }
 
 /* ===================== 查角色（本段） ===================== */
@@ -4355,22 +4330,6 @@ body {
   font-size: calc(10.5px * var(--font-scale));
   line-height: calc(1.6 * var(--line-scale));
   color: var(--text-4);
-}
-
-.mp-root[data-mp-theme="night"] .mp-wi-scan,
-.mp-root[data-mp-theme="night"] .mp-wi-retry {
-  color: #cbbffb;
-  background: rgba(150, 132, 235, .2);
-}
-
-.mp-root[data-mp-theme="night"] .mp-char-query {
-  color: #cbbffb;
-  background: rgba(150, 132, 235, .2);
-}
-
-.mp-root[data-mp-theme="night"] .mp-char-tag {
-  color: var(--text-3);
-  background: rgba(190, 180, 230, .12);
 }
 
 /* ===================== 查 TA 的手机（本段） ===================== */
@@ -4723,19 +4682,6 @@ body {
   text-align: right;
 }
 
-.mp-root[data-mp-theme="night"] .mp-cp-badge {
-  background: rgba(190, 180, 230, .12);
-}
-
-.mp-root[data-mp-theme="night"] .mp-cp-comment {
-  background: rgba(190, 180, 230, .08);
-}
-
-.mp-root[data-mp-theme="night"] .mp-cp-bubble {
-  background: rgba(255, 255, 255, .07);
-  color: var(--text);
-}
-
 /* ===== 本段：预设即 API（复制成新的一套） ===== */
 .mp-api-clone {
   display: flex;
@@ -4750,10 +4696,6 @@ body {
 }
 
 .mp-api-clone .mp-i { width: 16px; height: 16px; }
-
-.mp-root[data-mp-theme="night"] .mp-api-clone {
-  background: rgba(255, 255, 255, .06);
-}
 
 .mp-api-row .mp-api-tag {
   margin-left: 6px;
@@ -4788,10 +4730,6 @@ body {
 
 .mp-api-card-swap .mp-i { width: 12px; height: 12px; }
 
-.mp-root[data-mp-theme="night"] .mp-api-card-swap {
-  background: rgba(255, 255, 255, .1);
-}
-
 /* ===== 本段：壁纸透进页面（不再是纯白玻璃） ===== */
 .mp-root:not([data-mp-wall="none"]) .mp-page {
   background: linear-gradient(180deg, rgba(255, 252, 255, .52), rgba(248, 244, 254, .62));
@@ -4817,6 +4755,67 @@ body {
   background: rgba(38, 33, 58, .62);
 }
 
+.mp-root[data-mp-theme="night"] .mp-api-card-swap {
+  background: rgba(255, 255, 255, .1);
+}
+
+.mp-root[data-mp-theme="night"] .mp-api-clone {
+  background: rgba(255, 255, 255, .06);
+}
+
+.mp-root[data-mp-theme="night"] .mp-cp-badge {
+  background: rgba(190, 180, 230, .12);
+}
+
+.mp-root[data-mp-theme="night"] .mp-cp-comment {
+  background: rgba(190, 180, 230, .08);
+}
+
+.mp-root[data-mp-theme="night"] .mp-cp-bubble {
+  background: rgba(255, 255, 255, .07);
+  color: var(--text);
+}
+
+.mp-root[data-mp-theme="night"] .mp-wi-scan,
+.mp-root[data-mp-theme="night"] .mp-wi-retry {
+  color: #cbbffb;
+  background: rgba(150, 132, 235, .2);
+}
+
+.mp-root[data-mp-theme="night"] .mp-char-query {
+  color: #cbbffb;
+  background: rgba(150, 132, 235, .2);
+}
+
+.mp-root[data-mp-theme="night"] .mp-char-tag {
+  color: var(--text-3);
+  background: rgba(190, 180, 230, .12);
+}
+
+.mp-root[data-mp-theme="night"] .mp-roles-radio {
+  box-shadow: inset 0 0 0 1.5px rgba(190, 176, 250, .35);
+}
+
+.mp-root[data-mp-theme="night"] .mp-roles-radio.is-on {
+  box-shadow: inset 0 0 0 5px #a897f2;
+}
+
+.mp-root[data-mp-theme="night"] .mp-user-tag {
+  color: #cbbffb;
+  background: rgba(150, 132, 235, .22);
+}
+
+.mp-root[data-mp-theme="night"] .mp-glass-ico {
+  background:
+    radial-gradient(130% 115% at 16% 6%, rgba(255, 150, 200, .16), rgba(255, 255, 255, 0) 62%),
+    radial-gradient(135% 120% at 90% 98%, rgba(120, 200, 190, .14), rgba(255, 255, 255, 0) 64%),
+    linear-gradient(155deg, rgba(255, 255, 255, .17), rgba(255, 255, 255, .05) 58%);
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, .34),
+    inset 0 1px 0 rgba(255, 255, 255, .24),
+    inset 0 0 0 1px rgba(255, 255, 255, .14);
+  color: #f1ecff;
+}
 /* ============================ 音乐 ============================ */
 .mp-music {
   display: flex;

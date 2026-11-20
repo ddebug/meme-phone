@@ -34,14 +34,6 @@
   font-size: 9px;
   letter-spacing: .03em;
 }
-.mp-root[data-mp-theme="night"] .mp-extra-filter {
-  background: rgba(255, 255, 255, .06);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
-}
-.mp-root[data-mp-theme="night"] .mp-extra-filter.on {
-  background: rgba(255, 255, 255, .14);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16);
-}
 
 .mp-extra-kind-panel {
   margin-top: 12px;

@@ -89,15 +89,24 @@
 
 判据的前提：night/skin 覆写特异性高于同元素基础规则，与基础规则的先后无关紧要；只有**同键同特异性**才顺序敏感。
 
-### 当前结论
+### 当前结论（归位已收口）
 
-28 个段里散落覆写 **54 条**：**30 条可移动**、**19 条因同键冲突保留**、**5 条在 `apps-28`（末段）之后已无 themes 段**。剩余可移批次：`components-19`（→ `themes-21`，桌面磁贴）、`apps-22`（→ `themes-25`，音乐页）。保留主因是 `themes-25` 里的 frost 同键规则（`.mp-switch`、`.mp-switch.on`、`[frost][night] .mp-switch:not(.on)`、`is-danger` 的 name/ico）。
+散落覆写从 **75 条**降到 **33 条**：**42 条已归位**，剩下的 33 条里 **24 条移动会改变层叠**、**9 条技术上可移但结构上不宜**。
 
-### 已完成批次
+- **24 条保留**：
+  - 19 条——目标 themes 段之后存在同键规则，移动会让两条同特异性规则的先后反转。主因是 `themes-25` 里的 frost 同键规则（`.mp-switch` 350、`.mp-switch.on` 573、`[frost][night] .mp-switch:not(.on)` 812、`is-danger` 的 name/ico 341/345）。
+  - 5 条——`apps-28` 是最后一段，其后已无 themes 段，无处可去。
+- **9 条结构不宜**：它们与同控件的其它状态覆盖同处一块，单搬会把同一控件的夜景拆到两个文件——`.mp-seg button`（与 `button.on` 同组）、`.mp-chip-btn`（与 `.is-on`）、`.mp-ios-add`（两条覆盖）、音乐页整块 5 条（`music-card/empty/next/card-play/track-side`）、`.mp-theme-card`（与 `.is-on`）。搬它们收益为零、可维护性变差，故保持原样。
 
-- `apps-16` → `themes-18`：聊天模型页 6 条 `.mp-api-*` 夜间语义色，整块含注释搬移，声明与选择器未改。重建 + `npm test` 105 项全绿 + 昼夜 22 张 app 页比对全部 90 px。
-- `apps-20` → `themes-21`：12 条夜间覆写（`glass-ico`、`user-tag`、`roles-radio`、`wi-scan/wi-retry`、`char-query`、`char-tag`、`cp-badge/comment/bubble`、`api-clone`、`api-card-swap`），相邻块合并后 7 块整搬。比对 12 张白天全 0 px、夜间 11 张全 0 px（桌面夜间页见"已知不稳定"）。
-- `shell-13` → `themes-18`：3 条 `[data-mp-wall="none"][night]` 外壳/屏幕/页面深色背景，整块搬移。为此给预览加了 `wall` / `skin` 参数（`preview.html?view=x#night&wall=none`），`wall=none` 夜间三张图比对 0 px。
+### 已完成批次（7 批 / 42 条）
+
+- `apps-16` → `themes-18`：聊天模型页 6 条 `.mp-api-*` 夜间语义色，整块含注释搬移。昼夜 22 张 app 页比对 90 px（当时未加合成等待，属固定抖动）。
+- `apps-20` → `themes-21`：12 条（`glass-ico`、`user-tag`、`roles-radio`、`wi-scan/wi-retry`、`char-query`、`char-tag`、`cp-badge/comment/bubble`、`api-clone`、`api-card-swap`），相邻块合并后 7 块整搬。12 张白天 + 11 张夜间全 0 px。
+- `shell-13` → `themes-18`：3 条 `[data-mp-wall="none"][night]` 外壳/屏幕/页面深色背景。为此给预览加了 `wall` / `skin` 参数（`preview.html?view=x#night&wall=none`），三张图 0 px。
+- `components-19` → `themes-21`：桌面磁贴 3 条（`.mp-app .mp-tile`、其 `.mp-i`、`.mp-dock .mp-app .mp-tile`）。用 stash 回退取"移动前"同参数截图，比对 0 px。
+- `apps-24` → `themes-25`：装扮页 8 条（`dress-choice` + `.is-on`、`dress-toggle`、`dress-wall-swatch`、`dress-tile`、`icon-preview`、`icon-choice` + `.is-on`）；同块的 `theme-card` 与 `.is-on` 因混块不动。昼夜 24 张全 0 px。
+- `apps-16` → `themes-18`：剩余 5 条（`draw-icon.is-danger`、`ios-card`、`mem-chip` + `.is-recent` / `.is-empty`）。昼夜 24 张全 0 px。
+- 四条独立夜景：`apps-07` → `themes-09`（`chat-set-head`）、`components-17` → `themes-18`（`set-row.is-off .mp-switch`）、`apps-26` → `themes-27`（`extra-filter` + `.on`）、`apps-24` → `themes-25`（`dress-hero`）。昼夜 24 张全 0 px。
 
 ### 截图稳定性
 

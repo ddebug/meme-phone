@@ -945,10 +945,6 @@ body {
   background: rgba(216, 106, 134, .10);
 }
 
-.mp-root[data-mp-theme="night"] .mp-chat-set-head {
-  background: rgba(48, 43, 68, .72);
-}
-
 .mp-root[data-mp-theme="night"] .mp-set-row.is-danger .mp-set-name { color: #ee9bb1; }
 .mp-root[data-mp-theme="night"] .mp-set-row.is-danger .mp-set-ico {
   color: #ee9bb1;
@@ -2218,6 +2214,9 @@ body {
   background: linear-gradient(180deg, rgba(10, 8, 20, .18) 0%, rgba(10, 8, 20, .32) 60%, rgba(10, 8, 20, .52) 100%);
 }
 
+.mp-root[data-mp-theme="night"] .mp-chat-set-head {
+  background: rgba(48, 43, 68, .72);
+}
 /* ------------------------------------------------------------ 缩放适配
    手机壳的尺寸由 shell.js 的 deviceScale() 按可用视口算好后写进
    inline transform（translate + scale 一起），这里不再用媒体查询改
@@ -3546,7 +3545,6 @@ body {
 /* 置灰的开关行：能看见，但点不动 */
 .mp-root .mp-set-row.is-off { cursor: default; opacity: .62; }
 .mp-root .mp-set-row.is-off .mp-switch { background: #e9e9ea; }
-.mp-root[data-mp-theme="night"] .mp-set-row.is-off .mp-switch { background: #3a3a40; }
 
 .mp-root .mp-group-head {
   display: flex;
@@ -3851,6 +3849,8 @@ body {
 }
 
 .mp-root[data-mp-theme="night"] .mp-draw-icon.is-danger { color: #ee9bb1; }
+
+.mp-root[data-mp-theme="night"] .mp-set-row.is-off .mp-switch { background: #3a3a40; }
 /* ===================== 图标统一：毛玻璃磁贴（本段） ===================== */
 .mp-app .mp-tile {
   background:
@@ -5379,10 +5379,6 @@ body {
 .mp-root[data-mp-theme="night"] .mp-theme-card.is-on {
   box-shadow: inset 0 0 0 1.5px var(--accent), 0 8px 18px rgba(0, 0, 0, .3);
 }
-.mp-root[data-mp-theme="night"] .mp-dress-hero {
-  background: linear-gradient(155deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .04));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), var(--shadow-s);
-}
 
 .mp-dress-choice-row {
   display: flex;
@@ -6624,6 +6620,11 @@ body {
 
 .mp-root[data-mp-theme="night"] .mp-dress-choice { background: rgba(255, 255, 255, .06); }
 .mp-root[data-mp-theme="night"] .mp-dress-choice.is-on { background: rgba(167, 149, 255, .2); }
+
+.mp-root[data-mp-theme="night"] .mp-dress-hero {
+  background: linear-gradient(155deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .04));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), var(--shadow-s);
+}
 /* ------------------------------------------------------- 小剧场类型与美化页 */
 .mp-extra-filters {
   display: flex;
@@ -6659,14 +6660,6 @@ body {
   color: var(--text-2);
   font-size: 9px;
   letter-spacing: .03em;
-}
-.mp-root[data-mp-theme="night"] .mp-extra-filter {
-  background: rgba(255, 255, 255, .06);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
-}
-.mp-root[data-mp-theme="night"] .mp-extra-filter.on {
-  background: rgba(255, 255, 255, .14);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16);
 }
 
 .mp-extra-kind-panel {
@@ -7159,6 +7152,14 @@ body {
   .mp-extra-title { font-size: calc(22px * var(--font-scale)); }
 }
 
+.mp-root[data-mp-theme="night"] .mp-extra-filter {
+  background: rgba(255, 255, 255, .06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
+}
+.mp-root[data-mp-theme="night"] .mp-extra-filter.on {
+  background: rgba(255, 255, 255, .14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16);
+}
 /* --------------------------------------------- 聊天加号：小剧场弹窗 */
 .mp-sheet-panel {
   padding: 13px 12px 10px;

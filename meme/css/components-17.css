@@ -1,7 +1,6 @@
 /* 置灰的开关行：能看见，但点不动 */
 .mp-root .mp-set-row.is-off { cursor: default; opacity: .62; }
 .mp-root .mp-set-row.is-off .mp-switch { background: #e9e9ea; }
-.mp-root[data-mp-theme="night"] .mp-set-row.is-off .mp-switch { background: #3a3a40; }
 
 .mp-root .mp-group-head {
   display: flex;

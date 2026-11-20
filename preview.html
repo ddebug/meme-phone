@@ -23803,8 +23803,8 @@ function presetPanel(ctx, preset, contact) {
       <div class="mp-card-title">${esc(memoryPresetTitle(preset))}${active ? '<span class="mp-api-tag">使用中</span>' : ''}</div>
       <label class="mp-api-field">
         <span>保留层数</span>
-        <input id="mem-floors-input" class="mp-api-input" type="text" value="${esc(String(preset.floors || 10))}"
-          placeholder="1 到 50" inputmode="numeric" data-act="mem-floors" data-id="${esc(preset.id)}">
+        <input id="mem-floors-input" class="mp-api-input" type="text" value="${esc(String(preset.floors ?? 10))}"
+          placeholder="0 = 全部，1–50" inputmode="numeric" data-act="mem-floors" data-id="${esc(preset.id)}">
       </label>
       <div class="mp-mem-panel-note">${esc(modeNote)}${overrideNote ? ` · ${esc(overrideNote)}` : ''}</div>
       <button class="mp-set-row mp-mem-first" data-act="mem-first" data-id="${esc(preset.id)}" type="button">
@@ -23995,11 +23995,11 @@ function handle(ctx, act, data) {
   if (act === 'mem-floors') {
     const live = presetById(ctx.state, String(data.id || ''));
     if (!live) return true;
-    const floors = Math.max(1, Math.min(50, Number(String(data.value || '').replace(/[^\d]/g, '')) || 10));
+    const floors = Math.max(0, Math.min(50, Number(String(data.value || '').replace(/[^\d]/g, '')) || 10));
     if (floors === live.floors) return true;
     live.floors = floors;
     ctx.save();
-    say(ctx, `最近 ${floors} 层`);
+    say(ctx, floors > 0 ? `最近 ${floors} 层` : '全部原文');
     return true;
   }
 

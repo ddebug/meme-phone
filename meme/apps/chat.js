@@ -15,7 +15,7 @@ import { memoryEffectiveSummary, memoryPresetTitle } from '../memory.js';
 import { requestStats, estimateTokens, proactiveLead } from '../reply-context.js';
 import { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } from '../chat-transfer.js';
 import { avatarHtml, chatAvatarHtml, esc, shortText, timeText } from '../shell.js';
-import { renderBehaviorBubble, isSystemBehavior, behaviorSettings } from '../behavior.js';
+import { renderBehaviorBubble, isSystemBehavior, behaviorSettings, parseBehaviorReply } from '../behavior.js';
 import {
   applyBehaviorMessage, appointmentByMessage, respondAppointment, completeAppointment,
   respondFriendRequest, friendRequests, walletBalance, refundTransfer, revokeMembership,
@@ -157,7 +157,7 @@ function debugMessages(ctx, chat, contact, cache, draft) {
     const index = messages.findIndex(message => message.source === '场景提示');
     if (index >= 0) messages[index] = { ...messages[index], content: lead };
     else messages.push({ role: 'system', content: lead, source: '场景提示' });
-    messages.push({ role: 'user', content: '（现在没有新消息，主动发一条。）', source: '主动消息占位' });
+    messages.push({ role: 'user', content: '（现在没有新消息，主动开启聊天，按回复预设的格式发送。）', source: '主动消息占位' });
   } else if (mode === 'reply') {
     const who = ctx.state.settings?.user?.name || '我';
     messages.push({ role: 'user', content: `${who}：${String(draft || '').trim()}`, source: '最后一条聊天' });
@@ -931,7 +931,9 @@ async function runGeneration(ctx, chat, contact, options = {}) {
   try {
     if (kind === 'proactive') {
       const text = await ctx.ai.proactive(ctx, chat, contact, pick(poolFor(contact)));
-      bubbles = text ? [{ kind: 'proactive', text, behavior: null }] : [];
+      bubbles = parseBehaviorReply(text, {
+        from: 'them', allowed: behaviorSettings(ctx.state, chat),
+      }).map(bubble => ({ ...bubble, kind: bubble.kind === 'text' ? 'proactive' : bubble.kind }));
     } else {
       const result = await ctx.ai.reply(ctx, chat, contact, pick(poolFor(contact)), { omitIds: replaceIds });
       bubbles = Array.isArray(result?.bubbles) && result.bubbles.length

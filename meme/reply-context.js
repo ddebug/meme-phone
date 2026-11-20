@@ -18,13 +18,13 @@ const CJK_RE = /[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/u;
 
 /** 普通回复的场景提示；预览与实际发送共用，避免两套文案。 */
 export function replyLead(contact) {
-  return `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`;
+  return `你在扮演「${contact?.name || '对方'}」，用手机自然聊天。按当前回复预设的格式组织这一轮回复，可以分多个气泡，不限于一条；只扮演当前角色。`;
 }
 
 /** 主动开口的场景提示；预览与实际发送共用。 */
 export function proactiveLead(state, contact) {
   const idle = state?.settings?.proactive?.idleMinutes;
-  return `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。距离上次说话已经过去 ${idle} 分钟，你要主动发一条消息。`;
+  return `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。距离上次说话已经过去 ${idle} 分钟，你要主动开启这一轮聊天；格式与气泡数量遵循当前回复预设，可以自然分多条发送。`;
 }
 
 /**
@@ -601,7 +601,7 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
     messages.push({ role: 'user', content: `${messageWho(state, contact, lastMessage)}：${pendingUserText}`, source: '最后一条聊天', group: 'turn' });
   }
   if (options.proactive && !messages.some(message => message.role === 'user')) {
-    messages.push({ role: 'user', content: '（现在没有新消息，主动发一条。）', source: '主动消息占位', group: 'turn' });
+    messages.push({ role: 'user', content: '（现在没有新消息，主动开启聊天，按回复预设的格式发送。）', source: '主动消息占位', group: 'turn' });
   }
 
   const charTotal = messages.reduce((sum, message) => sum + String(message?.content || '').length, 0);

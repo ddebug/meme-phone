@@ -5,7 +5,7 @@
  * 数据结构刻意保持扁平，避免旧版那种「十个模块共享一个巨型对象、谁都改它」的局面。
  */
 
-import { FULL_REPLY_ITEM_DEFS } from './preset-defaults.js';
+import { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT } from './preset-defaults.js';
 import { normalizeBehavior, behaviorPreview } from './behavior.js';
 
 export const SCHEMA_VERSION = 2;
@@ -490,7 +490,7 @@ export function emptyState() {
             text: '',
             context: { ...DEFAULT_REPLY_CONTEXT },
             groups: DEFAULT_REPLY_GROUPS.map(group => ({ ...group })),
-            items: withReplyInstruction(defaultReplyItems(), '像平时发微信一样回消息：口语、短句，一次只回一两句。不要写旁白、括号里的动作，也不要写成小说段落。', 2.5),
+            items: withReplyInstruction(defaultReplyItems(), NATURAL_REPLY_INSTRUCTION, 2.5),
           },
         ],
       },
@@ -1670,6 +1670,18 @@ export function normalize(raw) {
         const anchor = Number.isFinite(Number(behavior?.order)) ? Number(behavior.order) : 2;
         presetItems = withReplyInstruction(presetItems, mainText, anchor + 0.5);
       }
+    }
+    /* 修复旧内置预设的单条限制：只替换已知原样文本，保留开关、分组、顺序和自定义内容。 */
+    if (builtInId) {
+      presetItems = presetItems.map(entry => {
+        if (entry.id === 'reply_item_format' && entry.content === LEGACY_SINGLE_REPLY_FORMAT) {
+          return { ...entry, content: MULTI_BUBBLE_REPLY_FORMAT };
+        }
+        if (entry.id === REPLY_INSTRUCTION_ID && entry.content === LEGACY_NATURAL_REPLY_INSTRUCTION) {
+          return { ...entry, content: NATURAL_REPLY_INSTRUCTION };
+        }
+        return entry;
+      });
     }
     replyPresets.push({
       id,

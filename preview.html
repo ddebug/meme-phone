@@ -7606,10 +7606,16 @@ __mods["meme/preset-defaults.js"] = function(module, exports, __req){
  * meme-phone · 默认聊天预设条目
  *
  * 来源：acsus-phone-standalone 的 getDefaultPresets()。
- * 24 条原版内容全部保留；用户/角色/个签/表情/聊天记录/时间改成 meme 的上下文条目，
+ * 保留原版条目与多气泡思路，消息格式适配本机；用户/角色/个签/表情/聊天记录/时间改成 meme 的上下文条目，
  * 依赖 acsus 消息协议或当前手机尚未接入的条目默认关闭，但内容仍原样保留。
  * 这里的 id 是稳定 id：导入、迁移和恢复默认都靠它对齐。
  */
+
+// 仅用于识别旧版原样内置条目；迁移时不覆盖用户自行修改的内容。
+const LEGACY_SINGLE_REPLY_FORMAT = '[回复格式要求]\n只输出角色要发的那一条消息。不要加角色名、时间、序号、冒号，也不要写旁白、括号动作或场景描写。\n[/回复格式要求]';
+const LEGACY_NATURAL_REPLY_INSTRUCTION = '像平时发微信一样回消息：口语、短句，一次只回一两句。不要写旁白、括号里的动作，也不要写成小说段落。';
+const NATURAL_REPLY_INSTRUCTION = '像平时发微信一样聊天：口语、短句，按意思自然分成多个气泡，不把一整轮回复挤在同一条里。通常发2～5条；简单回应也可以只发1条，不为凑数重复或强行追问。每个气泡独占一行，统一放在[消息]与[/消息]之间。不要写旁白、括号动作或小说段落。';
+const MULTI_BUBBLE_REPLY_FORMAT = '[回复格式要求]\n参考即时通讯的发消息方式，一行一个气泡，空行忽略；按语义自然拆分，通常2～5条，简单回应可只发1条，不为凑数重复。\n只输出当前角色这一轮要发的内容，用[消息]和[/消息]包住，例如：\n[消息]\n刚刚忙完\n你吃饭了吗\n[/消息]\n不要添加角色名、时间戳、序号或代码块；不要写旁白、括号动作、场景描写，也不要代替用户或其他角色发言。每条可用的表情或行为标签单独占一行，且只使用本会话已开启的标签。\n[/回复格式要求]';
 
 const FULL_REPLY_ITEM_DEFS = [
   {
@@ -7769,7 +7775,7 @@ const FULL_REPLY_ITEM_DEFS = [
     "label": "回复格式要求",
     "role": "system",
     "enabled": true,
-    "content": "[回复格式要求]\n只输出角色要发的那一条消息。不要加角色名、时间、序号、冒号，也不要写旁白、括号动作或场景描写。\n[/回复格式要求]",
+    "content": MULTI_BUBBLE_REPLY_FORMAT,
     "deletable": false
   },
   {
@@ -7805,6 +7811,10 @@ const FULL_REPLY_ITEM_DEFS = [
   }
 ];
 
+exports["LEGACY_SINGLE_REPLY_FORMAT"] = LEGACY_SINGLE_REPLY_FORMAT;
+exports["LEGACY_NATURAL_REPLY_INSTRUCTION"] = LEGACY_NATURAL_REPLY_INSTRUCTION;
+exports["NATURAL_REPLY_INSTRUCTION"] = NATURAL_REPLY_INSTRUCTION;
+exports["MULTI_BUBBLE_REPLY_FORMAT"] = MULTI_BUBBLE_REPLY_FORMAT;
 exports["FULL_REPLY_ITEM_DEFS"] = FULL_REPLY_ITEM_DEFS;
 };
 __mods["meme/behavior.js"] = function(module, exports, __req){
@@ -8498,7 +8508,7 @@ __mods["meme/data.js"] = function(module, exports, __req){
  * 数据结构刻意保持扁平，避免旧版那种「十个模块共享一个巨型对象、谁都改它」的局面。
  */
 
-const { FULL_REPLY_ITEM_DEFS } = __req("meme/preset-defaults.js");
+const { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT } = __req("meme/preset-defaults.js");
 const { normalizeBehavior, behaviorPreview } = __req("meme/behavior.js");
 
 const SCHEMA_VERSION = 2;
@@ -8983,7 +8993,7 @@ function emptyState() {
             text: '',
             context: { ...DEFAULT_REPLY_CONTEXT },
             groups: DEFAULT_REPLY_GROUPS.map(group => ({ ...group })),
-            items: withReplyInstruction(defaultReplyItems(), '像平时发微信一样回消息：口语、短句，一次只回一两句。不要写旁白、括号里的动作，也不要写成小说段落。', 2.5),
+            items: withReplyInstruction(defaultReplyItems(), NATURAL_REPLY_INSTRUCTION, 2.5),
           },
         ],
       },
@@ -10163,6 +10173,18 @@ function normalize(raw) {
         const anchor = Number.isFinite(Number(behavior?.order)) ? Number(behavior.order) : 2;
         presetItems = withReplyInstruction(presetItems, mainText, anchor + 0.5);
       }
+    }
+    /* 修复旧内置预设的单条限制：只替换已知原样文本，保留开关、分组、顺序和自定义内容。 */
+    if (builtInId) {
+      presetItems = presetItems.map(entry => {
+        if (entry.id === 'reply_item_format' && entry.content === LEGACY_SINGLE_REPLY_FORMAT) {
+          return { ...entry, content: MULTI_BUBBLE_REPLY_FORMAT };
+        }
+        if (entry.id === REPLY_INSTRUCTION_ID && entry.content === LEGACY_NATURAL_REPLY_INSTRUCTION) {
+          return { ...entry, content: NATURAL_REPLY_INSTRUCTION };
+        }
+        return entry;
+      });
     }
     replyPresets.push({
       id,
@@ -14829,7 +14851,7 @@ const { memoryEffectiveSummary, memoryPresetTitle } = __req("meme/memory.js");
 const { requestStats, estimateTokens, proactiveLead } = __req("meme/reply-context.js");
 const { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } = __req("meme/chat-transfer.js");
 const { avatarHtml, chatAvatarHtml, esc, shortText, timeText } = __req("meme/shell.js");
-const { renderBehaviorBubble, isSystemBehavior, behaviorSettings } = __req("meme/behavior.js");
+const { renderBehaviorBubble, isSystemBehavior, behaviorSettings, parseBehaviorReply } = __req("meme/behavior.js");
 const {
   applyBehaviorMessage, appointmentByMessage, respondAppointment, completeAppointment,
   respondFriendRequest, friendRequests, walletBalance, refundTransfer, revokeMembership,
@@ -14971,7 +14993,7 @@ function debugMessages(ctx, chat, contact, cache, draft) {
     const index = messages.findIndex(message => message.source === '场景提示');
     if (index >= 0) messages[index] = { ...messages[index], content: lead };
     else messages.push({ role: 'system', content: lead, source: '场景提示' });
-    messages.push({ role: 'user', content: '（现在没有新消息，主动发一条。）', source: '主动消息占位' });
+    messages.push({ role: 'user', content: '（现在没有新消息，主动开启聊天，按回复预设的格式发送。）', source: '主动消息占位' });
   } else if (mode === 'reply') {
     const who = ctx.state.settings?.user?.name || '我';
     messages.push({ role: 'user', content: `${who}：${String(draft || '').trim()}`, source: '最后一条聊天' });
@@ -15745,7 +15767,9 @@ async function runGeneration(ctx, chat, contact, options = {}) {
   try {
     if (kind === 'proactive') {
       const text = await ctx.ai.proactive(ctx, chat, contact, pick(poolFor(contact)));
-      bubbles = text ? [{ kind: 'proactive', text, behavior: null }] : [];
+      bubbles = parseBehaviorReply(text, {
+        from: 'them', allowed: behaviorSettings(ctx.state, chat),
+      }).map(bubble => ({ ...bubble, kind: bubble.kind === 'text' ? 'proactive' : bubble.kind }));
     } else {
       const result = await ctx.ai.reply(ctx, chat, contact, pick(poolFor(contact)), { omitIds: replaceIds });
       bubbles = Array.isArray(result?.bubbles) && result.bubbles.length
@@ -25750,13 +25774,13 @@ const CJK_RE = /[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/u;
 
 /** 普通回复的场景提示；预览与实际发送共用，避免两套文案。 */
 function replyLead(contact) {
-  return `你在扮演「${contact?.name || '对方'}」，用手机聊天，只说一条消息。`;
+  return `你在扮演「${contact?.name || '对方'}」，用手机自然聊天。按当前回复预设的格式组织这一轮回复，可以分多个气泡，不限于一条；只扮演当前角色。`;
 }
 
 /** 主动开口的场景提示；预览与实际发送共用。 */
 function proactiveLead(state, contact) {
   const idle = state?.settings?.proactive?.idleMinutes;
-  return `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。距离上次说话已经过去 ${idle} 分钟，你要主动发一条消息。`;
+  return `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。距离上次说话已经过去 ${idle} 分钟，你要主动开启这一轮聊天；格式与气泡数量遵循当前回复预设，可以自然分多条发送。`;
 }
 
 /**
@@ -26333,7 +26357,7 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
     messages.push({ role: 'user', content: `${messageWho(state, contact, lastMessage)}：${pendingUserText}`, source: '最后一条聊天', group: 'turn' });
   }
   if (options.proactive && !messages.some(message => message.role === 'user')) {
-    messages.push({ role: 'user', content: '（现在没有新消息，主动发一条。）', source: '主动消息占位', group: 'turn' });
+    messages.push({ role: 'user', content: '（现在没有新消息，主动开启聊天，按回复预设的格式发送。）', source: '主动消息占位', group: 'turn' });
   }
 
   const charTotal = messages.reduce((sum, message) => sum + String(message?.content || '').length, 0);

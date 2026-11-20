@@ -13028,12 +13028,24 @@ function clockText(date = new Date()) {
 }
 
 /* 按宿主窗口可用尺寸等比缩放手机壳；纯函数便于校验。
- * 高度必须用布局视口 innerHeight，不能用 visualViewport.height：
- * 软键盘弹起时可视高度会收缩，照它缩放会把整机在打字时误缩小。 */
+ * 注意：这里拿到的宽高必须是“窗口真实大小”，不能是软键盘弹起后被压缩的可视尺寸——
+ * 否则一打字整机就跟着缩成一小条。基准视口在 createShell 里记下，打字期间不更新。 */
 function computeDeviceScale(vw, vh) {
   if (!vw || !vh) return 1;
   const fit = Math.min((vw - 48) / 390, (vh - 48) / 844);
   return Math.max(0.45, Math.min(1, fit));
+}
+
+/* 读当前窗口布局视口尺寸。视觉视口(visualViewport)在键盘弹起时会收缩，不能用作基准。 */
+function readViewport() {
+  return { w: window.innerWidth || 0, h: window.innerHeight || 0 };
+}
+
+/* 决定缩放采用哪个视口：打字(软键盘弹起)期间保留基准，避免整机被压缩后的可视高度带小；
+   非聚焦时采纳新视口，响应真实的窗口拖动 / 旋转。纯函数便于校验。 */
+function viewportForScale(base, next, typing) {
+  if (typing) return base || next;
+  return next || base;
 }
 
 /* 壁纸：none / day / night / custom。自定义图直接作为 CSS 变量铺进壳内 */
@@ -13150,6 +13162,10 @@ function createShell(options) {
     sheetAnimated: false,
     toastTimer: 0,
     live: { inputValue: '', focus: false },
+    /* 是否有输入控件正聚焦：打字弹起软键盘期间为 true，用来忽略键盘造成的视口收缩 */
+    typing: false,
+    /* 缩放基准视口：打开手机时记下的窗口尺寸，不跟随软键盘期的可视高度抖动 */
+    baseViewport: readViewport(),
     scroller: null,
     bioEdit: false,
     deviceOffset: { x: 0, y: 0 },
@@ -13338,11 +13354,11 @@ function createShell(options) {
       </div>`;
   }
 
-  /* 桌面宿主的窗口往往装不下 844 高的手机：按可用视口等比缩小，整机才不会被裁掉 */
+  /* 桌面宿主的窗口往往装不下 844 高的手机：按基准视口等比缩小，整机才不会被裁掉。
+     基准视口不随打字弹键盘时的可视高度收缩更新（见 onWindowResize）。 */
   function deviceScale() {
-    const vw = window.visualViewport?.width || window.innerWidth || 0;
-    const vh = window.innerHeight || 0;
-    return computeDeviceScale(vw, vh);
+    const base = shell.baseViewport || readViewport();
+    return computeDeviceScale(base.w, base.h);
   }
 
   function deviceTransform() {
@@ -13630,12 +13646,25 @@ function createShell(options) {
   };
   window.addEventListener('pointerup', endPhoneDrag);
   window.addEventListener('pointercancel', endPhoneDrag);
-  const onWindowResize = () => {
+  /* 按当前窗口真实尺寸刷新缩放基准并重算整机变换 */
+  function refreshViewport() {
+    shell.baseViewport = readViewport();
     shell.deviceOffset = clampDeviceOffset(shell.deviceOffset?.x || 0, shell.deviceOffset?.y || 0);
     const device = root.querySelector('.mp-device');
     if (device) device.style.transform = deviceTransform();
-  };
+  }
+  function onWindowResize() {
+    /* 打字弹起软键盘时可视高度会被临时压缩；这是输入态，不能据此把整机缩小。
+       聚焦期间保留基准视口，失焦后由 focusout 再按真实窗口刷新一次。 */
+    shell.baseViewport = viewportForScale(shell.baseViewport, readViewport(), shell.typing);
+    shell.deviceOffset = clampDeviceOffset(shell.deviceOffset?.x || 0, shell.deviceOffset?.y || 0);
+    const device = root.querySelector('.mp-device');
+    if (device) device.style.transform = deviceTransform();
+  }
   window.addEventListener('resize', onWindowResize);
+  if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
+    window.visualViewport.addEventListener('resize', onWindowResize);
+  }
 
   /* 上滑：页面里快速上滑一段就回桌面 */
   let swipe = null;
@@ -13695,6 +13724,8 @@ function createShell(options) {
 
   /* 输入：不整页重绘，只切发送键状态并同步草稿 */
   root.addEventListener('input', event => {
+    /* 真的在打字即视为输入态：兜住个别环境 focusin 没派发的情况 */
+    if (event.target.closest('input, textarea')) shell.typing = true;
     const entry = shell.stack[shell.stack.length - 1];
     const app = entry ? apps[entry.view] : null;
     if (app && typeof app.onInput === 'function' && app.onInput(ctx, event)) return;
@@ -13706,11 +13737,17 @@ function createShell(options) {
   });
 
   root.addEventListener('focusin', event => {
+    if (event.target.closest('input, textarea')) shell.typing = true;
     if (event.target.closest('.mp-compose-box input')) shell.live.focus = true;
   });
 
   root.addEventListener('focusout', event => {
-    if (event.target.closest('.mp-compose-box input')) shell.live.focus = false;
+    if (event.target.closest('input, textarea')) shell.typing = false;
+    if (event.target.closest('.mp-compose-box input')) {
+      shell.live.focus = false;
+      /* 键盘收起后视口高度恢复，按真实窗口重新对一次缩放基准；延迟等收起动画结束 */
+      setTimeout(() => { if (!shell.typing) refreshViewport(); }, 120);
+    }
   });
 
   root.addEventListener('scroll', event => {
@@ -13749,6 +13786,9 @@ function createShell(options) {
       window.removeEventListener('pointerup', endPhoneDrag);
       window.removeEventListener('pointercancel', endPhoneDrag);
       window.removeEventListener('resize', onWindowResize);
+      if (window.visualViewport && typeof window.visualViewport.removeEventListener === 'function') {
+        window.visualViewport.removeEventListener('resize', onWindowResize);
+      }
       if (root) root.innerHTML = '';
     },
   };
@@ -13775,6 +13815,7 @@ exports["tintStyle"] = tintStyle;
 exports["esc"] = esc;
 exports["clockText"] = clockText;
 exports["computeDeviceScale"] = computeDeviceScale;
+exports["viewportForScale"] = viewportForScale;
 exports["applyWall"] = applyWall;
 exports["applyLook"] = applyLook;
 exports["dateText"] = dateText;

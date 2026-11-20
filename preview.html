@@ -2410,20 +2410,6 @@ body {
   background: var(--page);
 }
 
-.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-device {
-  background: rgba(18, 14, 30, .52);
-  box-shadow: 0 30px 70px rgba(10, 8, 20, .42), inset 0 0 0 1px rgba(255, 255, 255, .16);
-}
-
-.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-screen {
-  background: #12101a;
-}
-
-.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-page,
-.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-thread {
-  background: linear-gradient(180deg, #161222, #100c18);
-}
-
 /* 回桌面：底部操作条 */
 .mp-action-btn {
   display: inline-flex;
@@ -3846,6 +3832,20 @@ body {
 .mp-root[data-mp-theme="night"] .mp-api-btn.is-danger,
 .mp-root[data-mp-theme="night"] .mp-api-more-btn.is-danger { color: #f0a3a3; }
 .mp-root[data-mp-theme="night"] .mp-api-dot.is-bad { background: #e07878; }
+
+.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-device {
+  background: rgba(18, 14, 30, .52);
+  box-shadow: 0 30px 70px rgba(10, 8, 20, .42), inset 0 0 0 1px rgba(255, 255, 255, .16);
+}
+
+.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-screen {
+  background: #12101a;
+}
+
+.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-page,
+.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-thread {
+  background: linear-gradient(180deg, #161222, #100c18);
+}
 /* ===================== 图标统一：毛玻璃磁贴（本段） ===================== */
 .mp-app .mp-tile {
   background:
@@ -27212,11 +27212,14 @@ exports["importState"] = importState;
     log('hash=' + hash + ' view=' + view);
     const rest = new URLSearchParams(hash.split('&').slice(1).join('&') || '');
     const params = {};
-    rest.forEach(function(value, key) { if (key !== 'debug' && key !== 'night') params[key] = value; });
+    const styleKeys = ['debug', 'night', 'wall', 'skin'];
+    rest.forEach(function(value, key) { if (styleKeys.indexOf(key) < 0) params[key] = value; });
     if (view) api.goView(view, params);
-    if (hash.indexOf('night') >= 0) {
-      const node = document.getElementById('meme-phone');
-      if (node) node.dataset.mpTheme = 'night';
+    const node = document.getElementById('meme-phone');
+    if (node) {
+      if (hash.indexOf('night') >= 0) node.dataset.mpTheme = 'night';
+      const wall = rest.get('wall'); if (wall) node.dataset.mpWall = wall;
+      const skin = rest.get('skin'); if (skin) node.dataset.mpSkin = skin;
     }
     log('after goView, pages=' + document.querySelectorAll('.mp-page').length + ' desktop=' + document.querySelectorAll('.mp-desktop').length);
   }).catch(function(error){

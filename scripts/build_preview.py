@@ -170,11 +170,14 @@ def build() -> str:
     log('hash=' + hash + ' view=' + view);
     const rest = new URLSearchParams(hash.split('&').slice(1).join('&') || '');
     const params = {{}};
-    rest.forEach(function(value, key) {{ if (key !== 'debug' && key !== 'night') params[key] = value; }});
+    const styleKeys = ['debug', 'night', 'wall', 'skin'];
+    rest.forEach(function(value, key) {{ if (styleKeys.indexOf(key) < 0) params[key] = value; }});
     if (view) api.goView(view, params);
-    if (hash.indexOf('night') >= 0) {{
-      const node = document.getElementById('meme-phone');
-      if (node) node.dataset.mpTheme = 'night';
+    const node = document.getElementById('meme-phone');
+    if (node) {{
+      if (hash.indexOf('night') >= 0) node.dataset.mpTheme = 'night';
+      const wall = rest.get('wall'); if (wall) node.dataset.mpWall = wall;
+      const skin = rest.get('skin'); if (skin) node.dataset.mpSkin = skin;
     }}
     log('after goView, pages=' + document.querySelectorAll('.mp-page').length + ' desktop=' + document.querySelectorAll('.mp-desktop').length);
   }}).catch(function(error){{

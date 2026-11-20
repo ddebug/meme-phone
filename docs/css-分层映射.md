@@ -90,12 +90,13 @@
 
 ### 当前结论
 
-28 个段里散落覆写 **57 条**：**33 条可移动**、**19 条因同键冲突保留**、**5 条在 `apps-28`（末段）之后已无 themes 段**。剩余可移批次：`apps-20` 残余、`components-19`（→ `themes-21`）、`shell-13`（→ `themes-18`）、`apps-22`（→ `themes-25`）。保留主因是 `themes-25` 里的 frost 同键规则（`.mp-switch`、`.mp-switch.on`、`[frost][night] .mp-switch:not(.on)`、`is-danger` 的 name/ico）。
+28 个段里散落覆写 **54 条**：**30 条可移动**、**19 条因同键冲突保留**、**5 条在 `apps-28`（末段）之后已无 themes 段**。剩余可移批次：`components-19`（→ `themes-21`，桌面磁贴）、`apps-22`（→ `themes-25`，音乐页）。保留主因是 `themes-25` 里的 frost 同键规则（`.mp-switch`、`.mp-switch.on`、`[frost][night] .mp-switch:not(.on)`、`is-danger` 的 name/ico）。
 
 ### 已完成批次
 
 - `apps-16` → `themes-18`：聊天模型页 6 条 `.mp-api-*` 夜间语义色，整块含注释搬移，声明与选择器未改。重建 + `npm test` 105 项全绿 + 昼夜 22 张 app 页比对全部 90 px。
-- `apps-20` → `themes-21`：12 条夜间覆写（`glass-ico`、`user-tag`、`roles-radio`、`wi-scan/wi-retry`、`char-query`、`char-tag`、`cp-badge/comment/bubble`、`api-clone`、`api-card-swap`），相邻块合并后 7 块整搬。比对 12 张白天全 0 px、夜间 11 张全 0 px（桌面夜间页见下条不稳定说明）。
+- `apps-20` → `themes-21`：12 条夜间覆写（`glass-ico`、`user-tag`、`roles-radio`、`wi-scan/wi-retry`、`char-query`、`char-tag`、`cp-badge/comment/bubble`、`api-clone`、`api-card-swap`），相邻块合并后 7 块整搬。比对 12 张白天全 0 px、夜间 11 张全 0 px（桌面夜间页见"已知不稳定"）。
+- `shell-13` → `themes-18`：3 条 `[data-mp-wall="none"][night]` 外壳/屏幕/页面深色背景，整块搬移。为此给预览加了 `wall` / `skin` 参数（`preview.html?view=x#night&wall=none`），`wall=none` 夜间三张图比对 0 px。
 
 ### 已知不稳定
 

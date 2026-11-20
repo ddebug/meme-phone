@@ -37,20 +37,6 @@
   background: var(--page);
 }
 
-.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-device {
-  background: rgba(18, 14, 30, .52);
-  box-shadow: 0 30px 70px rgba(10, 8, 20, .42), inset 0 0 0 1px rgba(255, 255, 255, .16);
-}
-
-.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-screen {
-  background: #12101a;
-}
-
-.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-page,
-.mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-thread {
-  background: linear-gradient(180deg, #161222, #100c18);
-}
-
 /* 回桌面：底部操作条 */
 .mp-action-btn {
   display: inline-flex;

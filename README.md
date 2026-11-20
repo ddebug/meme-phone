@@ -135,7 +135,9 @@ meme-phone/
 │   ├── book.js          柏宝书只读桥
 │   ├── icons.js         内联 SVG 图标与马卡龙配色
 │   ├── theme-data.js    内置主题素材（像素小兔的横幅 / 头像 / 头像框 / 壁纸，WebP + GIF 内联）
-│   ├── meme.css         界面样式
+│   ├── meme.css         界面样式（入口，@import 引入 meme/css/ 的 28 段）
+│   ├── css/             五层拆分后的样式段：tokens / shell / components / apps / themes，
+│   │                    拼接顺序由 css/order.json 决定，跨层归属见 docs/css-分层映射.md
 │   └── apps/            聊天、通讯录、日记、设置、音乐、绘图、接口、预设、用户、
 │                        查角色、查 TA 的手机、小剧场/表情/计划/装扮/帮助
 ├── baibai-book/         柏宝书参考/ vendor 副本；扩展入口不再自动加载，避免与独立柏宝书抢占同一宿主
@@ -143,6 +145,7 @@ meme-phone/
 ├── quick-reply/         备用可导入快捷回复（/meme 召唤）；QR 栏按钮由扩展自动注入
 ├── scripts/
 │   ├── build_preview.py 打包 preview.html
+│   ├── analyze-css-layers.mjs  只读：列出散落在业务段里的主题/皮肤覆写，判定能否安全归位到 themes 段
 │   └── check.mjs        语法 / 必备文件 / 预览产物自检
 ├── docs/需求文档.md      需求与实现状态
 └── shots/               早期界面截图（其中钱包、会员两页已删除，别当现状看）
@@ -152,7 +155,9 @@ meme-phone/
 
 ```powershell
 npm run check                      # 语法、必备文件、preview 是否过期
+npm test                           # check + 全部单元测试（提交前跑这个）
 python scripts/build_preview.py    # 改完 meme/ 下的源码后重新打包 preview.html
+npm run css-layers                 # 只读：跨层归位的安全判定清单（动 CSS 段之前先跑）
 ```
 
 约定：

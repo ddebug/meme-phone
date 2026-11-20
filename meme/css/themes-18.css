@@ -77,3 +77,5 @@
 }
 
 .mp-root[data-mp-theme="night"] .mp-draw-icon.is-danger { color: #ee9bb1; }
+
+.mp-root[data-mp-theme="night"] .mp-set-row.is-off .mp-switch { background: #3a3a40; }

@@ -9,6 +9,7 @@
   "scripts": {
     "check": "node scripts/check.mjs",
     "test": "node scripts/test-all.mjs",
-    "preview": "python scripts/build_preview.py"
+    "preview": "python scripts/build_preview.py",
+    "css-layers": "node scripts/analyze-css-layers.mjs"
   }
 }

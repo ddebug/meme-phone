@@ -3399,17 +3399,6 @@ body {
 }
 .mp-root .mp-api-reply-link .mp-i { width: 14px; height: 14px; transform: rotate(-90deg); }
 
-/* 聊天模型页：夜间把浅底语义色换成亮色，避免深底上看不清 */
-.mp-root[data-mp-theme="night"] :is(.mp-api-btn.is-primary, .mp-api-count, .mp-api-chip, .mp-api-reply-link) { color: #c3b6ff; }
-.mp-root[data-mp-theme="night"] .mp-api-chip.is-draft { color: #f0c07a; }
-.mp-root[data-mp-theme="night"] .mp-api-pill.is-saved,
-.mp-root[data-mp-theme="night"] .mp-api-hint.is-clear { color: #8fe4b8; }
-.mp-root[data-mp-theme="night"] .mp-api-pill.is-dirty,
-.mp-root[data-mp-theme="night"] .mp-api-hint.is-dirty { color: #f0c07a; }
-.mp-root[data-mp-theme="night"] .mp-api-btn.is-danger,
-.mp-root[data-mp-theme="night"] .mp-api-more-btn.is-danger { color: #f0a3a3; }
-.mp-root[data-mp-theme="night"] .mp-api-dot.is-bad { background: #e07878; }
-
 /* 预设页的内联新建 / 改名 / 删除确认 */
 .mp-root .mp-api-inline {
   display: flex;
@@ -3846,6 +3835,17 @@ body {
   text-overflow: ellipsis;
 }
 .mp-root .mp-api-value.is-empty { color: var(--text-3); }
+
+/* 聊天模型页：夜间把浅底语义色换成亮色，避免深底上看不清 */
+.mp-root[data-mp-theme="night"] :is(.mp-api-btn.is-primary, .mp-api-count, .mp-api-chip, .mp-api-reply-link) { color: #c3b6ff; }
+.mp-root[data-mp-theme="night"] .mp-api-chip.is-draft { color: #f0c07a; }
+.mp-root[data-mp-theme="night"] .mp-api-pill.is-saved,
+.mp-root[data-mp-theme="night"] .mp-api-hint.is-clear { color: #8fe4b8; }
+.mp-root[data-mp-theme="night"] .mp-api-pill.is-dirty,
+.mp-root[data-mp-theme="night"] .mp-api-hint.is-dirty { color: #f0c07a; }
+.mp-root[data-mp-theme="night"] .mp-api-btn.is-danger,
+.mp-root[data-mp-theme="night"] .mp-api-more-btn.is-danger { color: #f0a3a3; }
+.mp-root[data-mp-theme="night"] .mp-api-dot.is-bad { background: #e07878; }
 /* ===================== 图标统一：毛玻璃磁贴（本段） ===================== */
 .mp-app .mp-tile {
   background:

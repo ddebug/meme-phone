@@ -101,7 +101,14 @@ body {
 /* --------------------------------------------------------------- 外壳 */
 .mp-overlay {
   position: fixed;
-  inset: 0;
+  /* 不用 inset:0——宿主若在 <html> 上留了 transform，fixed 的包含块会缩成 0 高，
+     整个浮层塌陷、手机被裁到视口外。视口单位不受包含块影响。 */
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box;
   z-index: 100000;
   display: flex;
   align-items: center;

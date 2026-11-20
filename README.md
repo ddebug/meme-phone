@@ -158,6 +158,7 @@ npm run check                      # 语法、必备文件、preview 是否过�
 npm test                           # check + 全部单元测试（提交前跑这个）
 python scripts/build_preview.py    # 改完 meme/ 下的源码后重新打包 preview.html
 npm run css-layers                 # 只读：跨层归位的安全判定清单（动 CSS 段之前先跑）
+npm run host-check                 # 真实酒馆宿主自检：挂载 / 居中 / 打字不缩小 / 进聊天页（宿主需先起）
 ```
 
 约定：

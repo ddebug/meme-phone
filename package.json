@@ -10,6 +10,7 @@
     "check": "node scripts/check.mjs",
     "test": "node scripts/test-all.mjs",
     "preview": "python scripts/build_preview.py",
-    "css-layers": "node scripts/analyze-css-layers.mjs"
+    "css-layers": "node scripts/analyze-css-layers.mjs",
+    "host-check": "node scripts/host-check.mjs"
   }
 }

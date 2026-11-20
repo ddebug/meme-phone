@@ -42,10 +42,35 @@ export function viewportForScale(base, next, typing) {
   return next || base;
 }
 
-/* 窄屏（手机 / 竖屏小窗）判定：宽度 ≤768px 时不再套桌面仿真手机的等比缩小，
-   整机改为铺满视口（配合 shell-03.css 的窄屏媒体查询）。纯函数便于校验。 */
-export function isMobileViewport(vw) {
-  return Number.isFinite(vw) && vw > 0 && vw <= 768;
+/* 手机竖屏判定：宽度 ≤768px 且竖着的视口。这类视口走窄屏规则——
+   缩放只由宽度决定，软键盘顶上来时只缩短高度，不缩宽度。纯函数便于校验。 */
+export function isMobileViewport(vw, vh) {
+  const w = Number(vw) || 0;
+  const h = Number(vh) || 0;
+  if (w <= 0 || h <= 0) return false;
+  return w <= 768 && h >= w;
+}
+
+/* 整机外框常量：.mp-device 是 content-box，390×844 之外四边各 10px padding */
+const DEVICE_W = 390;
+const DEVICE_H = 844;
+const DEVICE_PAD = 20;
+const MOBILE_GUTTER = 8;
+
+/* 整机尺寸。桌面沿用按宽高双项等比缩放（历史基线不变）；手机竖屏只按宽度定缩放，
+   宽度始终不随键盘变化，高度在剩余可视高度里缩短。availH 是键盘弹起后剩下的高度。
+   返回 scale 与 device 的 CSS 高度（不含 padding）。纯函数便于校验。 */
+export function deviceLayout(vw, vh, availH, mobile) {
+  const w = Number(vw) || 0;
+  const h = Number(vh) || 0;
+  const avail = Number(availH) || h;
+  if (!mobile) return { scale: computeDeviceScale(w, h), height: DEVICE_H };
+  const fit = (w - MOBILE_GUTTER * 2) / (DEVICE_W + DEVICE_PAD);
+  const scale = Math.max(0.45, Math.min(1, fit));
+  const usable = Math.max(240, avail - MOBILE_GUTTER * 2);
+  const fullVisual = (DEVICE_H + DEVICE_PAD) * scale;
+  const height = fullVisual <= usable ? DEVICE_H : Math.max(240, usable / scale - DEVICE_PAD);
+  return { scale, height };
 }
 
 /* 壁纸：none / day / night / custom。自定义图直接作为 CSS 变量铺进壳内 */
@@ -356,19 +381,51 @@ export function createShell(options) {
 
   /* 桌面宿主的窗口往往装不下 844 高的手机：按基准视口等比缩小，整机才不会被裁掉。
      基准视口不随打字弹键盘时的可视高度收缩更新（见 onWindowResize）。 */
-  function deviceScale() {
+  /* 视觉视口矩形：软键盘弹起时 height 扣掉键盘高度，offsetTop/Left 是当前可见区起点 */
+  function visualBox() {
+    const vv = window.visualViewport;
+    return {
+      top: vv ? (vv.offsetTop || 0) : 0,
+      left: vv ? (vv.offsetLeft || 0) : 0,
+      w: vv ? vv.width : (window.innerWidth || 0),
+      h: vv ? vv.height : (window.innerHeight || 0),
+    };
+  }
+
+  /* 当前该用哪套尺寸：手机竖屏按宽度定缩放、把高度让给键盘；桌面沿用基准视口等比缩放 */
+  function layoutNow() {
     const vp = readViewport();
-    /* 窄屏全屏模式：整机铺满视口，不做桌面仿真手机的等比缩小 */
-    if (isMobileViewport(vp.w)) return 1;
+    const box = visualBox();
+    if (isMobileViewport(vp.w, vp.h)) {
+      return { mobile: true, box, ...deviceLayout(vp.w, vp.h, box.h, true) };
+    }
     const base = shell.baseViewport || vp;
-    return computeDeviceScale(base.w, base.h);
+    return { mobile: false, box, scale: computeDeviceScale(base.w, base.h), height: DEVICE_H };
+  }
+
+  function deviceTransformOf(layout) {
+    /* 手机竖屏宽度已占满，没有拖动余量 */
+    const offset = layout.mobile ? { x: 0, y: 0 } : (shell.deviceOffset || { x: 0, y: 0 });
+    return `translate(${Math.round(offset.x || 0)}px, ${Math.round(offset.y || 0)}px) scale(${layout.scale.toFixed(4)})`;
   }
 
   function deviceTransform() {
-    const vp = readViewport();
-    if (isMobileViewport(vp.w)) return 'none';
-    const offset = shell.deviceOffset || { x: 0, y: 0 };
-    return `translate(${Math.round(offset.x || 0)}px, ${Math.round(offset.y || 0)}px) scale(${deviceScale().toFixed(4)})`;
+    return deviceTransformOf(layoutNow());
+  }
+
+  /* 浮层贴住当前可视区，整机按布局结果设缩放与高度：键盘弹起时只有高度在变 */
+  function applyLayout() {
+    const overlay = root?.querySelector('.mp-overlay');
+    const device = root?.querySelector('.mp-device');
+    if (!overlay || !device) return null;
+    const layout = layoutNow();
+    overlay.style.top = `${Math.round(layout.box.top)}px`;
+    overlay.style.left = `${Math.round(layout.box.left)}px`;
+    overlay.style.width = `${Math.round(layout.box.w)}px`;
+    overlay.style.height = `${Math.round(layout.box.h)}px`;
+    device.style.height = `${Math.round(layout.height)}px`;
+    device.style.transform = deviceTransformOf(layout);
+    return layout;
   }
 
   function render() {
@@ -387,9 +444,12 @@ export function createShell(options) {
     root.dataset.mpTheme = status;
     applyWall(root, state.settings);
     applyLook(root, state.settings);
+    /* 先算一次布局：整机高度与缩放一起写进首帧，避免开手机时先按 844 高闪一下再收 */
+    const layout = layoutNow();
+    const overlayStyle = `top: ${Math.round(layout.box.top)}px; left: ${Math.round(layout.box.left)}px; width: ${Math.round(layout.box.w)}px; height: ${Math.round(layout.box.h)}px`;
     root.innerHTML = `
-      <div class="mp-overlay">
-        <div class="mp-device" style="transform: ${deviceTransform()}">
+      <div class="mp-overlay" style="${overlayStyle}">
+        <div class="mp-device" style="height: ${Math.round(layout.height)}px; transform: ${deviceTransformOf(layout)}">
           <div class="mp-screen">
             ${state.settings.dress?.island === 'hide' ? '' : '<div class="mp-island"></div>'}
             <div class="mp-drag-handle" data-drag="phone" title="按住顶部拖动手机"></div>
@@ -606,11 +666,11 @@ export function createShell(options) {
   /* 顶部中间拖动手机壳：只在最上面一条区域响应，不影响页面里的滑动 */
   let phoneDrag = null;
   function clampDeviceOffset(x, y) {
-    /* 窄屏全屏模式：整机铺满视口，不允许拖动偏移 */
-    if (isMobileViewport(window.innerWidth || 0)) return { x: 0, y: 0 };
-    const scale = deviceScale();
-    const maxX = Math.max(0, (window.innerWidth + 390 * scale) / 2 - 90 * scale);
-    const maxY = Math.max(0, (window.innerHeight + 844 * scale) / 2 - 120 * scale);
+    /* 手机竖屏宽度已占满，没有拖动余量 */
+    if (isMobileViewport(window.innerWidth || 0, window.innerHeight || 0)) return { x: 0, y: 0 };
+    const layout = layoutNow();
+    const maxX = Math.max(0, (window.innerWidth + (DEVICE_W + DEVICE_PAD) * layout.scale) / 2 - 90 * layout.scale);
+    const maxY = Math.max(0, (window.innerHeight + (DEVICE_H + DEVICE_PAD) * layout.scale) / 2 - 120 * layout.scale);
     return {
       x: Math.max(-maxX, Math.min(maxX, x)),
       y: Math.max(-maxY, Math.min(maxY, y)),
@@ -653,24 +713,29 @@ export function createShell(options) {
   };
   window.addEventListener('pointerup', endPhoneDrag);
   window.addEventListener('pointercancel', endPhoneDrag);
-  /* 按当前窗口真实尺寸刷新缩放基准并重算整机变换 */
+  /* 按当前窗口真实尺寸刷新缩放基准并重排整机 */
   function refreshViewport() {
     shell.baseViewport = readViewport();
     shell.deviceOffset = clampDeviceOffset(shell.deviceOffset?.x || 0, shell.deviceOffset?.y || 0);
-    const device = root.querySelector('.mp-device');
-    if (device) device.style.transform = deviceTransform();
+    applyLayout();
   }
   function onWindowResize() {
-    /* 打字弹起软键盘时可视高度会被临时压缩；这是输入态，不能据此把整机缩小。
+    /* 手机竖屏：键盘顶上来只缩高度、宽度不动，直接按新的可视区重排 */
+    if (isMobileViewport(window.innerWidth || 0, window.innerHeight || 0)) {
+      applyLayout();
+      return;
+    }
+    /* 桌面：打字弹起软键盘时可视高度会被临时压缩，不能据此把整机缩小；
        聚焦期间保留基准视口，失焦后由 focusout 再按真实窗口刷新一次。 */
     shell.baseViewport = viewportForScale(shell.baseViewport, readViewport(), shell.typing);
     shell.deviceOffset = clampDeviceOffset(shell.deviceOffset?.x || 0, shell.deviceOffset?.y || 0);
-    const device = root.querySelector('.mp-device');
-    if (device) device.style.transform = deviceTransform();
+    applyLayout();
   }
   window.addEventListener('resize', onWindowResize);
   if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
     window.visualViewport.addEventListener('resize', onWindowResize);
+    /* iOS 软键盘时页面常被整体平移而不触发 resize，scroll 也当一次重排信号 */
+    window.visualViewport.addEventListener('scroll', onWindowResize);
   }
 
   /* 上滑：页面里快速上滑一段就回桌面 */
@@ -743,9 +808,17 @@ export function createShell(options) {
     if (entry && ctx.onDraft) ctx.onDraft(entry, input.value);
   });
 
+  /* 键盘弹出动画期间可视区会连续变化，聚焦后再补两次重排，兜住个别环境不发 resize 的情况 */
+  let keyboardTimer = 0;
+  function scheduleLayout() {
+    clearTimeout(keyboardTimer);
+    keyboardTimer = setTimeout(applyLayout, 260);
+  }
+
   root.addEventListener('focusin', event => {
     if (event.target.closest('input, textarea')) shell.typing = true;
     if (event.target.closest('.mp-compose-box input')) shell.live.focus = true;
+    if (event.target.closest('input, textarea')) scheduleLayout();
   });
 
   root.addEventListener('focusout', event => {
@@ -789,12 +862,14 @@ export function createShell(options) {
     destroy() {
       clearInterval(timer);
       clearTimeout(shell.toastTimer);
+      clearTimeout(keyboardTimer);
       window.removeEventListener('pointermove', onPhoneDragMove);
       window.removeEventListener('pointerup', endPhoneDrag);
       window.removeEventListener('pointercancel', endPhoneDrag);
       window.removeEventListener('resize', onWindowResize);
       if (window.visualViewport && typeof window.visualViewport.removeEventListener === 'function') {
         window.visualViewport.removeEventListener('resize', onWindowResize);
+        window.visualViewport.removeEventListener('scroll', onWindowResize);
       }
       if (root) root.innerHTML = '';
     },

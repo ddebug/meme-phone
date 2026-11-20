@@ -27,6 +27,8 @@
 
 .mp-device {
   position: relative;
+  /* 不许被 flex 容器压缩：宽度由 JS 的缩放统一决定，压缩会让左右留边对不上 */
+  flex: 0 0 auto;
   width: 390px;
   height: 844px;
   border-radius: 54px;
@@ -670,35 +672,12 @@
   margin-bottom: 16px;
 }
 
-/* --------------------------------------------------- 窄屏（手机）全屏铺满
-   宽屏桌面保留中间一台悬浮仿真手机；宽度 ≤768px 时整机铺满视口，去掉外壳边框、
-   圆角、阴影与外边距，不再靠 JS transform 等比缩小（与 shell.js 的 isMobileViewport 同步）。 */
+/* ------------------------------------------------- 窄屏（手机竖屏）排布
+   手机竖屏不铺满镜头、也不等比缩成小机器：宽度由 shell.js 按视口算缩放（键盘不影响宽度），
+   高度随软键盘缩短。这里只去掉浮层外边距，让可用高度就是整块屏幕，浮动定位交给 JS。 */
 @media (max-width: 768px) {
-  .mp-root {
-    padding: 0;
-  }
-
   .mp-overlay {
     padding: 0;
-    background: transparent;
-  }
-
-  .mp-device {
-    box-sizing: border-box;
-    width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    border-radius: 0;
-    padding: 0;
-    box-shadow: none;
-  }
-
-  .mp-screen {
-    border-radius: 0;
-  }
-
-  .mp-drag-handle {
-    display: none;
   }
 }
 

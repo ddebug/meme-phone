@@ -9,6 +9,7 @@ import { readWorldBook } from './host.js';
 import { buildMemoryContext } from './memory.js';
 import { behaviorContextText } from './behavior.js';
 import { diaryDayGroups, diaryEntryIsCurrent } from './diary.js';
+import { formatCompactHistory } from './history-context.js';
 
 /* ------------------------------------------------------------ 请求统计 */
 
@@ -176,11 +177,46 @@ export function transcript(state, chat, limit = 10, options = {}) {
 }
 
 /**
+ * 全量历史走 acsus 同款格式化：时间前缀、说话人、同一轮回复合并、引用/转发/日记。
+ * 只有显式设置字数预算时才退回简单逐行格式，避免破坏预算测试。
+ */
+function nativeHistoryTranscript(state, chat, limit, options = {}) {
+  if (!chat) return '';
+  const contact = state.contacts?.[chat.contactId];
+  const omitId = options.omitId || '';
+  const valid = (chat.messages || [])
+    .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded)
+    .filter(message => message.id !== omitId);
+  const count = Number(limit);
+  const selected = Number.isFinite(count) && count > 0 ? valid.slice(-Math.floor(count)) : valid.slice();
+  const latestDate = valid.length ? dayKey(new Date(Number(valid[valid.length - 1].at))) : '';
+  const groups = diaryDayGroups(chat);
+  const entries = state?.diary?.contacts?.[chat.contactId] || {};
+  const replaced = new Set();
+  const render = [];
+  for (const message of selected) {
+    const date = dayKey(new Date(Number(message.at)));
+    const entry = entries[date];
+    const replace = options.diary !== false && state?.diary?.enabled !== false && date !== latestDate &&
+      entry?.useOriginal !== true && diaryEntryIsCurrent(state, chat, entry, groups.get(date));
+    if (replace) {
+      if (!replaced.has(date)) {
+        render.push({ __diary: true, date, at: message.at, text: entry.text, key: date });
+        replaced.add(date);
+      }
+      continue;
+    }
+    render.push(message);
+  }
+  return formatCompactHistory(state, chat, render);
+}
+
+/**
  * 聊天上下文里的手机历史。和普通 transcript 不同的只有一点：
  * 发送窗口内的旧日期，如果已有当前有效的日记，就用一篇日记替换那天的原文；
  * 最近一天永远发原文，逐日切回原文也不会删掉日记。
  */
-export function historyTranscript(state, chat, limit = 10, options = {}) {
+export function historyTranscript(state, chat, limit = 0, options = {}) {
   if (!chat) return '';
   const contact = state.contacts?.[chat.contactId];
   const omitId = options.omitId || '';
@@ -188,7 +224,8 @@ export function historyTranscript(state, chat, limit = 10, options = {}) {
   const valid = (chat.messages || [])
     .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded)
     .filter(message => message.id !== omitId);
-  const selected = valid.slice(-Math.max(1, limit));
+  const count = Number(limit);
+  const selected = Number.isFinite(count) && count > 0 ? valid.slice(-Math.floor(count)) : valid.slice();
   const latestDate = valid.length ? dayKey(new Date(Number(valid[valid.length - 1].at))) : '';
   const groups = diaryDayGroups(chat);
   const entries = state?.diary?.contacts?.[chat.contactId] || {};
@@ -436,16 +473,18 @@ async function contextBlockFor(item, state, chat, contact, context, memoryText, 
   if (key === 'history') {
     const limit = effectivePhoneHistoryLimit(chat, context);
     const lastId = ctxOpts.omitLast ? (chat.messages?.[chat.messages.length - 1]?.id || '') : '';
-    const text = historyTranscript(state, chat, limit, {
-      omitId: lastId,
-      maxChars: ctxOpts.historyMaxChars,
-      diary: true,
-    });
-    return {
-      text: text ? `【历史小手机消息】\n${text}` : '',
-      status: text ? 'injected' : 'empty',
-      reason: text ? '' : '这个会话还没有聊天记录',
-    };
+    const transcriptOptions = { omitId: lastId, diary: true };
+    /* 无字数预算时走 acsus 同款全量格式；显式预算仍保留旧的截断路径。 */
+    const text = ctxOpts.historyMaxChars > 0
+      ? historyTranscript(state, chat, limit, { ...transcriptOptions, maxChars: ctxOpts.historyMaxChars })
+      : nativeHistoryTranscript(state, chat, limit, transcriptOptions);
+    if (!text) {
+      return { text: '', status: 'empty', reason: '这个会话还没有聊天记录' };
+    }
+    /* 和 acsus 的 chat-history 一样包一层角色/消息边界，并带“user 已读”分隔。 */
+    const charName = contact?.name || '角色';
+    const wrapped = `[角色-${charName}]\n[消息]\n${text}\n----上方对话user已读-----\n[/消息]\n[/角色-${charName}]`;
+    return { text: wrapped, status: 'injected', reason: '' };
   }
   return { text: '', status: 'empty', reason: '不认识的上下文来源' };
 }
@@ -469,8 +508,8 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
 
   if (options.memoryText === undefined && context.memory && chat) {
     try {
-      const story = await buildMemoryContext(state, chat, 1200);
-      options.memoryText = String(story?.text || story || '');
+      const story = await buildMemoryContext(state, chat, 0);
+      options.memoryText = String(story?.text || '');
     } catch {
       options.memoryText = '';
     }
@@ -481,7 +520,9 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
 
   const seen = new Set();
   let used = 0;
-  const charBudget = Math.max(2000, Number(context.charBudget) || 8000);
+  const budgetValue = Number(context.charBudget);
+  const charBudget = Number.isFinite(budgetValue) && budgetValue > 0 ? Math.round(budgetValue) : 0;
+  const budgetActive = charBudget > 0;
   /* 给模型回复预留的篇幅；这里只是字数口径的估算，不是精确 token，UI 带 ≈。 */
   const outputReserve = 1200;
 
@@ -512,7 +553,9 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
 
     let block;
     if (item.kind === 'context') {
-      const historyMaxChars = Math.max(0, charBudget - used - pendingUserText.length - pendingExtraChars - outputReserve - 24);
+      const historyMaxChars = budgetActive
+        ? Math.max(0, charBudget - used - pendingUserText.length - pendingExtraChars - outputReserve - 24)
+        : 0;
       block = await contextBlockFor(item, state, chat, contact, context, memoryText, {
         omitLast: !options.proactive,
         historyMaxChars,
@@ -532,7 +575,7 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
       reportItems.push({ ...base, status: 'duplicate', chars: 0, reason: '和前面的条目内容重复' });
       continue;
     }
-    if (used + content.length > charBudget) {
+    if (budgetActive && used + content.length > charBudget) {
       reportItems.push({ ...base, status: 'over-budget', chars: 0, reason: `整套上下文超过 ${charBudget} 字上限` });
       continue;
     }
@@ -574,9 +617,9 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
       estimate: true,
       charBudget,
       outputReserve,
-      overBudget: charTotal > charBudget,
+      overBudget: budgetActive && charTotal > charBudget,
       inputChars: lastUserText.length,
-      overLimitInput: lastUserText.length > charBudget,
+      overLimitInput: budgetActive && lastUserText.length > charBudget,
       items: reportItems,
       memoryChars: memoryText.length,
       personaBook: String(activePersona(state)?.lorebook || ''),

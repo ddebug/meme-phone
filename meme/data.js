@@ -21,12 +21,13 @@ export const DEFAULT_REPLY_CONTEXT = {
   memory: true,
   scene: true,
   history: true,
-  historyLimit: 10,
+  historyLimit: 0,
   time: true,
-  /* 世界书：扫最近几条聊天做关键词命中；单次注入字数上限；整套上下文的硬预算 */
+  /* 世界书：扫最近几条聊天做关键词命中；单次注入字数上限；整套上下文的硬预算。
+     0 = 不限制：聊天记录默认全部带上，不再用本地预算裁掉历史。 */
   bookFloors: 10,
   bookBudget: 2000,
-  charBudget: 8000,
+  charBudget: 0,
 };
 
 /** 回复指令在条目列表里的固定 id：它是普通条目，不再单独置顶。 */
@@ -75,8 +76,18 @@ function clampMin(value, min, fallback) {
   return Math.max(min, Math.round(num));
 }
 
+/* 0 表示“不限制”；正数才当作真实预算。 */
+function clampBudget(value, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(0, Math.min(200000, Math.round(num)));
+}
+
 export function normalizeReplyContext(raw) {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  /* 旧版本默认是「最近 10 条 + 8000 字预算」；这次整体改成不截断，
+     老存档里正好是这一组默认值时升级为 0，避免设置界面显示“全部”但实际还裁。 */
+  const legacyCut = Number(source.historyLimit) === 10 && Number(source.charBudget) === 8000;
   return {
     character: source.character !== false,
     user: source.user !== false,
@@ -86,11 +97,11 @@ export function normalizeReplyContext(raw) {
     memory: source.memory !== false,
     scene: source.scene !== false,
     history: source.history !== false,
-    historyLimit: clampMin(source.historyLimit, 1, DEFAULT_REPLY_CONTEXT.historyLimit),
+    historyLimit: legacyCut ? 0 : clampMin(source.historyLimit, 0, DEFAULT_REPLY_CONTEXT.historyLimit),
     time: source.time !== false,
     bookFloors: clampNumber(source.bookFloors, 1, 50, DEFAULT_REPLY_CONTEXT.bookFloors),
     bookBudget: clampNumber(source.bookBudget, 400, 6000, DEFAULT_REPLY_CONTEXT.bookBudget),
-    charBudget: clampNumber(source.charBudget, 2000, 20000, DEFAULT_REPLY_CONTEXT.charBudget),
+    charBudget: legacyCut ? 0 : clampBudget(source.charBudget, DEFAULT_REPLY_CONTEXT.charBudget),
   };
 }
 
@@ -189,21 +200,23 @@ export function chatHistoryFor(chat) {
   return normalizeChatHistory(chat?.history);
 }
 
-/** 这个小手机聊天注入最近几条：会话覆盖 > 回复预设；返回值至少 1。 */
+/** 这个小手机聊天注入最近几条：会话覆盖 > 回复预设；0 = 全部历史。 */
 export function effectivePhoneHistoryLimit(chat, context) {
-  const own = chatHistoryFor(chat).phoneLimit;
-  if (own > 0) return own;
-  return clampMin(context?.historyLimit, 1, DEFAULT_REPLY_CONTEXT.historyLimit);
+  const own = Number(chatHistoryFor(chat).phoneLimit);
+  if (Number.isFinite(own) && own > 0) return Math.round(own);
+  const presetLimit = Number(context?.historyLimit);
+  if (Number.isFinite(presetLimit)) return Math.max(0, Math.round(presetLimit));
+  return DEFAULT_REPLY_CONTEXT.historyLimit;
 }
 
-/** 这个角色读酒馆总结还是原文、读几层：会话覆盖 > 角色记忆开关 > 记忆方案。 */
+/** 这个角色读酒馆总结还是原文、读几层：会话覆盖 > 角色记忆开关 > 记忆方案；0 = 全部。 */
 export function effectiveTavernHistory(state, chat, preset) {
   const own = chatHistoryFor(chat);
   const wanted = own.tavernMode || memoryReadModeFor(state, chat?.contactId, preset);
   const mode = wanted === 'summary' ? 'summary' : wanted === 'recent' ? 'recent' : 'auto';
   const floors = own.tavernFloors > 0
-    ? own.tavernFloors
-    : clampNumber(preset?.floors, 1, 50, 10);
+    ? Math.max(0, Math.min(50, Math.round(Number(own.tavernFloors) || 0)))
+    : Math.max(0, Math.min(50, Math.round(Number(preset?.floors) || 0)));
   return { mode, floors, fromChat: Boolean(own.tavernMode || own.tavernFloors) };
 }
 
@@ -456,12 +469,12 @@ export function emptyState() {
         /* 行为标签：默认只放开约定计划和个签，转账/会员/好友申请要自己开 */
         behavior: { transfer: false, redpacket: false, membership: false, plan: true, friend: false, signature: true },
       },
-      /* 酒馆记忆方案：默认有酒馆总结就用总结，没有就取最近 10 层酒馆聊天 */
+      /* 酒馆记忆方案：默认有酒馆总结就用总结，没有就读全部酒馆聊天 */
       memory: {
         activeId: 'mem_auto',
         presets: [
-          { id: 'mem_auto', name: '默认', mode: 'auto', floors: 10, skipFirstFloor: false },
-          { id: 'mem_summary', name: '只看总结', mode: 'summary', floors: 10, skipFirstFloor: false },
+          { id: 'mem_auto', name: '默认', mode: 'auto', floors: 0, skipFirstFloor: false },
+          { id: 'mem_summary', name: '只看总结', mode: 'summary', floors: 0, skipFirstFloor: false },
           { id: 'mem_recent', name: '最近原文', mode: 'recent', floors: 20, skipFirstFloor: false },
         ],
         /* 手机默认读总结还是原文；按角色单独设过的，写在 byContact 里 */
@@ -1607,7 +1620,7 @@ export function normalize(raw) {
       id: String(item.id || `mem_${index + 1}`),
       name: String(item.name).trim().slice(0, 20),
       mode: ['auto', 'summary', 'recent'].includes(item.mode) ? item.mode : 'auto',
-      floors: Math.max(1, Math.min(50, Number(item.floors) || 10)),
+      floors: Math.max(0, Math.min(50, Math.round(Number(item.floors) || 0))),
       skipFirstFloor: Boolean(item.skipFirstFloor),
     }));
   merged.settings.memory = {

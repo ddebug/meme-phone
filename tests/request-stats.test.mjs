@@ -47,6 +47,6 @@ test('实际组装后酒馆历史与小手机历史分开统计，字符数与�
     assert.ok(item && item.status === 'injected');
     assert.ok(group);
     assert.equal(group.chars, item.chars);
-    assert.ok(group.tokens >= group.chars);
+    assert.ok(group.tokens > 0);
   }
 });

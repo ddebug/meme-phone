@@ -319,14 +319,17 @@ export async function readLatestTavernChat({ name = '', avatar = '', floors = 10
   const header = raw.find(line => line && typeof line === 'object' && line.chat_metadata && typeof line.chat_metadata === 'object');
   if (header?.chat_metadata) metadata = header.chat_metadata;
 
-  const lines = raw
+  const floorCount = Number(floors);
+  const floorLimit = Number.isFinite(floorCount) && floorCount > 0 ? Math.floor(floorCount) : 0;
+  let lines = raw
     .filter(line => line && !line.is_system && typeof line.mes === 'string' && line.mes.trim())
     .map(line => ({
       isUser: Boolean(line.is_user),
       name: line.name || (line.is_user ? (script.name1 || '你') : character.name),
       text: line.mes.trim(),
-    }))
-    .slice(-Math.max(1, Math.min(50, Number(floors) || 10)));
+    }));
+  /* floors <= 0 表示这层不截断：把聊天文件里的全部楼层都带上。 */
+  if (floorLimit > 0) lines = lines.slice(-floorLimit);
 
   return {
     available: Boolean(lines.length),
@@ -424,10 +427,10 @@ async function presetCompletion(preset, { prompt, system, messages }) {
   }
   headers['Content-Type'] = 'application/json';
 
+  /* 全量发送：组装阶段已经决定哪些内容进上下文，出站时不再按条数二次裁剪。 */
   const outgoing = Array.isArray(messages) && messages.length
     ? messages
       .filter(message => message && String(message.content || '').trim())
-      .slice(-40)
       .map(message => ({
         role: ['system', 'user', 'assistant'].includes(message.role) ? message.role : 'system',
         content: String(message.content).trim(),

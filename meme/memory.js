@@ -33,11 +33,12 @@ export function memoryPresetTitle(preset) {
 /** 一行说明，给聊天设置和预设页共用。 */
 export function memoryPresetSummary(preset) {
   if (!preset) return '还没设记忆方案';
-  const floors = Math.max(1, Math.min(50, Number(preset.floors) || 10));
+  const floors = Math.max(0, Math.min(50, Math.round(Number(preset.floors) || 0)));
+  const floorText = floors > 0 ? `最近 ${floors} 层` : '全部原文';
   const first = preset.skipFirstFloor ? ' · 首楼用原文' : '';
   if (preset.mode === 'summary') return `${memoryModeLabel(preset.mode)}${first}`;
-  if (preset.mode === 'recent') return `${memoryModeLabel(preset.mode)} · 最近 ${floors} 层${first}`;
-  return `${memoryModeLabel(preset.mode)} · 有总结先用，否则 ${floors} 层${first}`;
+  if (preset.mode === 'recent') return `${memoryModeLabel(preset.mode)} · ${floorText}${first}`;
+  return `${memoryModeLabel(preset.mode)} · 有总结先用，否则 ${floorText}${first}`;
 }
 
 /**
@@ -47,11 +48,13 @@ export function memoryPresetSummary(preset) {
 export function memoryEffectiveSummary(state, contactId, preset) {
   if (!preset) return '还没设记忆方案';
   const mode = memoryReadModeFor(state, contactId, preset);
-  const floors = Math.max(1, Math.min(50, Number(preset.floors) || 10));
+  const floors = Math.max(0, Math.min(50, Math.round(Number(preset.floors) || 0)));
   const first = preset.skipFirstFloor ? ' · 首楼用原文' : '';
   if (mode === 'summary') return `只用总结${first}`;
-  if (mode === 'recent') return `只看最近 ${floors} 层原文${first}`;
-  return `有总结看总结，没有就看最近 ${floors} 层原文${first}`;
+  if (mode === 'recent') {
+    return floors > 0 ? `只看最近 ${floors} 层原文${first}` : `读全部原文${first}`;
+  }
+  return floors > 0 ? `有总结看总结，没有就看最近 ${floors} 层原文${first}` : `有总结看总结，没有就看全部原文${first}`;
 }
 
 export function activeMemoryPreset(state, chat) {
@@ -61,24 +64,28 @@ export function activeMemoryPreset(state, chat) {
 function clip(text, limit) {
   const value = String(text || '').trim();
   if (!value) return '';
-  if (value.length <= limit) return value;
-  return `${value.slice(0, limit)}\n…（后面还有 ${value.length - limit} 字）`;
+  const max = Number(limit);
+  if (!Number.isFinite(max) || max <= 0) return value;
+  if (value.length <= max) return value;
+  return `${value.slice(0, max)}\n…（后面还有 ${value.length - max} 字）`;
 }
 
 function joinLines(lines) {
   return lines.map(line => `${line.isUser ? '你' : (line.name || 'TA')}：${line.text}`).join('\n');
 }
 
-/** 把最近几层裁到预算内：保留最新的部分，别把开头截掉。 */
+/** 把最近几层裁到预算内：保留最新的部分，别把开头截掉；limit <= 0 表示全部。 */
 function fitRecent(lines, limit) {
   let text = joinLines(lines);
-  if (text.length <= limit) return text;
+  const max = Number(limit);
+  if (!Number.isFinite(max) || max <= 0) return text;
+  if (text.length <= max) return text;
   const picked = [];
   let used = 0;
   for (let index = lines.length - 1; index >= 0; index -= 1) {
     const line = lines[index];
     const piece = `${line.isUser ? '你' : (line.name || 'TA')}：${line.text}`;
-    if (used + piece.length > limit && picked.length) break;
+    if (used + piece.length > max && picked.length) break;
     picked.unshift(line);
     used += piece.length + 1;
   }
@@ -125,18 +132,22 @@ export async function buildMemoryContext(state, chat, limit = 1200) {
   const contact = contactById(state, chat?.contactId);
   const tavern = effectiveTavernHistory(state, chat, preset);
   const wanted = tavern.mode;
-  const floors = Math.max(1, Math.min(50, Number(tavern.floors) || 10));
-  const summaryLimit = Math.max(300, Math.floor(limit * 0.75));
+  const floors = Math.max(0, Math.min(50, Math.round(Number(tavern.floors) || 0)));
+  const limitValue = Number(limit);
+  const charLimit = Number.isFinite(limitValue) && limitValue > 0 ? Math.round(limitValue) : 0;
+  const summaryLimit = charLimit > 0 ? Math.max(300, Math.floor(charLimit * 0.75)) : 0;
 
   /* 先找到这个角色最新的一份酒馆聊天。柏宝书只按这份聊天文件读：
      文件里有 chat_metadata[baibai_book] / 消息 extra.bbs_leaf 就直接用；
      没有才回退到当前打开聊天的只读接口。
-     不管这次读不读总结，都先把总结摸一遍——顶部要报「有没有总结、能不能切」。 */
+     不管这次读不读总结，都先把总结摸一遍——顶部要报「有没有总结、能不能切」。
+     读总结时要求全量楼层，避免总结被本地“最近 N 层”截断。 */
+  const readFloors = wanted === 'recent' ? floors : 0;
   const latest = contact?.name
     ? await readLatestTavernChat({
       name: contact.name,
       avatar: contact.tavernAvatar || '',
-      floors,
+      floors: readFloors,
       includeMemory: true,
     })
     : null;
@@ -220,15 +231,17 @@ export async function buildMemoryContext(state, chat, limit = 1200) {
     return emptyResult(preset, floors, { mode: wanted === 'recent' ? 'recent' : 'auto', hasSummary });
   }
 
-  const taverner = latest?.lines?.length ? latest : await readLatestTavernChat({
+  const tavernerBase = latest?.lines?.length ? latest : await readLatestTavernChat({
     name: contact.name,
     avatar: contact.tavernAvatar || '',
     floors,
   });
-  if (!taverner?.lines?.length) {
+  if (!tavernerBase?.lines?.length) {
     /* 明确选了读原文、但聊天文件里没有楼层：就是空的，不偷偷换成总结 */
     return emptyResult(preset, floors, { mode: wanted === 'recent' ? 'recent' : 'auto', hasSummary });
   }
+  /* 总结模式前面已经返回；这里读原文，按方案层数取最近 N 层。 */
+  const taverner = { ...tavernerBase, lines: tavernerBase.lines.slice(-floors) };
 
   const text = fitRecent(taverner.lines, limit);
   const head = `【酒馆聊天 · 最近 ${taverner.lines.length} 层${taverner.file ? ` · ${taverner.file.replace(/\.jsonl$/i, '')}` : ''}】`;

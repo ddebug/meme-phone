@@ -278,6 +278,12 @@ function chatSetRow(chatId, { iconName, title, sub, act, toggle, value, danger, 
     </button>`;
 }
 
+/* 历史条数的显示口径：0 表示全部。 */
+function phoneCountLabelFor(limit) {
+  const count = Number(limit);
+  return Number.isFinite(count) && count > 0 ? `${count} 条` : '全部';
+}
+
 /* 数字设置行：直接填数字，change 时立即保存，交互对齐 acsus 的聊天设置。 */
 function chatNumberRow(chatId, { iconName, title, sub, act, value, placeholder, min = 1, max = 50 }) {
   const maxAttr = max ? ` max="${max}"` : '';
@@ -437,27 +443,30 @@ function settingsBody(ctx, chatId) {
   const behavior = behaviorSettings(state, chat);
   const historyConfig = chatHistoryFor(chat);
   const tavern = effectiveTavernHistory(state, chat, memoryPresetFor(state, chat));
+  const tavernFloorLabel = tavern.floors > 0 ? `${tavern.floors} 层原文` : '全部原文';
   const tavernValue = tavern.mode === 'summary'
     ? '全部总结'
-    : tavern.mode === 'recent' ? `最近 ${tavern.floors} 层原文`
-      : `总结优先 · ${tavern.floors} 层原文`;
+    : tavern.mode === 'recent' ? (tavern.floors > 0 ? `最近 ${tavern.floors} 层原文` : '全部原文')
+      : `总结优先 · ${tavern.floors > 0 ? `${tavern.floors} 层原文` : '全部原文'}`;
   const phoneFollowLimit = replyContextFor(state, chat).historyLimit;
+  const phoneCount = historyConfig.phoneLimit > 0 ? historyConfig.phoneLimit : phoneFollowLimit;
+  const phoneCountLabel = phoneCount > 0 ? `${phoneCount} 条` : '全部';
   const tavernSub = '只改这个角色 · 设置读取方式和层数';
   const tavernFloorSub = [
     '最近原文层数',
-    tavern.mode === 'summary' ? '现在读全部总结，层数暂不生效' : `现在按 ${tavern.floors} 层读`,
+    tavern.mode === 'summary' ? '现在读全部总结，层数暂不生效' : `现在按 ${tavernFloorLabel} 读`,
     '填数字后会切到最近原文',
   ].join(' · ');
   const phoneNumberSub = [
-    '最近几条',
-    `现在读 ${historyConfig.phoneLimit || phoneFollowLimit} 条`,
+    '最近几条 · 0 = 全部',
+    `现在读 ${phoneCountLabel}`,
     '只改这个角色',
   ].join(' · ');
 
   const effectiveLines = [
     ['用哪个模型', llmName],
     ['怎么回复', replyName],
-    ['参考什么', `酒馆记忆 ${memoryEffectiveSummary(state, chat.contactId, activeMemory)} · 小手机历史 ${chatHistoryFor(chat).phoneLimit || phoneFollowLimit} 条`],
+    ['参考什么', `酒馆记忆 ${memoryEffectiveSummary(state, chat.contactId, activeMemory)} · 小手机历史 ${phoneCountLabel}`],
   ];
 
   return `
@@ -535,7 +544,8 @@ function settingsBody(ctx, chatId) {
           ${chatNumberRow(chat.id, {
             iconName: 'chat', title: '历史小手机消息',
             sub: phoneNumberSub, act: 'ts-phone-history',
-            value: historyConfig.phoneLimit || phoneFollowLimit, placeholder: String(phoneFollowLimit), max: null,
+            value: historyConfig.phoneLimit || (phoneFollowLimit > 0 ? phoneFollowLimit : ''),
+            placeholder: phoneFollowLimit > 0 ? String(phoneFollowLimit) : '0 = 全部', min: 0, max: null,
           })}
           ${chatSetRow(chat.id, {
             iconName: 'book', title: '酒馆记忆方案',
@@ -1403,12 +1413,12 @@ export const threadSettingsApp = {
         ctx.shell.debugPreview = null;
         ctx.save();
         ctx.rerender();
-        ctx.toast(`历史小手机消息按回复预设读 ${replyContextFor(ctx.state, chat).historyLimit} 条`);
+        ctx.toast(`历史小手机消息按回复预设读 ${phoneCountLabelFor(replyContextFor(ctx.state, chat).historyLimit)}`);
         return true;
       }
       const count = Number(raw);
-      if (!Number.isInteger(count) || count < 1) {
-        ctx.toast('条数填正整数');
+      if (!Number.isInteger(count) || count < 0) {
+        ctx.toast('条数填 0 或正整数');
         ctx.rerender();
         return true;
       }
@@ -1417,7 +1427,7 @@ export const threadSettingsApp = {
       ctx.shell.debugPreview = null;
       ctx.save();
       ctx.rerender();
-      ctx.toast(`历史小手机消息改成最近 ${count} 条`);
+      ctx.toast(count === 0 ? '历史小手机消息改成全部带上' : `历史小手机消息改成最近 ${count} 条`);
       return true;
     }
 

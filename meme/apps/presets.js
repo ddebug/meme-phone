@@ -7,7 +7,6 @@
 import { icon } from '../icons.js';
 import { esc } from '../shell.js';
 import { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext, normalizeReplyItems, normalizeCharacters, normalizeReplyGroups, replyGroupIdFor, positionalReplyGroups, defaultReplyItems, REPLY_CONTEXT_SPECS, chatsOf, REPLY_INSTRUCTION_ID, withReplyInstruction } from '../data.js';
-import { buildReplyMessages } from '../reply-context.js';
 import { tavernQuietPrompt } from '../host.js';
 
 let editingId = '';
@@ -97,7 +96,7 @@ function roleLabel(role) {
 
 function contextItemNote(item, context) {
   const spec = REPLY_CONTEXT_SPECS[item.auto];
-  if (item.auto === 'history') return `最近 ${context.historyLimit} 条会话`;
+  if (item.auto === 'history') return context.historyLimit > 0 ? `最近 ${context.historyLimit} 条会话` : '全部会话';
   return spec?.note || '手机读取当前数据';
 }
 
@@ -149,7 +148,7 @@ function previewHtml(preset) {
     </div>
     <div class="mp-preview-panel">${body}</div>
     <div class="mp-preview-foot">
-      共 ${messages.length} 条 · 条目占用 ${report.charUsed}/${report.charBudget} 字 · 人设世界书：${esc(report.personaBook || '未绑定')}
+      共 ${messages.length} 条 · 条目占用 ${report.charUsed}/${report.charBudget > 0 ? report.charBudget : '不限'} 字 · 人设世界书：${esc(report.personaBook || '未绑定')}
       ${skipped.length ? `<br>没注入：${esc(skipped.map(item => `${item.label}（${PREVIEW_STATUS[item.status] || item.reason || item.status}）`).join('；'))}` : ''}
     </div>`;
 }
@@ -754,9 +753,9 @@ export const replyPresetApp = {
           <button class="mp-row" data-act="reply-budget" type="button">
             <span class="mp-row-main">
               <span class="mp-row-name">整套上下文预算</span>
-              <span class="mp-row-sub">条目超过 ${context.charBudget} 字就不再继续塞，保证请求不会撑爆</span>
+              <span class="mp-row-sub">${context.charBudget > 0 ? `条目超过 ${context.charBudget} 字就不再继续塞，保证请求不会撑爆` : '不限字数，所有条目和历史都完整发送'}</span>
             </span>
-            <span class="mp-api-value">${context.charBudget} 字</span>
+            <span class="mp-api-value">${context.charBudget > 0 ? `${context.charBudget} 字` : '不限'}</span>
             ${icon('chevron')}
           </button>
         </div>
@@ -1037,25 +1036,26 @@ export const replyPresetApp = {
       if (item.auto === 'history') {
         const openLimitForm = () => ctx.openSheet({
           kind: 'text', title: '保留最近几条', value: String(context.historyLimit),
-          placeholder: '填正整数，比如 30', confirm: '存下',
+          placeholder: '0 = 全部，或填正整数', confirm: '存下',
           onText: raw => {
             const count = Number(String(raw || '').trim());
-            if (!Number.isInteger(count) || count < 1) { ctx.toast('条数填正整数'); return; }
-            setNumber('historyLimit', count, `聊天记录改成保留 ${count} 条`);
+            if (!Number.isInteger(count) || count < 0) { ctx.toast('条数填 0 或正整数'); return; }
+            setNumber('historyLimit', count, count === 0 ? '聊天记录改成全部带上' : `聊天记录改成保留 ${count} 条`);
           },
         });
         ctx.openSheet({
           kind: 'pick',
           title: '手机聊天记录',
-          note: `这条会按当前会话自动取最近几条消息；现在是 ${context.historyLimit} 条。`,
+          note: `这条会按当前会话自动取最近几条消息；现在是 ${context.historyLimit > 0 ? `${context.historyLimit} 条` : '全部'}。`,
           items: [
             { label: toggleLabel, value: 'toggle', icon: item.enabled ? 'close' : 'plus' },
+            { label: '全部带上', value: 'n:0', icon: 'chat', note: context.historyLimit === 0 ? '现在用的' : '不按条数截断' },
             ...[5, 10, 15, 20, 30].map(value => ({
               value: `n:${value}`,
               label: `保留最近 ${value} 条`,
               note: value === context.historyLimit ? '现在用的' : '',
             })),
-            { label: `自定义条数 · 当前 ${context.historyLimit} 条`, value: 'custom', icon: 'clock' },
+            { label: `自定义条数 · 当前 ${context.historyLimit > 0 ? `${context.historyLimit} 条` : '全部'}`, value: 'custom', icon: 'clock' },
             { label: '只对某些角色生效', value: 'characters', icon: 'contacts', note: charactersLabel(item) || '现在是全部角色' },
           ],
           onPick: value => {
@@ -1064,7 +1064,7 @@ export const replyPresetApp = {
             else if (value === 'custom') openLimitForm();
             else if (String(value).startsWith('n:')) {
               const count = Number(String(value).slice(2));
-              setNumber('historyLimit', count, `聊天记录改成保留 ${count} 条`);
+              setNumber('historyLimit', count, count === 0 ? '聊天记录改成全部带上' : `聊天记录改成保留 ${count} 条`);
             }
           },
         });
@@ -1126,12 +1126,15 @@ export const replyPresetApp = {
       ctx.openSheet({
         kind: 'pick',
         title: '整套上下文预算',
-        note: `条目按顺序往里装，累计超过预算的条目这次就不注入，避免请求太长把模型撑爆。现在是 ${context.charBudget} 字。`,
-        items: [4000, 6000, 8000, 12000, 16000].map(value => ({
-          value: `n:${value}`,
-          label: `${value} 字`,
-          note: value === context.charBudget ? '现在用的' : '',
-        })),
+        note: `条目按顺序往里装；选了字数上限后，累计超过预算的条目这次就不注入。现在是 ${context.charBudget > 0 ? `${context.charBudget} 字` : '不限'}。`,
+        items: [
+          { value: 'n:0', label: '不限字数', note: context.charBudget === 0 ? '现在用的' : '全部条目和历史都发送' },
+          ...[4000, 6000, 8000, 12000, 16000].map(value => ({
+            value: `n:${value}`,
+            label: `${value} 字`,
+            note: value === context.charBudget ? '现在用的' : '',
+          })),
+        ],
         onPick: value => {
           if (!String(value).startsWith('n:')) return;
           const size = Number(String(value).slice(2));
@@ -1141,7 +1144,7 @@ export const replyPresetApp = {
           resetPreview();
           ctx.save();
           ctx.rerender();
-          ctx.toast(`整套预算改成 ${size} 字`);
+          ctx.toast(size > 0 ? `整套预算改成 ${size} 字` : '整套预算改成不限');
         },
       });
       return true;
@@ -1168,7 +1171,7 @@ export const replyPresetApp = {
       preview = { presetId: preset.id, tab: preview.tab || 'messages', chatId: chat?.id || '', loading: true, error: '', data: null, flat: '' };
       const mySeq = ++previewSeq;
       ctx.rerender();
-      buildReplyMessages(ctx.state, chat, contact, { presetOverride: preset }).then(result => {
+      ctx.ai.preview(chat, contact, { presetOverride: preset }).then(result => {
         if (mySeq !== previewSeq) return; // 已有更新的预览请求，旧结果不覆盖
         preview = {
           presetId: preset.id,

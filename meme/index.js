@@ -116,11 +116,13 @@ function makeAi(getState) {
   async function compose(chat, contact, options = {}) {
     const state = getState();
     const ctxSettings = replyContextFor(state, chat);
-    const memoryLimit = options.proactive ? 900 : 1200;
+    /* 0 = 不限制：酒馆记忆和手机历史都按全量送，不再用本地预算截断。 */
+    const memoryLimit = 0;
     const storyBlock = ctxSettings.memory ? await story(state, chat, memoryLimit) : { text: '' };
     const theaterKind = theaterKindFor(state);
     const wantsTheater = !options.proactive && extrasEnabledFor(state, contact?.id);
     const built = await buildReplyMessages(state, chat, contact, {
+      presetOverride: options.presetOverride,
       memoryText: String(storyBlock?.text || ''),
       lead: options.proactive ? proactiveLead(state, contact) : replyLead(contact),
       extraPrompt: wantsTheater ? theaterPrompt(contact?.name, theaterKind) : '',
@@ -156,9 +158,10 @@ function makeAi(getState) {
      * 返回的 messages 故意不含最后一条用户消息，聊天页按当前草稿补上；
      * 这样输入时只重算 token，不用重复读记忆和世界书。
      */
-    async preview(chat, contact) {
+    async preview(chat, contact, options = {}) {
       const state = getState();
       const last = chat?.messages?.[chat.messages.length - 1];
+      const presetId = options.presetOverride?.id || replyPresetFor(state, chat)?.id || '';
       const key = [
         chat?.id || '',
         chat?.messages?.length || 0,
@@ -171,18 +174,21 @@ function makeAi(getState) {
         state.settings?.memory?.readMode || '',
         state.diary?.enabled !== false ? 'diaryon' : 'diaryoff',
         diaryFingerprint(state.diary?.contacts?.[chat?.contactId] || {}),
+        presetId ? `preset:${presetId}` : 'preset:active',
+        options.presetOverride ? JSON.stringify(options.presetOverride.context || {}) : '',
+        options.presetOverride ? JSON.stringify(options.presetOverride.items || []) : '',
       ].join('|');
       const hit = previewCache.get(key);
       if (hit && Date.now() - hit.at < 30000) return hit.value;
 
-      const { built, wantsTheater } = await compose(chat, contact, { omitLastUser: true });
+      const { built, wantsTheater } = await compose(chat, contact, { omitLastUser: true, presetOverride: options.presetOverride });
       const value = {
         key,
         messages: built.messages,
         report: built.report,
         wantsTheater,
         model: llmPresetFor(state, chat),
-        replyPreset: replyPresetFor(state, chat),
+        replyPreset: options.presetOverride || replyPresetFor(state, chat),
         at: Date.now(),
       };
       previewCache.set(key, { at: Date.now(), value });

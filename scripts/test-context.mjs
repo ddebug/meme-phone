@@ -73,7 +73,7 @@ function findItem(items, id) {
   ok(!text.includes('【旧毛衣】'), '关闭的世界书条目不注入');
   ok(text.includes('【角色档案 · 沈砚】'), '角色档案按角色卡读取');
   ok(text.includes('【场景信息】'), '场景信息单独成条');
-  ok(text.includes('【历史小手机消息】'), '聊天记录按条数注入');
+  ok(text.includes('[角色-沈砚]') && text.includes('----上方对话user已读-----'), '聊天记录按 acsus 消息边界注入');
   ok(text.includes('【我的个性签名】') && text.includes('夜里也要好好吃饭'), '个签按当前资料注入');
   ok(text.includes('【表情包库】') && text.includes('抱抱（🫂）'), '表情包库按当前面板注入');
   ok(messages[messages.length - 1].role === 'user', '最后一条聊天作为 user 消息');

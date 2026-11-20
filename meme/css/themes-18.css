@@ -66,3 +66,14 @@
 .mp-root[data-mp-wall="none"][data-mp-theme="night"] .mp-thread {
   background: linear-gradient(180deg, #161222, #100c18);
 }
+
+.mp-root[data-mp-theme="night"] .mp-mem-chip { background: rgba(167, 149, 255, .16); color: #c3b6ff; }
+.mp-root[data-mp-theme="night"] .mp-mem-chip.is-recent { background: rgba(120, 170, 230, .16); color: #9fc4ea; }
+.mp-root[data-mp-theme="night"] .mp-mem-chip.is-empty { background: rgba(255, 255, 255, .08); color: var(--text-3); }
+
+.mp-root[data-mp-theme="night"] .mp-ios-card {
+  background: linear-gradient(150deg, rgba(45, 39, 70, .74), rgba(31, 27, 48, .62));
+  box-shadow: var(--shadow-s), inset 0 0 0 1px rgba(255, 255, 255, .1);
+}
+
+.mp-root[data-mp-theme="night"] .mp-draw-icon.is-danger { color: #ee9bb1; }

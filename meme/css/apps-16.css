@@ -19,7 +19,7 @@
   border-radius: 11px;
 }
 .mp-root .mp-draw-icon.is-danger { color: #b75a73; }
-.mp-root[data-mp-theme="night"] .mp-draw-icon.is-danger { color: #ee9bb1; }
+
 .mp-root .mp-draw-side.is-danger { color: #d94b4b; }
 
 .mp-root .mp-draw-hint {
@@ -268,10 +268,7 @@
   cursor: pointer;
 }
 .mp-root .mp-ios-add:active { transform: scale(.985); }
-.mp-root[data-mp-theme="night"] .mp-ios-card {
-  background: linear-gradient(150deg, rgba(45, 39, 70, .74), rgba(31, 27, 48, .62));
-  box-shadow: var(--shadow-s), inset 0 0 0 1px rgba(255, 255, 255, .1);
-}
+
 .mp-root[data-mp-theme="night"] .mp-ios-memory-row,
 .mp-root[data-mp-theme="night"] .mp-ios-add { background: rgba(255, 255, 255, .08); }
 .mp-root[data-mp-theme="night"] .mp-ios-add { color: var(--accent); }
@@ -918,7 +915,4 @@
   box-shadow: none;
 }
 .mp-root .mp-mem-first .mp-set-name small { margin-top: 2px; }
-.mp-root[data-mp-theme="night"] .mp-mem-chip { background: rgba(167, 149, 255, .16); color: #c3b6ff; }
-.mp-root[data-mp-theme="night"] .mp-mem-chip.is-recent { background: rgba(120, 170, 230, .16); color: #9fc4ea; }
-.mp-root[data-mp-theme="night"] .mp-mem-chip.is-empty { background: rgba(255, 255, 255, .08); color: var(--text-3); }
 

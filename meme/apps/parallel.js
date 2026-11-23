@@ -1,118 +1,143 @@
 /**
- * meme-phone · 平行时空
+ * meme-phone · 平行时空（酒馆聊天分支）
  *
- * 一个角色可以开多场：「这一场」就是另一条时间线里的一段对话。
- * 生成用的是和原生聊天同一套组装（预设 / 接口 / 上下文 / 柏宝书记忆），
- * 但收发只写进这一场自己的会话里，不写回原生聊天，也不进聊天列表和未读数。
+ * 每一场都绑在某个酒馆聊天文件上：开一场时把那个文件的楼层整段抄下来当 base，
+ * 生成时交给酒馆自己的 prompt 组装，回复只存在这台小手机里，一个字都不写回聊天文件。
+ * 所以这里不需要小手机的模型 / 接口 / 回复预设，也没有未读、置顶、免打扰。
  */
 
 import { icon } from '../icons.js';
 import { esc, avatarHtml, shortText } from '../shell.js';
 import {
-  contactById, contactsOf, parallelChatsOf, parallelTitleOf, addParallelChat,
-  lastMessage, messagePreview,
+  contactById, contactForTavernCharacter, theatersOf, theaterTitleOf, addTheater,
 } from '../data.js';
+import { readOpenTavernChat } from '../host.js';
 
-function scenePreview(chat) {
-  const message = lastMessage(chat);
-  if (!message) return '还没开口。';
-  const body = messagePreview(message);
-  return `${message.from === 'me' ? '我：' : ''}${body}`;
+const TITLE_MAX = 32;
+
+/** 这一场接在哪个文件的第几楼。 */
+export function branchStatusLine(theater) {
+  const file = theater.chatFile ? `《${theater.chatFile}》` : '当前酒馆聊天';
+  return `接在 ${file} 第 ${theater.forkFloor || 0} 楼`;
 }
 
-/** 新开一场：先选角色，再给这一场起名字、写它从哪儿开始。 */
-function openContactPicker(ctx) {
-  const contacts = contactsOf(ctx.state).filter(contact => contact.kind !== 'group');
-  if (!contacts.length) {
-    ctx.toast('先去「通讯录」把角色加进来');
-    return;
+/** 背景从哪来：柏宝书总结 / 酒馆原文 / 旧版场景。 */
+export function branchMemoryLabel(theater) {
+  const memory = theater.memory || {};
+  if (memory.engine === 'baibai' && memory.text) return `柏宝书总结 · ${memory.text.length} 字`;
+  return theater.base?.length ? '酒馆原文 · 按预设自己裁' : '没有背景（旧版场景）';
+}
+
+/** 「这一场的背景」面板：快照楼层数、酒馆记忆的注入口径、重开一场的说明。 */
+export function branchContextPanelHtml(theater) {
+  const memory = theater.memory || {};
+  const base = Array.isArray(theater.base) ? theater.base : [];
+  return `
+    <div class="mp-sheet-note">${esc(branchStatusLine(theater))} · 快照 ${base.length} 层 · ${esc(branchMemoryLabel(theater))}</div>
+    ${memory.text ? `<div class="mp-prompt-role"><i></i>酒馆记忆的注入口径<span>${esc(branchMemoryLabel(theater))}</span></div><div class="mp-prompt-body">${esc(memory.text)}</div>` : ''}
+    <div class="mp-sheet-note">快照里的楼层是开这一场那一刻的酒馆原样（柏宝书的记忆叶子也跟着楼层走）。酒馆里后来继续聊的，不会自动进这一场；想跟上就重新开一场。</div>`;
+}
+
+
+function branchPreview(theater) {
+  const messages = theater?.messages || [];
+  const last = messages[messages.length - 1];
+  if (!last) return `从《${theater?.chatFile || '酒馆聊天'}》第 ${theater?.forkFloor || 0} 楼接下去`;
+  const body = String(last.mes || '').replace(/\s+/g, ' ').slice(0, 60);
+  return `${last.is_user ? '我：' : ''}${body}`;
+}
+
+/** 起一场：直接认酒馆当前打开的那个聊天文件，不弹表单、不取名。 */
+export async function createParallelBranch(ctx) {
+  const host = await readOpenTavernChat();
+  if (!host.available) {
+    ctx.toast(host.reason || '先在酒馆里打开要分叉的那个聊天');
+    return null;
   }
-  ctx.openSheet({
-    title: '从谁的哪条时间线开始？',
-    note: '一场就是一段独立的对话；同一个角色可以开很多场。',
-    items: contacts.map(contact => ({
-      label: contact.name,
-      value: contact.id,
-      icon: 'contacts',
-      note: contact.signature || contact.note || '',
-    })),
-    onPick: (contactId) => {
-      const contact = contactById(ctx.state, contactId);
-      if (contact) openSceneForm(ctx, contact);
-    },
+  const contactId = contactForTavernCharacter(ctx.state, {
+    name: host.characterName,
+    tavernAvatar: host.characterAvatar,
   });
+  const theater = addTheater(ctx.state, {
+    contactId,
+    characterName: host.characterName,
+    characterAvatar: host.characterAvatar,
+    chatFile: host.chatFile,
+    chatId: host.chatId,
+    presetName: host.presetName,
+    forkFloor: host.forkFloor,
+    base: host.base,
+    memory: host.memory,
+  });
+  ctx.save();
+  ctx.toast(`从第 ${host.forkFloor} 楼分出一条时间线`);
+  return theater;
 }
 
-function openSceneForm(ctx, contact, scene = null) {
-  const editing = Boolean(scene);
+function openRenameForm(ctx, theater) {
   ctx.openSheet({
     kind: 'form',
-    title: editing ? `改这一场 · ${contact?.name || ''}` : `新开一场 · ${contact?.name || ''}`,
-    fields: [
-      {
-        name: 'title',
-        label: '这一场叫什么',
-        placeholder: '比如：如果那天没下雨',
-        value: editing ? parallelTitleOf(scene) : '',
-        maxLength: 24,
-      },
-      {
-        name: 'scene',
-        type: 'textarea',
-        label: '这一场从哪儿开始',
-        placeholder: '想从哪种关系、哪句话、哪种情绪接下去？留空就从现在开始。',
-        value: editing ? String(scene.scene || '') : '',
-        maxLength: 2000,
-      },
-    ],
-    confirm: editing ? '存下来' : '开始这一段',
+    title: '给这一场改个名字',
+    note: `默认叫「${theaterTitleOf(theater)}」，改了以后就不再跟着编号走。`,
+    fields: [{
+      name: 'title',
+      label: '这一场叫什么',
+      value: theaterTitleOf(theater),
+      placeholder: '留空就回到默认名字',
+      maxLength: TITLE_MAX,
+    }],
+    confirm: '存下来',
     onForm: (values) => {
-      const title = String(values.title || '').trim().slice(0, 24);
-      const sceneText = String(values.scene || '').trim().slice(0, 2000);
-      if (editing) {
-        const live = ctx.state.chats[scene.id];
-        if (!live) return;
-        live.title = title || parallelTitleOf(live);
-        live.scene = sceneText;
-        ctx.save();
-        ctx.rerender();
-        ctx.toast('改好了');
-        return;
-      }
-      const chat = addParallelChat(ctx.state, contact.id, { title, scene: sceneText });
+      const title = String(values.title || '').trim().slice(0, TITLE_MAX);
+      theater.title = title || defaultSafeTitle(ctx.state, theater);
+      theater.autoTitle = !title;
       ctx.save();
-      ctx.go('thread', { chatId: chat.id });
+      ctx.rerender();
+      ctx.toast('改好了');
     },
   });
 }
 
-function openSceneMenu(ctx, chat) {
-  const contact = contactById(ctx.state, chat.contactId);
+function defaultSafeTitle(state, theater) {
+  const count = Object.values(state.theaters || {}).filter(item => item.chatFile === theater.chatFile).length;
+  return `${theater.characterName || 'TA'} · 分叉 ${Math.max(1, count)}`;
+}
+
+function openBranchMenu(ctx, theater) {
   ctx.openSheet({
-    title: parallelTitleOf(chat),
-    note: contact ? `${contact.name} · 另一条时间线` : '',
+    title: theaterTitleOf(theater),
+    note: `${theater.characterName || 'TA'} · ${theater.chatFile || '未绑定酒馆聊天'}`,
     items: [
-      { label: '改名 / 改这一场的设定', value: 'edit', icon: 'brush' },
+      { label: '改名', value: 'rename', icon: 'brush' },
+      { label: '看背景', value: 'context', icon: 'book' },
       { label: '删掉这一场', value: 'delete', icon: 'trash', danger: true },
     ],
     onPick: (value) => {
-      if (value === 'edit') {
-        openSceneForm(ctx, contact, chat);
+      if (value === 'rename') {
+        openRenameForm(ctx, theater);
+        return;
+      }
+      if (value === 'context') {
+        ctx.openSheet({
+          kind: 'panel',
+          title: '这一场的背景',
+          render: () => branchContextPanelHtml(theater),
+        });
         return;
       }
       if (value !== 'delete') return;
       ctx.openSheet({
-        title: `删掉「${parallelTitleOf(chat)}」？`,
+        title: `删掉「${theaterTitleOf(theater)}」？`,
         items: [{
           label: '确认删掉这一场',
           value: 'delete',
           icon: 'trash',
           danger: true,
-          note: '只会删这一场的对话；原生聊天、角色卡和柏宝书记忆都不动。',
+          note: '只删这台小手机里存的分支；酒馆聊天文件、角色卡、柏宝书记忆都不动。',
         }],
         onPick: (pick) => {
           if (pick !== 'delete') return;
-          delete ctx.state.chats[chat.id];
+          delete ctx.state.theaters[theater.id];
           ctx.save();
           ctx.rerender();
           ctx.toast('这一场删掉了');
@@ -126,75 +151,78 @@ export const parallelApp = {
   id: 'parallel', name: '平行时空', icon: 'parallel',
 
   render(ctx) {
-    const scenes = parallelChatsOf(ctx.state);
+    const list = theatersOf(ctx.state);
     const order = [];
     const groups = new Map();
-    for (const scene of scenes) {
-      const contact = contactById(ctx.state, scene.contactId);
-      const key = contact?.id || scene.contactId;
+    for (const theater of list) {
+      const key = theater.chatFile || `x:${theater.characterName}`;
       if (!groups.has(key)) {
-        groups.set(key, { contact, list: [] });
+        groups.set(key, { file: theater.chatFile, characterName: theater.characterName, list: [] });
         order.push(key);
       }
-      groups.get(key).list.push(scene);
+      groups.get(key).list.push(theater);
     }
 
     const cards = order.map(key => {
       const group = groups.get(key);
-      const name = group.contact?.name || '已删掉的角色';
+      const head = group.characterName || 'TA';
       return `
-        <div class="mp-group-label" style="margin-top:12px">${esc(name)} · ${group.list.length} 场</div>
+        <div class="mp-group-label" style="margin-top:12px">${esc(head)}${group.file ? ` · ${esc(group.file)}` : ''} · ${group.list.length} 场</div>
         <div class="mp-group-box">
-          ${group.list.map(scene => `
-            <button class="mp-row" data-act="open-scene" data-chat="${scene.id}" data-hold="scene-menu" type="button">
-              ${avatarHtml(group.contact?.name, group.contact?.avatar)}
+          ${group.list.map(theater => {
+            const contact = contactById(ctx.state, theater.contactId);
+            return `
+            <button class="mp-row" data-act="open-branch" data-theater="${theater.id}" data-hold="branch-menu" type="button">
+              ${avatarHtml(contact?.name || theater.characterName, contact?.avatar || theater.characterAvatar)}
               <div class="mp-row-main">
-                <div class="mp-row-name">${esc(parallelTitleOf(scene))}</div>
-                <div class="mp-row-sub">${esc(scenePreview(scene))}</div>
+                <div class="mp-row-name">${esc(theaterTitleOf(theater))}</div>
+                <div class="mp-row-sub">${esc(branchPreview(theater))}</div>
               </div>
               <div class="mp-row-side">
-                <span>${scene.updatedAt ? shortText(scene.updatedAt) : ''}</span>
-                <span class="mp-pill plain">${scene.messages?.length || 0} 条</span>
+                <span>${theater.updatedAt ? shortText(theater.updatedAt) : ''}</span>
+                <span class="mp-pill plain">${(theater.messages || []).length} 句</span>
               </div>
-            </button>`).join('')}
+            </button>`;
+          }).join('')}
         </div>`;
     }).join('');
 
     return `
       <div class="mp-page-body">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <div class="mp-subtitle" style="margin-top:0;flex:1">平行时空 · 同一段关系，另一条时间线</div>
-          <button class="mp-icon-btn" data-act="parallel-new" type="button" aria-label="新开一场">${icon('plus')}</button>
+          <div class="mp-subtitle" style="margin-top:0;flex:1">平行时空 · 酒馆聊天的一条分支，只留在这台小手机</div>
+          <button class="mp-icon-btn" data-act="branch-new" type="button" aria-label="从当前聊天开一场">${icon('plus')}</button>
         </div>
-        ${cards || '<div class="mp-empty">还没有开过场。<br>点右上角的「+」选一个角色，从这里开始的对话只留在这一场里。</div>'}
+        ${cards || '<div class="mp-empty">还没有开过场。<br>先在酒馆打开一个聊天，再点右上角的「+」——会从那个聊天当前的最后一楼分出来，预设、角色卡、世界书和记忆都用酒馆原来那套。</div>'}
         <div class="mp-card-sub" style="color:var(--text-4);margin-top:14px">
-          预设、接口、酒馆记忆和原生聊天一样；这一场里说的每句话只存在这台小手机里，不写回聊天，也不进未读。
+          生成走酒馆自己的组装（预设 / 角色卡 / 世界书 / 记忆），回复只写进这里，不写回聊天文件，也不进未读。
         </div>
       </div>`;
   },
 
   handle(ctx, act, data) {
-    if (act === 'parallel-new') {
-      openContactPicker(ctx);
+    if (act === 'branch-new') {
+      createParallelBranch(ctx).then(theater => {
+        if (!theater) return;
+        ctx.go('parallel-branch', { theaterId: theater.id });
+      });
       return true;
     }
-    if (act === 'open-scene') {
-      if (!ctx.state.chats[data.chat]) return true;
-      ctx.go('thread', { chatId: data.chat });
+    if (act === 'open-branch') {
+      if (!ctx.state.theaters[data.theater]) return true;
+      ctx.go('parallel-branch', { theaterId: data.theater });
       return true;
     }
-    if (act === 'scene-menu') {
-      const chat = ctx.state.chats[data.chat];
-      if (!chat) return true;
-      openSceneMenu(ctx, chat);
+    if (act === 'branch-menu') {
+      const theater = ctx.state.theaters[data.theater];
+      if (theater) openBranchMenu(ctx, theater);
       return true;
     }
     return false;
   },
 };
 
-/** 供聊天页长按菜单复用：这一场的改名 / 改设定入口。 */
-export function openParallelSceneForm(ctx, chat) {
-  const contact = contactById(ctx.state, chat.contactId);
-  openSceneForm(ctx, contact, chat);
+/** 供其它页面复用：改这一场名字。 */
+export function openParallelRename(ctx, theater) {
+  openRenameForm(ctx, theater);
 }

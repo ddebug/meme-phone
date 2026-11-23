@@ -538,6 +538,8 @@ export function emptyState() {
     charactersFromTavern: false,
     lookups: {},
     chats: {},
+    /* 平行时空：从某个酒馆聊天文件分出来的分支，只存在这台小手机里 */
+    theaters: {},
     diary: { enabled: true, entries: {}, contacts: {}, prompt: DEFAULT_DIARY_PROMPT, lastGenerated: '' },
     emoji: DEFAULT_EMOJI.map((item, index) => ({ id: `e${index + 1}`, ...item })),
     plans: [],
@@ -611,6 +613,26 @@ export function contactById(state, id) {
   return state.contacts[id] || null;
 }
 
+/** 酒馆角色 → 通讯录里的联系人：只按头像文件名认，缺了才新建一条。 */
+export function contactForTavernCharacter(state, character = {}) {
+  const key = String(character.tavernAvatar || character.avatar || character.name || '');
+  if (!key) return '';
+  const existing = Object.values(state.contacts).find(item => item.tavernAvatar === key)
+    || Object.values(state.contacts).find(item => !item.tavernAvatar && item.name === character.name);
+  if (existing) {
+    if (!existing.tavernAvatar) existing.tavernAvatar = key;
+    return existing.id;
+  }
+  const contact = addContact(state, {
+    name: character.name || 'TA',
+    cardName: character.name || '',
+    avatar: character.avatarUrl || '',
+    tavernAvatar: key,
+    kind: 'char',
+  });
+  return contact.id;
+}
+
 /* ----------------------------------------------------------------- 会话 */
 
 export function addChat(state, contactId, options = {}) {
@@ -635,66 +657,132 @@ export function addChat(state, contactId, options = {}) {
   return state.chats[id];
 }
 
-/** 一个联系人只保留一个一对一会话；群聊各自一条。平行时空的那些不算在这里。 */
+/** 一个联系人只保留一个一对一会话；群聊各自一条。 */
 export function chatFor(state, contactId) {
-  const existing = Object.values(state.chats).find(chat => chat.contactId === contactId && chat.kind !== 'group' && !chat.parallel);
+  const existing = Object.values(state.chats).find(chat => chat.contactId === contactId && chat.kind !== 'group');
   return existing || addChat(state, contactId);
 }
 
-/** 聊天列表：只算原生会话，平行时空的场景自己进 App。 */
 export function chatsOf(state) {
-  return Object.values(state.chats)
-    .filter(chat => !chat.parallel)
-    .sort((a, b) => (b.pinned - a.pinned) || (b.updatedAt - a.updatedAt));
+  return Object.values(state.chats).sort((a, b) => (b.pinned - a.pinned) || (b.updatedAt - a.updatedAt));
 }
 
 export function chatById(state, id) {
   return state.chats[id] || null;
 }
 
-/* ------------------------------------------------------- 平行时空 */
+/* ------------------------------------------------------- 平行时空（酒馆聊天分支） */
 
 /**
- * 平行时空的每一场也是一个会话对象（同一个角色可以开多场），
- * 只是不列进聊天列表、不算未读、不自动开口；生成走的是同一套组装。
+ * 平行时空不是一台新的小手机聊天，而是某个酒馆聊天文件的一条分支：
+ *   base   —— 开这一场时从当前聊天文件抄下来的楼层（酒馆原样，柏宝书的叶子跟着楼层走）
+ *   memory —— 开这一场时酒馆记忆的注入口径（有柏宝书就是它的总结，没有就是空）
+ *   messages —— 这一场自己新说的话，只存在这台小手机里
+ * 生成走酒馆自己的 prompt 组装（预设/角色卡/世界书/记忆），所以这里不需要小手机的模型和回复预设。
  */
-export function isParallelChat(chat) {
-  return Boolean(chat && chat.parallel);
+export function theaterById(state, id) {
+  return state.theaters?.[id] || null;
 }
 
-export function parallelChatsOf(state) {
-  return Object.values(state.chats || {})
-    .filter(isParallelChat)
-    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+export function theatersOf(state, options = {}) {
+  const list = Object.values(state.theaters || {});
+  const file = String(options.chatFile || '');
+  const filtered = file ? list.filter(item => item.chatFile === file) : list;
+  return filtered.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 }
 
-export function parallelTitleOf(chat) {
-  const title = String(chat?.title || '').trim();
+export function theaterTitleOf(theater) {
+  const title = String(theater?.title || '').trim();
   return title || '未命名的一场';
 }
 
-/** 开一场：标题和这一场的设定都由用户给，消息只存在这台小手机里。
- *  预设 / 接口 / 记忆先照这个角色原生聊天的选法抄一份，之后可以单独改。 */
-export function addParallelChat(state, contactId, options = {}) {
-  const chat = addChat(state, contactId, { ...options, kind: 'single' });
-  chat.parallel = true;
-  chat.title = String(options.title || '').trim().slice(0, 24) || '未命名的一场';
-  chat.scene = String(options.scene || '').trim().slice(0, 2000);
-  chat.muted = true;
-  chat.unread = 0;
-  const origin = originChatFor(state, contactId);
-  if (origin) {
-    chat.llmPresetId = String(origin.llmPresetId || '');
-    chat.memoryPresetId = String(origin.memoryPresetId || '');
-    chat.replyPresetId = String(origin.replyPresetId || '');
-    chat.history = normalizeChatHistory(origin.history);
-  }
-  return chat;
+/** 同一个聊天文件的第几场：角色 · 分叉 N。不改名就一直跟着这个口径走。 */
+export function defaultTheaterTitle(state, info = {}) {
+  const file = String(info.chatFile || '');
+  const name = String(info.characterName || 'TA').trim() || 'TA';
+  const count = Object.values(state.theaters || {}).filter(item => (file ? item.chatFile === file : item.characterName === name)).length + 1;
+  return `${name} · 分叉 ${count}`;
 }
 
-/** 这个角色原生聊天（不是平行时空里的任何一场）：剧场拿它当背景。 */
-export function originChatFor(state, contactId) {
-  return Object.values(state.chats || {}).find(chat => chat.contactId === contactId && !chat.parallel && chat.kind !== 'group') || null;
+export function addTheater(state, info = {}) {
+  const id = info.id || newId('th');
+  const theater = {
+    id,
+    title: String(info.title || '').trim().slice(0, 32) || defaultTheaterTitle(state, info),
+    autoTitle: !String(info.title || '').trim(),
+    contactId: String(info.contactId || ''),
+    characterName: String(info.characterName || ''),
+    characterAvatar: String(info.characterAvatar || ''),
+    chatFile: String(info.chatFile || ''),
+    chatId: String(info.chatId || ''),
+    presetName: String(info.presetName || ''),
+    forkFloor: Number(info.forkFloor) || 0,
+    base: Array.isArray(info.base) ? info.base : [],
+    memory: {
+      engine: String(info.memory?.engine || ''),
+      text: String(info.memory?.text || '').slice(0, 20000),
+      coverage: info.memory?.coverage || null,
+    },
+    messages: Array.isArray(info.messages) ? info.messages : [],
+    createdAt: Number(info.createdAt) || Date.now(),
+    updatedAt: Number(info.updatedAt) || Number(info.createdAt) || Date.now(),
+  };
+  state.theaters[id] = theater;
+  return theater;
+}
+
+/** 分支里的一条消息：酒馆形状（is_user / mes / name / send_date），额外带上展示用的 at。 */
+export function theaterMessage({ isUser = false, name = '', text = '', at = 0, source = '' } = {}) {
+  return {
+    is_user: Boolean(isUser),
+    name: String(name || ''),
+    mes: String(text || ''),
+    send_date: at ? new Date(at).toISOString() : new Date().toISOString(),
+    at: at || Date.now(),
+    source: String(source || ''),
+  };
+}
+
+export function theaterMessagesCount(theater) {
+  return (theater?.base?.length || 0) + (theater?.messages?.length || 0);
+}
+
+/** 旧版场景（塞在 chats 里的那种）转成分支：没有酒馆聊天可绑，第一次生成时再认当前聊天。 */
+function theaterFromLegacyChat(chat, chatId) {
+  const messages = (chat?.messages || [])
+    .filter(message => message && typeof message === 'object' && !message.kind && message.from !== 'system')
+    .map((message, index) => theatreLegacyMessage(message, chatId, index));
+  return {
+    id: chatId,
+    title: String(chat?.title || '').trim(),
+    autoTitle: false,
+    contactId: String(chat?.contactId || ''),
+    characterName: '',
+    characterAvatar: '',
+    chatFile: '',
+    chatId: '',
+    presetName: '',
+    forkFloor: 0,
+    base: [],
+    memory: { engine: '', text: '' },
+    messages,
+    legacy: true,
+    createdAt: Number(chat?.createdAt) || 0,
+    updatedAt: Number(chat?.updatedAt) || Number(chat?.createdAt) || 0,
+  };
+}
+
+function theatreLegacyMessage(message, chatId, index) {
+  const at = Number(message.at) || 0;
+  return {
+    is_user: message.from === 'me',
+    name: '',
+    mes: String(message.text || ''),
+    send_date: at ? new Date(at).toISOString() : '',
+    at,
+    source: 'legacy',
+    id: message.id || `${chatId}_m${index}`,
+  };
 }
 
 /** 手机里保存的聊天接口预设。 */
@@ -933,7 +1021,7 @@ export function pushMessage(state, chatId, message) {
 
 export function unreadTotal(state) {
   if (state.settings?.chat?.remind === false) return 0;
-  return Object.values(state.chats).reduce((sum, chat) => sum + (chat.muted || chat.parallel ? 0 : (chat.unread || 0)), 0);
+  return Object.values(state.chats).reduce((sum, chat) => sum + (chat.muted ? 0 : (chat.unread || 0)), 0);
 }
 
 /**
@@ -1453,29 +1541,50 @@ export function demoState() {
     ],
   });
 
-  /* 平行时空：演示数据留两场，进来就能看到这一页长什么样 */
-  const sceneShen = addParallelChat(state, shen.id, {
-    id: 'ch_demo_parallel_shen_1',
-    title: '如果那天没下雨',
-    scene: '如果那天他没开车，而是陪你坐了末班地铁。',
-    messages: [
-      { from: 'them', text: '最后一班了，你上不上？', at: at(22, 52) },
-      { from: 'me', text: '再等等，我还差一份表。', at: at(22, 55) },
-      { from: 'them', text: '那我就在站台上陪你再站一会儿。', at: at(23, 1) },
+  /* 平行时空：演示数据留两场分支，进来就能看到这一页长什么样 */
+  addTheater(state, {
+    id: 'th_demo_shen_1',
+    contactId: shen.id,
+    characterName: shen.name,
+    characterAvatar: shen.avatar || '',
+    chatFile: '沈砚 - 2026-11-10@22h10m.jsonl',
+    chatId: 'demo-shen',
+    presetName: '默认预设',
+    forkFloor: 3,
+    base: [
+      theaterMessage({ name: shen.name, text: '我在楼下，看到你窗户还亮着。', at: at(21, 40) }),
+      theaterMessage({ isUser: true, name: '我', text: '还在改一份表，你先回去。', at: at(21, 44) }),
+      theaterMessage({ name: shen.name, text: '不急，我等你一会儿。', at: at(21, 46) }),
     ],
+    memory: { engine: 'baibai', text: '此前的两天里，沈砚都在楼下等你下班，最后一次是在便利店台阶上分着吃了一个饭团。' },
+    messages: [
+      theaterMessage({ name: shen.name, text: '最后一班了，你上不上？', at: at(22, 52) }),
+      theaterMessage({ isUser: true, name: '我', text: '再等等，我还差一份表。', at: at(22, 55) }),
+    ],
+    createdAt: at(22, 40),
+    updatedAt: at(22, 56),
   });
-  sceneShen.unread = 0;
 
-  const sceneJiang = addParallelChat(state, jiang.id, {
-    id: 'ch_demo_parallel_jiang_1',
-    title: '留下的那条短信',
-    scene: '如果那天你没回他，把那句「在听」留在草稿箱里。',
-    messages: [
-      { from: 'them', text: '刚听到一半就想到你。', at: at(20, 41) },
-      { from: 'me', text: '哪一半。', at: at(20, 44) },
+  addTheater(state, {
+    id: 'th_demo_jiang_1',
+    contactId: jiang.id,
+    characterName: jiang.name,
+    characterAvatar: jiang.avatar || '',
+    chatFile: '江迟 - 2026-11-08@20h30m.jsonl',
+    chatId: 'demo-jiang',
+    presetName: '默认预设',
+    forkFloor: 2,
+    base: [
+      theaterMessage({ name: jiang.name, text: '今天电台里放了那首老歌。', at: at(20, 10) }),
+      theaterMessage({ isUser: true, name: '我', text: '哪一首。', at: at(20, 14) }),
     ],
+    memory: { engine: '', text: '' },
+    messages: [
+      theaterMessage({ name: jiang.name, text: '刚听到一半就想到你。', at: at(20, 41) }),
+    ],
+    createdAt: at(20, 30),
+    updatedAt: at(20, 42),
   });
-  sceneJiang.updatedAt = at(20, 50);
 
   writeDiary(state, '2026-11-10', '十点半他才到楼下，外套领子立着，靠在电动车上抬头看我的窗。\n「你今天又没吃饭吧。」他说得像是早就知道。\n便利店的灯太白，我坐在台阶上啃了半个饭团，他把剩下半个吃了，说味道还行。', { tags: ['沈砚', '夜宵'] });
   writeDiary(state, '2026-11-08', '雨。伞在办公室，走回去的时候鞋全湿了。\n林小满发来一张窗外的照片，说「你那边也下吗」。\n我说下。她说那我们算看见同一场雨。', { tags: ['林小满', '雨'] });
@@ -1990,6 +2099,9 @@ export function normalize(raw) {
   merged.version = SCHEMA_VERSION;
   merged.contacts = merged.contacts || {};
   merged.chats = merged.chats || {};
+  merged.theaters = merged.theaters && typeof merged.theaters === 'object' && !Array.isArray(merged.theaters)
+    ? merged.theaters
+    : {};
   merged.plans = Array.isArray(merged.plans) ? merged.plans : [];
   merged.music = {
     ...base.music,
@@ -2058,14 +2170,51 @@ export function normalize(raw) {
     chat.history = normalizeChatHistory(chat.history);
     if (chat.replyPresetId && !replyIds.has(String(chat.replyPresetId))) chat.replyPresetId = '';
     chat.unread = chat.unread || 0;
-    /* 平行时空：旧存档没有这两个字段时给个能看的名字；未读和免打扰口径固定 */
+    /* 旧版「平行时空」把场景塞在 chats 里：升级时挪进 theaters，不再混在聊天列表里 */
     if (chat.parallel) {
-      chat.title = String(chat.title || '').trim().slice(0, 24) || '未命名的一场';
-      chat.scene = String(chat.scene || '').slice(0, 2000);
-      chat.unread = 0;
-      chat.muted = true;
-      chat.pinned = false;
+      merged.theaters[chatId] = {
+        ...theaterFromLegacyChat(chat, chatId),
+        ...(merged.theaters[chatId] || {}),
+      };
+      delete merged.chats[chatId];
     }
+  }
+  for (const [id, theater] of Object.entries(merged.theaters)) {
+    const base = Array.isArray(theater?.base) ? theater.base.filter(item => item && typeof item === 'object') : [];
+    const messages = Array.isArray(theater?.messages) ? theater.messages : [];
+    merged.theaters[id] = {
+      id,
+      title: String(theater?.title || '').trim().slice(0, 32) || '未命名的一场',
+      autoTitle: theater?.autoTitle !== false,
+      contactId: String(theater?.contactId || ''),
+      characterName: String(theater?.characterName || ''),
+      characterAvatar: String(theater?.characterAvatar || ''),
+      chatFile: String(theater?.chatFile || ''),
+      chatId: String(theater?.chatId || ''),
+      presetName: String(theater?.presetName || ''),
+      forkFloor: Number(theater?.forkFloor) || base.length,
+      base: base.map(item => ({ ...item, mes: String(item.mes || item.text || '') })),
+      memory: {
+        engine: String(theater?.memory?.engine || ''),
+        text: String(theater?.memory?.text || '').slice(0, 20000),
+        coverage: theater?.memory?.coverage || null,
+      },
+      messages: messages
+        .filter(item => item && typeof item === 'object')
+        .map((item, index) => ({
+          is_user: Boolean(item.is_user ?? item.from === 'me'),
+          name: String(item.name || ''),
+          mes: String(item.mes ?? item.text ?? ''),
+          send_date: item.send_date || (item.at ? new Date(Number(item.at)).toISOString() : ''),
+          at: Number(item.at) || 0,
+          source: String(item.source || ''),
+          id: item.id || `${id}_m${index}`,
+        }))
+        .filter(item => item.mes),
+      createdAt: Number(theater?.createdAt) || 0,
+      updatedAt: Number(theater?.updatedAt) || Number(theater?.createdAt) || 0,
+      legacy: Boolean(theater?.legacy),
+    };
   }
   return merged;
 }

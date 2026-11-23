@@ -444,6 +444,125 @@ export async function generate({ prompt, system = '', messages = null, demoReply
 }
 
 /**
+ * 当前打开的那个酒馆聊天文件 —— 平行时空从这里分叉。
+ * base 是酒馆自己的楼层对象（原样复制）：柏宝书的 bbs_leaf 就挂在消息的 extra 上，
+ * 原样抄走才能在分支里接着读到同一套记忆。
+ */
+export async function readOpenTavernChat() {
+  const script = await loadHostScript();
+  const empty = {
+    available: false, reason: '', characterName: '', characterAvatar: '', chatFile: '', chatId: '',
+    presetName: '', forkFloor: 0, base: [], memory: { engine: '', text: '', coverage: null },
+  };
+  if (!script) return { ...empty, reason: '不在酒馆里，读不到聊天文件' };
+  const chat = Array.isArray(script.chat) ? script.chat : [];
+  if (!chat.length) return { ...empty, reason: '酒馆里还没有打开聊天' };
+  const characterId = script.characterId ?? script.this_chid;
+  const character = Array.isArray(script.characters) ? script.characters[characterId] : null;
+  const base = cloneChatFloors(chat);
+  return {
+    available: true,
+    reason: '',
+    characterName: String(character?.name || script.name2 || ''),
+    characterAvatar: String(character?.avatar || ''),
+    chatFile: String(character?.chat || ''),
+    chatId: String(script.getCurrentChatId?.() || script.chatId || ''),
+    presetName: String(script.chatCompletionSettings?.preset_settings_openai || ''),
+    forkFloor: base.length,
+    base,
+    memory: readTavernMemory(),
+  };
+}
+
+/** 深拷贝楼层；克隆失败整段跳过，不把半个聊天当快照。 */
+function cloneChatFloors(chat) {
+  try {
+    return JSON.parse(JSON.stringify(chat));
+  } catch {
+    return chat.map(line => ({ is_user: Boolean(line?.is_user), name: String(line?.name || ''), mes: String(line?.mes || ''), send_date: line?.send_date || '' }));
+  }
+}
+
+/**
+ * 酒馆记忆的注入口径：
+ * 装了柏宝书就用它算出来的总结（只读），没装就是空 —— 那种情况按酒馆默认读原文。
+ */
+export function readTavernMemory() {
+  try {
+    const api = globalThis.STBaiBaiBook;
+    if (!api || typeof api.getInjectedHistory !== 'function') return { engine: '', text: '', coverage: null };
+    const result = api.getInjectedHistory();
+    return {
+      engine: 'baibai',
+      text: String(result?.relativeText || '').trim(),
+      coverage: result?.coverage || null,
+    };
+  } catch {
+    return { engine: '', text: '', coverage: null };
+  }
+}
+
+/** 分支里的一条消息 → 酒馆 floor 对象。 */
+function toTavernFloor(message, fallbackName = '') {
+  const floor = {
+    is_user: Boolean(message?.is_user),
+    name: String(message?.name || (message?.is_user ? '' : fallbackName)),
+    mes: String(message?.mes ?? message?.text ?? ''),
+    send_date: String(message?.send_date || ''),
+  };
+  /* 快照里带过来的 extra 原样保留（柏宝书的 leaf 在这里） */
+  if (message?.extra && typeof message.extra === 'object') floor.extra = message.extra;
+  if (!floor.send_date) floor.send_date = new Date().toISOString();
+  return floor;
+}
+
+/**
+ * 平行时空的一次生成：把酒馆的 chat 临时换成「快照 + 这一场新说的话」，
+ * 交给酒馆自己的 generateQuietPrompt 去组装（预设 / 角色卡 / 世界书 / 记忆都是酒馆那套），
+ * 拿到回复后无论是在哪个分支点出错，都把真实聊天原样放回去，且一个字都不写进聊天文件。
+ */
+export async function branchReply({ base = [], branch = [], characterName = '' } = {}) {
+  const script = await loadHostScript();
+  const ctx = globalThis.SillyTavern?.getContext?.() || script;
+  if (!ctx || typeof ctx.generateQuietPrompt !== 'function') throw new Error('酒馆的生成接口不可用');
+  const hostChat = ctx.chat;
+  if (!Array.isArray(hostChat)) throw new Error('拿不到酒馆的当前聊天');
+  if (!base.length && !branch.length) throw new Error('这一场还没有可以接着说的上下文');
+
+  const backup = hostChat.slice();
+  const temp = [...base, ...branch].map(item => toTavernFloor(item, characterName));
+  const eventSource = ctx.eventSource;
+  const promptEvent = ctx.eventTypes?.CHAT_COMPLETION_PROMPT_READY;
+  let captured = null;
+  const onPrompt = (data) => {
+    if (!captured && Array.isArray(data?.chat)) captured = data.chat;
+  };
+  try {
+    if (promptEvent && eventSource?.on) eventSource.on(promptEvent, onPrompt);
+    hostChat.splice(0, hostChat.length, ...temp);
+    const text = await ctx.generateQuietPrompt({ quietPrompt: '', quietName: null });
+    return { text: String(text ?? '').trim(), prompt: captured };
+  } finally {
+    hostChat.splice(0, hostChat.length, ...backup);
+    if (promptEvent && eventSource?.removeListener) eventSource.removeListener(promptEvent, onPrompt);
+    /* 生成期间界面看到的是临时聊天，还原后让酒馆按真实聊天重画一遍 */
+    try { eventSource?.emit?.(ctx.eventTypes?.CHAT_CHANGED, ctx.chatId); } catch { /* 重画失败不影响数据 */ }
+  }
+}
+
+/** 让酒馆自己停下这一轮生成（和点酒馆的停止按钮同一条路径）。 */
+export function stopTavernGeneration() {
+  try {
+    const ctx = globalThis.SillyTavern?.getContext?.();
+    if (typeof ctx?.stopGeneration === 'function') {
+      ctx.stopGeneration();
+      return true;
+    }
+  } catch { /* 没有停止入口就交给超时 */ }
+  return false;
+}
+
+/**
  * 酒馆 custom 源会在 custom_url 后面自己补 /chat/completions，
  * 这里统一把用户填的 Base URL / Path 收成“只到 /v1”的根，避免拼成
  * .../v1/chat/completions/chat/completions。

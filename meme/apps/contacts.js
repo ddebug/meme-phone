@@ -177,7 +177,7 @@ export const contactApp = {
     if (!contact) {
       return `<div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button></div><div class="mp-page-body"><div class="mp-empty">这个人不在了。</div></div>`;
     }
-    const chats = Object.values(ctx.state.chats).filter(chat => chat.contactId === contact.id && !chat.parallel);
+    const chats = Object.values(ctx.state.chats).filter(chat => chat.contactId === contact.id);
     const extras = ctx.state.extras[contact.id] || [];
     const last = chats[0] ? lastMessage(chats[0]) : null;
     const card = characterCardFor(ctx.state, contact);
@@ -337,6 +337,7 @@ export const contactApp = {
           }
           if (value === 'delete') {
             const relatedChats = Object.values(ctx.state.chats || {}).filter(chat => chat.contactId === contact.id);
+            const relatedTheaters = Object.values(ctx.state.theaters || {}).filter(theater => theater.contactId === contact.id);
             ctx.openSheet({
               title: `删除「${contact.name}」？`,
               items: [{
@@ -344,7 +345,7 @@ export const contactApp = {
                 value: 'delete',
                 icon: 'trash',
                 danger: true,
-                note: `${relatedChats.length ? `会一起删掉 ${relatedChats.length} 个会话、` : ''}TA 的小剧场、平行时空里的几场、日记和查角色缓存。酒馆里的角色卡不会删。`,
+                note: `${relatedChats.length ? `会一起删掉 ${relatedChats.length} 个会话、` : ''}${relatedTheaters.length ? `${relatedTheaters.length} 场平行时空、` : ''}TA 的小剧场、日记和查角色缓存。酒馆里的角色卡和聊天文件不会删。`,
               }],
               onPick: async (pick) => {
                 if (pick !== 'delete') return;
@@ -354,6 +355,9 @@ export const contactApp = {
                 if (ctx.state.lookups) delete ctx.state.lookups[contact.id];
                 for (const chat of Object.values(ctx.state.chats)) {
                   if (chat.contactId === contact.id) delete ctx.state.chats[chat.id];
+                }
+                for (const theater of Object.values(ctx.state.theaters || {})) {
+                  if (theater.contactId === contact.id) delete ctx.state.theaters[theater.id];
                 }
                 await ctx.save();
                 ctx.toast('联系人和关联数据已删掉');

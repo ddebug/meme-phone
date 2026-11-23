@@ -2,132 +2,258 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  demoState, normalize, addParallelChat, parallelChatsOf, chatsOf, chatFor, unreadTotal,
-  originChatFor, isParallelChat, parallelTitleOf, pushMessage,
+  demoState, normalize, chatsOf, chatFor, unreadTotal, pushMessage,
+  addTheater, theatersOf, theaterById, theaterTitleOf, defaultTheaterTitle,
+  theaterMessage, theaterMessagesCount, contactForTavernCharacter,
 } from '../meme/data.js';
-import { parallelBackground, buildReplyMessages } from '../meme/reply-context.js';
+import { readOpenTavernChat, branchReply, readTavernMemory, __resetHostScriptForTests } from '../meme/host.js';
+import { parallelApp } from '../meme/apps/parallel.js';
+import { parallelBranchApp } from '../meme/apps/branch.js';
 
-function nativeChatOf(state) {
-  const chat = Object.values(state.chats).find(item => !item.parallel && item.messages?.length);
-  assert.ok(chat, '演示数据里应该有一场原生聊天');
-  return chat;
+function fakeHost(options = {}) {
+  const listeners = new Map();
+  const ctx = {
+    chat: options.chat || [
+      { is_user: false, name: '沈砚', mes: '楼下灯还亮着。', send_date: '2026-11-10T21:40:00.000Z' },
+      { is_user: true, name: '颜', mes: '还在改表。', send_date: '2026-11-10T21:44:00.000Z' },
+    ],
+    characters: [{ name: '沈砚', avatar: 'shen.png', chat: '沈砚 - 2026-11-10@22h10m.jsonl' }],
+    characterId: 0,
+    name1: '颜',
+    name2: '沈砚',
+    chatId: 'demo-shen',
+    getCurrentChatId: () => 'demo-shen',
+    chatCompletionSettings: { preset_settings_openai: '默认预设' },
+    eventTypes: { CHAT_COMPLETION_PROMPT_READY: 'chat_completion_prompt_ready', CHAT_CHANGED: 'chat_changed' },
+    eventSource: {
+      on(name, fn) { listeners.set(name, fn); },
+      removeListener(name, fn) { if (listeners.get(name) === fn) listeners.delete(name); },
+      emit(name, payload) {
+        const fn = listeners.get(name);
+        if (fn) fn(payload);
+        return Promise.resolve();
+      },
+    },
+    generateQuietPrompt: options.generateQuietPrompt || (async (args) => {
+      assert.equal(args.quietPrompt, '', '分支生成不塞额外指令，纯靠聊天历史');
+      ctx.eventSource.emit('chat_completion_prompt_ready', { chat: [{ role: 'system', content: '预设' }, { role: 'user', content: ctx.chat[ctx.chat.length - 1].mes }] });
+      return '那我就在站台上陪你一会儿。';
+    }),
+    stopGeneration: () => {},
+  };
+  globalThis.SillyTavern = { getContext: () => ctx };
+  __resetHostScriptForTests();
+  return ctx;
 }
 
-test('平行时空：可以给同一个角色开多场，但不进聊天列表、不算未读', () => {
-  const state = demoState();
-  const native = nativeChatOf(state);
-  const before = chatsOf(state).length;
-  const beforeScenes = parallelChatsOf(state).length;
-  const beforeOwn = parallelChatsOf(state).filter(item => item.contactId === native.contactId).length;
+test('平行时空：开一场默认叫「角色 · 分叉 N」，同名文件里往后累加', () => {
+  const state = { theaters: {} };
+  const file = '沈砚 - 2026-11-10@22h10m.jsonl';
+  const first = addTheater(state, { contactId: 'c1', characterName: '沈砚', chatFile: file, forkFloor: 3, base: [{ is_user: false, mes: 'a' }] });
+  const second = addTheater(state, { contactId: 'c1', characterName: '沈砚', chatFile: file, base: [] });
+  assert.equal(first.title, '沈砚 · 分叉 1');
+  assert.equal(first.autoTitle, true);
+  assert.equal(second.title, '沈砚 · 分叉 2', '同一个聊天文件里的第二场自动接编号');
+  assert.equal(defaultTheaterTitle(state, { characterName: '沈砚', chatFile: file }), '沈砚 · 分叉 3');
+  assert.equal(theaterTitleOf({ title: '   ' }), '未命名的一场');
 
-  const first = addParallelChat(state, native.contactId, { title: '如果那天没下雨', scene: '从车站的雨里接下去。' });
-  const second = addParallelChat(state, native.contactId, { title: '留下的那条短信' });
-  second.updatedAt = Math.max(Date.now(), ...parallelChatsOf(state).map(item => item.updatedAt || 0)) + 1000;
-
-  assert.equal(isParallelChat(first), true);
-  assert.equal(first.title, '如果那天没下雨');
-  assert.equal(first.muted, true);
-  assert.equal(first.unread, 0);
-  assert.equal(chatsOf(state).length, before, '场景不占聊天列表');
-  assert.equal(parallelChatsOf(state).length, beforeScenes + 2);
-  assert.equal(parallelChatsOf(state)[0].id, second.id, '最近改过的一场排在前面');
-  assert.ok(parallelChatsOf(state).find(item => item.id === first.id), '同一个角色的两场都在');
-  assert.equal(parallelChatsOf(state).filter(item => item.contactId === native.contactId).length, beforeOwn + 2, '一个角色可以开多场');
-  assert.equal(chatFor(state, native.contactId).id, native.id, 'chatFor 仍然只认原生会话');
-
-  const totalBefore = unreadTotal(state);
-  pushMessage(state, first.id, { from: 'them', text: '这句只留在剧场里' });
-  assert.equal(first.messages.length, 1);
-  assert.equal(first.unread, 1, '会话自己的未读照常记');
-  assert.equal(unreadTotal(state), totalBefore, '剧场不叠加到聊天角标');
+  const renamed = addTheater(state, { characterName: '江迟', chatFile: 'x.jsonl', title: '留下的那条短信' });
+  assert.equal(renamed.title, '留下的那条短信');
+  assert.equal(renamed.autoTitle, false);
 });
 
-test('平行时空：预设 / 接口 / 记忆跟着这个角色的原生聊天抄一份', () => {
+test('平行时空：分支不进聊天列表、不算未读、chatFor 仍只认原生会话', () => {
   const state = demoState();
-  const native = nativeChatOf(state);
-  native.llmPresetId = 'api_local';
-  native.memoryPresetId = 'mem_summary';
-  native.replyPresetId = 'reply_natural';
-  native.history = { phoneLimit: 40, tavernMode: 'recent', tavernFloors: 6 };
-
-  const scene = addParallelChat(state, native.contactId, { title: '照原本那套来' });
-  assert.equal(scene.llmPresetId, 'api_local');
-  assert.equal(scene.memoryPresetId, 'mem_summary');
-  assert.equal(scene.replyPresetId, 'reply_natural');
-  assert.deepEqual(scene.history, { phoneLimit: 40, tavernMode: 'recent', tavernFloors: 6 });
-  assert.equal(native.messages.length > 0, true, '原生聊天本身不动');
+  const native = Object.values(state.chats)[0];
+  const beforeChats = chatsOf(state).length;
+  const beforeUnread = unreadTotal(state);
+  addTheater(state, { contactId: native.contactId, characterName: '沈砚', chatFile: 'f.jsonl', base: [] });
+  assert.equal(chatsOf(state).length, beforeChats);
+  assert.equal(unreadTotal(state), beforeUnread);
+  assert.equal(chatFor(state, native.contactId).id, native.id);
 });
 
-test('平行时空：标题为空时有兜底名字，删掉角色只影响原生清理', () => {
-  const state = demoState();
-  const native = nativeChatOf(state);
-  const scene = addParallelChat(state, native.contactId, { title: '   ' });
-  assert.equal(parallelTitleOf(scene), '未命名的一场');
-  assert.equal(scene.messages.length, 0);
+test('平行时空：按聊天文件分组与排序，最近改过的排前面', () => {
+  const state = { theaters: {} };
+  const a = addTheater(state, { characterName: 'A', chatFile: 'a.jsonl', updatedAt: 100 });
+  const b = addTheater(state, { characterName: 'A', chatFile: 'a.jsonl', updatedAt: 300 });
+  addTheater(state, { characterName: 'B', chatFile: 'b.jsonl', updatedAt: 200 });
+  assert.deepEqual(theatersOf(state).map(item => item.id).sort(), [a.id, b.id, Object.values(state.theaters)[2].id].sort());
+  assert.equal(theatersOf(state)[0].id, b.id);
+  assert.equal(theatersOf(state, { chatFile: 'a.jsonl' }).length, 2);
+  assert.equal(theaterById(state, b.id).id, b.id);
+  assert.equal(theaterById(state, 'nope'), null);
 });
 
-test('平行时空：旧存档 normalize 补名字，并把未读 / 免打扰口径固定住', () => {
+test('平行时空：旧版塞在 chats 里的场景，升级时挪进 theaters 并从聊天列表里消失', () => {
   const next = normalize({
     chats: {
       s1: {
         id: 's1',
         contactId: 'c1',
         parallel: true,
-        title: '   ',
-        scene: '这一场从深夜的便利店开始。',
+        title: '如果那天没下雨',
         unread: 6,
-        muted: false,
-        pinned: true,
-        messages: [{ from: 'me', text: '在吗', at: 1700000000000 }],
+        messages: [
+          { from: 'me', text: '在吗', at: 1700000000000 },
+          { from: 'them', text: '在。', at: 1700000080000 },
+        ],
       },
     },
   });
-  const scene = next.chats.s1;
-  assert.equal(scene.parallel, true);
-  assert.equal(scene.title, '未命名的一场');
-  assert.equal(scene.scene, '这一场从深夜的便利店开始。');
-  assert.equal(scene.unread, 0);
-  assert.equal(scene.muted, true);
-  assert.equal(scene.pinned, false);
-  assert.equal(scene.messages.length, 1);
-  assert.equal(scene.messages[0].id, 's1_m0');
+  assert.equal(next.chats.s1, undefined, '旧场景不再混在聊天列表里');
+  const theater = next.theaters.s1;
+  assert.ok(theater, '挪进了 theaters');
+  assert.equal(theater.title, '如果那天没下雨');
+  assert.equal(theater.legacy, true);
+  assert.equal(theater.messages.length, 2);
+  assert.equal(theater.messages[0].is_user, true);
+  assert.equal(theater.messages[1].mes, '在。');
 });
 
-test('平行时空：背景带上这一场的设定和原生聊天最近几条，并明确不复述', () => {
-  const state = demoState();
-  const native = nativeChatOf(state);
-  const scene = addParallelChat(state, native.contactId, {
-    title: '没有寄出的那封信',
-    scene: '从他把信塞回抽屉那一刻开始。',
+test('平行时空：存档里的快照原样留着 extra（柏宝书的记忆叶子跟着楼层走）', () => {
+  const next = normalize({
+    theaters: {
+      th1: {
+        id: 'th1',
+        characterName: '沈砚',
+        chatFile: 'f.jsonl',
+        title: '   ',
+        forkFloor: 2,
+        base: [
+          { is_user: false, name: '沈砚', mes: '灯还亮着。', extra: { bbs_leaf: { id: 7 } } },
+          { is_user: true, name: '颜', mes: '改完就睡。' },
+        ],
+        memory: { engine: 'baibai', text: '昨天便利店。' },
+        messages: [{ is_user: false, name: '沈砚', mes: '我等你。', at: 1700000000000 }],
+      },
+    },
   });
-  const contact = state.contacts[native.contactId];
-  const text = parallelBackground(state, scene, contact);
-
-  assert.match(text, /【平行时空 · 没有寄出的那封信】/);
-  assert.match(text, /这一场的设定：从他把信塞回抽屉那一刻开始。/);
-  assert.match(text, /原生聊天/);
-  assert.match(text, /不要提到“小剧场”“平行时空”“另一个时刻”|不要提到“小剧场”“平行时空”“另一个时空”/);
-  const last = native.messages[native.messages.length - 1];
-  assert.ok(text.includes(String(last.text || '').trim()), '原生聊天最近几条要能当背景看到');
-  assert.equal(parallelBackground(state, native, contact), '', '原生聊天本身不生成这段背景');
+  const theater = next.theaters.th1;
+  assert.equal(theater.title, '未命名的一场');
+  assert.equal(theater.base[0].extra.bbs_leaf.id, 7);
+  assert.equal(theater.memory.engine, 'baibai');
+  assert.equal(theater.messages[0].at, 1700000000000);
+  assert.equal(theaterMessagesCount(theater), 3);
 });
 
-test('平行时空：走同一套组装，但原生聊天的原文只当背景，不当成本场历史', async () => {
-  const state = demoState();
-  const native = nativeChatOf(state);
-  const contact = state.contacts[native.contactId];
-  const scene = addParallelChat(state, native.contactId, { title: '如果那天没下雨', scene: '从站台开始。' });
-  pushMessage(state, scene.id, { from: 'me', text: '剧场里的第一句', at: 1800000000000 });
+test('平行时空：读当前聊天文件，快照是深拷贝，预设名从酒馆拿', async () => {
+  const ctx = fakeHost();
+  const chat = await readOpenTavernChat();
+  assert.equal(chat.available, true);
+  assert.equal(chat.characterName, '沈砚');
+  assert.equal(chat.chatFile, '沈砚 - 2026-11-10@22h10m.jsonl');
+  assert.equal(chat.presetName, '默认预设');
+  assert.equal(chat.forkFloor, 2);
+  assert.equal(chat.base.length, 2);
+  assert.equal(chat.memory.engine, '', '没装柏宝书时记忆注入口径为空，按酒馆默认读原文');
+  ctx.chat[0].mes = '改掉快照里的这句';
+  assert.equal(chat.base[0].mes, '楼下灯还亮着。', '快照是拷贝，不受酒馆后续改动影响');
+});
 
-  const built = await buildReplyMessages(state, scene, contact, {
-    extraPrompt: parallelBackground(state, scene, contact),
-    memoryText: '',
+test('平行时空：生成期间把酒馆聊天临时换成「快照 + 这一场」，结束后原样放回', async () => {
+  const ctx = fakeHost();
+  const original = ctx.chat.slice();
+  const base = [
+    { is_user: false, name: '沈砚', mes: '楼下灯还亮着。' },
+    { is_user: true, name: '颜', mes: '还在改表。' },
+  ];
+  const branch = [{ is_user: true, name: '颜', mes: '最后一班了？' }];
+  const result = await branchReply({ base, branch, characterName: '沈砚' });
+
+  assert.equal(result.text, '那我就在站台上陪你一会儿。');
+  assert.equal(ctx.chat.length, original.length, '生成完把真实聊天放回去');
+  assert.equal(ctx.chat[0].mes, original[0].mes);
+  assert.equal(result.prompt.length, 2, '抓到了这次真正发出去的提示词');
+});
+
+test('平行时空：生成失败也把酒馆聊天放回去，并且没有可用的生成接口时直接报错', async () => {
+  const ctx = fakeHost({
+    generateQuietPrompt: async () => { throw new Error('接口 502'); },
   });
-  const contents = built.messages.map(message => String(message.content || '')).join('\n');
-  assert.match(contents, /剧场里的第一句/, '本场最后一条要作为这一轮输入');
-  assert.match(contents, /【平行时空 · 如果那天没下雨】/);
-  const theater = built.messages.filter(message => message.group === 'theater');
-  assert.equal(theater.length, 1);
-  assert.equal(theater[0].source, '小剧场');
-  assert.equal(originChatFor(state, native.contactId).id, native.id);
+  const original = ctx.chat.slice();
+  await assert.rejects(
+    () => branchReply({ base: [{ mes: 'a' }], branch: [{ mes: 'b' }] }),
+    /502/,
+  );
+  assert.equal(ctx.chat.length, original.length);
+  assert.equal(ctx.chat[0].mes, original[0].mes);
+
+  globalThis.SillyTavern = { getContext: () => ({ chat: [] }) };
+  __resetHostScriptForTests();
+  await assert.rejects(() => branchReply({ base: [{ mes: 'a' }] }), /不可用/);
+});
+
+test('平行时空：有柏宝书就读它注入口径的总结当背景', () => {
+  globalThis.STBaiBaiBook = {
+    apiVersion: 1,
+    getInjectedHistory: () => ({ relativeText: '昨天他在楼下等到十一点。', coverage: { complete: true, missingAiFloors: [] } }),
+  };
+  const memory = readTavernMemory();
+  assert.equal(memory.engine, 'baibai');
+  assert.equal(memory.text, '昨天他在楼下等到十一点。');
+  globalThis.STBaiBaiBook = { apiVersion: 1, getInjectedHistory: () => { throw new Error('没打开聊天'); } };
+  assert.deepEqual(readTavernMemory(), { engine: '', text: '', coverage: null });
+  delete globalThis.STBaiBaiBook;
+});
+
+test('平行时空：酒馆角色按头像文件名认领联系人', () => {
+  const state = demoState();
+  const known = Object.values(state.contacts).find(contact => contact.name === '沈砚');
+  assert.ok(known, '演示数据里有沈砚');
+  const id = contactForTavernCharacter(state, { name: '沈砚', tavernAvatar: 'shen.png' });
+  assert.equal(id, known.id);
+  assert.equal(known.tavernAvatar, 'shen.png', '认领时把头像文件名补上');
+  assert.equal(contactForTavernCharacter(state, { name: '沈砚', tavernAvatar: 'shen.png' }), id, '不会重复建联系人');
+  const fresh = contactForTavernCharacter(state, { name: '新角色', tavernAvatar: 'new.png' });
+  assert.ok(state.contacts[fresh]);
+  assert.equal(state.contacts[fresh].tavernAvatar, 'new.png');
+});
+
+test('平行时空：分支页的发送键只有发送/停止两态，不吃「唤醒」态', () => {
+  const state = demoState();
+  const ctx = {
+    state,
+    shell: { live: { inputValue: '' }, root: { querySelector: () => null } },
+    save() {}, rerender() {}, toast() {}, go() {}, openSheet() {},
+  };
+  const theater = theatersOf(state)[0];
+  const html = parallelBranchApp.render(ctx, { theaterId: theater.id });
+  const send = html.match(/<button class="mp-send[^>]*>/)[0];
+  assert.match(send, /is-text/, '空输入时仍是发送态');
+  assert.doesNotMatch(send, /is-wake/, '分支页没有唤醒态');
+  assert.match(send, /data-plain="1"/);
+  assert.match(send, /data-act="branch-send"/);
+});
+
+test('平行时空：长按菜单三项，看背景能打开这一场的快照面板', () => {
+  const state = demoState();
+  const sheets = [];
+  const ctx = {
+    state,
+    shell: { live: { inputValue: '' }, root: { querySelector: () => null } },
+    save() {}, rerender() {}, toast() {}, go() {},
+    openSheet(sheet) { sheets.push(sheet); },
+  };
+  const theater = theatersOf(state)[0];
+  assert.equal(parallelApp.handle(ctx, 'branch-menu', { theater: theater.id }), true);
+  assert.deepEqual(sheets[0].items.map(item => item.label), ['改名', '看背景', '删掉这一场']);
+  sheets[0].onPick('context');
+  const panel = sheets[1];
+  assert.equal(panel.title, '这一场的背景');
+  const html = panel.render();
+  assert.match(html, /第 3 楼/, '说清接在哪个聊天文件的第几楼');
+  assert.match(html, /快照 3 层/);
+  assert.match(html, /重新开一场/, '提示酒馆后来继续聊的不会自动进来');
+});
+test('平行时空：分支消息存成酒馆形状，也带上展示用的时间', () => {
+  const message = theaterMessage({ isUser: true, name: '颜', text: '晚安', at: 1700000000000 });
+  assert.equal(message.is_user, true);
+  assert.equal(message.mes, '晚安');
+  assert.equal(message.at, 1700000000000);
+  assert.match(message.send_date, /^2023-11-1\dT/);
+  const stato = demoState();
+  const theater = theatersOf(stato)[0];
+  assert.ok(theater.messages.length, '演示数据里有一场已经说过话的分支');
+  pushMessage(stato, Object.values(stato.chats)[0].id, { from: 'me', text: '原生聊天照常' });
 });

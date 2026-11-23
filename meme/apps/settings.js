@@ -27,14 +27,15 @@ function downloadBackup(ctx, includeKeys) {
 function backupSummary(parsed) {
   const state = parsed && typeof parsed === 'object' && parsed.meme ? parsed.meme : parsed;
   if (!state || typeof state !== 'object') return { ok: false };
-  const allChats = Object.values(state.chats || {});
-  const chats = allChats.filter(chat => !chat.parallel);
+  const chats = Object.values(state.chats || {});
+  const theaters = Object.values(state.theaters || {});
   return {
     ok: true,
     contacts: Object.keys(state.contacts || {}).length,
     chats: chats.length,
-    scenes: allChats.length - chats.length,
-    messages: allChats.reduce((sum, chat) => sum + (chat.messages?.length || 0), 0),
+    scenes: theaters.length,
+    messages: chats.reduce((sum, chat) => sum + (chat.messages?.length || 0), 0)
+      + theaters.reduce((sum, theater) => sum + (theater.messages?.length || 0), 0),
     diary: Object.keys(state.diary?.entries || {}).length,
     favorites: (state.favorites || []).length,
   };
@@ -307,7 +308,7 @@ export const settingsApp = {
         ctx.openSheet({
           title: '恢复这份备份？',
           items: [{
-            label: `联系人 ${summary.contacts} · 会话 ${summary.chats} · 消息 ${summary.messages} · 日记 ${summary.diary} · 收藏 ${summary.favorites}`,
+            label: `联系人 ${summary.contacts} · 会话 ${summary.chats} · 平行时空 ${summary.scenes} 场 · 消息 ${summary.messages} · 日记 ${summary.diary} · 收藏 ${summary.favorites}`,
             value: 'confirm',
             icon: 'upload',
             note: '不含 Key 的备份恢复后，本机现有连接凭据保留不变；确认后覆盖当前数据。',

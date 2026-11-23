@@ -4,14 +4,14 @@
  */
 
 import { createStore } from './store.js';
-import { normalize, emptyState, demoState, syncTavernContacts, chatFor, chatsOf, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks, dayKey, isParallelChat } from './data.js';
+import { normalize, emptyState, demoState, syncTavernContacts, chatFor, chatsOf, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks, dayKey, theatersOf } from './data.js';
 import { createShell, applyWall, applyLook } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost, countTextTokens } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { favoritesApp } from './apps/favorites.js';
 import { photoApp } from './apps/photo.js';
 import { buildMemoryContext } from './memory.js';
-import { buildReplyMessages, transcript, replyLead, proactiveLead, diaryTranscript, characterBlock, sceneBlock, userBlock, parallelBackground } from './reply-context.js';
+import { buildReplyMessages, transcript, replyLead, proactiveLead, diaryTranscript, characterBlock, sceneBlock, userBlock } from './reply-context.js';
 import { behaviorPrompt, behaviorSettings, parseBehaviorReply } from './behavior.js';
 import { DIARY_OUTPUT_PROTOCOL, diaryFingerprint } from './diary.js';
 import { diaryApp, threadDiaryApp } from './apps/diary.js';
@@ -30,6 +30,7 @@ import { extrasApp, extrasSwitchApp, extraDetailApp, emojiApp,
   plansApp, dressApp, iconPickerApp, helpApp,
 } from './apps/more.js';
 import { parallelApp } from './apps/parallel.js';
+import { parallelBranchApp } from './apps/branch.js';
 
 const APPS = {
   'app-chat': chatApp,
@@ -42,6 +43,7 @@ const APPS = {
   'app-appearance': appearanceApp,
   'app-extras': extrasApp,
   'app-parallel': parallelApp,
+  'parallel-branch': parallelBranchApp,
   'extras-switch': extrasSwitchApp,
   'app-emoji': emojiApp,
   'app-plans': plansApp,
@@ -121,18 +123,13 @@ function makeAi(getState) {
     /* 0 = 不限制：酒馆记忆和手机历史都按全量送，不再用本地预算截断。 */
     const memoryLimit = 0;
     const storyBlock = ctxSettings.memory ? await story(state, chat, memoryLimit) : { text: '' };
-    const parallel = isParallelChat(chat);
     const theaterKind = theaterKindFor(state);
-    /* 平行时空的每一场：预设 / 接口 / 记忆和原生聊天一样，只是把这一场的设定和原生聊天当背景。
-       自动附带的小剧场片段只属于原生聊天，不进剧场。 */
-    const sceneBlockText = parallel ? parallelBackground(state, chat, contact) : '';
-    const wantsTheater = !parallel && !options.proactive && extrasEnabledFor(state, contact?.id);
+    const wantsTheater = !options.proactive && extrasEnabledFor(state, contact?.id);
     const built = await buildReplyMessages(state, chat, contact, {
       presetOverride: options.presetOverride,
       memoryText: String(storyBlock?.text || ''),
       lead: options.proactive ? proactiveLead(state, contact, chat) : replyLead(contact),
-      extraPrompt: sceneBlockText || (wantsTheater ? theaterPrompt(contact?.name, theaterKind) : ''),
-      extraPromptSource: parallel ? '平行时空' : '小剧场',
+      extraPrompt: wantsTheater ? theaterPrompt(contact?.name, theaterKind) : '',
       behaviorPrompt: behaviorPrompt(state, chat),
       proactive: Boolean(options.proactive),
       omitLastUser: Boolean(options.omitLastUser),
@@ -305,7 +302,7 @@ function makeAi(getState) {
       let material = '';
       if (chat) material = transcript(state, chat, 30, { day });
       else {
-        const chats = Object.values(state.chats).filter(chat => !chat.parallel);
+        const chats = Object.values(state.chats);
         material = chats.map(item => transcript(state, item, 10, { day })).join('\n');
       }
       const storyBlock = await story(state, chat, 900);
@@ -802,6 +799,11 @@ export function goView(view, params = {}) {
     const first = chatsOf(ctx.state)[0];
     if (!first) return;
     payload = { chatId: first.id };
+  }
+  if (view === 'parallel-branch' && !params.theaterId) {
+    const first = theatersOf(ctx.state)[0];
+    if (!first) return;
+    payload = { theaterId: first.id };
   }
   if (view === 'app-extras' && !params.contactId) {
     const withExtras = Object.keys(ctx.state.extras).find(key => (ctx.state.extras[key] || []).length);

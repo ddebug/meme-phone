@@ -549,6 +549,44 @@
   font-variant-numeric: tabular-nums;
 }
 .mp-debug-row { border-top: 1px solid rgba(74, 58, 110, .08); }
+
+/* 平行时空：提示词 / 背景面板里的分段块（角色行 + 正文整块） */
+.mp-prompt-row {
+  display: block;
+  padding: 7px 0;
+  border-top: 1px solid rgba(74, 58, 110, .08);
+}
+.mp-prompt-row:first-child { border-top: 0; }
+.mp-prompt-role {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text);
+}
+.mp-prompt-role i {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: 3px;
+  background: #9a86f5;
+}
+.mp-prompt-role span {
+  margin-left: auto;
+  font-size: calc(9.5px * var(--font-scale));
+  color: var(--text-4);
+  font-variant-numeric: tabular-nums;
+}
+.mp-prompt-body {
+  margin-top: 4px;
+  font-size: calc(11px * var(--font-scale));
+  line-height: 1.55;
+  color: var(--text-3);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 46vh;
+  overflow: auto;
+}
 .mp-debug-row summary {
   display: grid;
   grid-template-columns: 6px minmax(0, 1fr) auto;

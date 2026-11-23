@@ -52,8 +52,8 @@ test('设置有独立主动开口分组；沉默参考只在此组，默认不�
   assert.ok(groupStart >= 0);
   assert.match(group, /data-act="set-proactive-prompt"/);
   assert.match(group, /mp-set-value">默认</);
-  assert.match(group, /空着发送/);
-  assert.match(group, /不会定时发消息/);
+  assert.match(group, /主动开口提示词/);
+  assert.match(group, /空发送时参考沉默多久/);
   assert.match(group, /data-act="set-idle"/);
   assert.equal((html.match(/data-act="set-idle"/g) || []).length, 1);
   assert.doesNotMatch(html.slice(html.indexOf('高级与帮助')), /data-act="set-idle"/);

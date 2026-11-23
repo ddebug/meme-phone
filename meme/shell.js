@@ -517,7 +517,12 @@ export function createShell(options) {
     button.classList.toggle('is-stop', busy);
     button.classList.remove('is-text', 'is-request', 'is-wake');
     let label = '停止这次生成';
-    if (!busy) {
+    if (busy) {
+      // 平行时空这类「发送即生成」的 composer 只有停止与发送两种态，不吃唤醒态
+    } else if (button.dataset.plain === '1') {
+      button.classList.add('is-text');
+      label = '发送';
+    } else {
       button.classList.toggle('is-text', hasText);
       button.classList.toggle('is-request', !hasText && pending > 0);
       button.classList.toggle('is-wake', !hasText && pending === 0);

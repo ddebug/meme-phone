@@ -100,7 +100,7 @@ function contextPanelHtml(theater) {
 
 /** 旧版场景：还没有绑定聊天文件时，第一次生成就认当前打开的那个聊天。 */
 async function bindIfNeeded(ctx, theater) {
-  if (theater.chatFile && theater.base?.length) return true;
+  if (theater.chatFile && theater.forkFloor) return true;
   const host = await readOpenTavernChat();
   if (!host.available) return false;
   theater.chatFile = host.chatFile;
@@ -109,7 +109,8 @@ async function bindIfNeeded(ctx, theater) {
   theater.characterAvatar = theater.characterAvatar || host.characterAvatar;
   theater.presetName = host.presetName;
   theater.forkFloor = host.forkFloor;
-  theater.base = host.base;
+  theater.snapshot = host.snapshot || 'live';
+  theater.base = [];
   theater.memory = host.memory;
   theater.legacy = false;
   return true;
@@ -124,6 +125,8 @@ async function generateReply(ctx, theater) {
       base: theater.base || [],
       branch: theater.messages || [],
       characterName: theater.characterName,
+      chatId: theater.chatId,
+      forkFloor: theater.forkFloor,
     });
     if (task.stopped) return;
     const text = String(result.text || '').trim();

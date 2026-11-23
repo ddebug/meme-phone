@@ -445,21 +445,23 @@ export async function generate({ prompt, system = '', messages = null, demoReply
 
 /**
  * 当前打开的那个酒馆聊天文件 —— 平行时空从这里分叉。
- * base 是酒馆自己的楼层对象（原样复制）：柏宝书的 bbs_leaf 就挂在消息的 extra 上，
- * 原样抄走才能在分支里接着读到同一套记忆。
+ *
+ * 只记「分叉点」（chatId + 楼层数），**不复制整份 chat**：
+ * 大聊天（几十 MB）深拷贝 + 落盘会把小手机撑爆（保存时结构化克隆/序列化直接闪退）。
+ * 生成那一刻再从酒馆当前的 chat 里取前 forkFloor 层，楼层对象是酒馆原样（柏宝书的
+ * bbs_leaf 就挂在消息的 extra 上），所以分支里读到的是同一套记忆。
  */
 export async function readOpenTavernChat() {
   const script = await loadHostScript();
   const empty = {
     available: false, reason: '', characterName: '', characterAvatar: '', chatFile: '', chatId: '',
-    presetName: '', forkFloor: 0, base: [], memory: { engine: '', text: '', coverage: null },
+    presetName: '', forkFloor: 0, snapshot: 'live', base: [], memory: { engine: '', text: '', coverage: null },
   };
   if (!script) return { ...empty, reason: '不在酒馆里，读不到聊天文件' };
   const chat = Array.isArray(script.chat) ? script.chat : [];
   if (!chat.length) return { ...empty, reason: '酒馆里还没有打开聊天' };
   const characterId = script.characterId ?? script.this_chid;
   const character = Array.isArray(script.characters) ? script.characters[characterId] : null;
-  const base = cloneChatFloors(chat);
   return {
     available: true,
     reason: '',
@@ -468,19 +470,11 @@ export async function readOpenTavernChat() {
     chatFile: String(character?.chat || ''),
     chatId: String(script.getCurrentChatId?.() || script.chatId || ''),
     presetName: String(script.chatCompletionSettings?.preset_settings_openai || ''),
-    forkFloor: base.length,
-    base,
+    forkFloor: chat.length,
+    snapshot: 'live',
+    base: [],
     memory: readTavernMemory(),
   };
-}
-
-/** 深拷贝楼层；克隆失败整段跳过，不把半个聊天当快照。 */
-function cloneChatFloors(chat) {
-  try {
-    return JSON.parse(JSON.stringify(chat));
-  } catch {
-    return chat.map(line => ({ is_user: Boolean(line?.is_user), name: String(line?.name || ''), mes: String(line?.mes || ''), send_date: line?.send_date || '' }));
-  }
 }
 
 /**
@@ -517,33 +511,59 @@ function toTavernFloor(message, fallbackName = '') {
 }
 
 /**
- * 平行时空的一次生成：把酒馆的 chat 临时换成「快照 + 这一场新说的话」，
+ * 平行时空的一次生成：把酒馆的 chat 临时换成「分叉点之前的楼层 + 这一场新说的话」，
  * 交给酒馆自己的 generateQuietPrompt 去组装（预设 / 角色卡 / 世界书 / 记忆都是酒馆那套），
  * 拿到回复后无论是在哪个分支点出错，都把真实聊天原样放回去，且一个字都不写进聊天文件。
+ *
+ * base 有两种来源：
+ * - 传了 base（旧存档里的内联快照）：照旧用，只做浅拷贝，文本不复制；
+ * - 没传（现在的默认）：按 chatId + forkFloor 从酒馆当前 chat 里现取前 forkFloor 层，
+ *   大聊天因此不用把整份楼层存进小手机，也不用每次保存都克隆几十 MB。
  */
-export async function branchReply({ base = [], branch = [], characterName = '' } = {}) {
+export async function branchReply({ base = [], branch = [], characterName = '', chatId = '', forkFloor = 0 } = {}) {
   const script = await loadHostScript();
   const ctx = globalThis.SillyTavern?.getContext?.() || script;
   if (!ctx || typeof ctx.generateQuietPrompt !== 'function') throw new Error('酒馆的生成接口不可用');
   const hostChat = ctx.chat;
   if (!Array.isArray(hostChat)) throw new Error('拿不到酒馆的当前聊天');
-  if (!base.length && !branch.length) throw new Error('这一场还没有可以接着说的上下文');
+
+  let baseFloors = [];
+  if (Array.isArray(base) && base.length) {
+    baseFloors = base.map(item => ({ ...item }));
+  } else {
+    const expected = String(chatId || '');
+    const current = String(ctx.getCurrentChatId?.() || ctx.chatId || '');
+    if (expected && current && expected !== current) {
+      throw new Error('这一场绑的是另一个聊天文件，先在酒馆打开它再发');
+    }
+    const count = Number(forkFloor) || 0;
+    if (!count || count > hostChat.length) {
+      throw new Error('酒馆当前聊天对不上这一场的分叉点，先在酒馆打开原本那个聊天');
+    }
+    baseFloors = hostChat.slice(0, count).map(item => ({ ...item }));
+  }
+  if (!baseFloors.length && !branch.length) throw new Error('这一场还没有可以接着说的上下文');
 
   const backup = hostChat.slice();
-  const temp = [...base, ...branch].map(item => toTavernFloor(item, characterName));
+  const temp = [...baseFloors, ...branch.map(item => toTavernFloor(item, characterName))];
   const eventSource = ctx.eventSource;
   const promptEvent = ctx.eventTypes?.CHAT_COMPLETION_PROMPT_READY;
   let captured = null;
   const onPrompt = (data) => {
     if (!captured && Array.isArray(data?.chat)) captured = data.chat;
   };
+  /* 逐条 push，不用 splice(...temp)：几万楼的聊天会把参数展开撑爆调用栈 */
+  const replaceFloors = (next) => {
+    hostChat.splice(0, hostChat.length);
+    for (const floor of next) hostChat.push(floor);
+  };
   try {
     if (promptEvent && eventSource?.on) eventSource.on(promptEvent, onPrompt);
-    hostChat.splice(0, hostChat.length, ...temp);
+    replaceFloors(temp);
     const text = await ctx.generateQuietPrompt({ quietPrompt: '', quietName: null });
     return { text: String(text ?? '').trim(), prompt: captured };
   } finally {
-    hostChat.splice(0, hostChat.length, ...backup);
+    replaceFloors(backup);
     if (promptEvent && eventSource?.removeListener) eventSource.removeListener(promptEvent, onPrompt);
     /* 生成期间界面看到的是临时聊天，还原后让酒馆按真实聊天重画一遍 */
     try { eventSource?.emit?.(ctx.eventTypes?.CHAT_CHANGED, ctx.chatId); } catch { /* 重画失败不影响数据 */ }

@@ -36,6 +36,7 @@ function fakeHost(options = {}) {
     },
     generateQuietPrompt: options.generateQuietPrompt || (async (args) => {
       assert.equal(args.quietPrompt, '', '分支生成不塞额外指令，纯靠聊天历史');
+      ctx.sentFloors = ctx.chat.map(floor => floor.mes);
       ctx.eventSource.emit('chat_completion_prompt_ready', { chat: [{ role: 'system', content: '预设' }, { role: 'user', content: ctx.chat[ctx.chat.length - 1].mes }] });
       return '那我就在站台上陪你一会儿。';
     }),
@@ -131,24 +132,51 @@ test('平行时空：存档里的快照原样留着 extra（柏宝书的记忆�
   });
   const theater = next.theaters.th1;
   assert.equal(theater.title, '未命名的一场');
+  assert.equal(theater.snapshot, 'inline', '小份 base 仍然内联存着');
   assert.equal(theater.base[0].extra.bbs_leaf.id, 7);
   assert.equal(theater.memory.engine, 'baibai');
   assert.equal(theater.messages[0].at, 1700000000000);
   assert.equal(theaterMessagesCount(theater), 3);
 });
 
-test('平行时空：读当前聊天文件，快照是深拷贝，预设名从酒馆拿', async () => {
+test('平行时空：大份内联快照在升级时丢掉，只留分叉点（大聊天不把存档撑爆）', () => {
+  const big = Array.from({ length: 900 }, (_, index) => ({
+    is_user: index % 2 === 0,
+    name: '沈砚',
+    mes: `第 ${index} 楼：${'很长的一段。'.repeat(60)}`,
+  }));
+  const next = normalize({
+    theaters: {
+      th1: {
+        id: 'th1',
+        characterName: '沈砚',
+        chatFile: 'big.jsonl',
+        chatId: 'big-chat',
+        forkFloor: 900,
+        base: big,
+        messages: [{ is_user: true, name: '颜', mes: '我开一条新时间线。' }],
+      },
+    },
+  });
+  const theater = next.theaters.th1;
+  assert.equal(theater.snapshot, 'live');
+  assert.equal(theater.base.length, 0, '不再把几十 MB 楼层留在存档里');
+  assert.equal(theater.forkFloor, 900, '分叉点还在，生成时按它现取');
+  assert.equal(theater.messages.length, 1);
+});
+
+test('平行时空：读当前聊天只回分叉点，不复制楼层', async () => {
   const ctx = fakeHost();
   const chat = await readOpenTavernChat();
   assert.equal(chat.available, true);
   assert.equal(chat.characterName, '沈砚');
   assert.equal(chat.chatFile, '沈砚 - 2026-11-10@22h10m.jsonl');
   assert.equal(chat.presetName, '默认预设');
+  assert.equal(chat.chatId, 'demo-shen');
   assert.equal(chat.forkFloor, 2);
-  assert.equal(chat.base.length, 2);
+  assert.equal(chat.snapshot, 'live');
+  assert.equal(chat.base.length, 0, '不复制整份聊天，大聊天也不会卡在开分支这一步');
   assert.equal(chat.memory.engine, '', '没装柏宝书时记忆注入口径为空，按酒馆默认读原文');
-  ctx.chat[0].mes = '改掉快照里的这句';
-  assert.equal(chat.base[0].mes, '楼下灯还亮着。', '快照是拷贝，不受酒馆后续改动影响');
 });
 
 test('平行时空：生成期间把酒馆聊天临时换成「快照 + 这一场」，结束后原样放回', async () => {
@@ -165,6 +193,49 @@ test('平行时空：生成期间把酒馆聊天临时换成「快照 + 这一�
   assert.equal(ctx.chat.length, original.length, '生成完把真实聊天放回去');
   assert.equal(ctx.chat[0].mes, original[0].mes);
   assert.equal(result.prompt.length, 2, '抓到了这次真正发出去的提示词');
+});
+
+test('平行时空：live 分叉点按 chatId + 楼层数从酒馆现取前 N 层', async () => {
+  const ctx = fakeHost();
+  const result = await branchReply({
+    chatId: 'demo-shen',
+    forkFloor: 1,
+    branch: [{ is_user: true, name: '颜', mes: '最后一班了？' }],
+    characterName: '沈砚',
+  });
+  assert.deepEqual(ctx.sentFloors, ['楼下灯还亮着。', '最后一班了？'], '只取分叉点之前的楼层，加上这一场新说的');
+  assert.equal(ctx.chat.length, 2, '生成完把真实聊天放回去');
+  assert.equal(ctx.chat[1].mes, '还在改表。');
+  assert.equal(result.text, '那我就在站台上陪你一会儿。');
+});
+
+test('平行时空：换了聊天文件就不拿别的聊天凑数', async () => {
+  const ctx = fakeHost();
+  await assert.rejects(
+    () => branchReply({ chatId: 'other-chat', forkFloor: 1, branch: [{ is_user: true, mes: '在吗' }] }),
+    /另一个聊天文件/,
+  );
+  assert.equal(ctx.chat[1].mes, '还在改表。');
+  await assert.rejects(
+    () => branchReply({ chatId: 'demo-shen', forkFloor: 99, branch: [{ is_user: true, mes: '在吗' }] }),
+    /对不上/,
+  );
+});
+
+test('平行时空：几万楼的长聊天换 chat 也不会撑爆调用栈', async () => {
+  const floors = Array.from({ length: 70000 }, (_, index) => ({
+    is_user: index % 2 === 0, name: '沈砚', mes: `第 ${index} 楼`,
+  }));
+  const ctx = fakeHost({ chat: floors });
+  const result = await branchReply({
+    chatId: 'demo-shen',
+    forkFloor: floors.length,
+    branch: [{ is_user: true, name: '颜', mes: '再分一条线。' }],
+    characterName: '沈砚',
+  });
+  assert.equal(ctx.sentFloors.length, 70001, '生成时临时装进分叉点 + 这一场');
+  assert.equal(ctx.chat.length, floors.length, '结束后恢复原样');
+  assert.equal(result.text, '那我就在站台上陪你一会儿。');
 });
 
 test('平行时空：生成失败也把酒馆聊天放回去，并且没有可用的生成接口时直接报错', async () => {
@@ -208,6 +279,36 @@ test('平行时空：酒馆角色按头像文件名认领联系人', () => {
   const fresh = contactForTavernCharacter(state, { name: '新角色', tavernAvatar: 'new.png' });
   assert.ok(state.contacts[fresh]);
   assert.equal(state.contacts[fresh].tavernAvatar, 'new.png');
+});
+
+test('平行时空：几十 MB 的大聊天开一场后，存档里只多出一条小记录', async () => {
+  const bigLine = '很长的一段聊天内容。'.repeat(140);
+  const chat = Array.from({ length: 3000 }, (_, index) => ({
+    is_user: index % 2 === 0,
+    name: index % 2 === 0 ? '沈砚' : '颜',
+    mes: `${index}｜${bigLine}`,
+  }));
+  const ctx = fakeHost({ chat });
+  const host = await readOpenTavernChat();
+  assert.equal(host.forkFloor, 3000, '只数楼层，不抄内容');
+
+  const state = demoState();
+  const theater = addTheater(state, {
+    characterName: host.characterName,
+    characterAvatar: host.characterAvatar,
+    chatFile: host.chatFile,
+    chatId: host.chatId,
+    presetName: host.presetName,
+    forkFloor: host.forkFloor,
+    snapshot: host.snapshot,
+    base: host.base,
+    memory: host.memory,
+  });
+  assert.equal(theater.snapshot, 'live');
+  assert.equal(theater.base.length, 0);
+  const saved = JSON.stringify(theater);
+  assert.ok(saved.length < 5000, `一场分支落盘只有 ${saved.length} 字符，不随聊天体积膨胀`);
+  assert.ok(ctx.chat.length === 3000, '真实聊天没被动过');
 });
 
 test('平行时空：分支页的发送键只有发送/停止两态，不吃「唤醒」态', () => {

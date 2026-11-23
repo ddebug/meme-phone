@@ -21,21 +21,27 @@ export function branchStatusLine(theater) {
   return `接在 ${file} 第 ${theater.forkFloor || 0} 楼`;
 }
 
-/** 背景从哪来：柏宝书总结 / 酒馆原文 / 旧版场景。 */
+/** 背景从哪来：柏宝书总结 / 酒馆原文（现取）/ 旧版内联快照 / 旧版场景。 */
 export function branchMemoryLabel(theater) {
   const memory = theater.memory || {};
   if (memory.engine === 'baibai' && memory.text) return `柏宝书总结 · ${memory.text.length} 字`;
-  return theater.base?.length ? '酒馆原文 · 按预设自己裁' : '没有背景（旧版场景）';
+  if (theater.base?.length) return `内联快照 · ${theater.base.length} 层`;
+  return theater.forkFloor ? `酒馆原文 · 生成时现取第 ${theater.forkFloor} 楼之前` : '没有背景（旧版场景）';
 }
 
-/** 「这一场的背景」面板：快照楼层数、酒馆记忆的注入口径、重开一场的说明。 */
+/** 「这一场的背景」面板：分叉点、酒馆记忆的注入口径、重开一场的说明。 */
 export function branchContextPanelHtml(theater) {
   const memory = theater.memory || {};
   const base = Array.isArray(theater.base) ? theater.base : [];
+  const inline = Boolean(base.length);
+  const fork = theater.forkFloor || 0;
+  const mode = inline
+    ? '存档里存着当时那段聊天的副本'
+    : `小手机不存聊天副本，只记楼层数，每次生成从酒馆当前聊天里取前 ${fork} 楼`;
   return `
-    <div class="mp-sheet-note">${esc(branchStatusLine(theater))} · 快照 ${base.length} 层 · ${esc(branchMemoryLabel(theater))}</div>
+    <div class="mp-sheet-note">${esc(branchStatusLine(theater))} · ${inline ? `内联快照 ${base.length} 层` : '不存副本，生成时从酒馆现取'} · ${esc(branchMemoryLabel(theater))}</div>
     ${memory.text ? `<div class="mp-prompt-role"><i></i>酒馆记忆的注入口径<span>${esc(branchMemoryLabel(theater))}</span></div><div class="mp-prompt-body">${esc(memory.text)}</div>` : ''}
-    <div class="mp-sheet-note">快照里的楼层是开这一场那一刻的酒馆原样（柏宝书的记忆叶子也跟着楼层走）。酒馆里后来继续聊的，不会自动进这一场；想跟上就重新开一场。</div>`;
+    <div class="mp-sheet-note">分叉点固定在第 ${fork} 楼：${mode}（柏宝书的记忆叶子就在这些楼层上）。酒馆里后来继续聊的，不会自动进这一场；想跟上就重新开一场。</div>`;
 }
 
 
@@ -66,6 +72,7 @@ export async function createParallelBranch(ctx) {
     chatId: host.chatId,
     presetName: host.presetName,
     forkFloor: host.forkFloor,
+    snapshot: host.snapshot || 'live',
     base: host.base,
     memory: host.memory,
   });

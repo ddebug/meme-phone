@@ -564,9 +564,10 @@ export function emptyState() {
 export const DEFAULT_DIARY_PROMPT = `站在角色自己的视角写日记，第一人称“我”指日记作者，而不是用户。
 根据角色资料和完整聊天历史保持角色的身份、语气及与用户的关系。
 按指定日期分别写，每篇按时间顺序，标出大概几点。适度压缩重要事件、互动、感受和关系变化，不要逐句复述。
-不强制保留用户原话；确有必要时可择要引用，但引用必须与原文一致，不伪造原话。
+尽量保留用户原话，尤其是她对我说的话和有感情的句子，不改字，不润色，不伪造原话。
 只记录聊天中能确认的事情。隔天转述的旧事要说明是当日回顾；不编造线下行动、关系或动机，不把猜测当成事实。
-保持角色平时的语感，不要写成说明书。`;
+保持角色平时的语感，不要写成说明书。
+每一天的总结在 500 字以内`;
 export const DIARY_SKIP_THRESHOLD = 20;
 
 const DEFAULT_EMOJI = [
@@ -675,11 +676,25 @@ export function chatById(state, id) {
 
 /**
  * 平行时空不是一台新的小手机聊天，而是某个酒馆聊天文件的一条分支：
- *   base   —— 开这一场时从当前聊天文件抄下来的楼层（酒馆原样，柏宝书的叶子跟着楼层走）
+ *   snapshot/forkFloor —— 分叉点：默认 'live'，只记聊天文件与楼层数，生成时从酒馆现取
+ *   base   —— 只有小份旧存档才内联存的楼层（酒馆原样，柏宝书的叶子跟着楼层走）
  *   memory —— 开这一场时酒馆记忆的注入口径（有柏宝书就是它的总结，没有就是空）
  *   messages —— 这一场自己新说的话，只存在这台小手机里
  * 生成走酒馆自己的 prompt 组装（预设/角色卡/世界书/记忆），所以这里不需要小手机的模型和回复预设。
  */
+/** 内联快照上限：超过就当 live，只留分叉点（大聊天不落盘，避免保存时克隆几十 MB 闪退）。 */
+const INLINE_BASE_MAX = 300000;
+
+function baseChars(base) {
+  if (!Array.isArray(base)) return 0;
+  let total = 0;
+  for (const item of base) {
+    total += String(item?.mes ?? item?.text ?? '').length + 160;
+    if (total > INLINE_BASE_MAX) return total;
+  }
+  return total;
+}
+
 export function theaterById(state, id) {
   return state.theaters?.[id] || null;
 }
@@ -706,6 +721,10 @@ export function defaultTheaterTitle(state, info = {}) {
 
 export function addTheater(state, info = {}) {
   const id = info.id || newId('th');
+  /* 快照默认不落盘：只记分叉点，生成时从酒馆现取楼层。
+     只有显式给了小份 base（演示 / 旧存档）才内联存，避免大聊天把存档撑爆。 */
+  const rawBase = Array.isArray(info.base) ? info.base : [];
+  const keepInline = rawBase.length > 0 && baseChars(rawBase) <= INLINE_BASE_MAX;
   const theater = {
     id,
     title: String(info.title || '').trim().slice(0, 32) || defaultTheaterTitle(state, info),
@@ -716,8 +735,9 @@ export function addTheater(state, info = {}) {
     chatFile: String(info.chatFile || ''),
     chatId: String(info.chatId || ''),
     presetName: String(info.presetName || ''),
-    forkFloor: Number(info.forkFloor) || 0,
-    base: Array.isArray(info.base) ? info.base : [],
+    forkFloor: Number(info.forkFloor) || rawBase.length,
+    snapshot: keepInline ? 'inline' : 'live',
+    base: keepInline ? rawBase : [],
     memory: {
       engine: String(info.memory?.engine || ''),
       text: String(info.memory?.text || '').slice(0, 20000),
@@ -2180,7 +2200,8 @@ export function normalize(raw) {
     }
   }
   for (const [id, theater] of Object.entries(merged.theaters)) {
-    const base = Array.isArray(theater?.base) ? theater.base.filter(item => item && typeof item === 'object') : [];
+    const rawBase = Array.isArray(theater?.base) ? theater.base.filter(item => item && typeof item === 'object') : [];
+    const keepInline = rawBase.length > 0 && baseChars(rawBase) <= INLINE_BASE_MAX;
     const messages = Array.isArray(theater?.messages) ? theater.messages : [];
     merged.theaters[id] = {
       id,
@@ -2192,8 +2213,10 @@ export function normalize(raw) {
       chatFile: String(theater?.chatFile || ''),
       chatId: String(theater?.chatId || ''),
       presetName: String(theater?.presetName || ''),
-      forkFloor: Number(theater?.forkFloor) || base.length,
-      base: base.map(item => ({ ...item, mes: String(item.mes || item.text || '') })),
+      forkFloor: Number(theater?.forkFloor) || rawBase.length,
+      /* 大份 base 不再进存档：只留分叉点，生成时从酒馆现取（旧存档升级时也走这条） */
+      snapshot: keepInline ? 'inline' : 'live',
+      base: keepInline ? rawBase.map(item => ({ ...item, mes: String(item.mes || item.text || '') })) : [],
       memory: {
         engine: String(theater?.memory?.engine || ''),
         text: String(theater?.memory?.text || '').slice(0, 20000),

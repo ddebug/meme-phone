@@ -699,10 +699,10 @@ function threadBody(ctx, chatId) {
   const sendAct = busy ? 'stop-generation' : 'send';
   const sendTitle = busy
     ? '停止这次生成'
-    : (hasDraft ? '发送这条；再点一次让 TA 回' : (waiting ? `让 TA 回这 ${waiting} 条` : '空着发时让 TA 主动开口'));
+    : (hasDraft ? '发送这条；再点一次让 TA 回' : (waiting ? `让 TA 回这 ${waiting} 条` : '发送'));
   const composerHint = busy
     ? '生成中 · 点右边停止'
-    : (hasDraft ? '先发出去，再点右边让 TA 回' : (waiting ? `${waiting} 条已发出 · 点右边让 TA 回` : '空着发，TA 会主动开口'));
+    : (hasDraft ? '先发出去，再点右边让 TA 回' : (waiting ? `${waiting} 条已发出 · 点右边让 TA 回` : ''));
 
   /* 显示窗口：只渲染最近一页，往上翻再加载更早的。
      注意这里只管屏幕上的 DOM 数量，发给模型的历史仍按上下文预算从完整 messages 里取。 */
@@ -815,7 +815,7 @@ function threadBody(ctx, chatId) {
           <button class="mp-plus-toggle${ctx.shell.plusOpen === chat.id ? ' is-open' : ''}" data-act="composer-plus" data-chat="${chat.id}" type="button" aria-expanded="${ctx.shell.plusOpen === chat.id}" aria-controls="mpComposerPlus">
             ${icon('plus')}<span>更多</span>
           </button>
-          <span class="mp-composer-hint">${icon('spark')}<span class="mp-composer-hint-text">${esc(composerHint)}</span></span>
+          ${composerHint ? `<span class="mp-composer-hint">${icon('spark')}<span class="mp-composer-hint-text">${esc(composerHint)}</span></span>` : ''}
         </div>
         <input id="mpMsgPhoto" type="file" accept="image/*" data-chat="${chat.id}" style="position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0">
       </div>

@@ -504,6 +504,7 @@ export function createShell(options) {
     const button = root.querySelector('.mp-send');
     const input = root.querySelector('.mp-compose-box input');
     const hint = root.querySelector('.mp-composer-hint-text');
+    const hintBox = root.querySelector('.mp-composer-hint');
     if (!button || !input) return;
     const hasText = Boolean(input.value.trim());
     const busy = button.dataset.busy === '1';
@@ -523,13 +524,14 @@ export function createShell(options) {
         label = `让 TA 回这 ${pending} 条`;
         hintText = `${pending} 条已发出 · 点右边让 TA 回`;
       } else {
-        label = '空着发时让 TA 主动开口';
-        hintText = '空着发，TA 会主动开口';
+        label = '发送';
+        hintText = '';
       }
     }
     button.setAttribute('aria-label', label);
     button.title = label;
     if (hint) hint.textContent = hintText;
+    if (hintBox) hintBox.style.display = hintText ? '' : 'none';
   };
 
   shell.refresh = render;

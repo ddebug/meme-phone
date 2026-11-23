@@ -6,7 +6,7 @@
  */
 
 import { eventSource, event_types, getRequestHeaders } from '/script.js';
-import { openMemePhone, closeMemePhone, initMemePhone, isOpen, getState, closeMemePhone as closeUI } from './meme/index.js';
+import { openMemePhone, closeMemePhone, initMemePhone, isOpen, closeMemePhone as closeUI } from './meme/index.js';
 
 const PANEL_ID = 'meme-phone-settings';
 const MENU_ID = 'meme-phone-menu-entry';
@@ -26,7 +26,7 @@ function setStatus(text, isError = false) {
 
 function describeStatus(status) {
   if (!status) return '';
-  if (status.error) return `保存出错：${status.error}\n请先在下面导出备份，再刷新页面。`;
+  if (status.error) return `保存出错：${status.error}\n请先在手机「设置 → 数据 → 导出备份」里备份，再刷新页面。`;
   if (status.saving) return '正在保存…';
   if (status.dirty) return '有改动还没写入。';
   return '已同步。';
@@ -76,11 +76,10 @@ function mountPanel() {
   panel.open = false;
   panel.innerHTML = `
     <summary>meme-phone · 桌面式小手机</summary>
-    <p class="meme-note">桌面 + App 图标的前端，数据单独存在 <code>/user/files/meme-phone.json</code>，不会写进酒馆的角色卡或聊天记录。</p>
+    <p class="meme-note">桌面 + App 图标的前端，数据只存在小手机里，不会写进酒馆的角色卡或聊天记录。</p>
     <p class="meme-note">召唤：点扩展菜单，或点聊天框上方快捷回复栏里的「召唤手机」；也可以在输入框敲 <code>/meme</code>。</p>
     <div class="meme-actions">
       <button type="button" data-role="open">打开手机</button>
-      <button type="button" data-role="export">导出备份</button>
       <label><input type="file" accept=".json,application/json" data-role="import">导入备份</label>
     </div>
     <p data-role="status" class="meme-note"></p>
@@ -91,25 +90,6 @@ function mountPanel() {
   (target || document.body).append(panel);
 
   ui('open').addEventListener('click', () => { void openPhone(); });
-
-  ui('export').addEventListener('click', () => {
-    try {
-      const state = getState();
-      if (!state) { setStatus('还没载入数据。', true); return; }
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `meme-phone-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.append(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setStatus('备份已导出。');
-    } catch (error) {
-      setStatus(`导出失败：${error?.message || error}`, true);
-    }
-  });
 
   ui('import').addEventListener('change', async event => {
     const file = event.target.files?.[0];

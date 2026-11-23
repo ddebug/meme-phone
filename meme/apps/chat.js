@@ -213,7 +213,7 @@ function debugGroupHtml(group) {
     <div class="mp-debug-group">
       <span class="mp-debug-dot mp-debug-dot-${group.key}"></span>
       <span class="mp-debug-group-name">${esc(group.label)}</span>
-      <span class="mp-debug-group-meta">${formatNumber(group.count)} 条 · ${formatNumber(group.chars)} 字</span>
+      <span class="mp-debug-group-meta">${formatNumber(group.chars)} 字</span>
       <span class="mp-debug-num">${formatNumber(group.tokens)} tk</span>
     </div>`;
 }
@@ -237,7 +237,7 @@ function debugPanelHtml(ctx, chat, contact, cache, draft) {
   return `
     <div class="mp-debug-panel">
       <div class="mp-debug-summary">
-        <div class="mp-debug-summary-main">${want} · ${formatNumber(groups.length)} 组 · ${formatNumber(stats.rows.length)} 条 · ≈ ${formatNumber(stats.total)} tk${budget ? ` · 上下文 ${budget}` : ''}</div>
+        <div class="mp-debug-summary-main">${want} · ≈ ${formatNumber(stats.total)} tk${budget ? ` · 上下文 ${budget}` : ''}</div>
         <div class="mp-debug-model">${esc(modelName)} · ${esc(preset)}</div>
       </div>
       <div class="mp-debug-share" aria-hidden="true">${bars || '<span class="mp-debug-seg mp-debug-seg-empty" style="width:100%"></span>'}</div>
@@ -245,10 +245,10 @@ function debugPanelHtml(ctx, chat, contact, cache, draft) {
       <div class="mp-debug-list">${groups.map(debugGroupHtml).join('') || '<div class="mp-debug-empty">这一轮没有可发送的消息。</div>'}</div>
       ${skipped.length ? `
       <details class="mp-debug-more">
-        <summary>未进入这一次 · ${skipped.length} 条</summary>
+        <summary>未进入这一次</summary>
         ${skipped.map(item => `<div class="mp-debug-skip"><span>${esc(item.label || '条目')}</span><small>${esc(item.reason || item.status || '')}</small></div>`).join('')}
       </details>` : ''}
-      <div class="mp-debug-foot">按字符估算，实际 token 以模型分词为准。${mode === 'none' ? ' 空发送已关闭，这里只显示基础上下文。' : ''}</div>
+      <div class="mp-debug-foot">token 数为预估值，实际以模型分词与接口计费为准。${mode === 'none' ? ' 空发送已关闭，这里只显示基础上下文。' : ''}</div>
     </div>`;
 }
 

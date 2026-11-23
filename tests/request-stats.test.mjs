@@ -21,6 +21,14 @@ test('requestStats 按上下文来源拆成酒馆历史、小手机历史和其�
   assert.equal(stats.totalChars, 4 + 4 + 2 + 2 + 4 + 2);
 });
 
+test('requestStats 字数按 Unicode 字符计数，并优先使用宿主分词结果', () => {
+  const stats = requestStats([
+    msg('场景提示', 'A\r\n😀', { tokenCount: 11 }),
+  ]);
+  assert.equal(stats.rows[0].chars, 3);
+  assert.equal(stats.rows[0].tokens, 15);
+});
+
 test('requestStats 优先使用消息自带的 group，不依赖用户改过的条目名', () => {
   const stats = requestStats([
     msg('我自己的记忆名字', '酒馆内容', { group: 'tavern' }),

@@ -35,6 +35,30 @@ export function __resetHostScriptForTests() {
   hostScriptTried = false;
 }
 
+/**
+ * 用酒馆当前分词器数一段正文；只计数，不请求模型。
+ * 宿主没暴露分词器时返回 null，让调用方退回本地估算。
+ */
+export async function countTextTokens(text, timeoutMs = 3000) {
+  const script = await loadHostScript();
+  const hostCtx = globalThis.SillyTavern?.getContext?.() || script?.getContext?.() || {};
+  const count = hostCtx?.getTokenCountAsync;
+  if (typeof count !== 'function') return null;
+  let timer = 0;
+  try {
+    const value = await Promise.race([
+      Promise.resolve().then(() => count.call(hostCtx, String(text || ''), 0)),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('tokenizer timeout')), timeoutMs); }),
+    ]);
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? Math.ceil(number) : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function isStandalone() {
   return Boolean(globalThis.__MEME_DEMO__) || !hostScript;
 }

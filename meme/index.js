@@ -6,7 +6,7 @@
 import { createStore } from './store.js';
 import { normalize, emptyState, demoState, syncTavernContacts, chatFor, chatsOf, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks, dayKey, isParallelChat } from './data.js';
 import { createShell, applyWall, applyLook } from './shell.js';
-import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
+import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost, countTextTokens } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { favoritesApp } from './apps/favorites.js';
 import { photoApp } from './apps/photo.js';
@@ -190,9 +190,14 @@ function makeAi(getState) {
       if (hit && Date.now() - hit.at < 30000) return hit.value;
 
       const { built, wantsTheater } = await compose(chat, contact, { omitLastUser: true, omitPending: true, presetOverride: options.presetOverride });
+      /* 有酒馆分词器就按真实分词数；只有拿不到时才让界面退回本地估算。 */
+      const tokenCounts = await Promise.all(built.messages.map(message => countTextTokens(message.content)));
+      const messages = built.messages.map((message, index) => (
+        Number.isFinite(tokenCounts[index]) ? { ...message, tokenCount: tokenCounts[index] } : message
+      ));
       const value = {
         key,
-        messages: built.messages,
+        messages,
         report: built.report,
         wantsTheater,
         model: llmPresetFor(state, chat),

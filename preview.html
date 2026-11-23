@@ -11960,6 +11960,30 @@ function __resetHostScriptForTests() {
   hostScriptTried = false;
 }
 
+/**
+ * 用酒馆当前分词器数一段正文；只计数，不请求模型。
+ * 宿主没暴露分词器时返回 null，让调用方退回本地估算。
+ */
+async function countTextTokens(text, timeoutMs = 3000) {
+  const script = await loadHostScript();
+  const hostCtx = globalThis.SillyTavern?.getContext?.() || script?.getContext?.() || {};
+  const count = hostCtx?.getTokenCountAsync;
+  if (typeof count !== 'function') return null;
+  let timer = 0;
+  try {
+    const value = await Promise.race([
+      Promise.resolve().then(() => count.call(hostCtx, String(text || ''), 0)),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('tokenizer timeout')), timeoutMs); }),
+    ]);
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? Math.ceil(number) : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function isStandalone() {
   return Boolean(globalThis.__MEME_DEMO__) || !hostScript;
 }
@@ -13279,6 +13303,7 @@ async function probeHost() {
 
 exports["loadHostScript"] = loadHostScript;
 exports["__resetHostScriptForTests"] = __resetHostScriptForTests;
+exports["countTextTokens"] = countTextTokens;
 exports["isStandalone"] = isStandalone;
 exports["readTavernCharacters"] = readTavernCharacters;
 exports["readTavernCards"] = readTavernCards;
@@ -15589,7 +15614,7 @@ function debugGroupHtml(group) {
     <div class="mp-debug-group">
       <span class="mp-debug-dot mp-debug-dot-${group.key}"></span>
       <span class="mp-debug-group-name">${esc(group.label)}</span>
-      <span class="mp-debug-group-meta">${formatNumber(group.count)} 条 · ${formatNumber(group.chars)} 字</span>
+      <span class="mp-debug-group-meta">${formatNumber(group.chars)} 字</span>
       <span class="mp-debug-num">${formatNumber(group.tokens)} tk</span>
     </div>`;
 }
@@ -15613,7 +15638,7 @@ function debugPanelHtml(ctx, chat, contact, cache, draft) {
   return `
     <div class="mp-debug-panel">
       <div class="mp-debug-summary">
-        <div class="mp-debug-summary-main">${want} · ${formatNumber(groups.length)} 组 · ${formatNumber(stats.rows.length)} 条 · ≈ ${formatNumber(stats.total)} tk${budget ? ` · 上下文 ${budget}` : ''}</div>
+        <div class="mp-debug-summary-main">${want} · ≈ ${formatNumber(stats.total)} tk${budget ? ` · 上下文 ${budget}` : ''}</div>
         <div class="mp-debug-model">${esc(modelName)} · ${esc(preset)}</div>
       </div>
       <div class="mp-debug-share" aria-hidden="true">${bars || '<span class="mp-debug-seg mp-debug-seg-empty" style="width:100%"></span>'}</div>
@@ -15621,10 +15646,10 @@ function debugPanelHtml(ctx, chat, contact, cache, draft) {
       <div class="mp-debug-list">${groups.map(debugGroupHtml).join('') || '<div class="mp-debug-empty">这一轮没有可发送的消息。</div>'}</div>
       ${skipped.length ? `
       <details class="mp-debug-more">
-        <summary>未进入这一次 · ${skipped.length} 条</summary>
+        <summary>未进入这一次</summary>
         ${skipped.map(item => `<div class="mp-debug-skip"><span>${esc(item.label || '条目')}</span><small>${esc(item.reason || item.status || '')}</small></div>`).join('')}
       </details>` : ''}
-      <div class="mp-debug-foot">按字符估算，实际 token 以模型分词为准。${mode === 'none' ? ' 空发送已关闭，这里只显示基础上下文。' : ''}</div>
+      <div class="mp-debug-foot">token 数为预估值，实际以模型分词与接口计费为准。${mode === 'none' ? ' 空发送已关闭，这里只显示基础上下文。' : ''}</div>
     </div>`;
 }
 
@@ -26839,6 +26864,11 @@ function proactiveLead(state, contact, chat = null, now = new Date()) {
   return proactivePromptFor(state).replace(/\{\{(char|user|当前时间|间隔时长|沉默阈值)\}\}/g, (_, key) => values[key]);
 }
 
+/** 字数按 Unicode 字符数，换行统一算一个，代理对不重复计数。 */
+function countChars(input) {
+  return [...String(input || '').replace(/\r\n?/g, '\n')].length;
+}
+
 /**
  * 本地 token 估算：中文按 1 字 1 tk，其它字符按 4 字符 1 tk，emoji 按 2 tk。
  * 不引依赖，不冒充精确分词；界面上统一带 ≈。
@@ -26897,13 +26927,14 @@ function requestStats(messages) {
   const rows = (Array.isArray(messages) ? messages : []).map((message, index) => {
     const content = String(message?.content || '');
     const group = requestGroup(message);
+    const hostTokens = Number(message?.tokenCount);
     return {
       index,
       role: message?.role || 'system',
       source: String(message?.source || '消息'),
       content,
-      chars: content.length,
-      tokens: estimateTokens(content) + 4,
+      chars: countChars(content),
+      tokens: (Number.isFinite(hostTokens) && hostTokens >= 0 ? Math.ceil(hostTokens) : estimateTokens(content)) + 4,
       group,
     };
   });
@@ -27380,7 +27411,7 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
       ? serializeMessage(lastMessage)
       : '');
   const pendingExtraChars = [options.behaviorPrompt, options.extraPrompt]
-    .reduce((sum, text) => sum + String(text || '').length, 0);
+    .reduce((sum, text) => sum + countChars(text), 0);
 
   for (const item of items) {
     const base = { id: item.id, label: item.label, kind: item.kind };
@@ -27400,7 +27431,7 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
     let block;
     if (item.kind === 'context') {
       const historyMaxChars = budgetActive
-        ? Math.max(0, charBudget - used - pendingUserText.length - pendingExtraChars - outputReserve - 24)
+        ? Math.max(0, charBudget - used - countChars(pendingUserText) - pendingExtraChars - outputReserve - 24)
         : 0;
       block = await contextBlockFor(item, state, chat, contact, context, memoryText, {
         omitLast: !options.proactive,
@@ -27422,18 +27453,18 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
       reportItems.push({ ...base, status: 'duplicate', chars: 0, reason: '和前面的条目内容重复' });
       continue;
     }
-    if (budgetActive && used + content.length > charBudget) {
+    if (budgetActive && used + countChars(content) > charBudget) {
       reportItems.push({ ...base, status: 'over-budget', chars: 0, reason: `整套上下文超过 ${charBudget} 字上限` });
       continue;
     }
 
     seen.add(key);
-    used += content.length;
+    used += countChars(content);
     const group = item.kind === 'context'
       ? (item.auto === 'memory' ? 'tavern' : item.auto === 'history' ? 'phone' : 'context')
       : 'rule';
     messages.push({ role: item.role || 'system', content, source: item.label, id: item.id, group });
-    reportItems.push({ ...base, status: 'injected', chars: content.length, reason: block.reason || '' });
+    reportItems.push({ ...base, status: 'injected', chars: countChars(content), reason: block.reason || '' });
   }
 
   /* 行为标签：只把当前打开的转账 / 计划 / 会员等写进系统提示，关掉的就不教模型。 */
@@ -27453,7 +27484,7 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
     messages.push({ role: 'user', content: '（现在没有新消息，主动开启聊天，按回复预设的格式发送。）', source: '主动消息占位', group: 'turn' });
   }
 
-  const charTotal = messages.reduce((sum, message) => sum + String(message?.content || '').length, 0);
+  const charTotal = messages.reduce((sum, message) => sum + countChars(message?.content), 0);
 
   return {
     messages,
@@ -27467,10 +27498,10 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
       charBudget,
       outputReserve,
       overBudget: budgetActive && charTotal > charBudget,
-      inputChars: lastUserText.length,
-      overLimitInput: budgetActive && lastUserText.length > charBudget,
+      inputChars: countChars(lastUserText),
+      overLimitInput: budgetActive && countChars(lastUserText) > charBudget,
       items: reportItems,
-      memoryChars: memoryText.length,
+      memoryChars: countChars(memoryText),
       personaBook: String(activePersona(state)?.lorebook || ''),
     },
   };
@@ -27478,6 +27509,7 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
 
 exports["replyLead"] = replyLead;
 exports["proactiveLead"] = proactiveLead;
+exports["countChars"] = countChars;
 exports["estimateTokens"] = estimateTokens;
 exports["requestStats"] = requestStats;
 exports["serializeMessage"] = serializeMessage;
@@ -27503,7 +27535,7 @@ __mods["meme/index.js"] = function(module, exports, __req){
 const { createStore } = __req("meme/store.js");
 const { normalize, emptyState, demoState, syncTavernContacts, chatFor, chatsOf, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks, dayKey, isParallelChat } = __req("meme/data.js");
 const { createShell, applyWall, applyLook } = __req("meme/shell.js");
-const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } = __req("meme/host.js");
+const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost, countTextTokens } = __req("meme/host.js");
 const { chatApp, threadApp, threadSettingsApp } = __req("meme/apps/chat.js");
 const { favoritesApp } = __req("meme/apps/favorites.js");
 const { photoApp } = __req("meme/apps/photo.js");
@@ -27687,9 +27719,14 @@ function makeAi(getState) {
       if (hit && Date.now() - hit.at < 30000) return hit.value;
 
       const { built, wantsTheater } = await compose(chat, contact, { omitLastUser: true, omitPending: true, presetOverride: options.presetOverride });
+      /* 有酒馆分词器就按真实分词数；只有拿不到时才让界面退回本地估算。 */
+      const tokenCounts = await Promise.all(built.messages.map(message => countTextTokens(message.content)));
+      const messages = built.messages.map((message, index) => (
+        Number.isFinite(tokenCounts[index]) ? { ...message, tokenCount: tokenCounts[index] } : message
+      ));
       const value = {
         key,
-        messages: built.messages,
+        messages,
         report: built.report,
         wantsTheater,
         model: llmPresetFor(state, chat),

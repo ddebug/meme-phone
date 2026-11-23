@@ -45,6 +45,11 @@ export function proactiveLead(state, contact, chat = null, now = new Date()) {
   return proactivePromptFor(state).replace(/\{\{(char|user|当前时间|间隔时长|沉默阈值)\}\}/g, (_, key) => values[key]);
 }
 
+/** 字数按 Unicode 字符数，换行统一算一个，代理对不重复计数。 */
+export function countChars(input) {
+  return [...String(input || '').replace(/\r\n?/g, '\n')].length;
+}
+
 /**
  * 本地 token 估算：中文按 1 字 1 tk，其它字符按 4 字符 1 tk，emoji 按 2 tk。
  * 不引依赖，不冒充精确分词；界面上统一带 ≈。
@@ -103,13 +108,14 @@ export function requestStats(messages) {
   const rows = (Array.isArray(messages) ? messages : []).map((message, index) => {
     const content = String(message?.content || '');
     const group = requestGroup(message);
+    const hostTokens = Number(message?.tokenCount);
     return {
       index,
       role: message?.role || 'system',
       source: String(message?.source || '消息'),
       content,
-      chars: content.length,
-      tokens: estimateTokens(content) + 4,
+      chars: countChars(content),
+      tokens: (Number.isFinite(hostTokens) && hostTokens >= 0 ? Math.ceil(hostTokens) : estimateTokens(content)) + 4,
       group,
     };
   });
@@ -586,7 +592,7 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
       ? serializeMessage(lastMessage)
       : '');
   const pendingExtraChars = [options.behaviorPrompt, options.extraPrompt]
-    .reduce((sum, text) => sum + String(text || '').length, 0);
+    .reduce((sum, text) => sum + countChars(text), 0);
 
   for (const item of items) {
     const base = { id: item.id, label: item.label, kind: item.kind };
@@ -606,7 +612,7 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
     let block;
     if (item.kind === 'context') {
       const historyMaxChars = budgetActive
-        ? Math.max(0, charBudget - used - pendingUserText.length - pendingExtraChars - outputReserve - 24)
+        ? Math.max(0, charBudget - used - countChars(pendingUserText) - pendingExtraChars - outputReserve - 24)
         : 0;
       block = await contextBlockFor(item, state, chat, contact, context, memoryText, {
         omitLast: !options.proactive,
@@ -628,18 +634,18 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
       reportItems.push({ ...base, status: 'duplicate', chars: 0, reason: '和前面的条目内容重复' });
       continue;
     }
-    if (budgetActive && used + content.length > charBudget) {
+    if (budgetActive && used + countChars(content) > charBudget) {
       reportItems.push({ ...base, status: 'over-budget', chars: 0, reason: `整套上下文超过 ${charBudget} 字上限` });
       continue;
     }
 
     seen.add(key);
-    used += content.length;
+    used += countChars(content);
     const group = item.kind === 'context'
       ? (item.auto === 'memory' ? 'tavern' : item.auto === 'history' ? 'phone' : 'context')
       : 'rule';
     messages.push({ role: item.role || 'system', content, source: item.label, id: item.id, group });
-    reportItems.push({ ...base, status: 'injected', chars: content.length, reason: block.reason || '' });
+    reportItems.push({ ...base, status: 'injected', chars: countChars(content), reason: block.reason || '' });
   }
 
   /* 行为标签：只把当前打开的转账 / 计划 / 会员等写进系统提示，关掉的就不教模型。 */
@@ -659,7 +665,7 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
     messages.push({ role: 'user', content: '（现在没有新消息，主动开启聊天，按回复预设的格式发送。）', source: '主动消息占位', group: 'turn' });
   }
 
-  const charTotal = messages.reduce((sum, message) => sum + String(message?.content || '').length, 0);
+  const charTotal = messages.reduce((sum, message) => sum + countChars(message?.content), 0);
 
   return {
     messages,
@@ -673,10 +679,10 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
       charBudget,
       outputReserve,
       overBudget: budgetActive && charTotal > charBudget,
-      inputChars: lastUserText.length,
-      overLimitInput: budgetActive && lastUserText.length > charBudget,
+      inputChars: countChars(lastUserText),
+      overLimitInput: budgetActive && countChars(lastUserText) > charBudget,
       items: reportItems,
-      memoryChars: memoryText.length,
+      memoryChars: countChars(memoryText),
       personaBook: String(activePersona(state)?.lorebook || ''),
     },
   };

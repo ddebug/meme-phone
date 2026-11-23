@@ -1,35 +1,27 @@
 /**
  * meme-phone · 酒馆扩展入口
  *
- * 只做三件事：在扩展设置里放一个面板、在扩展菜单里放一个入口、负责挂载/卸载界面。
+ * 只做三件事：在扩展菜单里放一个入口、在聊天框上方挂「召唤手机」、负责挂载/卸载界面。
+ * 不在扩展设置里常驻面板；导入、导出和设置都进手机里操作。
  * 界面本身的代码全在 meme/ 下，与宿主无关的部分可以单独打开预览页看。
  */
 
 import { eventSource, event_types, getRequestHeaders } from '/script.js';
 import { openMemePhone, closeMemePhone, initMemePhone, isOpen, closeMemePhone as closeUI } from './meme/index.js';
 
-const PANEL_ID = 'meme-phone-settings';
 const MENU_ID = 'meme-phone-menu-entry';
 
-let panel = null;
 let bootPromise = null;
 let busy = false;
 
-function ui(role) { return panel?.querySelector(`[data-role="${role}"]`); }
-
-function setStatus(text, isError = false) {
-  const node = ui('status');
-  if (!node) return;
-  node.textContent = text;
-  node.dataset.error = String(isError);
-}
-
-function describeStatus(status) {
-  if (!status) return '';
-  if (status.error) return `保存出错：${status.error}\n请先在手机「设置 → 数据 → 导出备份」里备份，再刷新页面。`;
-  if (status.saving) return '正在保存…';
-  if (status.dirty) return '有改动还没写入。';
-  return '已同步。';
+function notify(message, isError = false) {
+  const type = isError ? 'error' : 'info';
+  try {
+    const toastr = globalThis.toastr;
+    if (typeof toastr?.[type] === 'function') { toastr[type](message); return; }
+  } catch { /* 宿主没给 toastr 就退回控制台 */ }
+  if (isError) console.error(`[meme-phone] ${message}`);
+  else console.info(`[meme-phone] ${message}`);
 }
 
 async function boot() {
@@ -42,13 +34,11 @@ async function boot() {
 async function openPhone() {
   if (busy) return;
   busy = true;
-  setStatus('正在打开…');
   try {
     await boot();
     await openMemePhone({ getHeaders: () => getRequestHeaders(), seedFromTavern: true });
-    setStatus('已打开。关掉窗口后回到这里。');
   } catch (error) {
-    setStatus(`打开失败：${error?.message || error}`, true);
+    notify(`打开手机失败：${error?.message || error}`, true);
   } finally {
     busy = false;
   }
@@ -67,49 +57,6 @@ function registerMenuEntry() {
     menu.append(item);
   }
   return item;
-}
-
-function mountPanel() {
-  if (panel) return;
-  panel = document.createElement('details');
-  panel.id = PANEL_ID;
-  panel.open = false;
-  panel.innerHTML = `
-    <summary>meme-phone · 桌面式小手机</summary>
-    <p class="meme-note">桌面 + App 图标的前端，数据只存在小手机里，不会写进酒馆的角色卡或聊天记录。</p>
-    <p class="meme-note">召唤：点扩展菜单，或点聊天框上方快捷回复栏里的「召唤手机」；也可以在输入框敲 <code>/meme</code>。</p>
-    <div class="meme-actions">
-      <button type="button" data-role="open">打开手机</button>
-      <label><input type="file" accept=".json,application/json" data-role="import">导入备份</label>
-    </div>
-    <p data-role="status" class="meme-note"></p>
-  `;
-
-  const target = document.querySelector('#extensions_settings2, #extensions_settings');
-  if (!target) panel.classList.add('meme-floating');
-  (target || document.body).append(panel);
-
-  ui('open').addEventListener('click', () => { void openPhone(); });
-
-  ui('import').addEventListener('change', async event => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    try {
-      const parsed = JSON.parse(await file.text());
-      if (!globalThis.confirm('导入会替换当前 meme-phone 的全部数据。确定继续？')) return;
-      const { importState } = await import('./meme/index.js');
-      await importState(parsed);
-      setStatus('导入完成，刷新页面后再打开手机。');
-    } catch (error) {
-      setStatus(`导入失败：${error?.message || error}`, true);
-    } finally {
-      event.target.value = '';
-    }
-  });
-
-  globalThis.addEventListener('meme-phone-storage-status', event => {
-    setStatus(describeStatus(event.detail));
-  });
 }
 
 /* ------------------------------------------------------------ 召唤入口 */
@@ -261,15 +208,23 @@ function syncQrButton(enabled) {
  * 点开却是空白或无反应的情况。手机侧的记忆读取仍然走 `bookApi()` 只读桥。
  */
 
+function onStorageStatus(event) {
+  const status = event.detail;
+  if (!status?.error) return;
+  notify(`保存出错：${status.error}。请先在手机「设置 → 数据 → 导出备份」里备份，再刷新页面。`, true);
+}
+
 export async function startMemePhone() {
-  mountPanel();
+  if (!globalThis.__MEME_STORAGE_STATUS_BOUND__) {
+    globalThis.__MEME_STORAGE_STATUS_BOUND__ = true;
+    globalThis.addEventListener('meme-phone-storage-status', onStorageStatus);
+  }
   registerSlashCommand();
   syncQrButton(true);
   try {
     await boot();
-    setStatus(describeStatus({ ready: true }));
   } catch (error) {
-    setStatus(`载入失败：${error?.message || error}`, true);
+    notify(`载入失败：${error?.message || error}`, true);
   }
   registerMenuEntry();
   setInterval(() => {

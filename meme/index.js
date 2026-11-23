@@ -124,11 +124,12 @@ function makeAi(getState) {
     const built = await buildReplyMessages(state, chat, contact, {
       presetOverride: options.presetOverride,
       memoryText: String(storyBlock?.text || ''),
-      lead: options.proactive ? proactiveLead(state, contact) : replyLead(contact),
+      lead: options.proactive ? proactiveLead(state, contact, chat) : replyLead(contact),
       extraPrompt: wantsTheater ? theaterPrompt(contact?.name, theaterKind) : '',
       behaviorPrompt: behaviorPrompt(state, chat),
       proactive: Boolean(options.proactive),
       omitLastUser: Boolean(options.omitLastUser),
+      omitPending: Boolean(options.omitPending),
       omitIds: Array.isArray(options.omitIds) ? options.omitIds : [],
     });
     return { built, wantsTheater, theaterKind, ctxSettings };
@@ -138,7 +139,7 @@ function makeAi(getState) {
     async reply(context, chat, contact, demoReply, options = {}) {
       const state = getState();
       const { built, wantsTheater, theaterKind } = await compose(chat, contact, options);
-      const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat), demo: demoMode });
+      const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat), demo: demoMode, signal: options.signal });
       if (result.error) throw new Error(result.error);
       const content = wantsTheater ? splitTheaterBlocks(result.text, contact?.name).text : result.text;
       const bubbles = parseBehaviorReply(content, {
@@ -181,7 +182,7 @@ function makeAi(getState) {
       const hit = previewCache.get(key);
       if (hit && Date.now() - hit.at < 30000) return hit.value;
 
-      const { built, wantsTheater } = await compose(chat, contact, { omitLastUser: true, presetOverride: options.presetOverride });
+      const { built, wantsTheater } = await compose(chat, contact, { omitLastUser: true, omitPending: true, presetOverride: options.presetOverride });
       const value = {
         key,
         messages: built.messages,
@@ -205,10 +206,10 @@ function makeAi(getState) {
       }
     },
 
-    async proactive(context, chat, contact, demoReply) {
+    async proactive(context, chat, contact, demoReply, options = {}) {
       const state = getState();
       const { built } = await compose(chat, contact, { proactive: true });
-      const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat), demo: demoMode });
+      const result = await generate({ messages: built.messages, demoReply, preset: llmPresetFor(state, chat), demo: demoMode, signal: options.signal });
       if (result.error) throw new Error(result.error);
       return result.text;
     },
@@ -651,14 +652,14 @@ export async function openMemePhone(options = {}) {
     painter.drawImage(img, 0, 0, canvas.width, canvas.height);
     let dataUrl = canvas.toDataURL('image/jpeg', 0.78);
     if (dataUrl.length > 380000) dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-    pushMessage(state, chatId, { from: 'me', kind: 'image', text: '', image: dataUrl });
+    pushMessage(state, chatId, { from: 'me', kind: 'image', text: '', image: dataUrl, pending: true });
     ctx.save();
     ctx.rerender();
     setTimeout(() => {
       const box = rootEl.querySelector('.mp-messages');
       if (box) box.scrollTop = box.scrollHeight;
     }, 30);
-    ctx.toast('照片发过去了');
+    ctx.toast('照片已发出');
   }
 
   rootEl.addEventListener('change', event => {

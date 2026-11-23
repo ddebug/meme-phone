@@ -5,7 +5,7 @@
  * 数据结构刻意保持扁平，避免旧版那种「十个模块共享一个巨型对象、谁都改它」的局面。
  */
 
-import { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT } from './preset-defaults.js';
+import { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT, DEFAULT_PROACTIVE_PROMPT, PROACTIVE_PROMPT_MAX_LENGTH } from './preset-defaults.js';
 import { normalizeBehavior, behaviorPreview } from './behavior.js';
 
 export const SCHEMA_VERSION = 2;
@@ -463,7 +463,7 @@ export function emptyState() {
       theater: { kind: 'daily' },
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
-      proactive: { enabled: true, idleMinutes: 120, dailyCount: 5 },
+      proactive: { enabled: true, idleMinutes: 120, dailyCount: 5, prompt: '' },
       chat: {
         showTime: true, enterToSend: false, remind: true, wake: true, debugBar: false,
         /* 行为标签：默认只放开约定计划和个签，转账/会员/好友申请要自己开 */
@@ -732,6 +732,16 @@ export function replyItemsFor(state, chat) {
   return normalizeReplyItems(preset?.items, normalizeReplyContext(preset?.context));
 }
 
+/** 主动提示词只存覆盖值，空白/原样默认文本表示使用内置默认。 */
+export function normalizeProactivePrompt(value) {
+  const text = typeof value === 'string' ? value.trim().slice(0, PROACTIVE_PROMPT_MAX_LENGTH) : '';
+  return text === DEFAULT_PROACTIVE_PROMPT ? '' : text;
+}
+
+export function proactivePromptFor(state) {
+  return normalizeProactivePrompt(state?.settings?.proactive?.prompt) || DEFAULT_PROACTIVE_PROMPT;
+}
+
 /** 把条目里的旧版变量换成当前数据；不认识的占位符保留，方便用户自己排查。 */
 export function fillPromptTokens(text, state, chat) {
   const contact = chat ? state?.contacts?.[chat.contactId] : null;
@@ -868,7 +878,41 @@ export function unreadTotal(state) {
   return Object.values(state.chats).reduce((sum, chat) => sum + (chat.muted ? 0 : (chat.unread || 0)), 0);
 }
 
-/* 空发送永远触发主动开口：这是固定行为，不再提供全局、会话级开关 */
+/**
+ * 两步发送：文字 / 表情 / 照片先落成 pending 气泡，纸飞机再统一请求一次 AI。
+ * 只取最后一条 TA 消息之后的连续待回消息；更早的 pending 已经被回复，不再重复送。
+ */
+export function pendingUserMessages(chat) {
+  const list = chat?.messages || [];
+  const result = [];
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const message = list[index];
+    if (!message || message.kind === 'system' || message.kind === 'recalled' || message.excluded) continue;
+    if (message.from === 'them') break;
+    const hasBody = message.text || message.image || message.emoji || message.forward || message.behavior;
+    if (message.from === 'me' && message.pending && hasBody) result.unshift(message);
+  }
+  return result;
+}
+
+export function pendingUserCount(chat) {
+  return pendingUserMessages(chat).length;
+}
+
+/** 回复成功后只清掉这一轮真正送出去的消息；停止 / 失败时保留，方便再点一次纸飞机。 */
+export function clearPendingMessages(chat, ids = null) {
+  const only = ids ? new Set(ids.map(String)) : null;
+  let cleared = 0;
+  for (const message of chat?.messages || []) {
+    if (!message?.pending) continue;
+    if (only && !only.has(String(message.id))) continue;
+    delete message.pending;
+    cleared += 1;
+  }
+  return cleared;
+}
+
+/* 空着点纸飞机、且没有待回消息时，才触发主动开口；两步发送不提供关闭开关 */
 export function wakeAllowed(/* state, chat */) {
   return true;
 }
@@ -1581,6 +1625,13 @@ export function normalize(raw) {
     },
   };
   /* 旧存档的 settings.chat 可能没有新字段，这里按默认补一次，避免被浅合并冲掉 */
+  const proactiveRaw = raw.settings?.proactive;
+  const proactiveSource = proactiveRaw && typeof proactiveRaw === 'object' && !Array.isArray(proactiveRaw) ? proactiveRaw : {};
+  merged.settings.proactive = {
+    ...base.settings.proactive,
+    ...proactiveSource,
+    prompt: normalizeProactivePrompt(proactiveSource.prompt),
+  };
   merged.settings.chat = { ...base.settings.chat, ...(merged.settings.chat || {}) };
   merged.settings.chat.behavior = {
     ...base.settings.chat.behavior,

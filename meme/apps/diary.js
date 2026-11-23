@@ -5,7 +5,7 @@
  */
 
 import { icon } from '../icons.js';
-import { chatById, chatFor, contactById, dayKey, DIARY_SKIP_THRESHOLD } from '../data.js';
+import { chatById, chatFor, contactById, dayKey, DEFAULT_DIARY_PROMPT, DIARY_SKIP_THRESHOLD } from '../data.js';
 import { esc } from '../shell.js';
 import {
   diaryContextMode, diaryDayGroups, diaryDayStatuses, diaryFingerprint, diaryParamsFingerprint,
@@ -309,6 +309,7 @@ function threadDayRows(ctx, contactId, chat, statuses, latestDate, busy) {
   const available = new Set(statuses.filter(item => item.status !== 'skipped').map(item => item.date));
   st.selected = new Set([...st.selected].filter(date => available.has(date)));
   const pending = statuses.filter(item => item.status === 'pending');
+  const overwritable = statuses.filter(item => String(item.entry?.text || '').trim());
   const rows = statuses.slice().reverse().map(item => {
     const entry = item.entry;
     const text = String(entry?.text || '').trim();
@@ -332,8 +333,15 @@ function threadDayRows(ctx, contactId, chat, statuses, latestDate, busy) {
     <div class="mp-td-actions">
       <button class="mp-btn" data-act="td-generate-selected" data-contact="${esc(contactId)}" type="button"${busy || !st.selected.size ? ' disabled' : ''}>${icon('spark')}整理勾选（${st.selected.size} 天）</button>
       <button class="mp-btn ghost" data-act="td-generate-pending" data-contact="${esc(contactId)}" type="button"${busy || !pending.length ? ' disabled' : ''}>全部待整理（${pending.length} 天）</button>
+      <button class="mp-btn ghost" data-act="td-generate-all" data-contact="${esc(contactId)}" type="button"${busy || !overwritable.length ? ' disabled' : ''}>全部重写${overwritable.length ? `（${overwritable.length} 天）` : ''}</button>
     </div>
-    <div class="mp-td-note">选中的日期共用一次模型请求。生成会读取这个角色全部未排除的聊天记录，${DIARY_SKIP_THRESHOLD} 条以内的日期跳过。</div>
+    <div class="mp-td-selection-bar">
+      <span>已选 <b>${st.selected.size}</b> 天</span>
+      ${st.selected.size
+        ? `<button class="mp-td-link" data-act="td-clear-selected" data-contact="${esc(contactId)}" type="button">清空勾选</button>`
+        : '<span class="mp-td-selection-hint">点日期左边的方框可以多选</span>'}
+    </div>
+    <div class="mp-td-note">选中的日期共用一次模型请求。自动整理会跳过 ${DIARY_SKIP_THRESHOLD} 条以内的日期；「全部重写」只处理已经写过正文的日期。</div>
     <div class="mp-td-list">${rows || '<div class="mp-empty">这个角色还没有聊天记录。</div>'}</div>`;
 }
 
@@ -358,14 +366,14 @@ function renderThreadPage(ctx, contactId) {
       <div class="mp-page-body">
         <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记 · 按天整理聊天，只在这个角色里保存</div>
         <div class="mp-group-box" style="margin-top:10px">
-          <button class="mp-set-row" data-act="td-toggle-replace" type="button">
+          <button class="mp-set-row" data-act="td-toggle-replace" data-contact="${esc(contactId)}" type="button">
             <span class="mp-set-ico">${icon('book')}</span>
             <span class="mp-set-name">用日记替换聊天<small>${enabled ? '现在开启：旧日期用日记替换原文；最近一天仍读原文' : '现在关闭：聊天上下文全部读原文'}</small></span>
             <span class="mp-switch${enabled ? ' on' : ''}"></span>
           </button>
         </div>
         <div class="mp-td-toolbar">
-          <button class="mp-btn ghost" data-act="td-prompt" type="button">${icon('brush')}日记提示词</button>
+          <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>
         </div>
         <div class="mp-empty">这个角色还没有聊天记录。先聊过几天，再回来按日期整理。</div>
       </div>`;
@@ -375,14 +383,14 @@ function renderThreadPage(ctx, contactId) {
     <div class="mp-page-body">
       <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记 · 按天整理聊天，只在这个角色里保存</div>
       <div class="mp-group-box" style="margin-top:10px">
-        <button class="mp-set-row" data-act="td-toggle-replace" type="button">
+        <button class="mp-set-row" data-act="td-toggle-replace" data-contact="${esc(contactId)}" type="button">
           <span class="mp-set-ico">${icon('book')}</span>
           <span class="mp-set-name">用日记替换聊天<small>${enabled ? '现在开启：旧日期用日记替换原文；最近一天仍读原文' : '现在关闭：聊天上下文全部读原文'}</small></span>
           <span class="mp-switch${enabled ? ' on' : ''}"></span>
         </button>
       </div>
       <div class="mp-td-toolbar">
-        <button class="mp-btn ghost" data-act="td-prompt" type="button">${icon('brush')}日记提示词</button>
+        <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>
         <span class="mp-td-toolbar-note">${statuses.filter(item => item.status === 'pending').length} 天待整理</span>
       </div>
       <div class="mp-month-bar">
@@ -432,6 +440,7 @@ async function runThreadGeneration(ctx, contactId, dates) {
       });
     }
     state.diary.lastGenerated = new Date().toISOString();
+    threadState(ctx, contactId).selected.clear();
     ctx.save();
     ctx.toast(`整理好了 ${parsed.length} 天`);
   } catch (error) {
@@ -496,18 +505,43 @@ function handleThreadDiary(ctx, act, data, event) {
   }
   if (act === 'td-prompt') {
     ctx.openSheet({
-      kind: 'text',
+      kind: 'panel',
       title: '日记怎么写',
-      value: state.diary.prompt || '',
-      placeholder: '给模型的日记写作要求…',
-      confirm: '存下',
-      onText: (text) => {
-        state.diary.prompt = String(text || '').trim() || state.diary.prompt;
-        ctx.save();
-        ctx.rerender();
-        ctx.toast('日记提示词已保存；旧日记会标成待整理，重新整理后生效');
-      },
+      doneLabel: '取消',
+      render: () => `
+        <div class="mp-diary-prompt-editor">
+          <div class="mp-diary-prompt-hint">只影响以后生成的日记。可以改写法、篇幅和是否引用原话；“存下”后旧日记会标成待整理，重新整理才生效。</div>
+          <textarea id="mpDiaryPromptDraft" class="mp-diary-prompt-textarea" aria-label="日记提示词" placeholder="给模型的日记写作要求…">${esc(state.diary.prompt || DEFAULT_DIARY_PROMPT)}</textarea>
+          <div class="mp-diary-prompt-actions">
+            <button class="mp-btn ghost" data-act="td-prompt-reset" data-contact="${esc(contactId)}" type="button">恢复默认</button>
+            <button class="mp-btn accent" data-act="td-prompt-save" data-contact="${esc(contactId)}" type="button">存下</button>
+          </div>
+        </div>`,
     });
+    setTimeout(() => {
+      const node = ctx.shell.root.querySelector('#mpDiaryPromptDraft');
+      if (node) { node.focus(); node.setSelectionRange(node.value.length, node.value.length); }
+    }, 80);
+    return true;
+  }
+  if (act === 'td-prompt-reset') {
+    const node = ctx.shell.root.querySelector('#mpDiaryPromptDraft');
+    if (!node) return true;
+    node.value = DEFAULT_DIARY_PROMPT;
+    node.focus();
+    node.setSelectionRange(node.value.length, node.value.length);
+    ctx.toast('默认写法已填回，点「存下」才会生效');
+    return true;
+  }
+  if (act === 'td-prompt-save') {
+    const node = ctx.shell.root.querySelector('#mpDiaryPromptDraft');
+    const text = String(node?.value || '').trim();
+    if (!text) { ctx.toast('提示词不能为空'); return true; }
+    ctx.closeSheet();
+    state.diary.prompt = text;
+    ctx.save();
+    ctx.rerender();
+    ctx.toast('日记提示词已保存；旧日记会标成待整理，重新整理后生效');
     return true;
   }
   if (act === 'td-edit') {
@@ -569,6 +603,20 @@ function handleThreadDiary(ctx, act, data, event) {
     ctx.save();
     ctx.rerender();
     ctx.toast('日记已删除，原始聊天保留');
+    return true;
+  }
+  if (act === 'td-clear-selected') {
+    st.selected.clear();
+    ctx.rerender();
+    ctx.toast('已清空勾选');
+    return true;
+  }
+  if (act === 'td-generate-all') {
+    const dates = diaryDayStatuses(state, chat)
+      .filter(item => String(item.entry?.text || '').trim())
+      .map(item => item.date);
+    if (!dates.length) { ctx.toast('还没有可重写的日记'); return true; }
+    requestThreadGeneration(ctx, contactId, dates);
     return true;
   }
   if (act === 'td-generate-one') {

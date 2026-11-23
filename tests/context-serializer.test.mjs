@@ -49,6 +49,29 @@ test('C2：历史记录与最后一条聊天不与历史记录重复注入', asy
   assert.equal(hits[0].source, '最后一条聊天');
 });
 
+test('C3：多条待回消息合并成一次请求，历史里不再重复出现', async () => {
+  const state = demoState();
+  const { chat, contact } = seedChat(state, [
+    { id: 'h1', from: 'them', kind: 'text', text: '前面的话' },
+    { id: 'p1', from: 'me', kind: 'text', text: '第一句', pending: true },
+    { id: 'p2', from: 'me', kind: 'text', text: '第二句', pending: true },
+    { id: 'p3', from: 'me', kind: 'text', text: '第三句', pending: true },
+  ]);
+  const result = await buildReplyMessages(state, chat, contact, { memoryText: '' });
+  const turn = result.messages.filter(message => message.source === '最后一条聊天');
+  assert.equal(turn.length, 1);
+  assert.ok(turn[0].content.includes('第一句'));
+  assert.ok(turn[0].content.includes('第二句'));
+  assert.ok(turn[0].content.includes('第三句'));
+  assert.ok(turn[0].content.includes('〔3〕'));
+  for (const text of ['第一句', '第二句', '第三句']) {
+    const hits = result.messages.filter(message => String(message.content).includes(text));
+    assert.equal(hits.length, 1, `${text} 只能出现在当前轮，不应再进历史`);
+  }
+  const preview = await buildReplyMessages(state, chat, contact, { memoryText: '', omitPending: true, omitLastUser: true });
+  assert.equal(preview.messages.filter(message => String(message.content).includes('第一句')).length, 0);
+});
+
 test('C2：历史按字数预算从新到旧装入，装不下就停但至少留最新一条', () => {
   const state = demoState();
   const { chat } = seedChat(state, [

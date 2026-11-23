@@ -5,7 +5,8 @@
 
 import { icon, TINT } from '../icons.js';
 import { esc, tintStyle } from '../shell.js';
-import { contactsOf, chatsOf, unreadTotal } from '../data.js';
+import { contactsOf, chatsOf, unreadTotal, proactivePromptFor, normalizeProactivePrompt } from '../data.js';
+import { PROACTIVE_PROMPT_MAX_LENGTH } from '../preset-defaults.js';
 import { imageEndpoint } from './draw.js';
 
 function downloadBackup(ctx, includeKeys) {
@@ -49,6 +50,44 @@ function row(ctx, { iconName, title, sub, act, value, toggle, app }) {
     </button>`;
 }
 
+async function saveProactivePrompt(ctx, value) {
+  const prompt = normalizeProactivePrompt(value);
+  if (ctx.state.settings.proactive.prompt !== prompt) {
+    ctx.state.settings.proactive.prompt = prompt;
+    ctx.ai?.clearPreview?.();
+  }
+  try { return await ctx.save() !== false; }
+  catch (error) {
+    ctx.toast(error?.message || '保存失败，提示词草稿已保留');
+    return false;
+  }
+}
+
+function openProactivePromptEditor(ctx, draft = proactivePromptFor(ctx.state)) {
+  const custom = Boolean(normalizeProactivePrompt(ctx.state.settings.proactive.prompt));
+  ctx.openSheet({
+    kind: 'form',
+    title: `主动开口提示词 · ${custom ? '自定义' : '默认'}`,
+    confirm: '保存',
+    fields: [{
+      name: 'prompt', type: 'textarea', label: '空着发送时，告诉 TA 怎么主动开口',
+      value: draft, maxLength: PROACTIVE_PROMPT_MAX_LENGTH,
+      placeholder: '留空保存即恢复默认提示词',
+      hint: `可用 {{char}}、{{user}}、{{当前时间}}、{{间隔时长}}、{{沉默阈值}}。间隔时长是最近一条用户消息距今，缺失时为“未知”；沉默阈值仅作参考，不会新增定时消息。最多 ${PROACTIVE_PROMPT_MAX_LENGTH} 字，留空保存即恢复默认。`,
+    }],
+    onForm: async values => {
+      const draft = typeof values.prompt === 'string' ? values.prompt : '';
+      if (!await saveProactivePrompt(ctx, draft)) {
+        // 外壳提交时已关掉表单；保存失败重新打开，保留这次输入供重试。
+        openProactivePromptEditor(ctx, draft);
+        return;
+      }
+      ctx.rerender();
+      ctx.toast(normalizeProactivePrompt(draft) ? '主动开口提示词已保存' : '已使用默认主动开口提示词');
+    },
+  });
+}
+
 export const settingsApp = {
   id: 'settings', name: '设置', icon: 'settings',
 
@@ -57,6 +96,7 @@ export const settingsApp = {
     const host = ctx.shell.hostInfo || {};
     const apiReady = host.hasGenerate;
     const contacts = contactsOf(state).length;
+    const customProactivePrompt = Boolean(normalizeProactivePrompt(state.settings.proactive.prompt));
     const image = imageEndpoint(state);
     const imageLabel = image.engine === 'custom' ? '自定义接口' : image.engine === 'doubao' ? '豆包 · 火山方舟' : 'NovelAI 官方';
     const imageReady = image.engine === 'custom' ? Boolean(image.url) : Boolean(image.url && image.key);
@@ -94,6 +134,15 @@ export const settingsApp = {
         </div>
 
         <div class="mp-group">
+          <div class="mp-group-label">主动开口</div>
+          <div class="mp-group-box">
+            ${row(ctx, { iconName: 'reply', title: '主动开口提示词', sub: '只在空着发送时使用，不会定时发消息', act: 'set-proactive-prompt', value: customProactivePrompt ? '自定义' : '默认' })}
+            ${row(ctx, { iconName: 'clock', title: '空发送时参考沉默多久', sub: '写进主动开口的提示，仅作参考，不会自己定时发消息', act: 'set-idle', value: `${state.settings.proactive.idleMinutes} 分钟` })}
+            ${customProactivePrompt ? row(ctx, { iconName: 'reply', title: '恢复默认提示词', sub: '只恢复主动开口提示词，其他设置不变', act: 'set-proactive-prompt-reset' }) : ''}
+          </div>
+        </div>
+
+        <div class="mp-group">
           <div class="mp-group-label">AI 设置 · 参考什么材料</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'book', title: '手机读法', sub: state.settings.memory.readMode === 'recent' ? '现在只读最近原文' : '现在有总结先读总结，没有就读最近原文', act: 'set-toggle-memory-read', toggle: state.settings.memory.readMode !== 'recent' })}
@@ -122,7 +171,6 @@ export const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">高级与帮助</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'clock', title: '空发送时参考沉默多久', sub: '写进主动开口的提示，不会自己定时发消息', act: 'set-idle', value: `${state.settings.proactive.idleMinutes} 分钟` })}
             ${row(ctx, { iconName: 'bell', title: '消息提醒', sub: '有新消息时在图标上显示红点', act: 'set-toggle-remind', toggle: state.settings.chat.remind !== false })}
             ${row(ctx, { iconName: 'code', title: '请求调试栏', sub: state.settings.chat.debugBar ? '现在开着：输入框上方会显示 token 与请求构成' : '现在关着：需要时再打开', act: 'set-toggle-debug', toggle: state.settings.chat.debugBar === true })}
             ${row(ctx, { iconName: 'help', title: '帮助', sub: '怎么用、快捷键、常见问题', act: 'set-open', app: 'help' })}
@@ -171,13 +219,37 @@ export const settingsApp = {
       return true;
     }
 
+    if (act === 'set-proactive-prompt') {
+      openProactivePromptEditor(ctx);
+      return true;
+    }
+
+    if (act === 'set-proactive-prompt-reset') {
+      if (!normalizeProactivePrompt(ctx.state.settings.proactive.prompt)) return true;
+      ctx.openSheet({
+        title: '恢复默认主动开口提示词？',
+        items: [{ label: '恢复默认提示词', value: 'restore', icon: 'reply', note: '只恢复这段提示词，沉默参考和其他设置都不变。' }],
+        onPick: async value => {
+          if (value !== 'restore') return;
+          if (!await saveProactivePrompt(ctx, '')) {
+            openProactivePromptEditor(ctx);
+            return;
+          }
+          ctx.rerender();
+          ctx.toast('已恢复默认主动开口提示词');
+        },
+      });
+      return true;
+    }
+
     if (act === 'set-idle') {
       ctx.openSheet({
         title: '沉默多久算久',
         items: [30, 60, 120, 240].map(min => ({ label: `${min} 分钟`, value: String(min) })),
-        onPick: (value) => {
-          state.settings.proactive.idleMinutes = Number(value);
-          ctx.save();
+        onPick: async value => {
+          ctx.state.settings.proactive.idleMinutes = Number(value);
+          ctx.ai?.clearPreview?.();
+          await ctx.save();
           ctx.rerender();
         },
       });

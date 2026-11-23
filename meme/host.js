@@ -386,13 +386,21 @@ export function tavernQuietPrompt(messages, system = '', prompt = '') {
   ].filter(Boolean).join('\n\n');
 }
 
-export async function generate({ prompt, system = '', messages = null, demoReply = '', preset = null, demo = false }) {
+function abortError() {
+  const error = new Error('已停止这次生成');
+  error.name = 'AbortError';
+  return error;
+}
+
+export async function generate({ prompt, system = '', messages = null, demoReply = '', preset = null, demo = false, signal = null }) {
+  if (signal?.aborted) throw abortError();
   const script = await loadHostScript();
   const isCustom = Boolean(preset && preset.engine !== 'tavern' && String(preset.url || '').trim());
 
   /* 自定义接口：失败 / 超时 / 空返回都把原错误抛出来，不静默退回酒馆模型。 */
   if (isCustom) {
-    const text = await presetCompletion(preset, { prompt, system, messages });
+    const text = await presetCompletion(preset, { prompt, system, messages, signal });
+    if (signal?.aborted) throw abortError();
     if (!text) throw new Error('这套接口没有返回内容');
     return { text, demo: false, provider: preset.engine || 'custom' };
   }
@@ -400,6 +408,8 @@ export async function generate({ prompt, system = '', messages = null, demoReply
   if (script && typeof script.generateQuietPrompt === 'function') {
     const quiet = tavernQuietPrompt(messages, system, prompt);
     const text = await script.generateQuietPrompt({ quietPrompt: quiet, quietName: '' });
+    /* 酒馆 quiet prompt 没有公开的取消入口：停止后晚到的结果也不许写进聊天。 */
+    if (signal?.aborted) throw abortError();
     if (typeof text === 'string' && text.trim()) return { text: text.trim(), demo: false, provider: 'tavern' };
     return { text: '', demo: false, error: '模型没有返回内容', provider: 'tavern' };
   }
@@ -435,7 +445,8 @@ export function chatCompletionsRoot(url, path = '') {
 }
 
 /** 借酒馆后端请求一套自定义 OpenAI 兼容接口，避开浏览器 CORS。 */
-async function presetCompletion(preset, { prompt, system, messages }) {
+async function presetCompletion(preset, { prompt, system, messages, signal = null }) {
+  if (signal?.aborted) throw abortError();
   const script = await loadHostScript();
   if (!script) return '';
   const root = chatCompletionsRoot(preset.url, preset.path);
@@ -478,7 +489,9 @@ async function presetCompletion(preset, { prompt, system, messages }) {
     body: JSON.stringify(body),
     credentials: 'same-origin',
     cache: 'no-store',
+    signal,
   });
+  if (signal?.aborted) throw abortError();
   if (!response.ok) throw new Error(`接口返回 ${response.status}`);
   const data = await response.json().catch(() => null);
   if (!data || data.error) throw new Error(data?.message || '接口没有返回内容');

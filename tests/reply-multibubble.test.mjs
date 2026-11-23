@@ -127,7 +127,7 @@ function controllerFixture(t, replyText, inputText = '') {
       reply: async () => { calls++; return { bubbles: parseBehaviorReply(replyText), text: replyText }; },
     },
   };
-  return { ...data, ctx, queue, callCount: () => calls };
+  return { ...data, ctx, queue, input, callCount: () => calls };
 }
 
 test('多气泡：主动开口一轮请求落库为两条，属于同一轮且刷新可保留', async t => {
@@ -152,11 +152,17 @@ test('多气泡：主动不发占位不会存成聊天正文', async t => {
 });
 
 test('多气泡：普通回复一轮请求可落库三条，不依赖三次模型调用', async t => {
-  const { ctx, chat, queue, callCount } = controllerFixture(t, '[消息]\n到家了\n路上买了点吃的\n你呢\n[/消息]', '你到家了吗');
+  const { ctx, chat, queue, callCount, input } = controllerFixture(t, '[消息]\n到家了\n路上买了点吃的\n你呢\n[/消息]', '你到家了吗');
+  threadApp.handle(ctx, 'send', { chat: chat.id });
+  assert.equal(callCount(), 0);
+  assert.equal(chat.messages.length, 1);
+  assert.equal(chat.messages[0].pending, true);
+  input.value = '';
   threadApp.handle(ctx, 'send', { chat: chat.id });
   queue.shift()();
   await new Promise(setImmediate);
   assert.equal(callCount(), 1);
+  assert.equal(chat.messages[0].pending, undefined);
   const replies = chat.messages.filter(item => item.from === 'them');
   assert.deepEqual(replies.map(item => item.text), ['到家了', '路上买了点吃的', '你呢']);
   assert.equal(new Set(replies.map(item => item.turnId)).size, 1);

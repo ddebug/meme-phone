@@ -4,7 +4,7 @@
  * 旧的独立拼装函数已删除，避免出现两套逻辑。
  */
 
-import { replyContextFor, replyItemsFor, replyPresetFor, normalizeReplyContext, normalizeReplyItems, fillPromptTokens, characterCardFor, itemAppliesToChat, effectivePhoneHistoryLimit, dayKey } from './data.js';
+import { replyContextFor, replyItemsFor, replyPresetFor, normalizeReplyContext, normalizeReplyItems, fillPromptTokens, characterCardFor, itemAppliesToChat, effectivePhoneHistoryLimit, dayKey, proactivePromptFor, pendingUserMessages } from './data.js';
 import { readWorldBook } from './host.js';
 import { buildMemoryContext } from './memory.js';
 import { behaviorContextText } from './behavior.js';
@@ -21,10 +21,28 @@ export function replyLead(contact) {
   return `你在扮演「${contact?.name || '对方'}」，用手机自然聊天。按当前回复预设的格式组织这一轮回复，可以分多个气泡，不限于一条；只扮演当前角色。`;
 }
 
-/** 主动开口的场景提示；预览与实际发送共用。 */
-export function proactiveLead(state, contact) {
-  const idle = state?.settings?.proactive?.idleMinutes;
-  return `你在扮演「${contact?.name || '对方'}」，现在是手机聊天。距离上次说话已经过去 ${idle} 分钟，你要主动开启这一轮聊天；格式与气泡数量遵循当前回复预设，可以自然分多条发送。`;
+/** 主动开口的场景提示；预览与实际发送共用，阈值与真实沉默时长分开。 */
+export function proactiveLead(state, contact, chat = null, now = new Date()) {
+  const at = now.getTime();
+  let lastUserAt = 0;
+  for (const message of chat?.messages || []) {
+    const stamp = Number(message?.at);
+    if (message?.from === 'me' && Number.isFinite(stamp) && stamp > 0 && stamp <= at) {
+      lastUserAt = Math.max(lastUserAt, stamp);
+    }
+  }
+  const idle = Number(state?.settings?.proactive?.idleMinutes);
+  const values = {
+    char: contact?.name || '对方',
+    user: state?.settings?.user?.name || '我',
+    当前时间: now.toLocaleString('zh-CN', {
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+    }),
+    间隔时长: lastUserAt ? `${Math.floor((at - lastUserAt) / 60000)} 分钟` : '未知（当前会话没有有效的用户消息时间）',
+    沉默阈值: `${Number.isFinite(idle) && idle > 0 ? Math.round(idle) : 120} 分钟`,
+  };
+  // 一次替换：用户/角色名里即使包含占位符，也不会被当成新的模板再次展开。
+  return proactivePromptFor(state).replace(/\{\{(char|user|当前时间|间隔时长|沉默阈值)\}\}/g, (_, key) => values[key]);
 }
 
 /**
@@ -146,12 +164,12 @@ export function serializeMessage(message) {
 export function transcript(state, chat, limit = 10, options = {}) {
   if (!chat) return '';
   const contact = state.contacts?.[chat.contactId];
-  const omitId = options.omitId || '';
+  const omitIds = new Set([...(options.omitIds || []), options.omitId || ''].filter(Boolean).map(String));
   const day = options.day || '';
   const maxChars = Math.max(0, Number(options.maxChars) || 0);
   const valid = (chat.messages || [])
     .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded)
-    .filter(message => message.id !== omitId)
+    .filter(message => !omitIds.has(String(message.id)))
     .filter(message => !day || dayKey(new Date(Number(message.at) || Date.now())) === day);
   const lines = valid.slice(-Math.max(1, limit)).map(message => {
     const text = serializeMessage(message);
@@ -183,10 +201,10 @@ export function transcript(state, chat, limit = 10, options = {}) {
 function nativeHistoryTranscript(state, chat, limit, options = {}) {
   if (!chat) return '';
   const contact = state.contacts?.[chat.contactId];
-  const omitId = options.omitId || '';
+  const omitIds = new Set([...(options.omitIds || []), options.omitId || ''].filter(Boolean).map(String));
   const valid = (chat.messages || [])
     .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded)
-    .filter(message => message.id !== omitId);
+    .filter(message => !omitIds.has(String(message.id)));
   const count = Number(limit);
   const selected = Number.isFinite(count) && count > 0 ? valid.slice(-Math.floor(count)) : valid.slice();
   const latestDate = valid.length ? dayKey(new Date(Number(valid[valid.length - 1].at))) : '';
@@ -219,11 +237,11 @@ function nativeHistoryTranscript(state, chat, limit, options = {}) {
 export function historyTranscript(state, chat, limit = 0, options = {}) {
   if (!chat) return '';
   const contact = state.contacts?.[chat.contactId];
-  const omitId = options.omitId || '';
+  const omitIds = new Set([...(options.omitIds || []), options.omitId || ''].filter(Boolean).map(String));
   const maxChars = Math.max(0, Number(options.maxChars) || 0);
   const valid = (chat.messages || [])
     .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded)
-    .filter(message => message.id !== omitId);
+    .filter(message => !omitIds.has(String(message.id)));
   const count = Number(limit);
   const selected = Number.isFinite(count) && count > 0 ? valid.slice(-Math.floor(count)) : valid.slice();
   const latestDate = valid.length ? dayKey(new Date(Number(valid[valid.length - 1].at))) : '';
@@ -473,7 +491,8 @@ async function contextBlockFor(item, state, chat, contact, context, memoryText, 
   if (key === 'history') {
     const limit = effectivePhoneHistoryLimit(chat, context);
     const lastId = ctxOpts.omitLast ? (chat.messages?.[chat.messages.length - 1]?.id || '') : '';
-    const transcriptOptions = { omitId: lastId, diary: true };
+    const extraOmitIds = Array.isArray(ctxOpts.omitIds) ? ctxOpts.omitIds : [];
+    const transcriptOptions = { omitId: lastId, omitIds: extraOmitIds, diary: true };
     /* 无字数预算时走 acsus 同款全量格式；显式预算仍保留旧的截断路径。 */
     const text = ctxOpts.historyMaxChars > 0
       ? historyTranscript(state, chat, limit, { ...transcriptOptions, maxChars: ctxOpts.historyMaxChars })
@@ -527,12 +546,18 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
   const outputReserve = 1200;
 
   /* 先算出这一轮的当前输入（不注入但先占预算），历史只能吃剩下的空间 */
-  const omitIds = new Set(options.omitIds || []);
+  const omitIds = new Set((options.omitIds || []).map(String));
   const lastMessage = chat?.messages?.[chat.messages.length - 1];
-  const pendingUserText = (chat && !options.omitLastUser && !options.proactive && lastMessage
-    && !lastMessage.excluded && !omitIds.has(lastMessage.id))
-    ? serializeMessage(lastMessage)
-    : '';
+  const pendingAll = options.proactive ? [] : pendingUserMessages(chat);
+  const pendingMessages = options.omitPending ? [] : pendingAll;
+  const pendingIds = new Set(pendingAll.map(message => String(message.id)));
+  const pendingParts = pendingMessages.map(serializeMessage).filter(Boolean);
+  const pendingUserText = pendingParts.length
+    ? (pendingParts.length > 1 ? pendingParts.map((part, index) => `〔${index + 1}〕${part}`).join('\n') : pendingParts[0])
+    : (chat && !options.omitLastUser && !options.proactive && lastMessage
+      && !lastMessage.excluded && !omitIds.has(String(lastMessage.id))
+      ? serializeMessage(lastMessage)
+      : '');
   const pendingExtraChars = [options.behaviorPrompt, options.extraPrompt]
     .reduce((sum, text) => sum + String(text || '').length, 0);
 
@@ -558,6 +583,7 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
         : 0;
       block = await contextBlockFor(item, state, chat, contact, context, memoryText, {
         omitLast: !options.proactive,
+        omitIds: pendingIds.size ? [...pendingIds] : [],
         historyMaxChars,
       });
     } else {

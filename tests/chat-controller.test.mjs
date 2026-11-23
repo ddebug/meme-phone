@@ -43,11 +43,13 @@ test('B1：会话被删除后，旧任务失效', () => {
   assert.equal(generationValid(gone, task, 'c1'), false);
 });
 
-test('B1：取消后任务失效，且不承诺中止网络（仅忽略结果）', () => {
+test('B1：取消后任务失效，并 abort 当前请求信号', () => {
   const ctx = makeCtx();
   const task = startGeneration(ctx, 'c1', 'reply');
+  assert.equal(task.abort.signal.aborted, false);
   cancelGeneration('c1', 'chat-cleared');
   assert.equal(generationValid(ctx, task, 'c1'), false);
+  assert.equal(task.abort.signal.aborted, true);
 });
 
 test('B1：任务结束后同一会话可再次启动', () => {

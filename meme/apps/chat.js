@@ -9,10 +9,11 @@ import {
   wakeAllowed, messagePreview, addExtrasEntry, theaterKindFor, THEATER_KINDS, theaterKindById,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, replyContextFor, normalizeReplyItems,
-  chatHistoryFor, effectiveTavernHistory,
+  chatHistoryFor, effectiveTavernHistory, pendingUserMessages, pendingUserCount, clearPendingMessages,
 } from '../data.js';
 import { memoryEffectiveSummary, memoryPresetTitle } from '../memory.js';
-import { requestStats, estimateTokens, proactiveLead } from '../reply-context.js';
+import { diaryDayStatuses } from '../diary.js';
+import { requestStats, estimateTokens, proactiveLead, serializeMessage } from '../reply-context.js';
 import { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } from '../chat-transfer.js';
 import { avatarHtml, chatAvatarHtml, esc, shortText, timeText } from '../shell.js';
 import { renderBehaviorBubble, isSystemBehavior, behaviorSettings, parseBehaviorReply } from '../behavior.js';
@@ -28,6 +29,20 @@ const REPLY_POOL = {
   林小满: ['雨好像小了一点。', '你带伞了吗。', '我这边刚停，云还很厚。'],
   顾南风: ['书店这本我觉得你会喜欢。', '封面是深蓝色的，摸起来有点粗。', '要给你留着吗。'],
 };
+
+/* 输入栏加号：和 acsus 一样在当前页面展开工具面板，不再弹一层列表。 */
+const COMPOSER_PLUS_ITEMS = [
+  { value: 'photo', label: '照片', icon: 'image' },
+  { value: 'emoji', label: '表情', icon: 'smile' },
+  { value: 'poke', label: '戳一戳', icon: 'spark' },
+  { value: 'quote', label: '引用', icon: 'reply' },
+  { value: 'transfer', label: '转账', icon: 'transfer' },
+  { value: 'redpacket', label: '红包', icon: 'wallet' },
+  { value: 'plan', label: '约定', icon: 'plan' },
+  { value: 'membership', label: '送会员', icon: 'spark' },
+  { value: 'theater', label: '剧场设置', icon: 'theater' },
+  { value: 'extra', label: '存剧场', icon: 'bookmark' },
+];
 
 function poolFor(contact) {
   return REPLY_POOL[contact?.name] || ['嗯，我在。', '刚看到消息。', '你说吧，我听着。'];
@@ -61,21 +76,26 @@ let debugSeq = 0;
 
 /* --------------------------------------------------------- 生成任务控制器
  * 发送 / 主动开口 / 重生成共用：每个会话同一时刻只允许一个有效生成任务，
- * 其他会话不被全局锁阻塞。任务冻结会话身份与状态代次，提交前后都再校验。 */
-const activeGenerations = new Map(); // chatId -> { reqId, epoch, kind, done, cancelReason }
+ * 其他会话不被全局锁阻塞。任务冻结会话身份与状态代次，提交前后都再校验。
+ * 停止按钮会先 abort 当前信号；自定义接口能真正掐断 fetch，酒馆 quiet prompt
+ * 没有取消入口时只丢弃晚到的结果，不把假回复写进聊天。 */
+const activeGenerations = new Map(); // chatId -> { reqId, epoch, kind, done, cancelReason, abort }
 let generationSeq = 0;
 
 export function startGeneration(ctx, chatId, kind) {
   const existing = activeGenerations.get(chatId);
   if (existing && !existing.done) return null;
-  const task = { reqId: `g${++generationSeq}`, epoch: ctx.epoch(), kind, done: false, cancelReason: '' };
+  const task = {
+    reqId: `g${++generationSeq}`, epoch: ctx.epoch(), kind, done: false, cancelReason: '',
+    abort: typeof AbortController === 'function' ? new AbortController() : null,
+  };
   activeGenerations.set(chatId, task);
   return task;
 }
 
 export function generationValid(ctx, task, chatId) {
   if (!task || task.done) return false;
-  if (task.cancelReason) return false;                 // 已取消：仅忽略结果，不承诺已中止网络
+  if (task.cancelReason) return false;                 // 已取消：晚到的结果一律不写
   if (task.epoch !== ctx.epoch()) return false;        // 导入 / 清空已整份替换状态
   const chat = chatById(ctx.state, chatId);
   return Boolean(chat);                                // 会话已被删除
@@ -86,10 +106,15 @@ export function finishGeneration(chatId) {
   if (task) { task.done = true; activeGenerations.delete(chatId); }
 }
 
-/** 取消会话上的在途任务：仅忽略结果；宿主无法终止服务端生成时，不承诺已停止计费。 */
+/** 取消会话上的在途任务：先 abort 可中止的请求，再让晚到的结果失效。 */
 export function cancelGeneration(chatId, reason = 'state-replaced') {
   const task = activeGenerations.get(chatId);
-  if (task) { task.cancelReason = reason; task.done = true; activeGenerations.delete(chatId); }
+  if (task) {
+    task.cancelReason = reason;
+    task.abort?.abort?.();
+    task.done = true;
+    activeGenerations.delete(chatId);
+  }
 }
 
 /** 仅供测试：清空在途任务表。 */
@@ -143,24 +168,36 @@ function debugKey(ctx, chat) {
   ].join('|');
 }
 
-function debugMode(ctx, chat, draft) {
-  if (String(draft || '').trim()) return 'reply';
+function debugMode(ctx, chat, draft, pendingCount = pendingUserCount(chat)) {
+  if (String(draft || '').trim() || pendingCount > 0) return 'reply';
   return wakeAllowed(ctx.state, chat) ? 'proactive' : 'none';
 }
 
-/** 在缓存的 base 上补最后一条；输入变化时不用重新读记忆 / 世界书。 */
+/** 在缓存的 base 上补这一轮；输入变化时不用重新读记忆 / 世界书。 */
 function debugMessages(ctx, chat, contact, cache, draft) {
-  const mode = debugMode(ctx, chat, draft);
+  const pending = pendingUserMessages(chat);
+  const mode = debugMode(ctx, chat, draft, pending.length);
   const messages = (cache.messages || []).map(message => ({ ...message }));
   if (mode === 'proactive') {
-    const lead = proactiveLead(ctx.state, contact);
+    const lead = proactiveLead(ctx.state, contact, chat);
     const index = messages.findIndex(message => message.source === '场景提示');
     if (index >= 0) messages[index] = { ...messages[index], content: lead };
     else messages.push({ role: 'system', content: lead, source: '场景提示' });
     messages.push({ role: 'user', content: '（现在没有新消息，主动开启聊天，按回复预设的格式发送。）', source: '主动消息占位' });
   } else if (mode === 'reply') {
     const who = ctx.state.settings?.user?.name || '我';
-    messages.push({ role: 'user', content: `${who}：${String(draft || '').trim()}`, source: '最后一条聊天' });
+    const draftText = String(draft || '').trim();
+    if (draftText) {
+      messages.push({ role: 'user', content: `${who}：${draftText}`, source: '最后一条聊天' });
+    } else {
+      const parts = pending.map(serializeMessage).filter(Boolean);
+      if (parts.length) {
+        const text = parts.length > 1
+          ? parts.map((part, index) => `〔${index + 1}〕${part}`).join('\n')
+          : parts[0];
+        messages.push({ role: 'user', content: `${who}：${text}`, source: '最后一条聊天' });
+      }
+    }
   }
   return { mode, messages };
 }
@@ -418,6 +455,12 @@ function settingsBody(ctx, chatId) {
   const count = chat.messages?.length || 0;
   const mode = contact?.kind === 'group' ? '群聊' : contact?.kind === 'char' ? '酒馆角色' : '单聊';
   const status = [mode, `${count} 条消息`, chat.pinned ? '置顶' : '', chat.muted ? '免打扰' : ''].filter(Boolean).join(' · ');
+  const diaryStatuses = diaryDayStatuses(state, chat);
+  const diaryWritten = diaryStatuses.filter(item => String(item.entry?.text || '').trim()).length;
+  const diaryPending = diaryStatuses.filter(item => item.status === 'pending').length;
+  const diarySub = diaryWritten
+    ? `${diaryWritten} 天已写${diaryPending ? ` · ${diaryPending} 天待整理` : ''}`
+    : '按天记录这个角色和你的聊天';
   const presets = apiPresetsOf(state);
   const ownPreset = presets.find(item => item.id === chat.llmPresetId) || null;
   const globalPreset = presets.find(item => item.id === state.settings.api?.activeChat) || presets[0] || null;
@@ -497,6 +540,13 @@ function settingsBody(ctx, chatId) {
       </div>
 
       <div class="mp-group">
+        <div class="mp-group-label">日记</div>
+        <div class="mp-group-box">
+          ${chatSetRow(chat.id, { iconName: 'diary', title: 'TA 的日记', sub: diarySub, act: 'ts-diary' })}
+        </div>
+      </div>
+
+      <div class="mp-group">
         <div class="mp-group-label">模型</div>
         <div class="mp-group-box">
           ${chatSetRow(chat.id, {
@@ -560,7 +610,6 @@ function settingsBody(ctx, chatId) {
           ${card
             ? chatSetRow(chat.id, { iconName: 'contacts', title: '角色设定与世界书', sub: '角色卡正文只读；世界书开关会写回酒馆，影响所有会话', act: 'ts-open-character' })
             : chatSetRow(chat.id, { iconName: 'search', title: '去查角色', sub: '还没同步这张角色卡', act: 'ts-open-characters' })}
-          ${chatSetRow(chat.id, { iconName: 'diary', title: 'TA 的日记', sub: '按天记录这个角色和你的聊天', act: 'ts-diary' })}
           ${chatSetRow(chat.id, { iconName: 'theater', title: '看 TA 的小剧场', sub: '这个角色存下来的片段', act: 'ts-extras' })}
         </div>
       </div>
@@ -633,6 +682,19 @@ function threadBody(ctx, chatId) {
   const contact = contactById(state, chat.contactId);
   const messages = chat.messages || [];
   const quote = ctx.shell.quote?.[chatId] || null;
+  const pendingMessages = pendingUserMessages(chat);
+  const waiting = pendingMessages.length;
+  const busyTask = activeGenerations.get(chat.id);
+  const busy = Boolean(busyTask && !busyTask.done);
+  const hasDraft = Boolean(String(ctx.shell.live.inputValue || '').trim());
+  const sendState = busy ? 'is-stop' : (hasDraft ? 'is-text' : (waiting ? 'is-request' : 'is-wake'));
+  const sendAct = busy ? 'stop-generation' : 'send';
+  const sendTitle = busy
+    ? '停止这次生成'
+    : (hasDraft ? '发送这条；再点一次让 TA 回' : (waiting ? `让 TA 回这 ${waiting} 条` : '空着发时让 TA 主动开口'));
+  const composerHint = busy
+    ? '生成中 · 点右边停止'
+    : (hasDraft ? '先发出去，再点右边让 TA 回' : (waiting ? `${waiting} 条已发出 · 点右边让 TA 回` : '空着发，TA 会主动开口'));
 
   /* 显示窗口：只渲染最近一页，往上翻再加载更早的。
      注意这里只管屏幕上的 DOM 数量，发给模型的历史仍按上下文预算从完整 messages 里取。 */
@@ -721,7 +783,6 @@ function threadBody(ctx, chatId) {
       <div class="mp-composer">
         ${debugBar}
         ${behaviorFormHtml(ctx, chat)}
-        <div class="mp-composer-tip">空着发出去，TA 会主动开口</div>
         ${quote ? `
         <div class="mp-quote-chip">
           <span style="color:var(--accent-deep)">${icon('reply')}</span>
@@ -729,15 +790,41 @@ function threadBody(ctx, chatId) {
           <button class="mp-sq-btn" data-act="clear-quote" data-chat="${chat.id}" type="button" style="width:26px;height:26px">${icon('close')}</button>
         </div>` : ''}
         ${chat.failedTurn ? `<div class="mp-composer-tip is-error">${esc(chat.failedTurn.reason || '这一轮没接通')} <button class="mp-mini-btn" data-act="retry-turn" data-chat="${chat.id}" type="button">重试</button></div>` : ''}
+        ${composerPlusHtml(ctx, chat)}
         <div class="mp-composer-row">
-          <button class="mp-sq-btn" data-act="composer-plus" data-chat="${chat.id}" type="button" aria-label="更多">${icon('plus')}</button>
           <div class="mp-compose-box">
             <input type="text" placeholder="发消息…" value="${esc(ctx.shell.live.inputValue || '')}" aria-label="输入消息">
+            <button class="mp-send ${sendState}" data-act="${sendAct}" data-chat="${chat.id}" data-busy="${busy ? '1' : '0'}" data-pending="${waiting}" type="button" aria-label="${esc(sendTitle)}" title="${esc(sendTitle)}">
+              <span class="mp-send-wake">${icon('spark')}</span>
+              <span class="mp-send-now">${icon('send')}</span>
+              <span class="mp-send-stop">${icon('stop')}</span>
+            </button>
           </div>
-          <button class="mp-sq-btn" data-act="say-first" data-chat="${chat.id}" type="button" aria-label="让 TA 先说" title="让 TA 主动开口">${icon('reply')}</button>
-          <button class="mp-send" data-act="send" data-chat="${chat.id}" type="button" aria-label="发送">${icon('send')}</button>
+        </div>
+        <div class="mp-composer-tools">
+          <button class="mp-plus-toggle${ctx.shell.plusOpen === chat.id ? ' is-open' : ''}" data-act="composer-plus" data-chat="${chat.id}" type="button" aria-expanded="${ctx.shell.plusOpen === chat.id}" aria-controls="mpComposerPlus">
+            ${icon('plus')}<span>更多</span>
+          </button>
+          <span class="mp-composer-hint">${icon('spark')}<span class="mp-composer-hint-text">${esc(composerHint)}</span></span>
         </div>
         <input id="mpMsgPhoto" type="file" accept="image/*" data-chat="${chat.id}" style="position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0">
+      </div>
+    </div>`;
+}
+
+function composerPlusHtml(ctx, chat) {
+  if (ctx.shell.plusOpen !== chat.id) return '';
+  return `
+    <div class="mp-plus-panel" id="mpComposerPlus" role="group" aria-label="聊天工具">
+      <div class="mp-plus-head">
+        <span>加点什么</span>
+        <button class="mp-plus-close" data-act="composer-plus-close" data-chat="${chat.id}" type="button" aria-label="收起工具">${icon('close')}</button>
+      </div>
+      <div class="mp-plus-grid">
+        ${COMPOSER_PLUS_ITEMS.map(item => `
+          <button class="mp-plus-item" data-act="composer-plus-pick" data-chat="${chat.id}" data-value="${item.value}" type="button">
+            ${icon(item.icon)}<span>${item.label}</span>
+          </button>`).join('')}
       </div>
     </div>`;
 }
@@ -803,6 +890,16 @@ function scrollToBottom(ctx) {
   ctx.shell.scroller = null;
 }
 
+function stopGeneration(ctx, chatId) {
+  const chat = chatById(ctx.state, chatId);
+  const task = activeGenerations.get(chatId);
+  if (!task || task.done) { ctx.toast('这条会话现在没有在生成'); return; }
+  cancelGeneration(chatId, 'user-stop');
+  if (chat) setTyping(ctx, chat, false);
+  ctx.rerender();
+  ctx.toast('已停止，结果不会写回');
+}
+
 function doSend(ctx, chatId) {
   const input = ctx.shell.root.querySelector('.mp-compose-box input');
   const text = (input?.value || '').trim();
@@ -810,23 +907,116 @@ function doSend(ctx, chatId) {
   if (!chat) return;
   const contact = contactById(ctx.state, chat.contactId);
 
+  /* 生成中再点一次按钮就是停止；输入框里没发出去的字留在原处。 */
   const busy = activeGenerations.get(chatId);
-  if (busy && !busy.done) { ctx.toast('正在回复这条会话，稍等一下'); return; }
+  if (busy && !busy.done) { stopGeneration(ctx, chatId); return; }
 
   if (!text) {
-    runGeneration(ctx, chat, contact, { kind: 'proactive' });
+    ctx.shell.plusOpen = '';
+    const pending = pendingUserMessages(chat);
+    ctx.rerender();
+    /* 有待回消息：纸飞机统一请求一次；没有才走主动开口。 */
+    if (pending.length) runGeneration(ctx, chat, contact, { kind: 'reply' });
+    else runGeneration(ctx, chat, contact, { kind: 'proactive' });
     return;
   }
 
-  pushMessage(ctx.state, chatId, { from: 'me', text, quote: ctx.shell.quote?.[chatId] || null });
+  /* 第一步只暂存，不请求模型；可以连续发多条，最后再点纸飞机。 */
+  pushMessage(ctx.state, chatId, { from: 'me', text, quote: ctx.shell.quote?.[chatId] || null, pending: true });
   chat.draft = '';
   chat.unread = 0;
   if (ctx.shell.quote) delete ctx.shell.quote[chatId];
+  ctx.shell.plusOpen = '';
   ctx.shell.live = { inputValue: '', focus: true };
   ctx.save();
   ctx.rerender();
   scrollToBottom(ctx);
-  runGeneration(ctx, chat, contact, { kind: 'reply' });
+  const waiting = pendingUserCount(chat);
+  ctx.toast(waiting > 1 ? `已发出 ${waiting} 条` : '已发出');
+}
+
+function composerAction(ctx, chatId, value) {
+  const chat = chatById(ctx.state, chatId);
+  if (!chat) return;
+  ctx.shell.plusOpen = '';
+
+  if (value === 'photo') {
+    const picker = ctx.shell.root.querySelector('#mpMsgPhoto');
+    if (picker) {
+      try { picker.click(); } catch (error) { ctx.toast('相册打不开，换一张试试'); }
+    } else {
+      ctx.toast('相册没准备好，再点一次');
+    }
+    ctx.rerender();
+    return;
+  }
+
+  if (value === 'emoji') {
+    const list = Array.isArray(ctx.state.emoji) ? ctx.state.emoji : [];
+    ctx.openSheet({
+      title: '发哪个表情',
+      items: list.slice(0, 12).map(item => ({ label: `${item.char} ${item.name || ''}`.trim(), value: item.char, note: '点上就发出去' })),
+      onPick: (char) => {
+        if (!char) return;
+        pushMessage(ctx.state, chat.id, { from: 'me', kind: 'emoji', emoji: char, text: char, pending: true });
+        chat.unread = 0;
+        ctx.save();
+        ctx.rerender();
+        scrollToBottom(ctx);
+        ctx.toast('表情已发出');
+      },
+    });
+    return;
+  }
+
+  if (value === 'poke') {
+    pushMessage(ctx.state, chat.id, { from: 'me', kind: 'poke', text: '' });
+    ctx.save();
+    ctx.rerender();
+    scrollToBottom(ctx);
+    return;
+  }
+
+  if (value === 'transfer' || value === 'redpacket') {
+    ctx.shell.behaviorForm = { chatId, kind: value };
+    ctx.rerender();
+    return;
+  }
+
+  if (value === 'plan') {
+    ctx.shell.behaviorForm = { chatId, kind: 'plan' };
+    ctx.rerender();
+    return;
+  }
+
+  if (value === 'membership') {
+    ctx.shell.behaviorForm = { chatId, kind: 'membership' };
+    ctx.rerender();
+    return;
+  }
+
+  if (value === 'theater') {
+    openTheaterSheet(ctx, chat);
+    return;
+  }
+
+  if (value === 'quote') {
+    const last = lastMessage(chat);
+    if (!last) { ctx.toast('还没有可引用的消息'); ctx.rerender(); return; }
+    ctx.shell.quote = ctx.shell.quote || {};
+    ctx.shell.quote[chatId] = { text: messagePreview(last), from: last.from };
+    ctx.rerender();
+    return;
+  }
+
+  if (value === 'extra') {
+    const last = lastMessage(chat);
+    const contact = contactById(ctx.state, chat.contactId);
+    if (!last || !contact) { ctx.toast('还没有内容'); ctx.rerender(); return; }
+    saveMessageExtra(ctx, chat, contact, last);
+    ctx.toast('已存进小剧场');
+    ctx.rerender();
+  }
 }
 
 function commitBehaviorMessage(ctx, chat, contact, draft) {
@@ -915,6 +1105,8 @@ async function runGeneration(ctx, chat, contact, options = {}) {
   if (!task) { ctx.toast('正在回复这条会话，稍等一下'); return; }
 
   setTyping(ctx, chat, true);
+  ctx.rerender();
+  scrollToBottom(ctx);
 
   const delay = kind === 'proactive' ? 1500 : 900 + Math.random() * 700;
   await sleep(delay);
@@ -924,18 +1116,24 @@ async function runGeneration(ctx, chat, contact, options = {}) {
     return;
   }
 
+  const pendingIds = kind === 'reply'
+    ? pendingUserMessages(chat).map(message => message.id)
+    : [];
   let bubbles = [];
   let sections = [];
   let kindOut = '';
   let error = '';
   try {
     if (kind === 'proactive') {
-      const text = await ctx.ai.proactive(ctx, chat, contact, pick(poolFor(contact)));
+      const text = await ctx.ai.proactive(ctx, chat, contact, pick(poolFor(contact)), { signal: task.abort?.signal });
       bubbles = parseBehaviorReply(text, {
         from: 'them', allowed: behaviorSettings(ctx.state, chat),
       }).map(bubble => ({ ...bubble, kind: bubble.kind === 'text' ? 'proactive' : bubble.kind }));
     } else {
-      const result = await ctx.ai.reply(ctx, chat, contact, pick(poolFor(contact)), { omitIds: replaceIds });
+      const result = await ctx.ai.reply(ctx, chat, contact, pick(poolFor(contact)), {
+        omitIds: replaceIds,
+        signal: task.abort?.signal,
+      });
       bubbles = Array.isArray(result?.bubbles) && result.bubbles.length
         ? result.bubbles
         : (result?.text ? [{ kind: 'text', text: result.text, behavior: null }] : []);
@@ -973,6 +1171,8 @@ async function runGeneration(ctx, chat, contact, options = {}) {
     return;
   }
 
+  /* 只有这一轮真的写出了回复，才把送出去的待回标记摘掉；停止或失败继续留着。 */
+  clearPendingMessages(chat, pendingIds);
   const turnId = `t${Date.now().toString(36)}${generationSeq}`;
   let firstSaved = null;
 
@@ -1563,15 +1763,7 @@ export const threadApp = {
     }
 
     if (act === 'send') { doSend(ctx, chatId); return true; }
-
-    if (act === 'say-first') {
-      const chat = chatById(ctx.state, chatId);
-      if (!chat) return true;
-      const busy = activeGenerations.get(chatId);
-      if (busy && !busy.done) { ctx.toast('正在回复这条会话，稍等一下'); return true; }
-      runGeneration(ctx, chat, contactById(ctx.state, chat.contactId), { kind: 'proactive' });
-      return true;
-    }
+    if (act === 'stop-generation') { stopGeneration(ctx, chatId); return true; }
 
     if (act === 'retry-turn') {
       const chat = chatById(ctx.state, chatId);
@@ -1669,14 +1861,13 @@ export const threadApp = {
         };
       }
       if (!draft) return true;
-      const saved = commitBehaviorMessage(ctx, chat, contact, draft);
+      const saved = commitBehaviorMessage(ctx, chat, contact, { ...draft, pending: true });
       if (!saved) return true;
       ctx.shell.behaviorForm = null;
       ctx.save();
       ctx.rerender();
       scrollToBottom(ctx);
-      ctx.toast('发出去了');
-      runGeneration(ctx, chat, contact, { kind: 'reply' });
+      ctx.toast('已发出');
       return true;
     }
 
@@ -1750,89 +1941,28 @@ export const threadApp = {
     }
 
     if (act === 'composer-plus') {
-      ctx.openSheet({
-        title: '加点什么',
-        items: [
-          { label: '照片', value: 'photo', icon: 'image', note: '从相册选一张，压小了再存进手机' },
-          { label: '表情', value: 'emoji', icon: 'smile', note: '发一个大表情，不是文字里的贴图' },
-          { label: '戳一戳', value: 'poke', icon: 'spark', note: '在聊天里留一行「你拍了拍 TA」' },
-          { label: '转账', value: 'transfer', icon: 'transfer', note: `钱包余额 ¥${walletBalance(ctx.state).toFixed(2)}` },
-          { label: '红包', value: 'redpacket', icon: 'transfer', note: '发一个红包，留言可以不写' },
-          { label: '约定计划', value: 'plan', icon: 'plan', note: '发一条待 TA 接受的约定' },
-          { label: '送会员', value: 'membership', icon: 'spark', note: '从余额扣，给 TA 送 VIP / SVIP' },
-          { label: '小剧场', value: 'theater', icon: 'theater', note: '这轮带不带、写哪种；内容去小剧场 App 看' },
-          { label: '引用最近一条', value: 'quote', icon: 'reply' },
-          { label: '把这条存进小剧场', value: 'extra', icon: 'theater' },
-        ],
-        onPick: (value) => {
-          const chat = chatById(ctx.state, chatId);
-          if (!chat) return;
-          if (value === 'photo') {
-            const picker = ctx.shell.root.querySelector('#mpMsgPhoto');
-            if (picker) {
-              try { picker.click(); } catch (error) { ctx.toast('相册打不开，换一张试试'); }
-            } else {
-              ctx.toast('相册没准备好，再点一次');
-            }
-            return;
-          }
-          if (value === 'emoji') {
-            const list = Array.isArray(ctx.state.emoji) ? ctx.state.emoji : [];
-            ctx.openSheet({
-              title: '发哪个表情',
-              items: list.slice(0, 12).map(item => ({ label: `${item.char} ${item.name || ''}`.trim(), value: item.char, note: '点上就发出去' })),
-              onPick: (char) => {
-                if (!char) return;
-                pushMessage(ctx.state, chat.id, { from: 'me', kind: 'emoji', emoji: char, text: char });
-                chat.unread = 0;
-                ctx.save();
-                ctx.rerender();
-                scrollToBottom(ctx);
-                runGeneration(ctx, chat, contactById(ctx.state, chat.contactId), { kind: 'reply' });
-              },
-            });
-          }
-          if (value === 'poke') {
-            pushMessage(ctx.state, chat.id, { from: 'me', kind: 'poke', text: '' });
-            ctx.save();
-            ctx.rerender();
-            scrollToBottom(ctx);
-          }
-          if (value === 'transfer' || value === 'redpacket') {
-            ctx.shell.behaviorForm = { chatId, kind: value };
-            ctx.rerender();
-            return;
-          }
-          if (value === 'plan') {
-            ctx.shell.behaviorForm = { chatId, kind: 'plan' };
-            ctx.rerender();
-            return;
-          }
-          if (value === 'membership') {
-            ctx.shell.behaviorForm = { chatId, kind: 'membership' };
-            ctx.rerender();
-            return;
-          }
-          if (value === 'theater') {
-            openTheaterSheet(ctx, chat);
-            return;
-          }
-          if (value === 'quote') {
-            const last = lastMessage(chat);
-            if (!last) { ctx.toast('还没有可引用的消息'); return; }
-            ctx.shell.quote = ctx.shell.quote || {};
-            ctx.shell.quote[chatId] = { text: messagePreview(last), from: last.from };
-            ctx.rerender();
-          }
-          if (value === 'extra') {
-            const last = lastMessage(chat);
-            const contact = contactById(ctx.state, chat.contactId);
-            if (!last || !contact) { ctx.toast('还没有内容'); return; }
-            saveMessageExtra(ctx, chat, contact, last);
-            ctx.toast('已存进小剧场');
-          }
-        },
-      });
+      const box = ctx.shell.root.querySelector('.mp-messages');
+      const atBottom = box ? box.scrollHeight - box.scrollTop - box.clientHeight < 24 : false;
+      ctx.shell.plusOpen = ctx.shell.plusOpen === chatId ? '' : chatId;
+      ctx.rerender();
+      if (atBottom) scrollToBottom(ctx);
+      return true;
+    }
+
+    if (act === 'composer-plus-close') {
+      const box = ctx.shell.root.querySelector('.mp-messages');
+      const atBottom = box ? box.scrollHeight - box.scrollTop - box.clientHeight < 24 : false;
+      ctx.shell.plusOpen = '';
+      ctx.rerender();
+      if (atBottom) scrollToBottom(ctx);
+      return true;
+    }
+
+    if (act === 'composer-plus-pick') {
+      const box = ctx.shell.root.querySelector('.mp-messages');
+      const atBottom = box ? box.scrollHeight - box.scrollTop - box.clientHeight < 24 : false;
+      composerAction(ctx, chatId, String(data.value || ''));
+      if (atBottom) scrollToBottom(ctx);
       return true;
     }
 
@@ -1932,6 +2062,7 @@ export const threadApp = {
                   kind: 'forwarded',
                   text: '',
                   forward: { text: messagePreview(message), from: contact?.name || 'TA' },
+                  pending: true,
                 });
                 ctx.save();
                 ctx.toast(`已转发给「${target.name}」`);

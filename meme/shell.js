@@ -503,10 +503,33 @@ export function createShell(options) {
   shell.improveSendState = function improveSendState() {
     const button = root.querySelector('.mp-send');
     const input = root.querySelector('.mp-compose-box input');
+    const hint = root.querySelector('.mp-composer-hint-text');
     if (!button || !input) return;
     const hasText = Boolean(input.value.trim());
-    button.classList.toggle('is-text', hasText);
-    button.classList.toggle('is-wake', !hasText);
+    const busy = button.dataset.busy === '1';
+    const pending = Math.max(0, Number(button.dataset.pending) || 0);
+    button.classList.toggle('is-stop', busy);
+    button.classList.remove('is-text', 'is-request', 'is-wake');
+    let label = '停止这次生成';
+    let hintText = '生成中 · 点右边停止';
+    if (!busy) {
+      button.classList.toggle('is-text', hasText);
+      button.classList.toggle('is-request', !hasText && pending > 0);
+      button.classList.toggle('is-wake', !hasText && pending === 0);
+      if (hasText) {
+        label = '发送这条；再点一次让 TA 回';
+        hintText = '先发出去，再点右边让 TA 回';
+      } else if (pending > 0) {
+        label = `让 TA 回这 ${pending} 条`;
+        hintText = `${pending} 条已发出 · 点右边让 TA 回`;
+      } else {
+        label = '空着发时让 TA 主动开口';
+        hintText = '空着发，TA 会主动开口';
+      }
+    }
+    button.setAttribute('aria-label', label);
+    button.title = label;
+    if (hint) hint.textContent = hintText;
   };
 
   shell.refresh = render;

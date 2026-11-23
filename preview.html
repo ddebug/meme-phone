@@ -445,6 +445,45 @@ body {
   -webkit-backdrop-filter: blur(8px);
 }
 
+/* 首页左上角：直接进入最后说过话的那条会话 */
+.mp-recent-jump {
+  position: absolute;
+  z-index: 3;
+  top: 9px;
+  left: 12px;
+  max-width: calc(100% - 128px);
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .66);
+  color: var(--accent-deep);
+  font: inherit;
+  font-size: calc(11px * var(--font-scale));
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .68);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.mp-recent-jump::after {
+  content: "›";
+  margin-left: 1px;
+  color: var(--text-3);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.mp-recent-jump:active { transform: scale(.96); }
+.mp-recent-jump .mp-i { width: 13px; height: 13px; flex: none; }
+.mp-recent-jump-label { color: var(--text-3); font-weight: 500; }
+.mp-recent-jump-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
 .mp-profile-avatar {
   position: relative;
   z-index: 2;
@@ -9511,9 +9550,10 @@ function emptyState() {
 const DEFAULT_DIARY_PROMPT = `站在角色自己的视角写日记，第一人称“我”指日记作者，而不是用户。
 根据角色资料和完整聊天历史保持角色的身份、语气及与用户的关系。
 按指定日期分别写，每篇按时间顺序，标出大概几点。适度压缩重要事件、互动、感受和关系变化，不要逐句复述。
-不强制保留用户原话；确有必要时可择要引用，但引用必须与原文一致，不伪造原话。
+尽量保留用户原话，尤其是她对我说的话和有感情的句子，不改字，不润色，不伪造原话。
 只记录聊天中能确认的事情。隔天转述的旧事要说明是当日回顾；不编造线下行动、关系或动机，不把猜测当成事实。
-保持角色平时的语感，不要写成说明书。`;
+保持角色平时的语感，不要写成说明书。
+每一天的总结在 500 字以内`;
 const DIARY_SKIP_THRESHOLD = 20;
 
 const DEFAULT_EMOJI = [
@@ -9622,11 +9662,25 @@ function chatById(state, id) {
 
 /**
  * 平行时空不是一台新的小手机聊天，而是某个酒馆聊天文件的一条分支：
- *   base   —— 开这一场时从当前聊天文件抄下来的楼层（酒馆原样，柏宝书的叶子跟着楼层走）
+ *   snapshot/forkFloor —— 分叉点：默认 'live'，只记聊天文件与楼层数，生成时从酒馆现取
+ *   base   —— 只有小份旧存档才内联存的楼层（酒馆原样，柏宝书的叶子跟着楼层走）
  *   memory —— 开这一场时酒馆记忆的注入口径（有柏宝书就是它的总结，没有就是空）
  *   messages —— 这一场自己新说的话，只存在这台小手机里
  * 生成走酒馆自己的 prompt 组装（预设/角色卡/世界书/记忆），所以这里不需要小手机的模型和回复预设。
  */
+/** 内联快照上限：超过就当 live，只留分叉点（大聊天不落盘，避免保存时克隆几十 MB 闪退）。 */
+const INLINE_BASE_MAX = 300000;
+
+function baseChars(base) {
+  if (!Array.isArray(base)) return 0;
+  let total = 0;
+  for (const item of base) {
+    total += String(item?.mes ?? item?.text ?? '').length + 160;
+    if (total > INLINE_BASE_MAX) return total;
+  }
+  return total;
+}
+
 function theaterById(state, id) {
   return state.theaters?.[id] || null;
 }
@@ -9653,6 +9707,10 @@ function defaultTheaterTitle(state, info = {}) {
 
 function addTheater(state, info = {}) {
   const id = info.id || newId('th');
+  /* 快照默认不落盘：只记分叉点，生成时从酒馆现取楼层。
+     只有显式给了小份 base（演示 / 旧存档）才内联存，避免大聊天把存档撑爆。 */
+  const rawBase = Array.isArray(info.base) ? info.base : [];
+  const keepInline = rawBase.length > 0 && baseChars(rawBase) <= INLINE_BASE_MAX;
   const theater = {
     id,
     title: String(info.title || '').trim().slice(0, 32) || defaultTheaterTitle(state, info),
@@ -9663,8 +9721,9 @@ function addTheater(state, info = {}) {
     chatFile: String(info.chatFile || ''),
     chatId: String(info.chatId || ''),
     presetName: String(info.presetName || ''),
-    forkFloor: Number(info.forkFloor) || 0,
-    base: Array.isArray(info.base) ? info.base : [],
+    forkFloor: Number(info.forkFloor) || rawBase.length,
+    snapshot: keepInline ? 'inline' : 'live',
+    base: keepInline ? rawBase : [],
     memory: {
       engine: String(info.memory?.engine || ''),
       text: String(info.memory?.text || '').slice(0, 20000),
@@ -11127,7 +11186,8 @@ function normalize(raw) {
     }
   }
   for (const [id, theater] of Object.entries(merged.theaters)) {
-    const base = Array.isArray(theater?.base) ? theater.base.filter(item => item && typeof item === 'object') : [];
+    const rawBase = Array.isArray(theater?.base) ? theater.base.filter(item => item && typeof item === 'object') : [];
+    const keepInline = rawBase.length > 0 && baseChars(rawBase) <= INLINE_BASE_MAX;
     const messages = Array.isArray(theater?.messages) ? theater.messages : [];
     merged.theaters[id] = {
       id,
@@ -11139,8 +11199,10 @@ function normalize(raw) {
       chatFile: String(theater?.chatFile || ''),
       chatId: String(theater?.chatId || ''),
       presetName: String(theater?.presetName || ''),
-      forkFloor: Number(theater?.forkFloor) || base.length,
-      base: base.map(item => ({ ...item, mes: String(item.mes || item.text || '') })),
+      forkFloor: Number(theater?.forkFloor) || rawBase.length,
+      /* 大份 base 不再进存档：只留分叉点，生成时从酒馆现取（旧存档升级时也走这条） */
+      snapshot: keepInline ? 'inline' : 'live',
+      base: keepInline ? rawBase.map(item => ({ ...item, mes: String(item.mes || item.text || '') })) : [],
       memory: {
         engine: String(theater?.memory?.engine || ''),
         text: String(theater?.memory?.text || '').slice(0, 20000),
@@ -12717,21 +12779,23 @@ async function generate({ prompt, system = '', messages = null, demoReply = '', 
 
 /**
  * 当前打开的那个酒馆聊天文件 —— 平行时空从这里分叉。
- * base 是酒馆自己的楼层对象（原样复制）：柏宝书的 bbs_leaf 就挂在消息的 extra 上，
- * 原样抄走才能在分支里接着读到同一套记忆。
+ *
+ * 只记「分叉点」（chatId + 楼层数），**不复制整份 chat**：
+ * 大聊天（几十 MB）深拷贝 + 落盘会把小手机撑爆（保存时结构化克隆/序列化直接闪退）。
+ * 生成那一刻再从酒馆当前的 chat 里取前 forkFloor 层，楼层对象是酒馆原样（柏宝书的
+ * bbs_leaf 就挂在消息的 extra 上），所以分支里读到的是同一套记忆。
  */
 async function readOpenTavernChat() {
   const script = await loadHostScript();
   const empty = {
     available: false, reason: '', characterName: '', characterAvatar: '', chatFile: '', chatId: '',
-    presetName: '', forkFloor: 0, base: [], memory: { engine: '', text: '', coverage: null },
+    presetName: '', forkFloor: 0, snapshot: 'live', base: [], memory: { engine: '', text: '', coverage: null },
   };
   if (!script) return { ...empty, reason: '不在酒馆里，读不到聊天文件' };
   const chat = Array.isArray(script.chat) ? script.chat : [];
   if (!chat.length) return { ...empty, reason: '酒馆里还没有打开聊天' };
   const characterId = script.characterId ?? script.this_chid;
   const character = Array.isArray(script.characters) ? script.characters[characterId] : null;
-  const base = cloneChatFloors(chat);
   return {
     available: true,
     reason: '',
@@ -12740,19 +12804,11 @@ async function readOpenTavernChat() {
     chatFile: String(character?.chat || ''),
     chatId: String(script.getCurrentChatId?.() || script.chatId || ''),
     presetName: String(script.chatCompletionSettings?.preset_settings_openai || ''),
-    forkFloor: base.length,
-    base,
+    forkFloor: chat.length,
+    snapshot: 'live',
+    base: [],
     memory: readTavernMemory(),
   };
-}
-
-/** 深拷贝楼层；克隆失败整段跳过，不把半个聊天当快照。 */
-function cloneChatFloors(chat) {
-  try {
-    return JSON.parse(JSON.stringify(chat));
-  } catch {
-    return chat.map(line => ({ is_user: Boolean(line?.is_user), name: String(line?.name || ''), mes: String(line?.mes || ''), send_date: line?.send_date || '' }));
-  }
 }
 
 /**
@@ -12789,33 +12845,59 @@ function toTavernFloor(message, fallbackName = '') {
 }
 
 /**
- * 平行时空的一次生成：把酒馆的 chat 临时换成「快照 + 这一场新说的话」，
+ * 平行时空的一次生成：把酒馆的 chat 临时换成「分叉点之前的楼层 + 这一场新说的话」，
  * 交给酒馆自己的 generateQuietPrompt 去组装（预设 / 角色卡 / 世界书 / 记忆都是酒馆那套），
  * 拿到回复后无论是在哪个分支点出错，都把真实聊天原样放回去，且一个字都不写进聊天文件。
+ *
+ * base 有两种来源：
+ * - 传了 base（旧存档里的内联快照）：照旧用，只做浅拷贝，文本不复制；
+ * - 没传（现在的默认）：按 chatId + forkFloor 从酒馆当前 chat 里现取前 forkFloor 层，
+ *   大聊天因此不用把整份楼层存进小手机，也不用每次保存都克隆几十 MB。
  */
-async function branchReply({ base = [], branch = [], characterName = '' } = {}) {
+async function branchReply({ base = [], branch = [], characterName = '', chatId = '', forkFloor = 0 } = {}) {
   const script = await loadHostScript();
   const ctx = globalThis.SillyTavern?.getContext?.() || script;
   if (!ctx || typeof ctx.generateQuietPrompt !== 'function') throw new Error('酒馆的生成接口不可用');
   const hostChat = ctx.chat;
   if (!Array.isArray(hostChat)) throw new Error('拿不到酒馆的当前聊天');
-  if (!base.length && !branch.length) throw new Error('这一场还没有可以接着说的上下文');
+
+  let baseFloors = [];
+  if (Array.isArray(base) && base.length) {
+    baseFloors = base.map(item => ({ ...item }));
+  } else {
+    const expected = String(chatId || '');
+    const current = String(ctx.getCurrentChatId?.() || ctx.chatId || '');
+    if (expected && current && expected !== current) {
+      throw new Error('这一场绑的是另一个聊天文件，先在酒馆打开它再发');
+    }
+    const count = Number(forkFloor) || 0;
+    if (!count || count > hostChat.length) {
+      throw new Error('酒馆当前聊天对不上这一场的分叉点，先在酒馆打开原本那个聊天');
+    }
+    baseFloors = hostChat.slice(0, count).map(item => ({ ...item }));
+  }
+  if (!baseFloors.length && !branch.length) throw new Error('这一场还没有可以接着说的上下文');
 
   const backup = hostChat.slice();
-  const temp = [...base, ...branch].map(item => toTavernFloor(item, characterName));
+  const temp = [...baseFloors, ...branch.map(item => toTavernFloor(item, characterName))];
   const eventSource = ctx.eventSource;
   const promptEvent = ctx.eventTypes?.CHAT_COMPLETION_PROMPT_READY;
   let captured = null;
   const onPrompt = (data) => {
     if (!captured && Array.isArray(data?.chat)) captured = data.chat;
   };
+  /* 逐条 push，不用 splice(...temp)：几万楼的聊天会把参数展开撑爆调用栈 */
+  const replaceFloors = (next) => {
+    hostChat.splice(0, hostChat.length);
+    for (const floor of next) hostChat.push(floor);
+  };
   try {
     if (promptEvent && eventSource?.on) eventSource.on(promptEvent, onPrompt);
-    hostChat.splice(0, hostChat.length, ...temp);
+    replaceFloors(temp);
     const text = await ctx.generateQuietPrompt({ quietPrompt: '', quietName: null });
     return { text: String(text ?? '').trim(), prompt: captured };
   } finally {
-    hostChat.splice(0, hostChat.length, ...backup);
+    replaceFloors(backup);
     if (promptEvent && eventSource?.removeListener) eventSource.removeListener(promptEvent, onPrompt);
     /* 生成期间界面看到的是临时聊天，还原后让酒馆按真实聊天重画一遍 */
     try { eventSource?.emit?.(ctx.eventTypes?.CHAT_CHANGED, ctx.chatId); } catch { /* 重画失败不影响数据 */ }
@@ -13954,7 +14036,7 @@ __mods["meme/shell.js"] = function(module, exports, __req){
 const { icon: ico, TINT } = __req("meme/icons.js");
 const { PIXEL_BUNNY } = __req("meme/theme-data.js");
 const {
-  unreadTotal, dayKey,
+  unreadTotal, dayKey, chatsOf, contactById,
 } = __req("meme/data.js");
 
 function esc(text) {
@@ -14176,10 +14258,19 @@ function createShell(options) {
 
   /* ------------------------------------------------------------ 渲染 */
 
+  /* 首页快捷入口只认最后说过话的会话，不跟置顶排序走。 */
+  function recentChatOf(state) {
+    return chatsOf(state)
+      .slice()
+      .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0))[0] || null;
+  }
+
   function desktopHtml() {
     const state = ctx.state;
     const themeArt = state.settings.dress?.theme === 'pixel' ? PIXEL_BUNNY : null;
     const { myName, myAvatar, myBio } = desktopIdentity(state);
+    const recentChat = recentChatOf(state);
+    const recentContact = recentChat ? contactById(state, recentChat.contactId) : null;
     const ownBanner = String(state.settings.profile?.banner || '').trim();
     const themedBanner = themeArt ? themeArt.banner : '';
     const bannerImage = ownBanner || themedBanner;
@@ -14207,6 +14298,10 @@ function createShell(options) {
           <span class="mp-profile-banner${bannerImage ? ' is-custom' : ''}" data-act="profile-banner"${bannerStyle} title="点一下换背景图">
             <span class="mp-profile-stamp">${stampText}</span>
           </span>
+          ${recentChat ? `
+          <button class="mp-recent-jump" data-act="open-recent" data-chat="${esc(recentChat.id)}" type="button" aria-label="打开最近聊天：${esc(recentContact?.name || '')}" title="进入最近聊天">
+            ${ico('chat')}<span class="mp-recent-jump-label">最近聊天</span><span class="mp-recent-jump-name">${esc(recentContact?.name || '聊天')}</span>
+          </button>` : ''}
           <span class="mp-profile-avatar${myAvatar ? '' : ' is-empty'}" data-act="open-app" data-app="user"${myAvatar ? ` style="background-image:url(&quot;${myAvatar}&quot;)"` : ''}>${myAvatar ? '' : esc(String(myName).slice(0, 1))}</span>
           <span class="mp-profile-name" data-act="open-app" data-app="user">${esc(myName)}</span>
           ${shell.bioEdit ? `
@@ -14521,6 +14616,12 @@ function createShell(options) {
 
   const acts = {
     'open-app': (data) => { shell.live = { inputValue: '', focus: false }; ctx.go('app-' + data.app, {}); },
+    'open-recent': (data) => {
+      const chat = data.chat ? ctx.state.chats[data.chat] : recentChatOf(ctx.state);
+      if (!chat) { ctx.toast('还没有聊天'); return; }
+      shell.live = { inputValue: '', focus: false };
+      ctx.go('thread', { chatId: chat.id });
+    },
     'home': () => { shell.live = { inputValue: '', focus: false }; ctx.home(); },
     'back': () => { if (shell.sheet) ctx.closeSheet(); else ctx.back(); },
     'sheet-close': () => ctx.closeSheet(),
@@ -18136,21 +18237,27 @@ function branchStatusLine(theater) {
   return `接在 ${file} 第 ${theater.forkFloor || 0} 楼`;
 }
 
-/** 背景从哪来：柏宝书总结 / 酒馆原文 / 旧版场景。 */
+/** 背景从哪来：柏宝书总结 / 酒馆原文（现取）/ 旧版内联快照 / 旧版场景。 */
 function branchMemoryLabel(theater) {
   const memory = theater.memory || {};
   if (memory.engine === 'baibai' && memory.text) return `柏宝书总结 · ${memory.text.length} 字`;
-  return theater.base?.length ? '酒馆原文 · 按预设自己裁' : '没有背景（旧版场景）';
+  if (theater.base?.length) return `内联快照 · ${theater.base.length} 层`;
+  return theater.forkFloor ? `酒馆原文 · 生成时现取第 ${theater.forkFloor} 楼之前` : '没有背景（旧版场景）';
 }
 
-/** 「这一场的背景」面板：快照楼层数、酒馆记忆的注入口径、重开一场的说明。 */
+/** 「这一场的背景」面板：分叉点、酒馆记忆的注入口径、重开一场的说明。 */
 function branchContextPanelHtml(theater) {
   const memory = theater.memory || {};
   const base = Array.isArray(theater.base) ? theater.base : [];
+  const inline = Boolean(base.length);
+  const fork = theater.forkFloor || 0;
+  const mode = inline
+    ? '存档里存着当时那段聊天的副本'
+    : `小手机不存聊天副本，只记楼层数，每次生成从酒馆当前聊天里取前 ${fork} 楼`;
   return `
-    <div class="mp-sheet-note">${esc(branchStatusLine(theater))} · 快照 ${base.length} 层 · ${esc(branchMemoryLabel(theater))}</div>
+    <div class="mp-sheet-note">${esc(branchStatusLine(theater))} · ${inline ? `内联快照 ${base.length} 层` : '不存副本，生成时从酒馆现取'} · ${esc(branchMemoryLabel(theater))}</div>
     ${memory.text ? `<div class="mp-prompt-role"><i></i>酒馆记忆的注入口径<span>${esc(branchMemoryLabel(theater))}</span></div><div class="mp-prompt-body">${esc(memory.text)}</div>` : ''}
-    <div class="mp-sheet-note">快照里的楼层是开这一场那一刻的酒馆原样（柏宝书的记忆叶子也跟着楼层走）。酒馆里后来继续聊的，不会自动进这一场；想跟上就重新开一场。</div>`;
+    <div class="mp-sheet-note">分叉点固定在第 ${fork} 楼：${mode}（柏宝书的记忆叶子就在这些楼层上）。酒馆里后来继续聊的，不会自动进这一场；想跟上就重新开一场。</div>`;
 }
 
 
@@ -18181,6 +18288,7 @@ async function createParallelBranch(ctx) {
     chatId: host.chatId,
     presetName: host.presetName,
     forkFloor: host.forkFloor,
+    snapshot: host.snapshot || 'live',
     base: host.base,
     memory: host.memory,
   });
@@ -18452,7 +18560,7 @@ function contextPanelHtml(theater) {
 
 /** 旧版场景：还没有绑定聊天文件时，第一次生成就认当前打开的那个聊天。 */
 async function bindIfNeeded(ctx, theater) {
-  if (theater.chatFile && theater.base?.length) return true;
+  if (theater.chatFile && theater.forkFloor) return true;
   const host = await readOpenTavernChat();
   if (!host.available) return false;
   theater.chatFile = host.chatFile;
@@ -18461,7 +18569,8 @@ async function bindIfNeeded(ctx, theater) {
   theater.characterAvatar = theater.characterAvatar || host.characterAvatar;
   theater.presetName = host.presetName;
   theater.forkFloor = host.forkFloor;
-  theater.base = host.base;
+  theater.snapshot = host.snapshot || 'live';
+  theater.base = [];
   theater.memory = host.memory;
   theater.legacy = false;
   return true;
@@ -18476,6 +18585,8 @@ async function generateReply(ctx, theater) {
       base: theater.base || [],
       branch: theater.messages || [],
       characterName: theater.characterName,
+      chatId: theater.chatId,
+      forkFloor: theater.forkFloor,
     });
     if (task.stopped) return;
     const text = String(result.text || '').trim();

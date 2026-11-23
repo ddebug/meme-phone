@@ -8,7 +8,7 @@
 import { icon as ico, TINT } from './icons.js';
 import { PIXEL_BUNNY } from './theme-data.js';
 import {
-  unreadTotal, dayKey,
+  unreadTotal, dayKey, chatsOf, contactById,
 } from './data.js';
 
 export function esc(text) {
@@ -230,10 +230,19 @@ export function createShell(options) {
 
   /* ------------------------------------------------------------ 渲染 */
 
+  /* 首页快捷入口只认最后说过话的会话，不跟置顶排序走。 */
+  function recentChatOf(state) {
+    return chatsOf(state)
+      .slice()
+      .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0))[0] || null;
+  }
+
   function desktopHtml() {
     const state = ctx.state;
     const themeArt = state.settings.dress?.theme === 'pixel' ? PIXEL_BUNNY : null;
     const { myName, myAvatar, myBio } = desktopIdentity(state);
+    const recentChat = recentChatOf(state);
+    const recentContact = recentChat ? contactById(state, recentChat.contactId) : null;
     const ownBanner = String(state.settings.profile?.banner || '').trim();
     const themedBanner = themeArt ? themeArt.banner : '';
     const bannerImage = ownBanner || themedBanner;
@@ -261,6 +270,10 @@ export function createShell(options) {
           <span class="mp-profile-banner${bannerImage ? ' is-custom' : ''}" data-act="profile-banner"${bannerStyle} title="点一下换背景图">
             <span class="mp-profile-stamp">${stampText}</span>
           </span>
+          ${recentChat ? `
+          <button class="mp-recent-jump" data-act="open-recent" data-chat="${esc(recentChat.id)}" type="button" aria-label="打开最近聊天：${esc(recentContact?.name || '')}" title="进入最近聊天">
+            ${ico('chat')}<span class="mp-recent-jump-label">最近聊天</span><span class="mp-recent-jump-name">${esc(recentContact?.name || '聊天')}</span>
+          </button>` : ''}
           <span class="mp-profile-avatar${myAvatar ? '' : ' is-empty'}" data-act="open-app" data-app="user"${myAvatar ? ` style="background-image:url(&quot;${myAvatar}&quot;)"` : ''}>${myAvatar ? '' : esc(String(myName).slice(0, 1))}</span>
           <span class="mp-profile-name" data-act="open-app" data-app="user">${esc(myName)}</span>
           ${shell.bioEdit ? `
@@ -575,6 +588,12 @@ export function createShell(options) {
 
   const acts = {
     'open-app': (data) => { shell.live = { inputValue: '', focus: false }; ctx.go('app-' + data.app, {}); },
+    'open-recent': (data) => {
+      const chat = data.chat ? ctx.state.chats[data.chat] : recentChatOf(ctx.state);
+      if (!chat) { ctx.toast('还没有聊天'); return; }
+      shell.live = { inputValue: '', focus: false };
+      ctx.go('thread', { chatId: chat.id });
+    },
     'home': () => { shell.live = { inputValue: '', focus: false }; ctx.home(); },
     'back': () => { if (shell.sheet) ctx.closeSheet(); else ctx.back(); },
     'sheet-close': () => ctx.closeSheet(),

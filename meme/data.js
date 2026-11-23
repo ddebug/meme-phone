@@ -627,18 +627,66 @@ export function addChat(state, contactId, options = {}) {
   return state.chats[id];
 }
 
-/** 一个联系人只保留一个一对一会话；群聊各自一条。 */
+/** 一个联系人只保留一个一对一会话；群聊各自一条。平行时空的那些不算在这里。 */
 export function chatFor(state, contactId) {
-  const existing = Object.values(state.chats).find(chat => chat.contactId === contactId && chat.kind !== 'group');
+  const existing = Object.values(state.chats).find(chat => chat.contactId === contactId && chat.kind !== 'group' && !chat.parallel);
   return existing || addChat(state, contactId);
 }
 
+/** 聊天列表：只算原生会话，平行时空的场景自己进 App。 */
 export function chatsOf(state) {
-  return Object.values(state.chats).sort((a, b) => (b.pinned - a.pinned) || (b.updatedAt - a.updatedAt));
+  return Object.values(state.chats)
+    .filter(chat => !chat.parallel)
+    .sort((a, b) => (b.pinned - a.pinned) || (b.updatedAt - a.updatedAt));
 }
 
 export function chatById(state, id) {
   return state.chats[id] || null;
+}
+
+/* ------------------------------------------------------- 平行时空 */
+
+/**
+ * 平行时空的每一场也是一个会话对象（同一个角色可以开多场），
+ * 只是不列进聊天列表、不算未读、不自动开口；生成走的是同一套组装。
+ */
+export function isParallelChat(chat) {
+  return Boolean(chat && chat.parallel);
+}
+
+export function parallelChatsOf(state) {
+  return Object.values(state.chats || {})
+    .filter(isParallelChat)
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+}
+
+export function parallelTitleOf(chat) {
+  const title = String(chat?.title || '').trim();
+  return title || '未命名的一场';
+}
+
+/** 开一场：标题和这一场的设定都由用户给，消息只存在这台小手机里。
+ *  预设 / 接口 / 记忆先照这个角色原生聊天的选法抄一份，之后可以单独改。 */
+export function addParallelChat(state, contactId, options = {}) {
+  const chat = addChat(state, contactId, { ...options, kind: 'single' });
+  chat.parallel = true;
+  chat.title = String(options.title || '').trim().slice(0, 24) || '未命名的一场';
+  chat.scene = String(options.scene || '').trim().slice(0, 2000);
+  chat.muted = true;
+  chat.unread = 0;
+  const origin = originChatFor(state, contactId);
+  if (origin) {
+    chat.llmPresetId = String(origin.llmPresetId || '');
+    chat.memoryPresetId = String(origin.memoryPresetId || '');
+    chat.replyPresetId = String(origin.replyPresetId || '');
+    chat.history = normalizeChatHistory(origin.history);
+  }
+  return chat;
+}
+
+/** 这个角色原生聊天（不是平行时空里的任何一场）：剧场拿它当背景。 */
+export function originChatFor(state, contactId) {
+  return Object.values(state.chats || {}).find(chat => chat.contactId === contactId && !chat.parallel && chat.kind !== 'group') || null;
 }
 
 /** 手机里保存的聊天接口预设。 */
@@ -875,7 +923,7 @@ export function pushMessage(state, chatId, message) {
 
 export function unreadTotal(state) {
   if (state.settings?.chat?.remind === false) return 0;
-  return Object.values(state.chats).reduce((sum, chat) => sum + (chat.muted ? 0 : (chat.unread || 0)), 0);
+  return Object.values(state.chats).reduce((sum, chat) => sum + (chat.muted || chat.parallel ? 0 : (chat.unread || 0)), 0);
 }
 
 /**
@@ -1394,6 +1442,30 @@ export function demoState() {
       { from: 'them', text: '我带吉他。', at: at(16, 2) },
     ],
   });
+
+  /* 平行时空：演示数据留两场，进来就能看到这一页长什么样 */
+  const sceneShen = addParallelChat(state, shen.id, {
+    id: 'ch_demo_parallel_shen_1',
+    title: '如果那天没下雨',
+    scene: '如果那天他没开车，而是陪你坐了末班地铁。',
+    messages: [
+      { from: 'them', text: '最后一班了，你上不上？', at: at(22, 52) },
+      { from: 'me', text: '再等等，我还差一份表。', at: at(22, 55) },
+      { from: 'them', text: '那我就在站台上陪你再站一会儿。', at: at(23, 1) },
+    ],
+  });
+  sceneShen.unread = 0;
+
+  const sceneJiang = addParallelChat(state, jiang.id, {
+    id: 'ch_demo_parallel_jiang_1',
+    title: '留下的那条短信',
+    scene: '如果那天你没回他，把那句「在听」留在草稿箱里。',
+    messages: [
+      { from: 'them', text: '刚听到一半就想到你。', at: at(20, 41) },
+      { from: 'me', text: '哪一半。', at: at(20, 44) },
+    ],
+  });
+  sceneJiang.updatedAt = at(20, 50);
 
   writeDiary(state, '2026-11-10', '十点半他才到楼下，外套领子立着，靠在电动车上抬头看我的窗。\n「你今天又没吃饭吧。」他说得像是早就知道。\n便利店的灯太白，我坐在台阶上啃了半个饭团，他把剩下半个吃了，说味道还行。', { tags: ['沈砚', '夜宵'] });
   writeDiary(state, '2026-11-08', '雨。伞在办公室，走回去的时候鞋全湿了。\n林小满发来一张窗外的照片，说「你那边也下吗」。\n我说下。她说那我们算看见同一场雨。', { tags: ['林小满', '雨'] });
@@ -1969,6 +2041,14 @@ export function normalize(raw) {
     chat.history = normalizeChatHistory(chat.history);
     if (chat.replyPresetId && !replyIds.has(String(chat.replyPresetId))) chat.replyPresetId = '';
     chat.unread = chat.unread || 0;
+    /* 平行时空：旧存档没有这两个字段时给个能看的名字；未读和免打扰口径固定 */
+    if (chat.parallel) {
+      chat.title = String(chat.title || '').trim().slice(0, 24) || '未命名的一场';
+      chat.scene = String(chat.scene || '').slice(0, 2000);
+      chat.unread = 0;
+      chat.muted = true;
+      chat.pinned = false;
+    }
   }
   return merged;
 }

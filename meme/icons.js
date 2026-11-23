@@ -9,6 +9,7 @@ const P = {
   diary: '<path d="M5.5 4.5h9.5a2.5 2.5 0 0 1 2.5 2.5v12.5H8a2.5 2.5 0 0 1-2.5-2.5z"/><path d="M8.5 4.5v15"/><path d="M11.4 9h3.6M11.4 12.6h3.6"/>',
   settings: '<circle cx="12" cy="12" r="2.9"/><path d="M12 3.8v2.2M12 18v2.2M4.6 12H3M21 12h-1.6M6.9 6.9l1.5 1.5M15.6 15.6l1.5 1.5M17.1 6.9l-1.5 1.5M8.4 15.6l-1.5 1.5"/>',
   theater: '<path d="M4 8.4h16v9.2a1.6 1.6 0 0 1-1.6 1.6H5.6A1.6 1.6 0 0 1 4 17.6z"/><path d="M4.6 5.2h14.8l-1 3.2H5.6z"/><path d="M8.6 12.6h2M13.4 12.6h2"/>',
+  parallel: '<path d="M4.6 8.4h11.2"/><path d="M13 5.6 16.2 8.4 13 11.2"/><path d="M4.6 15.6h11.2"/><path d="M13 12.8 16.2 15.6 13 18.4"/>',
   bookmark: '<path d="M7 4.6h10A1.4 1.4 0 0 1 18.4 6v13.4l-6.4-3.7-6.4 3.7V6A1.4 1.4 0 0 1 7 4.6z"/>',
   smile: '<circle cx="12" cy="12" r="7.8"/><path d="M9.2 14.6c.7.9 1.7 1.4 2.8 1.4s2.1-.5 2.8-1.4"/><circle cx="9.4" cy="10.2" r=".8"/><circle cx="14.6" cy="10.2" r=".8"/>',
   plan: '<rect x="4.4" y="4.6" width="15.2" height="15" rx="3"/><path d="M8 9.4l1.6 1.6 2.6-2.6M8 15l1.6 1.6 2.6-2.6"/><path d="M14.6 9.8h2.4M14.6 15.4h2.4"/>',
@@ -61,6 +62,7 @@ export const TINT = {
   diary: ['#f8cfdf', '#f2a0c2'],
   settings: ['#cfd2e6', '#a8aed0'],
   theater: ['#e2ccf6', '#bf9cec'],
+  parallel: ['#d6e2f7', '#9dbaf0'],
   bookmark: ['#f4c8e6', '#e79fce'],
   smile: ['#fbd0c4', '#f39f92'],
   plan: ['#bfe9d6', '#7fd2bc'],
@@ -84,7 +86,7 @@ export const ICON_NAMES = Object.keys(P);
 
 export const ICON_LABELS = {
   chat: '聊天气泡', contacts: '联系人', diary: '日记本', settings: '齿轮',
-  theater: '小剧场', bookmark: '书签', smile: '笑脸', plan: '清单',
+  theater: '小剧场', parallel: '平行时空', bookmark: '书签', smile: '笑脸', plan: '清单',
   brush: '画笔', help: '问号', back: '左箭头', home: '房子',
   chevron: '下箭头', close: '关闭', plus: '加号', send: '纸飞机', stop: '停止',
   spark: '星光', search: '放大镜', more: '更多', copy: '复制',
@@ -102,6 +104,7 @@ export const APP_ICON_TARGETS = [
   { id: 'diary', name: '日记', icon: 'diary' },
   { id: 'settings', name: '设置', icon: 'settings' },
   { id: 'extras', name: '小剧场', icon: 'theater' },
+  { id: 'parallel', name: '平行时空', icon: 'parallel' },
   { id: 'music', name: '音乐', icon: 'music' },
   { id: 'draw', name: '绘图', icon: 'image' },
   { id: 'plans', name: '计划', icon: 'plan' },

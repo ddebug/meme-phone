@@ -10,11 +10,13 @@ import {
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, replyContextFor, normalizeReplyItems,
   chatHistoryFor, effectiveTavernHistory, pendingUserMessages, pendingUserCount, clearPendingMessages,
+  parallelTitleOf, isParallelChat,
 } from '../data.js';
 import { memoryEffectiveSummary, memoryPresetTitle } from '../memory.js';
 import { diaryDayStatuses } from '../diary.js';
 import { requestStats, estimateTokens, proactiveLead, serializeMessage } from '../reply-context.js';
 import { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } from '../chat-transfer.js';
+import { openParallelSceneForm } from './parallel.js';
 import { avatarHtml, chatAvatarHtml, esc, shortText, timeText } from '../shell.js';
 import { renderBehaviorBubble, isSystemBehavior, behaviorSettings, parseBehaviorReply } from '../behavior.js';
 import {
@@ -453,8 +455,8 @@ function settingsBody(ctx, chatId) {
   const contact = contactById(state, chat.contactId);
   const card = (state.characters || []).find(item => item.name === contact?.name);
   const count = chat.messages?.length || 0;
-  const mode = contact?.kind === 'group' ? '群聊' : contact?.kind === 'char' ? '酒馆角色' : '单聊';
-  const status = [mode, `${count} 条消息`, chat.pinned ? '置顶' : '', chat.muted ? '免打扰' : ''].filter(Boolean).join(' · ');
+  const mode = chat.parallel ? '平行时空' : contact?.kind === 'group' ? '群聊' : contact?.kind === 'char' ? '酒馆角色' : '单聊';
+  const status = [mode, `${count} 条消息`, chat.pinned && !chat.parallel ? '置顶' : '', chat.muted && !chat.parallel ? '免打扰' : ''].filter(Boolean).join(' · ');
   const diaryStatuses = diaryDayStatuses(state, chat);
   const diaryWritten = diaryStatuses.filter(item => String(item.entry?.text || '').trim()).length;
   const diaryPending = diaryStatuses.filter(item => item.status === 'pending').length;
@@ -514,15 +516,17 @@ function settingsBody(ctx, chatId) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-subtitle" style="margin-top:0">聊天设置 · 只改这个会话的开关和引用；角色卡、世界书是全局的，改会写到酒馆</div>
+      <div class="mp-subtitle" style="margin-top:0">${chat.parallel
+        ? '平行时空 · 这一场跟原生聊天用同一套预设、接口和记忆，只改它自己的开关'
+        : '聊天设置 · 只改这个会话的开关和引用；角色卡、世界书是全局的，改会写到酒馆'}</div>
 
       <div class="mp-chat-set-head">
         ${avatarHtml(contact?.name || '?', contact?.avatar)}
         <div class="mp-chat-set-main">
-          <div class="mp-chat-set-name">${esc(contact?.name || '这个会话')}</div>
+          <div class="mp-chat-set-name">${esc(chat.parallel ? parallelTitleOf(chat) : (contact?.name || '这个会话'))}</div>
           <div class="mp-chat-set-sub">${esc(status)}</div>
         </div>
-        ${chat.pinned ? `<span class="mp-pill">置顶</span>` : ''}
+        ${chat.pinned && !chat.parallel ? `<span class="mp-pill">置顶</span>` : ''}
       </div>
 
       <div class="mp-card" style="margin-top:12px">
@@ -532,10 +536,14 @@ function settingsBody(ctx, chatId) {
       </div>
 
       <div class="mp-group" style="margin-top:16px">
-        <div class="mp-group-label">聊天</div>
+        <div class="mp-group-label">${chat.parallel ? '这一场' : '聊天'}</div>
         <div class="mp-group-box">
+          ${chat.parallel ? `
+          ${chatSetRow(chat.id, { iconName: 'brush', title: '改名 / 改这一场的设定', sub: '场景写进上下文，只在剧场里生效', act: 'ts-parallel-scene' })}
+          ` : `
           ${chatSetRow(chat.id, { iconName: 'pin', title: '置顶聊天', sub: chat.pinned ? '已固定在会话列表最上面' : '让这个会话排在前面', act: 'ts-toggle-pin', toggle: chat.pinned })}
           ${chatSetRow(chat.id, { iconName: 'bell', title: '消息免打扰', sub: chat.muted ? '新消息不显示未读角标' : '这个会话的新消息照常计数', act: 'ts-toggle-mute', toggle: chat.muted })}
+          `}
         </div>
       </div>
 
@@ -610,7 +618,7 @@ function settingsBody(ctx, chatId) {
           ${card
             ? chatSetRow(chat.id, { iconName: 'contacts', title: '角色设定与世界书', sub: '角色卡正文只读；世界书开关会写回酒馆，影响所有会话', act: 'ts-open-character' })
             : chatSetRow(chat.id, { iconName: 'search', title: '去查角色', sub: '还没同步这张角色卡', act: 'ts-open-characters' })}
-          ${chatSetRow(chat.id, { iconName: 'theater', title: '看 TA 的小剧场', sub: '这个角色存下来的片段', act: 'ts-extras' })}
+          ${chat.parallel ? '' : chatSetRow(chat.id, { iconName: 'theater', title: '看 TA 的小剧场', sub: '这个角色存下来的片段', act: 'ts-extras' })}
         </div>
       </div>
 
@@ -774,8 +782,10 @@ function threadBody(ctx, chatId) {
         <button class="mp-back" data-act="back" type="button">${icon('back')}</button>
         ${avatarHtml(contact?.name, contact?.avatar)}
         <div style="flex:1;min-width:0">
-          <div class="mp-thread-name">${esc(contact?.name || '')}</div>
-          <div class="mp-thread-status"><span class="mp-dot"></span>${esc(contact?.signature || '在线')}</div>
+          <div class="mp-thread-name">${esc(chat.parallel ? parallelTitleOf(chat) : (contact?.name || ''))}${chat.parallel ? `<span class="mp-pill">平行时空</span>` : ''}</div>
+          <div class="mp-thread-status">${chat.parallel
+            ? `<span>${esc(contact?.name || 'TA')} · 另一条时间线</span>`
+            : `<span class="mp-dot"></span>${esc(contact?.signature || '在线')}`}</div>
         </div>
         <button class="mp-icon-btn" data-act="thread-settings" data-chat="${chat.id}" type="button" aria-label="聊天设置">${icon('settings')}</button>
       </div>
@@ -814,6 +824,8 @@ function threadBody(ctx, chatId) {
 
 function composerPlusHtml(ctx, chat) {
   if (ctx.shell.plusOpen !== chat.id) return '';
+  /* 平行时空的每一场自带场景，不需要「剧场设置 / 存剧场」这两个原生聊天专用项 */
+  const items = COMPOSER_PLUS_ITEMS.filter(item => !(chat.parallel && (item.value === 'theater' || item.value === 'extra')));
   return `
     <div class="mp-plus-panel" id="mpComposerPlus" role="group" aria-label="聊天工具">
       <div class="mp-plus-head">
@@ -821,7 +833,7 @@ function composerPlusHtml(ctx, chat) {
         <button class="mp-plus-close" data-act="composer-plus-close" data-chat="${chat.id}" type="button" aria-label="收起工具">${icon('close')}</button>
       </div>
       <div class="mp-plus-grid">
-        ${COMPOSER_PLUS_ITEMS.map(item => `
+        ${items.map(item => `
           <button class="mp-plus-item" data-act="composer-plus-pick" data-chat="${chat.id}" data-value="${item.value}" type="button">
             ${icon(item.icon)}<span>${item.label}</span>
           </button>`).join('')}
@@ -1284,6 +1296,29 @@ export const chatApp = {
       const chat = chatById(ctx.state, data.chat);
       const contact = chat && contactById(ctx.state, chat.contactId);
       if (!chat) return true;
+      /* 平行时空的一场：只有改名和删掉这一场，没有置顶 / 免打扰 */
+      if (isParallelChat(chat)) {
+        ctx.openSheet({
+          title: parallelTitleOf(chat),
+          note: `${contact?.name || 'TA'} · 另一条时间线`,
+          items: [
+            { label: '改名 / 改这一场的设定', value: 'edit', icon: 'brush' },
+            { label: '删掉这一场', value: 'delete', icon: 'trash', danger: true },
+          ],
+          onPick: (value) => {
+            if (value === 'edit') {
+              openParallelSceneForm(ctx, chat);
+              return;
+            }
+            if (value !== 'delete') return;
+            delete ctx.state.chats[chat.id];
+            ctx.save();
+            ctx.rerender();
+            ctx.toast('这一场删掉了');
+          },
+        });
+        return true;
+      }
       ctx.openSheet({
         title: contact?.name || '',
         items: [
@@ -1462,6 +1497,11 @@ export const threadSettingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(`${current[key] ? '已关闭' : '已打开'}${key === 'friend' ? '好友申请' : key === 'signature' ? '个签' : key === 'plan' ? '约定计划' : key === 'membership' ? '会员' : key === 'redpacket' ? '红包' : '转账'}`);
+      return true;
+    }
+
+    if (act === 'ts-parallel-scene') {
+      openParallelSceneForm(ctx, chat);
       return true;
     }
 

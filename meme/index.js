@@ -4,14 +4,14 @@
  */
 
 import { createStore } from './store.js';
-import { normalize, emptyState, demoState, syncTavernContacts, chatFor, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks, dayKey } from './data.js';
+import { normalize, emptyState, demoState, syncTavernContacts, chatFor, chatsOf, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks, dayKey, isParallelChat } from './data.js';
 import { createShell, applyWall, applyLook } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { favoritesApp } from './apps/favorites.js';
 import { photoApp } from './apps/photo.js';
 import { buildMemoryContext } from './memory.js';
-import { buildReplyMessages, transcript, replyLead, proactiveLead, diaryTranscript, characterBlock, sceneBlock, userBlock } from './reply-context.js';
+import { buildReplyMessages, transcript, replyLead, proactiveLead, diaryTranscript, characterBlock, sceneBlock, userBlock, parallelBackground } from './reply-context.js';
 import { behaviorPrompt, behaviorSettings, parseBehaviorReply } from './behavior.js';
 import { DIARY_OUTPUT_PROTOCOL, diaryFingerprint } from './diary.js';
 import { diaryApp, threadDiaryApp } from './apps/diary.js';
@@ -26,10 +26,10 @@ import { charPhoneApp, charPhoneThreadApp, ensureLookup } from './apps/charphone
 import { musicApp, musicPlaylistApp, stopMusic } from './apps/music.js';
 import { memoryPresetsApp } from './apps/memory.js';
 import { presetsApp, replyPresetApp } from './apps/presets.js';
-import {
-  extrasApp, extrasSwitchApp, extraDetailApp, emojiApp,
+import { extrasApp, extrasSwitchApp, extraDetailApp, emojiApp,
   plansApp, dressApp, iconPickerApp, helpApp,
 } from './apps/more.js';
+import { parallelApp } from './apps/parallel.js';
 
 const APPS = {
   'app-chat': chatApp,
@@ -41,6 +41,7 @@ const APPS = {
   'app-settings': settingsApp,
   'app-appearance': appearanceApp,
   'app-extras': extrasApp,
+  'app-parallel': parallelApp,
   'extras-switch': extrasSwitchApp,
   'app-emoji': emojiApp,
   'app-plans': plansApp,
@@ -69,6 +70,7 @@ const APPS = {
 };
 
 const DESKTOP_APPS = [
+  { id: 'parallel', name: '平行时空', icon: 'parallel' },
   { id: 'extras', name: '小剧场', icon: 'theater' },
   { id: 'music', name: '音乐', icon: 'music' },
   { id: 'draw', name: '绘图', icon: 'image' },
@@ -119,13 +121,18 @@ function makeAi(getState) {
     /* 0 = 不限制：酒馆记忆和手机历史都按全量送，不再用本地预算截断。 */
     const memoryLimit = 0;
     const storyBlock = ctxSettings.memory ? await story(state, chat, memoryLimit) : { text: '' };
+    const parallel = isParallelChat(chat);
     const theaterKind = theaterKindFor(state);
-    const wantsTheater = !options.proactive && extrasEnabledFor(state, contact?.id);
+    /* 平行时空的每一场：预设 / 接口 / 记忆和原生聊天一样，只是把这一场的设定和原生聊天当背景。
+       自动附带的小剧场片段只属于原生聊天，不进剧场。 */
+    const sceneBlockText = parallel ? parallelBackground(state, chat, contact) : '';
+    const wantsTheater = !parallel && !options.proactive && extrasEnabledFor(state, contact?.id);
     const built = await buildReplyMessages(state, chat, contact, {
       presetOverride: options.presetOverride,
       memoryText: String(storyBlock?.text || ''),
       lead: options.proactive ? proactiveLead(state, contact, chat) : replyLead(contact),
-      extraPrompt: wantsTheater ? theaterPrompt(contact?.name, theaterKind) : '',
+      extraPrompt: sceneBlockText || (wantsTheater ? theaterPrompt(contact?.name, theaterKind) : ''),
+      extraPromptSource: parallel ? '平行时空' : '小剧场',
       behaviorPrompt: behaviorPrompt(state, chat),
       proactive: Boolean(options.proactive),
       omitLastUser: Boolean(options.omitLastUser),
@@ -293,7 +300,7 @@ function makeAi(getState) {
       let material = '';
       if (chat) material = transcript(state, chat, 30, { day });
       else {
-        const chats = Object.values(state.chats);
+        const chats = Object.values(state.chats).filter(chat => !chat.parallel);
         material = chats.map(item => transcript(state, item, 10, { day })).join('\n');
       }
       const storyBlock = await story(state, chat, 900);
@@ -787,7 +794,7 @@ export function goView(view, params = {}) {
   if (!ctx?.shell) return;
   let payload = params;
   if (view === 'thread' && !params.chatId) {
-    const first = Object.values(ctx.state.chats)[0];
+    const first = chatsOf(ctx.state)[0];
     if (!first) return;
     payload = { chatId: first.id };
   }

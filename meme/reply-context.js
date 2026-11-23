@@ -4,7 +4,7 @@
  * 旧的独立拼装函数已删除，避免出现两套逻辑。
  */
 
-import { replyContextFor, replyItemsFor, replyPresetFor, normalizeReplyContext, normalizeReplyItems, fillPromptTokens, characterCardFor, itemAppliesToChat, effectivePhoneHistoryLimit, dayKey, proactivePromptFor, pendingUserMessages } from './data.js';
+import { replyContextFor, replyItemsFor, replyPresetFor, normalizeReplyContext, normalizeReplyItems, fillPromptTokens, characterCardFor, itemAppliesToChat, effectivePhoneHistoryLimit, dayKey, proactivePromptFor, pendingUserMessages, originChatFor, parallelTitleOf } from './data.js';
 import { readWorldBook } from './host.js';
 import { buildMemoryContext } from './memory.js';
 import { behaviorContextText } from './behavior.js';
@@ -81,9 +81,11 @@ const REQUEST_GROUP_LABELS = {
 };
 
 function requestGroup(message) {
+  const source = String(message?.source || '');
+  /* 同一个 theater 分组：原生聊天叫「小剧场」，剧场那几场叫「平行时空」 */
+  if (source === '平行时空') return { key: 'theater', label: '平行时空' };
   const explicit = String(message?.group || '');
   if (REQUEST_GROUP_LABELS[explicit]) return { key: explicit, label: REQUEST_GROUP_LABELS[explicit] };
-  const source = String(message?.source || '');
   if (source === '小剧场') return { key: 'theater', label: '小剧场' };
   if (source === '回复要求' || source === '场景提示' || source === '行为提示') return { key: 'rule', label: '规则' };
   if (source === '最后一条聊天' || source === '主动消息占位') return { key: 'turn', label: '本轮' };
@@ -192,6 +194,31 @@ export function transcript(state, chat, limit = 10, options = {}) {
     used += cost;
   }
   return kept.join('\n');
+}
+
+/**
+ * 平行时空的场景背景：这一场自己的设定 + 这个角色原生聊天的最近几条。
+ * 原生聊天只当背景；剧场里的收发只留在这一段里，不写回原生聊天。
+ */
+export function parallelBackground(state, chat, contact, options = {}) {
+  if (!chat || !chat.parallel) return '';
+  const title = parallelTitleOf(chat);
+  const scene = String(chat.scene || '').trim();
+  const limitValue = Number(options.limit);
+  const limit = Number.isFinite(limitValue) && limitValue > 0 ? Math.round(limitValue) : 30;
+  const maxValue = Number(options.maxChars);
+  const maxChars = Number.isFinite(maxValue) && maxValue > 0 ? Math.round(maxValue) : 3000;
+  const origin = originChatFor(state, chat.contactId);
+  const originLines = origin && (origin.messages || []).length
+    ? transcript(state, origin, limit, { maxChars })
+    : '';
+  const name = String(contact?.name || 'TA');
+  return [
+    `【平行时空 · ${title}】`,
+    scene ? `这一场的设定：${scene}` : '',
+    `这一段发生在「${name}」的另一条时间线里：关系、称呼、说话习惯都和原生聊天保持一致，可以顺着原生聊天里的情绪往下走；但这是独立的一场，不要提到“小剧场”“平行时空”“另一个时空”，也不要把原生聊天里的话原样搬过来。`,
+    originLines ? `【和 ${name} 的原生聊天 · 最近几条，只当背景】\n${originLines}` : '',
+  ].filter(Boolean).join('\n\n');
 }
 
 /**
@@ -619,7 +646,9 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
   if (options.behaviorPrompt) messages.push({ role: 'system', content: String(options.behaviorPrompt), source: '行为提示', group: 'rule' });
 
   /* 小剧场放在全部预设条目之后、最后一条聊天之前，避免被前面的回复格式/行为条目盖掉。 */
-  if (options.extraPrompt) messages.push({ role: 'system', content: String(options.extraPrompt), source: '小剧场', group: 'theater' });
+  if (options.extraPrompt) {
+    messages.push({ role: 'system', content: String(options.extraPrompt), source: String(options.extraPromptSource || '小剧场'), group: 'theater' });
+  }
 
   let lastUserText = '';
   if (pendingUserText) {

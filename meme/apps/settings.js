@@ -27,12 +27,14 @@ function downloadBackup(ctx, includeKeys) {
 function backupSummary(parsed) {
   const state = parsed && typeof parsed === 'object' && parsed.meme ? parsed.meme : parsed;
   if (!state || typeof state !== 'object') return { ok: false };
-  const chats = Object.values(state.chats || {});
+  const allChats = Object.values(state.chats || {});
+  const chats = allChats.filter(chat => !chat.parallel);
   return {
     ok: true,
     contacts: Object.keys(state.contacts || {}).length,
     chats: chats.length,
-    messages: chats.reduce((sum, chat) => sum + (chat.messages?.length || 0), 0),
+    scenes: allChats.length - chats.length,
+    messages: allChats.reduce((sum, chat) => sum + (chat.messages?.length || 0), 0),
     diary: Object.keys(state.diary?.entries || {}).length,
     favorites: (state.favorites || []).length,
   };

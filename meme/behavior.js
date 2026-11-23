@@ -296,9 +296,22 @@ function messageLines(text) {
     return wrapped[1].split('\n').map(line => line.trim()).filter(Boolean);
   }
   const lines = source.split('\n').map(line => line.trim()).filter(Boolean);
-  const tagged = lines.some(line => /^\[(转账|红包|送会员|开会员|约定计划|约定计划已完成|好友申请|改个签|图片|表情|戳一戳|撤回|转发|引用)\]/.test(line));
+  const tagged = lines.some(line => /^\[(转账|红包|送会员|开会员|约定计划|约定计划已完成|好友申请|改个签|图片|表情|戳一戳|撤回|转发|引用|心里|潜台词)\]/.test(line));
   if (!tagged) return [source];
   return lines;
+}
+
+/* 心理活动 / 潜台词：紧跟气泡下一行的隐藏标注，只给用户点开看，不算一条消息。
+   上限与 data.js 的 MESSAGE_INNER_MAX / MESSAGE_SUBTEXT_MAX 保持一致。 */
+const MIND_LIMITS = { inner: 240, subtext: 160 };
+
+export function parseMindLine(line) {
+  const match = String(line || '').trim().match(/^\[(心里|潜台词)\]\s*([\s\S]*)$/);
+  if (!match) return null;
+  const key = match[1] === '心里' ? 'inner' : 'subtext';
+  const text = match[2].replace(/\[\/(?:心里|潜台词)\]/g, '').trim();
+  if (!text) return null;
+  return { key, value: text.slice(0, MIND_LIMITS[key]) };
 }
 
 /**
@@ -324,7 +337,15 @@ export function parseBehaviorReply(text, options = {}) {
   const lines = messageLines(source);
   const max = Math.max(1, Math.min(30, Number(options.max) || 30));
   const messages = [];
-  for (const line of lines.slice(0, max)) {
+  for (const line of lines) {
+    /* 标注行挂在它前面那个气泡上；第一个气泡之前出现的标注直接丢掉。 */
+    const mind = parseMindLine(line);
+    if (mind) {
+      const target = messages[messages.length - 1];
+      if (target) target[mind.key] = mind.value;
+      continue;
+    }
+    if (messages.length >= max) continue;
     const parsed = parseOneBubble(line, messages.length, { ...options, at });
     if (!parsed) continue;
     const gate = BEHAVIOR_GATE[parsed.kind];

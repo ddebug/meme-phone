@@ -261,6 +261,110 @@
   font-size: calc(9px * var(--font-scale));
 }
 
+/* 潜台词：气泡下的小眼睛开关；点开后在气泡下面展开一层半透明的“没说出口的话” */
+.mp-eye {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding: 0 4px 0 3px;
+  height: calc(15px * var(--font-scale));
+  border: 1px solid rgba(142, 123, 242, .22);
+  border-radius: 6px;
+  background: rgba(142, 123, 242, .07);
+  color: var(--text-3);
+  font: inherit;
+  font-size: calc(9px * var(--font-scale));
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mp-eye .mp-i { width: 11px; height: 11px; }
+.mp-eye.on {
+  background: rgba(142, 123, 242, .17);
+  border-color: rgba(142, 123, 242, .4);
+  color: var(--accent-deep);
+}
+.mp-msg.me .mp-eye { color: rgba(255, 255, 255, .7); border-color: rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .12); }
+.mp-msg.me .mp-eye.on { color: #fff; background: rgba(255, 255, 255, .24); }
+
+.mp-subtext {
+  align-self: stretch;
+  max-width: 100%;
+  padding: 6px 9px 6px 10px;
+  border-left: 2px solid rgba(142, 123, 242, .45);
+  border-radius: 4px 9px 9px 4px;
+  background: linear-gradient(150deg, rgba(142, 123, 242, .1), rgba(178, 131, 232, .06));
+  color: var(--text-2);
+  font-size: calc(11px * var(--font-scale));
+  line-height: calc(1.5 * var(--line-scale));
+  word-break: break-word;
+  user-select: none;
+}
+.mp-subtext-label {
+  margin-right: 5px;
+  color: var(--accent-deep);
+  font-size: calc(9px * var(--font-scale));
+  letter-spacing: .04em;
+}
+.mp-msg.me .mp-subtext {
+  border-left: 0;
+  border-right: 2px solid rgba(255, 255, 255, .45);
+  border-radius: 9px 4px 4px 9px;
+  background: rgba(255, 255, 255, .14);
+  color: rgba(255, 255, 255, .9);
+}
+.mp-msg.me .mp-subtext-label { color: rgba(255, 255, 255, .78); }
+
+/* 头像角上的小点：这条消息背后有心理活动，点头像能看 */
+.mp-avatar-wrap { position: relative; display: block; line-height: 0; }
+.mp-avatar-mind {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--lav);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .92);
+}
+
+/* 心理活动面板（从头像点进来） */
+.mp-mind { display: flex; flex-direction: column; gap: 11px; }
+.mp-mind-head { display: flex; align-items: center; gap: 9px; }
+.mp-mind-head-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mp-mind-name { font-size: calc(13px * var(--font-scale)); font-weight: 600; }
+.mp-mind-time { font-size: calc(9.5px * var(--font-scale)); color: var(--text-4); }
+.mp-mind-block {
+  padding: 9px 11px;
+  border: 1px solid rgba(142, 123, 242, .14);
+  border-radius: var(--r-m);
+  background: linear-gradient(160deg, rgba(142, 123, 242, .09), rgba(178, 131, 232, .03));
+}
+.mp-mind-block.is-sub { background: linear-gradient(160deg, rgba(143, 185, 242, .12), rgba(255, 255, 255, .4)); border-color: rgba(143, 185, 242, .22); }
+.mp-mind-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 4px;
+  color: var(--accent-deep);
+  font-size: calc(10px * var(--font-scale));
+  letter-spacing: .03em;
+}
+.mp-mind-label .mp-i { width: 12px; height: 12px; }
+.mp-mind-block.is-sub .mp-mind-label { color: #4a7fbf; }
+.mp-mind-text {
+  font-size: calc(13px * var(--font-scale));
+  line-height: calc(1.62 * var(--line-scale));
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.mp-mind-text.is-empty { color: var(--text-3); font-size: calc(12px * var(--font-scale)); }
+.mp-mind-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.mp-mind-actions .mp-mini-btn { display: inline-flex; align-items: center; gap: 4px; }
+.mp-mind-actions .mp-mini-btn .mp-i { width: 12px; height: 12px; }
+
 .mp-typing {
   display: inline-flex;
   gap: 3px;
@@ -269,7 +373,6 @@
   border-radius: var(--r-m);
   box-shadow: var(--shadow-s);
 }
-
 .mp-typing i {
   width: 5px;
   height: 5px;

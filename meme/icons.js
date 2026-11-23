@@ -48,6 +48,8 @@ const P = {
   download: '<path d="M12 4.8v9.8"/><path d="M8.2 10.8 12 14.6l3.8-3.8"/><path d="M5.4 18.4h13.2"/>',
   upload: '<path d="M12 19.2V9.4"/><path d="M8.2 13.2 12 9.4l3.8 3.8"/><path d="M5.4 5.6h13.2"/>',
   grip: '<circle cx="9" cy="7" r=".9"/><circle cx="15" cy="7" r=".9"/><circle cx="9" cy="12" r=".9"/><circle cx="15" cy="12" r=".9"/><circle cx="9" cy="17" r=".9"/><circle cx="15" cy="17" r=".9"/>',
+  eye: '<path d="M3.4 12c2-3.4 5-5.2 8.6-5.2S18.6 8.6 20.6 12c-2 3.4-5 5.2-8.6 5.2S5.4 15.4 3.4 12z"/><circle cx="12" cy="12" r="2.4"/>',
+  'eye-off': '<path d="M4.2 9.4C3.6 10.2 3.4 10.9 3.4 12c2 3.4 5 5.2 8.6 5.2 1.5 0 2.9-.3 4.1-.8"/><path d="M9.8 6.9c.7-.1 1.4-.1 2.2-.1 3.6 0 6.6 1.8 8.6 5.2-.5.9-1.2 1.7-1.9 2.4"/><path d="M4.4 4.4 19.6 19.6"/>',
 };
 
 export function icon(name, className = '') {
@@ -95,6 +97,7 @@ export const ICON_LABELS = {
   pin: '定位', bell: '铃铛', code: '代码', book: '书本',
   music: '音符', play: '播放', pause: '暂停', next: '下一首',
   download: '下载', upload: '上传', grip: '拖动排序',
+  eye: '小眼睛', 'eye-off': '闭眼',
 };
 
 /** 桌面与 Dock 上所有可换图标的 App。 */

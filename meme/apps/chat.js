@@ -26,7 +26,7 @@ import {
 } from '../behavior-domains.js';
 
 const REPLY_POOL = {
-  沈砚: ['到楼下了，风比刚才小一点。', '你先忙，我在便利店坐着。', '记得吃点东西，别又是咖啡。', '刚看到你窗户还亮着。'],
+  沈砚: ['到楼下了，风比刚才小一点。', '你先忙，我在便利店坐着。', '记得吃点东西，别又是咖啡。', '刚看到你窗户还亮着。', '我先不催你了。\n[潜台词]其实我还在楼下等着。\n[心里]她要是再忙一个小时，我就把这份饭团先吃掉。'],
   江迟: ['那首歌我存下来了。', '下次你在车上再放一次。', '今天听了一下午，副歌有点上头。'],
   林小满: ['雨好像小了一点。', '你带伞了吗。', '我这边刚停，云还很厚。'],
   顾南风: ['书店这本我觉得你会喜欢。', '封面是深蓝色的，摸起来有点粗。', '要给你留着吗。'],
@@ -383,6 +383,44 @@ function openMessageExtra(ctx, chat, contact, message) {
       }
       if (value === 'all') ctx.go('app-extras', { contactId: chat.contactId });
     },
+  });
+}
+
+function mindPanelHtml(ctx, chat, contact, message) {
+  const inner = String(message.inner || '').trim();
+  const subtext = String(message.subtext || '').trim();
+  const name = contact?.name || 'TA';
+  return `
+    <div class="mp-mind">
+      <div class="mp-mind-head">
+        ${avatarHtml(contact?.name, contact?.avatar)}
+        <div class="mp-mind-head-main">
+          <div class="mp-mind-name">${esc(name)} · 这一条背后</div>
+          <div class="mp-mind-time">${esc(timeText(message.at || Date.now()))}</div>
+        </div>
+      </div>
+      <div class="mp-mind-block">
+        <div class="mp-mind-label">${icon('eye')}<span>心理活动</span></div>
+        <div class="mp-mind-text${inner ? '' : ' is-empty'}">${esc(inner || '这条没有写心理活动；下一轮可以让 TA 把念头写出来。')}</div>
+      </div>
+      ${subtext ? `
+      <div class="mp-mind-block is-sub">
+        <div class="mp-mind-label">${icon('eye-off')}<span>潜台词</span></div>
+        <div class="mp-mind-text">${esc(subtext)}</div>
+      </div>` : ''}
+      <div class="mp-mind-actions">
+        <button class="mp-mini-btn plain" data-act="mind-extra" data-chat="${esc(chat.id)}" data-msg="${esc(message.id)}" type="button">${icon('theater')}这条的小剧场</button>
+        ${String(message.text || '').trim() ? `<button class="mp-mini-btn plain" data-act="mind-save-extra" data-chat="${esc(chat.id)}" data-msg="${esc(message.id)}" type="button">${icon('bookmark')}存成小剧场</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function openMindSheet(ctx, chat, contact, message) {
+  ctx.openSheet({
+    kind: 'panel',
+    title: '',
+    doneLabel: '收起',
+    render: () => mindPanelHtml(ctx, chat, contact, message),
   });
 }
 
@@ -752,16 +790,26 @@ function threadBody(ctx, chatId) {
         : message.forward
           ? `<div class="mp-bubble mp-bubble-forward"><div class="mp-forward-head">${icon('forward')}<span>转发的消息</span></div><div class="mp-forward-text">${esc(message.forward.text || '')}</div>${message.forward.from ? `<div class="mp-forward-src">来自 ${esc(message.forward.from)}</div>` : ''}</div>`
           : `<div class="mp-bubble">${esc(message.text)}</div>`);
+    /* 潜台词默认收着，点小眼睛才在气泡下面展开；开关只存在这次浏览里，不写存档。 */
+    const subOpen = Boolean(ctx.shell.subOpen?.[`${chat.id}:${message.id}`]);
+    const subHtml = message.subtext && subOpen
+      ? `<div class="mp-subtext"><span class="mp-subtext-label">潜台词</span><span class="mp-subtext-text">${esc(message.subtext)}</span></div>`
+      : '';
+    const subToggle = message.subtext
+      ? `<button class="mp-eye${subOpen ? ' on' : ''}" data-act="toggle-subtext" data-chat="${chat.id}" data-msg="${message.id}" type="button" aria-pressed="${subOpen ? 'true' : 'false'}" aria-label="${subOpen ? '收起潜台词' : '看这条的潜台词'}">${icon(subOpen ? 'eye-off' : 'eye')}<span>潜台词</span></button>`
+      : '';
     blocks.push(`
       <div class="mp-msg${me ? ' me' : ''}" data-hold="message-menu" data-chat="${chat.id}" data-msg="${message.id}">
         ${me
           ? avatarHtml(state.settings.user.name, state.settings.user.avatar)
-          : `<button class="mp-avatar-btn" data-act="avatar-extra" data-chat="${chat.id}" data-msg="${message.id}" type="button" aria-label="看 TA 的小剧场">${avatarHtml(speaker?.name || contact?.name, speaker?.avatar || contact?.avatar)}</button>`}
+          : `<button class="mp-avatar-btn${message.inner ? ' has-mind' : ''}" data-act="avatar-mind" data-chat="${chat.id}" data-msg="${message.id}" type="button" aria-label="看 TA 的心理活动"><span class="mp-avatar-wrap">${avatarHtml(speaker?.name || contact?.name, speaker?.avatar || contact?.avatar)}${message.inner ? '<i class="mp-avatar-mind" aria-hidden="true"></i>' : ''}</span></button>`}
         <div class="mp-msg-body">
           ${message.quote ? `<div class="mp-quote-line">${icon('reply')}<span>${esc(message.quote.text)}</span></div>` : ''}
           ${bubble}
+          ${subHtml}
           <div class="mp-msg-meta">
             ${message.proactive ? '<span class="mp-tag-proactive">主动开口</span>' : ''}
+            ${subToggle}
             ${speaker ? `<span>${esc(speaker.name)}</span>` : ''}
             <span>${startGroup ? '' : timeText(message.at)}</span>
           </div>
@@ -1081,6 +1129,8 @@ function bubbleEntry(bubble, turnId) {
     forward: bubble.forward || null,
     quote: bubble.quote || null,
     behavior: bubble.behavior || null,
+    inner: bubble.inner || '',
+    subtext: bubble.subtext || '',
   };
 }
 
@@ -2006,6 +2056,44 @@ export const threadApp = {
       return true;
     }
 
+    if (act === 'avatar-mind') {
+      const chat = chatById(ctx.state, chatId);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (!chat || !message) return true;
+      const contact = contactById(ctx.state, chat.contactId);
+      openMindSheet(ctx, chat, contact, message);
+      return true;
+    }
+
+    if (act === 'mind-extra') {
+      const chat = chatById(ctx.state, chatId);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (!chat || !message) return true;
+      const contact = contactById(ctx.state, chat.contactId);
+      openMessageExtra(ctx, chat, contact, message);
+      return true;
+    }
+
+    if (act === 'mind-save-extra') {
+      const chat = chatById(ctx.state, chatId);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (!chat || !message) return true;
+      const contact = contactById(ctx.state, chat.contactId);
+      saveMessageExtra(ctx, chat, contact, message);
+      ctx.closeSheet?.();
+      ctx.toast('已存进小剧场');
+      return true;
+    }
+
+    if (act === 'toggle-subtext') {
+      const key = `${chatId}:${data.msg}`;
+      if (!ctx.shell.subOpen) ctx.shell.subOpen = {};
+      if (ctx.shell.subOpen[key]) delete ctx.shell.subOpen[key];
+      else ctx.shell.subOpen[key] = true;
+      ctx.rerender();
+      return true;
+    }
+
     if (act === 'avatar-extra') {
       const chat = chatById(ctx.state, chatId);
       const message = chat?.messages.find(item => item.id === data.msg);
@@ -2062,6 +2150,8 @@ export const threadApp = {
           { label: '转发给…', value: 'forward', icon: 'forward' },
           ...(recallable ? [{ label: '撤回这条', value: 'recall', icon: 'refresh', note: '两分钟内可以撤回' }] : []),
           { label: '存成小剧场', value: 'extra', icon: 'theater' },
+          ...(message.inner ? [{ label: '看 TA 的心理活动', value: 'mind', icon: 'eye' }] : []),
+          ...(message.subtext ? [{ label: '看这条的潜台词', value: 'sub', icon: 'eye-off' }] : []),
           ...(message.from === 'them' ? [{ label: '让 TA 重新说一次', value: 'regen', icon: 'refresh' }] : []),
           { label: '删除这条', value: 'delete', icon: 'trash', danger: true },
         ],
@@ -2118,6 +2208,8 @@ export const threadApp = {
             message.emoji = '';
             message.forward = null;
             message.behavior = null;
+            message.inner = '';
+            message.subtext = '';
             ctx.save();
             ctx.rerender();
             ctx.toast('已撤回');
@@ -2125,6 +2217,15 @@ export const threadApp = {
           if (value === 'extra') {
             saveMessageExtra(ctx, chat, contact, message);
             ctx.toast('已存进小剧场');
+          }
+          if (value === 'mind') {
+            openMindSheet(ctx, chat, contact, message);
+          }
+          if (value === 'sub') {
+            const key = `${chat.id}:${message.id}`;
+            if (!ctx.shell.subOpen) ctx.shell.subOpen = {};
+            ctx.shell.subOpen[key] = true;
+            ctx.rerender();
           }
           if (value === 'regen') {
             const turn = turnMessages(chat, message);

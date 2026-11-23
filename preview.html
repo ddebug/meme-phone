@@ -1184,6 +1184,110 @@ body {
   font-size: calc(9px * var(--font-scale));
 }
 
+/* 潜台词：气泡下的小眼睛开关；点开后在气泡下面展开一层半透明的“没说出口的话” */
+.mp-eye {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding: 0 4px 0 3px;
+  height: calc(15px * var(--font-scale));
+  border: 1px solid rgba(142, 123, 242, .22);
+  border-radius: 6px;
+  background: rgba(142, 123, 242, .07);
+  color: var(--text-3);
+  font: inherit;
+  font-size: calc(9px * var(--font-scale));
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mp-eye .mp-i { width: 11px; height: 11px; }
+.mp-eye.on {
+  background: rgba(142, 123, 242, .17);
+  border-color: rgba(142, 123, 242, .4);
+  color: var(--accent-deep);
+}
+.mp-msg.me .mp-eye { color: rgba(255, 255, 255, .7); border-color: rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .12); }
+.mp-msg.me .mp-eye.on { color: #fff; background: rgba(255, 255, 255, .24); }
+
+.mp-subtext {
+  align-self: stretch;
+  max-width: 100%;
+  padding: 6px 9px 6px 10px;
+  border-left: 2px solid rgba(142, 123, 242, .45);
+  border-radius: 4px 9px 9px 4px;
+  background: linear-gradient(150deg, rgba(142, 123, 242, .1), rgba(178, 131, 232, .06));
+  color: var(--text-2);
+  font-size: calc(11px * var(--font-scale));
+  line-height: calc(1.5 * var(--line-scale));
+  word-break: break-word;
+  user-select: none;
+}
+.mp-subtext-label {
+  margin-right: 5px;
+  color: var(--accent-deep);
+  font-size: calc(9px * var(--font-scale));
+  letter-spacing: .04em;
+}
+.mp-msg.me .mp-subtext {
+  border-left: 0;
+  border-right: 2px solid rgba(255, 255, 255, .45);
+  border-radius: 9px 4px 4px 9px;
+  background: rgba(255, 255, 255, .14);
+  color: rgba(255, 255, 255, .9);
+}
+.mp-msg.me .mp-subtext-label { color: rgba(255, 255, 255, .78); }
+
+/* 头像角上的小点：这条消息背后有心理活动，点头像能看 */
+.mp-avatar-wrap { position: relative; display: block; line-height: 0; }
+.mp-avatar-mind {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--lav);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .92);
+}
+
+/* 心理活动面板（从头像点进来） */
+.mp-mind { display: flex; flex-direction: column; gap: 11px; }
+.mp-mind-head { display: flex; align-items: center; gap: 9px; }
+.mp-mind-head-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mp-mind-name { font-size: calc(13px * var(--font-scale)); font-weight: 600; }
+.mp-mind-time { font-size: calc(9.5px * var(--font-scale)); color: var(--text-4); }
+.mp-mind-block {
+  padding: 9px 11px;
+  border: 1px solid rgba(142, 123, 242, .14);
+  border-radius: var(--r-m);
+  background: linear-gradient(160deg, rgba(142, 123, 242, .09), rgba(178, 131, 232, .03));
+}
+.mp-mind-block.is-sub { background: linear-gradient(160deg, rgba(143, 185, 242, .12), rgba(255, 255, 255, .4)); border-color: rgba(143, 185, 242, .22); }
+.mp-mind-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 4px;
+  color: var(--accent-deep);
+  font-size: calc(10px * var(--font-scale));
+  letter-spacing: .03em;
+}
+.mp-mind-label .mp-i { width: 12px; height: 12px; }
+.mp-mind-block.is-sub .mp-mind-label { color: #4a7fbf; }
+.mp-mind-text {
+  font-size: calc(13px * var(--font-scale));
+  line-height: calc(1.62 * var(--line-scale));
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.mp-mind-text.is-empty { color: var(--text-3); font-size: calc(12px * var(--font-scale)); }
+.mp-mind-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.mp-mind-actions .mp-mini-btn { display: inline-flex; align-items: center; gap: 4px; }
+.mp-mind-actions .mp-mini-btn .mp-i { width: 12px; height: 12px; }
+
 .mp-typing {
   display: inline-flex;
   gap: 3px;
@@ -1192,7 +1296,6 @@ body {
   border-radius: var(--r-m);
   box-shadow: var(--shadow-s);
 }
-
 .mp-typing i {
   width: 5px;
   height: 5px;
@@ -7880,6 +7983,9 @@ const LEGACY_NATURAL_REPLY_INSTRUCTION = '像平时发微信一样回消息：�
 const NATURAL_REPLY_INSTRUCTION = '像平时发微信一样聊天：口语、短句，按意思自然分成多个气泡，不把一整轮回复挤在同一条里。通常发2～5条；简单回应也可以只发1条，不为凑数重复或强行追问。每个气泡独占一行，统一放在[消息]与[/消息]之间。不要写旁白、括号动作或小说段落。';
 const MULTI_BUBBLE_REPLY_FORMAT = '[回复格式要求]\n参考即时通讯的发消息方式，一行一个气泡，空行忽略；按语义自然拆分，通常2～5条，简单回应可只发1条，不为凑数重复。\n只输出当前角色这一轮要发的内容，用[消息]和[/消息]包住，例如：\n[消息]\n刚刚忙完\n你吃饭了吗\n[/消息]\n不要添加角色名、时间戳、序号或代码块；不要写旁白、括号动作、场景描写，也不要代替用户或其他角色发言。每条可用的表情或行为标签单独占一行，且只使用本会话已开启的标签。\n[/回复格式要求]';
 
+/* 心理活动 / 潜台词是藏在气泡后面的两层含义：只有用户点开才看得到，不算聊天气泡。 */
+const MIND_PROMPT = '[心理活动与潜台词]\n这两种标注只给用户点开看，不会出现在聊天气泡里：\n- [心里]：TA 发这条时真正的念头，用「我」的口气，1 句，30 字以内。\n- [潜台词]：这条消息表面之下真正想说的，1 句，30 字以内。\n写法：\n- 紧跟在对应的气泡下面，另起一行，各自单独一行，两种标注之间不要空行。\n- 只写 TA 自己的，不写用户在想什么；不加引号，不解释，也不要写“他心里想”这类旁白。\n- 不必每条都写，只在真有第二层意思时加；一条气泡最多各一行，用户的消息不加。\n[/心理活动与潜台词]';
+
 // 主动开口是空发送触发的单次请求，不是后台定时器；时间变量在请求/预览时统一替换。
 const PROACTIVE_PROMPT_MAX_LENGTH = 4000;
 const DEFAULT_PROACTIVE_PROMPT = '你正在扮演「{{char}}」，与「{{user}}」用手机聊天。\n当前时间：{{当前时间}}。距离用户上次发消息已过去：{{间隔时长}}。\n沉默参考阈值：{{沉默阈值}}，它只是参考，不要把阈值当成实际已过去的时间。\n这次是用户空发送，希望你主动开启一轮聊天。结合角色性格和已有聊天，自然分享近况、接续话题或轻轻问候，不要机械追问，也不要替用户发言。\n内容与气泡数量遵循当前回复预设，可以自然分多条短消息；不要写旁白、动作描写或系统说明。';
@@ -8046,6 +8152,14 @@ const FULL_REPLY_ITEM_DEFS = [
     "deletable": false
   },
   {
+    "id": "reply_item_mind",
+    "label": "心理活动与潜台词",
+    "role": "system",
+    "enabled": true,
+    "content": MIND_PROMPT,
+    "deletable": false
+  },
+  {
     "context": "lorebook",
     "label": "人设世界书",
     "enabled": true
@@ -8082,6 +8196,7 @@ exports["LEGACY_SINGLE_REPLY_FORMAT"] = LEGACY_SINGLE_REPLY_FORMAT;
 exports["LEGACY_NATURAL_REPLY_INSTRUCTION"] = LEGACY_NATURAL_REPLY_INSTRUCTION;
 exports["NATURAL_REPLY_INSTRUCTION"] = NATURAL_REPLY_INSTRUCTION;
 exports["MULTI_BUBBLE_REPLY_FORMAT"] = MULTI_BUBBLE_REPLY_FORMAT;
+exports["MIND_PROMPT"] = MIND_PROMPT;
 exports["PROACTIVE_PROMPT_MAX_LENGTH"] = PROACTIVE_PROMPT_MAX_LENGTH;
 exports["DEFAULT_PROACTIVE_PROMPT"] = DEFAULT_PROACTIVE_PROMPT;
 exports["FULL_REPLY_ITEM_DEFS"] = FULL_REPLY_ITEM_DEFS;
@@ -8385,9 +8500,22 @@ function messageLines(text) {
     return wrapped[1].split('\n').map(line => line.trim()).filter(Boolean);
   }
   const lines = source.split('\n').map(line => line.trim()).filter(Boolean);
-  const tagged = lines.some(line => /^\[(转账|红包|送会员|开会员|约定计划|约定计划已完成|好友申请|改个签|图片|表情|戳一戳|撤回|转发|引用)\]/.test(line));
+  const tagged = lines.some(line => /^\[(转账|红包|送会员|开会员|约定计划|约定计划已完成|好友申请|改个签|图片|表情|戳一戳|撤回|转发|引用|心里|潜台词)\]/.test(line));
   if (!tagged) return [source];
   return lines;
+}
+
+/* 心理活动 / 潜台词：紧跟气泡下一行的隐藏标注，只给用户点开看，不算一条消息。
+   上限与 data.js 的 MESSAGE_INNER_MAX / MESSAGE_SUBTEXT_MAX 保持一致。 */
+const MIND_LIMITS = { inner: 240, subtext: 160 };
+
+function parseMindLine(line) {
+  const match = String(line || '').trim().match(/^\[(心里|潜台词)\]\s*([\s\S]*)$/);
+  if (!match) return null;
+  const key = match[1] === '心里' ? 'inner' : 'subtext';
+  const text = match[2].replace(/\[\/(?:心里|潜台词)\]/g, '').trim();
+  if (!text) return null;
+  return { key, value: text.slice(0, MIND_LIMITS[key]) };
 }
 
 /**
@@ -8413,7 +8541,15 @@ function parseBehaviorReply(text, options = {}) {
   const lines = messageLines(source);
   const max = Math.max(1, Math.min(30, Number(options.max) || 30));
   const messages = [];
-  for (const line of lines.slice(0, max)) {
+  for (const line of lines) {
+    /* 标注行挂在它前面那个气泡上；第一个气泡之前出现的标注直接丢掉。 */
+    const mind = parseMindLine(line);
+    if (mind) {
+      const target = messages[messages.length - 1];
+      if (target) target[mind.key] = mind.value;
+      continue;
+    }
+    if (messages.length >= max) continue;
     const parsed = parseOneBubble(line, messages.length, { ...options, at });
     if (!parsed) continue;
     const gate = BEHAVIOR_GATE[parsed.kind];
@@ -8759,6 +8895,7 @@ function fromAcsusMessage(message, index = 0, fallbackKey = '') {
 exports["BEHAVIOR_KINDS"] = BEHAVIOR_KINDS;
 exports["normalizeBehavior"] = normalizeBehavior;
 exports["makeBehaviorMessage"] = makeBehaviorMessage;
+exports["parseMindLine"] = parseMindLine;
 exports["parseBehaviorReply"] = parseBehaviorReply;
 exports["isSystemBehavior"] = isSystemBehavior;
 exports["renderBehaviorBubble"] = renderBehaviorBubble;
@@ -8853,6 +8990,14 @@ function clampBudget(value, fallback) {
   const num = Number(value);
   if (!Number.isFinite(num)) return fallback;
   return Math.max(0, Math.min(200000, Math.round(num)));
+}
+
+/* 心理活动 / 潜台词：藏在气泡后面的两层含义，只给用户点开看，不进模型上下文。 */
+const MESSAGE_INNER_MAX = 240;
+const MESSAGE_SUBTEXT_MAX = 160;
+
+function clampMind(value, limit) {
+  return String(value ?? '').trim().slice(0, limit);
 }
 
 function normalizeReplyContext(raw) {
@@ -9200,9 +9345,9 @@ function normalizeReplyItems(raw, rawContext) {
     if (seenAuto.has(key)) return;
     items.push(contextItem(key, { enabled: context[key] !== false }));
   });
-  /* 旧版本创建的预设没有「回复格式要求 / 尾部」，补上这两条固定条目；
+  /* 旧版本创建的预设没有「回复格式要求 / 心理活动与潜台词 / 尾部」，补上这几条固定条目；
    * 其他聊天条目可能被用户删过，不强行加回来。 */
-  ['reply_item_format', 'reply_item_footer'].forEach(id => {
+  ['reply_item_format', 'reply_item_mind', 'reply_item_footer'].forEach(id => {
     if (items.some(item => item.id === id)) return;
     const fixed = defaultReplyItems().find(item => item.id === id);
     if (fixed) items.push({ ...fixed });
@@ -9686,6 +9831,8 @@ function pushMessage(state, chatId, message) {
     emoji: message.emoji || '',
     forward: message.forward || null,
     behavior: normalizeBehavior(kind, message.behavior),
+    inner: clampMind(message.inner, MESSAGE_INNER_MAX),
+    subtext: clampMind(message.subtext, MESSAGE_SUBTEXT_MAX),
   };
   chat.messages.push(entry);
   chat.updatedAt = entry.at;
@@ -10173,20 +10320,20 @@ function demoState() {
   const chatShen = addChat(state, shen.id, {
     id: 'ch_demo_shen',
     messages: [
-      { from: 'them', text: '到楼下了，今天风有点大。', at: at(21, 2) },
+      { from: 'them', text: '到楼下了，今天风有点大。', at: at(21, 2), inner: '要是她今天也加班，我就不该把车停这么远。', subtext: '就是顺路，别想多。' },
       { from: 'me', text: '我还在加班，别等我了。', at: at(21, 10) },
-      { from: 'them', text: '那就等你到八点，便利店坐会儿。', at: at(21, 24) },
+      { from: 'them', text: '那就等你到八点，便利店坐会儿。', at: at(21, 24), inner: '反正回去也是一个人，坐着等，总比空等强。' },
       { from: 'me', text: '八点真不一定能走。', at: at(21, 41) },
       { from: 'me', text: '你先回去。', at: at(22, 6) },
-      { from: 'them', text: '我到了，路上小心。', at: at(22, 40), quote: { text: '你先回去。', from: 'me' } },
-      { from: 'them', text: '我的意思是，你要是坚持加班，我就只好把你那份夜宵先吃了。', at: at(22, 44), proactive: true, kind: 'proactive' },
+      { from: 'them', text: '我到了，路上小心。', at: at(22, 40), quote: { text: '你先回去。', from: 'me' }, subtext: '我根本没走，就在楼下。' },
+      { from: 'them', text: '我的意思是，你要是坚持加班，我就只好把你那份夜宵先吃了。', at: at(22, 44), proactive: true, kind: 'proactive', inner: '她要是真不下来，我就把这份饭团留到明天早上再热一次。' },
     ],
   });
   chatShen.unread = 2;
 
   const chatJiang = addChat(state, jiang.id, {
     messages: [
-      { from: 'them', text: '那首歌我循环了一下午。', at: at(18, 30) },
+      { from: 'them', text: '那首歌我循环了一下午。', at: at(18, 30), inner: '副歌一进来就想到那天车上，她跟着哼错了拍子。', subtext: '其实是想约你再去听一次。' },
       { from: 'me', text: '哪首？', at: at(19, 2) },
       { from: 'them', text: '就你上次在车上放的那首。', at: at(19, 20) },
     ],
@@ -10804,11 +10951,18 @@ function normalize(raw) {
   merged.emoji = Array.isArray(merged.emoji) && merged.emoji.length ? merged.emoji : base.emoji;
   for (const [chatId, chat] of Object.entries(merged.chats)) {
     chat.messages = Array.isArray(chat.messages)
-      ? chat.messages.map((message, index) => ({
-        ...message,
-        id: message.id || `${chatId}_m${index}`,
-        behavior: normalizeBehavior(message.kind, message.behavior),
-      }))
+      ? chat.messages.map((message, index) => {
+        const built = {
+          ...message,
+          id: message.id || `${chatId}_m${index}`,
+          behavior: normalizeBehavior(message.kind, message.behavior),
+        };
+        const inner = clampMind(message.inner, MESSAGE_INNER_MAX);
+        const subtext = clampMind(message.subtext, MESSAGE_SUBTEXT_MAX);
+        if (inner) built.inner = inner; else delete built.inner;
+        if (subtext) built.subtext = subtext; else delete built.subtext;
+        return built;
+      })
       : [];
     chat.history = normalizeChatHistory(chat.history);
     if (chat.replyPresetId && !replyIds.has(String(chat.replyPresetId))) chat.replyPresetId = '';
@@ -10830,6 +10984,9 @@ exports["DEFAULT_REPLY_CONTEXT"] = DEFAULT_REPLY_CONTEXT;
 exports["REPLY_INSTRUCTION_ID"] = REPLY_INSTRUCTION_ID;
 exports["replyInstructionItem"] = replyInstructionItem;
 exports["withReplyInstruction"] = withReplyInstruction;
+exports["MESSAGE_INNER_MAX"] = MESSAGE_INNER_MAX;
+exports["MESSAGE_SUBTEXT_MAX"] = MESSAGE_SUBTEXT_MAX;
+exports["clampMind"] = clampMind;
 exports["normalizeReplyContext"] = normalizeReplyContext;
 exports["DEFAULT_REPLY_GROUPS"] = DEFAULT_REPLY_GROUPS;
 exports["normalizeReplyGroups"] = normalizeReplyGroups;
@@ -13379,6 +13536,8 @@ const P = {
   download: '<path d="M12 4.8v9.8"/><path d="M8.2 10.8 12 14.6l3.8-3.8"/><path d="M5.4 18.4h13.2"/>',
   upload: '<path d="M12 19.2V9.4"/><path d="M8.2 13.2 12 9.4l3.8 3.8"/><path d="M5.4 5.6h13.2"/>',
   grip: '<circle cx="9" cy="7" r=".9"/><circle cx="15" cy="7" r=".9"/><circle cx="9" cy="12" r=".9"/><circle cx="15" cy="12" r=".9"/><circle cx="9" cy="17" r=".9"/><circle cx="15" cy="17" r=".9"/>',
+  eye: '<path d="M3.4 12c2-3.4 5-5.2 8.6-5.2S18.6 8.6 20.6 12c-2 3.4-5 5.2-8.6 5.2S5.4 15.4 3.4 12z"/><circle cx="12" cy="12" r="2.4"/>',
+  'eye-off': '<path d="M4.2 9.4C3.6 10.2 3.4 10.9 3.4 12c2 3.4 5 5.2 8.6 5.2 1.5 0 2.9-.3 4.1-.8"/><path d="M9.8 6.9c.7-.1 1.4-.1 2.2-.1 3.6 0 6.6 1.8 8.6 5.2-.5.9-1.2 1.7-1.9 2.4"/><path d="M4.4 4.4 19.6 19.6"/>',
 };
 
 function icon(name, className = '') {
@@ -13426,6 +13585,7 @@ const ICON_LABELS = {
   pin: '定位', bell: '铃铛', code: '代码', book: '书本',
   music: '音符', play: '播放', pause: '暂停', next: '下一首',
   download: '下载', upload: '上传', grip: '拖动排序',
+  eye: '小眼睛', 'eye-off': '闭眼',
 };
 
 /** 桌面与 Dock 上所有可换图标的 App。 */
@@ -13984,6 +14144,7 @@ function createShell(options) {
     const button = root.querySelector('.mp-send');
     const input = root.querySelector('.mp-compose-box input');
     const hint = root.querySelector('.mp-composer-hint-text');
+    const hintBox = root.querySelector('.mp-composer-hint');
     if (!button || !input) return;
     const hasText = Boolean(input.value.trim());
     const busy = button.dataset.busy === '1';
@@ -14003,13 +14164,14 @@ function createShell(options) {
         label = `让 TA 回这 ${pending} 条`;
         hintText = `${pending} 条已发出 · 点右边让 TA 回`;
       } else {
-        label = '空着发时让 TA 主动开口';
-        hintText = '空着发，TA 会主动开口';
+        label = '发送';
+        hintText = '';
       }
     }
     button.setAttribute('aria-label', label);
     button.title = label;
     if (hint) hint.textContent = hintText;
+    if (hintBox) hintBox.style.display = hintText ? '' : 'none';
   };
 
   shell.refresh = render;
@@ -15427,7 +15589,7 @@ const {
 } = __req("meme/behavior-domains.js");
 
 const REPLY_POOL = {
-  沈砚: ['到楼下了，风比刚才小一点。', '你先忙，我在便利店坐着。', '记得吃点东西，别又是咖啡。', '刚看到你窗户还亮着。'],
+  沈砚: ['到楼下了，风比刚才小一点。', '你先忙，我在便利店坐着。', '记得吃点东西，别又是咖啡。', '刚看到你窗户还亮着。', '我先不催你了。\n[潜台词]其实我还在楼下等着。\n[心里]她要是再忙一个小时，我就把这份饭团先吃掉。'],
   江迟: ['那首歌我存下来了。', '下次你在车上再放一次。', '今天听了一下午，副歌有点上头。'],
   林小满: ['雨好像小了一点。', '你带伞了吗。', '我这边刚停，云还很厚。'],
   顾南风: ['书店这本我觉得你会喜欢。', '封面是深蓝色的，摸起来有点粗。', '要给你留着吗。'],
@@ -15787,6 +15949,44 @@ function openMessageExtra(ctx, chat, contact, message) {
   });
 }
 
+function mindPanelHtml(ctx, chat, contact, message) {
+  const inner = String(message.inner || '').trim();
+  const subtext = String(message.subtext || '').trim();
+  const name = contact?.name || 'TA';
+  return `
+    <div class="mp-mind">
+      <div class="mp-mind-head">
+        ${avatarHtml(contact?.name, contact?.avatar)}
+        <div class="mp-mind-head-main">
+          <div class="mp-mind-name">${esc(name)} · 这一条背后</div>
+          <div class="mp-mind-time">${esc(timeText(message.at || Date.now()))}</div>
+        </div>
+      </div>
+      <div class="mp-mind-block">
+        <div class="mp-mind-label">${icon('eye')}<span>心理活动</span></div>
+        <div class="mp-mind-text${inner ? '' : ' is-empty'}">${esc(inner || '这条没有写心理活动；下一轮可以让 TA 把念头写出来。')}</div>
+      </div>
+      ${subtext ? `
+      <div class="mp-mind-block is-sub">
+        <div class="mp-mind-label">${icon('eye-off')}<span>潜台词</span></div>
+        <div class="mp-mind-text">${esc(subtext)}</div>
+      </div>` : ''}
+      <div class="mp-mind-actions">
+        <button class="mp-mini-btn plain" data-act="mind-extra" data-chat="${esc(chat.id)}" data-msg="${esc(message.id)}" type="button">${icon('theater')}这条的小剧场</button>
+        ${String(message.text || '').trim() ? `<button class="mp-mini-btn plain" data-act="mind-save-extra" data-chat="${esc(chat.id)}" data-msg="${esc(message.id)}" type="button">${icon('bookmark')}存成小剧场</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function openMindSheet(ctx, chat, contact, message) {
+  ctx.openSheet({
+    kind: 'panel',
+    title: '',
+    doneLabel: '收起',
+    render: () => mindPanelHtml(ctx, chat, contact, message),
+  });
+}
+
 function theaterPanelHtml(ctx, chat) {
   const state = ctx.state;
   const currentId = chat?.contactId ? String(chat.contactId) : '';
@@ -16100,10 +16300,10 @@ function threadBody(ctx, chatId) {
   const sendAct = busy ? 'stop-generation' : 'send';
   const sendTitle = busy
     ? '停止这次生成'
-    : (hasDraft ? '发送这条；再点一次让 TA 回' : (waiting ? `让 TA 回这 ${waiting} 条` : '空着发时让 TA 主动开口'));
+    : (hasDraft ? '发送这条；再点一次让 TA 回' : (waiting ? `让 TA 回这 ${waiting} 条` : '发送'));
   const composerHint = busy
     ? '生成中 · 点右边停止'
-    : (hasDraft ? '先发出去，再点右边让 TA 回' : (waiting ? `${waiting} 条已发出 · 点右边让 TA 回` : '空着发，TA 会主动开口'));
+    : (hasDraft ? '先发出去，再点右边让 TA 回' : (waiting ? `${waiting} 条已发出 · 点右边让 TA 回` : ''));
 
   /* 显示窗口：只渲染最近一页，往上翻再加载更早的。
      注意这里只管屏幕上的 DOM 数量，发给模型的历史仍按上下文预算从完整 messages 里取。 */
@@ -16153,16 +16353,26 @@ function threadBody(ctx, chatId) {
         : message.forward
           ? `<div class="mp-bubble mp-bubble-forward"><div class="mp-forward-head">${icon('forward')}<span>转发的消息</span></div><div class="mp-forward-text">${esc(message.forward.text || '')}</div>${message.forward.from ? `<div class="mp-forward-src">来自 ${esc(message.forward.from)}</div>` : ''}</div>`
           : `<div class="mp-bubble">${esc(message.text)}</div>`);
+    /* 潜台词默认收着，点小眼睛才在气泡下面展开；开关只存在这次浏览里，不写存档。 */
+    const subOpen = Boolean(ctx.shell.subOpen?.[`${chat.id}:${message.id}`]);
+    const subHtml = message.subtext && subOpen
+      ? `<div class="mp-subtext"><span class="mp-subtext-label">潜台词</span><span class="mp-subtext-text">${esc(message.subtext)}</span></div>`
+      : '';
+    const subToggle = message.subtext
+      ? `<button class="mp-eye${subOpen ? ' on' : ''}" data-act="toggle-subtext" data-chat="${chat.id}" data-msg="${message.id}" type="button" aria-pressed="${subOpen ? 'true' : 'false'}" aria-label="${subOpen ? '收起潜台词' : '看这条的潜台词'}">${icon(subOpen ? 'eye-off' : 'eye')}<span>潜台词</span></button>`
+      : '';
     blocks.push(`
       <div class="mp-msg${me ? ' me' : ''}" data-hold="message-menu" data-chat="${chat.id}" data-msg="${message.id}">
         ${me
           ? avatarHtml(state.settings.user.name, state.settings.user.avatar)
-          : `<button class="mp-avatar-btn" data-act="avatar-extra" data-chat="${chat.id}" data-msg="${message.id}" type="button" aria-label="看 TA 的小剧场">${avatarHtml(speaker?.name || contact?.name, speaker?.avatar || contact?.avatar)}</button>`}
+          : `<button class="mp-avatar-btn${message.inner ? ' has-mind' : ''}" data-act="avatar-mind" data-chat="${chat.id}" data-msg="${message.id}" type="button" aria-label="看 TA 的心理活动"><span class="mp-avatar-wrap">${avatarHtml(speaker?.name || contact?.name, speaker?.avatar || contact?.avatar)}${message.inner ? '<i class="mp-avatar-mind" aria-hidden="true"></i>' : ''}</span></button>`}
         <div class="mp-msg-body">
           ${message.quote ? `<div class="mp-quote-line">${icon('reply')}<span>${esc(message.quote.text)}</span></div>` : ''}
           ${bubble}
+          ${subHtml}
           <div class="mp-msg-meta">
             ${message.proactive ? '<span class="mp-tag-proactive">主动开口</span>' : ''}
+            ${subToggle}
             ${speaker ? `<span>${esc(speaker.name)}</span>` : ''}
             <span>${startGroup ? '' : timeText(message.at)}</span>
           </div>
@@ -16216,7 +16426,7 @@ function threadBody(ctx, chatId) {
           <button class="mp-plus-toggle${ctx.shell.plusOpen === chat.id ? ' is-open' : ''}" data-act="composer-plus" data-chat="${chat.id}" type="button" aria-expanded="${ctx.shell.plusOpen === chat.id}" aria-controls="mpComposerPlus">
             ${icon('plus')}<span>更多</span>
           </button>
-          <span class="mp-composer-hint">${icon('spark')}<span class="mp-composer-hint-text">${esc(composerHint)}</span></span>
+          ${composerHint ? `<span class="mp-composer-hint">${icon('spark')}<span class="mp-composer-hint-text">${esc(composerHint)}</span></span>` : ''}
         </div>
         <input id="mpMsgPhoto" type="file" accept="image/*" data-chat="${chat.id}" style="position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0">
       </div>
@@ -16482,6 +16692,8 @@ function bubbleEntry(bubble, turnId) {
     forward: bubble.forward || null,
     quote: bubble.quote || null,
     behavior: bubble.behavior || null,
+    inner: bubble.inner || '',
+    subtext: bubble.subtext || '',
   };
 }
 
@@ -17407,6 +17619,44 @@ const threadApp = {
       return true;
     }
 
+    if (act === 'avatar-mind') {
+      const chat = chatById(ctx.state, chatId);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (!chat || !message) return true;
+      const contact = contactById(ctx.state, chat.contactId);
+      openMindSheet(ctx, chat, contact, message);
+      return true;
+    }
+
+    if (act === 'mind-extra') {
+      const chat = chatById(ctx.state, chatId);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (!chat || !message) return true;
+      const contact = contactById(ctx.state, chat.contactId);
+      openMessageExtra(ctx, chat, contact, message);
+      return true;
+    }
+
+    if (act === 'mind-save-extra') {
+      const chat = chatById(ctx.state, chatId);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (!chat || !message) return true;
+      const contact = contactById(ctx.state, chat.contactId);
+      saveMessageExtra(ctx, chat, contact, message);
+      ctx.closeSheet?.();
+      ctx.toast('已存进小剧场');
+      return true;
+    }
+
+    if (act === 'toggle-subtext') {
+      const key = `${chatId}:${data.msg}`;
+      if (!ctx.shell.subOpen) ctx.shell.subOpen = {};
+      if (ctx.shell.subOpen[key]) delete ctx.shell.subOpen[key];
+      else ctx.shell.subOpen[key] = true;
+      ctx.rerender();
+      return true;
+    }
+
     if (act === 'avatar-extra') {
       const chat = chatById(ctx.state, chatId);
       const message = chat?.messages.find(item => item.id === data.msg);
@@ -17463,6 +17713,8 @@ const threadApp = {
           { label: '转发给…', value: 'forward', icon: 'forward' },
           ...(recallable ? [{ label: '撤回这条', value: 'recall', icon: 'refresh', note: '两分钟内可以撤回' }] : []),
           { label: '存成小剧场', value: 'extra', icon: 'theater' },
+          ...(message.inner ? [{ label: '看 TA 的心理活动', value: 'mind', icon: 'eye' }] : []),
+          ...(message.subtext ? [{ label: '看这条的潜台词', value: 'sub', icon: 'eye-off' }] : []),
           ...(message.from === 'them' ? [{ label: '让 TA 重新说一次', value: 'regen', icon: 'refresh' }] : []),
           { label: '删除这条', value: 'delete', icon: 'trash', danger: true },
         ],
@@ -17519,6 +17771,8 @@ const threadApp = {
             message.emoji = '';
             message.forward = null;
             message.behavior = null;
+            message.inner = '';
+            message.subtext = '';
             ctx.save();
             ctx.rerender();
             ctx.toast('已撤回');
@@ -17526,6 +17780,15 @@ const threadApp = {
           if (value === 'extra') {
             saveMessageExtra(ctx, chat, contact, message);
             ctx.toast('已存进小剧场');
+          }
+          if (value === 'mind') {
+            openMindSheet(ctx, chat, contact, message);
+          }
+          if (value === 'sub') {
+            const key = `${chat.id}:${message.id}`;
+            if (!ctx.shell.subOpen) ctx.shell.subOpen = {};
+            ctx.shell.subOpen[key] = true;
+            ctx.rerender();
           }
           if (value === 'regen') {
             const turn = turnMessages(chat, message);

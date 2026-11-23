@@ -83,6 +83,14 @@ function clampBudget(value, fallback) {
   return Math.max(0, Math.min(200000, Math.round(num)));
 }
 
+/* 心理活动 / 潜台词：藏在气泡后面的两层含义，只给用户点开看，不进模型上下文。 */
+export const MESSAGE_INNER_MAX = 240;
+export const MESSAGE_SUBTEXT_MAX = 160;
+
+export function clampMind(value, limit) {
+  return String(value ?? '').trim().slice(0, limit);
+}
+
 export function normalizeReplyContext(raw) {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   /* 旧版本默认是「最近 10 条 + 8000 字预算」；这次整体改成不截断，
@@ -428,9 +436,9 @@ export function normalizeReplyItems(raw, rawContext) {
     if (seenAuto.has(key)) return;
     items.push(contextItem(key, { enabled: context[key] !== false }));
   });
-  /* 旧版本创建的预设没有「回复格式要求 / 尾部」，补上这两条固定条目；
+  /* 旧版本创建的预设没有「回复格式要求 / 心理活动与潜台词 / 尾部」，补上这几条固定条目；
    * 其他聊天条目可能被用户删过，不强行加回来。 */
-  ['reply_item_format', 'reply_item_footer'].forEach(id => {
+  ['reply_item_format', 'reply_item_mind', 'reply_item_footer'].forEach(id => {
     if (items.some(item => item.id === id)) return;
     const fixed = defaultReplyItems().find(item => item.id === id);
     if (fixed) items.push({ ...fixed });
@@ -914,6 +922,8 @@ export function pushMessage(state, chatId, message) {
     emoji: message.emoji || '',
     forward: message.forward || null,
     behavior: normalizeBehavior(kind, message.behavior),
+    inner: clampMind(message.inner, MESSAGE_INNER_MAX),
+    subtext: clampMind(message.subtext, MESSAGE_SUBTEXT_MAX),
   };
   chat.messages.push(entry);
   chat.updatedAt = entry.at;
@@ -1401,20 +1411,20 @@ export function demoState() {
   const chatShen = addChat(state, shen.id, {
     id: 'ch_demo_shen',
     messages: [
-      { from: 'them', text: '到楼下了，今天风有点大。', at: at(21, 2) },
+      { from: 'them', text: '到楼下了，今天风有点大。', at: at(21, 2), inner: '要是她今天也加班，我就不该把车停这么远。', subtext: '就是顺路，别想多。' },
       { from: 'me', text: '我还在加班，别等我了。', at: at(21, 10) },
-      { from: 'them', text: '那就等你到八点，便利店坐会儿。', at: at(21, 24) },
+      { from: 'them', text: '那就等你到八点，便利店坐会儿。', at: at(21, 24), inner: '反正回去也是一个人，坐着等，总比空等强。' },
       { from: 'me', text: '八点真不一定能走。', at: at(21, 41) },
       { from: 'me', text: '你先回去。', at: at(22, 6) },
-      { from: 'them', text: '我到了，路上小心。', at: at(22, 40), quote: { text: '你先回去。', from: 'me' } },
-      { from: 'them', text: '我的意思是，你要是坚持加班，我就只好把你那份夜宵先吃了。', at: at(22, 44), proactive: true, kind: 'proactive' },
+      { from: 'them', text: '我到了，路上小心。', at: at(22, 40), quote: { text: '你先回去。', from: 'me' }, subtext: '我根本没走，就在楼下。' },
+      { from: 'them', text: '我的意思是，你要是坚持加班，我就只好把你那份夜宵先吃了。', at: at(22, 44), proactive: true, kind: 'proactive', inner: '她要是真不下来，我就把这份饭团留到明天早上再热一次。' },
     ],
   });
   chatShen.unread = 2;
 
   const chatJiang = addChat(state, jiang.id, {
     messages: [
-      { from: 'them', text: '那首歌我循环了一下午。', at: at(18, 30) },
+      { from: 'them', text: '那首歌我循环了一下午。', at: at(18, 30), inner: '副歌一进来就想到那天车上，她跟着哼错了拍子。', subtext: '其实是想约你再去听一次。' },
       { from: 'me', text: '哪首？', at: at(19, 2) },
       { from: 'them', text: '就你上次在车上放的那首。', at: at(19, 20) },
     ],
@@ -2032,11 +2042,18 @@ export function normalize(raw) {
   merged.emoji = Array.isArray(merged.emoji) && merged.emoji.length ? merged.emoji : base.emoji;
   for (const [chatId, chat] of Object.entries(merged.chats)) {
     chat.messages = Array.isArray(chat.messages)
-      ? chat.messages.map((message, index) => ({
-        ...message,
-        id: message.id || `${chatId}_m${index}`,
-        behavior: normalizeBehavior(message.kind, message.behavior),
-      }))
+      ? chat.messages.map((message, index) => {
+        const built = {
+          ...message,
+          id: message.id || `${chatId}_m${index}`,
+          behavior: normalizeBehavior(message.kind, message.behavior),
+        };
+        const inner = clampMind(message.inner, MESSAGE_INNER_MAX);
+        const subtext = clampMind(message.subtext, MESSAGE_SUBTEXT_MAX);
+        if (inner) built.inner = inner; else delete built.inner;
+        if (subtext) built.subtext = subtext; else delete built.subtext;
+        return built;
+      })
       : [];
     chat.history = normalizeChatHistory(chat.history);
     if (chat.replyPresetId && !replyIds.has(String(chat.replyPresetId))) chat.replyPresetId = '';

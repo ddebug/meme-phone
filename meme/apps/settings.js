@@ -114,41 +114,41 @@ export const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">身份与外观</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'contacts', title: '用户', sub: `${state.settings.user.name || '还没选'} · 点击换人`, act: 'set-open', app: 'user' })}
-            ${row(ctx, { iconName: 'brush', title: '装扮与主题', sub: `${wallLabel} · ${state.settings.theme === 'night' ? '夜间' : '日间'} · 字体与图标`, act: 'set-open-dress' })}
+            ${row(ctx, { iconName: 'contacts', title: '用户', sub: state.settings.user.name || '还没选', act: 'set-open', app: 'user' })}
+            ${row(ctx, { iconName: 'brush', title: '装扮与主题', sub: `${wallLabel} · ${state.settings.theme === 'night' ? '夜间' : '日间'}`, act: 'set-open-dress' })}
           </div>
         </div>
 
         <div class="mp-group">
           <div class="mp-group-label">AI 设置 · 连接</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'code', title: '酒馆连接', sub: apiReady ? '酒馆模型可用；聊天接口在下面单独配' : '未接入（预览环境）；聊天接口在下面单独配', act: 'set-host-status', value: apiReady ? '已连接' : '未连接' })}
-            ${row(ctx, { iconName: 'code', title: '聊天接口与预设', sub: '每套 = 地址 + Key + 模型，只影响聊天', act: 'set-open', app: 'api' })}
+            ${row(ctx, { iconName: 'code', title: '酒馆连接', value: apiReady ? '已连接' : '未连接', act: 'set-host-status' })}
+            ${row(ctx, { iconName: 'code', title: '聊天接口与预设', act: 'set-open', app: 'api' })}
           </div>
         </div>
 
         <div class="mp-group">
           <div class="mp-group-label">AI 设置 · 怎么回复</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'reply', title: '回复预设', sub: '告诉模型该怎么回消息，可多套切换', act: 'set-open', app: 'presets' })}
-            ${row(ctx, { iconName: 'reply', title: '日记提示词', sub: '决定它怎么替你写日记', act: 'set-prompt' })}
+            ${row(ctx, { iconName: 'reply', title: '回复预设', act: 'set-open', app: 'presets' })}
+            ${row(ctx, { iconName: 'reply', title: '日记提示词', act: 'set-prompt' })}
           </div>
         </div>
 
         <div class="mp-group">
           <div class="mp-group-label">主动开口</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'reply', title: '主动开口提示词', sub: '只在空着发送时使用，不会定时发消息', act: 'set-proactive-prompt', value: customProactivePrompt ? '自定义' : '默认' })}
-            ${row(ctx, { iconName: 'clock', title: '空发送时参考沉默多久', sub: '写进主动开口的提示，仅作参考，不会自己定时发消息', act: 'set-idle', value: `${state.settings.proactive.idleMinutes} 分钟` })}
-            ${customProactivePrompt ? row(ctx, { iconName: 'reply', title: '恢复默认提示词', sub: '只恢复主动开口提示词，其他设置不变', act: 'set-proactive-prompt-reset' }) : ''}
+            ${row(ctx, { iconName: 'reply', title: '主动开口提示词', value: customProactivePrompt ? '自定义' : '默认', act: 'set-proactive-prompt' })}
+            ${row(ctx, { iconName: 'clock', title: '空发送时参考沉默多久', value: `${state.settings.proactive.idleMinutes} 分钟`, act: 'set-idle' })}
+            ${customProactivePrompt ? row(ctx, { iconName: 'reply', title: '恢复默认提示词', act: 'set-proactive-prompt-reset' }) : ''}
           </div>
         </div>
 
         <div class="mp-group">
           <div class="mp-group-label">AI 设置 · 参考什么材料</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'book', title: '手机读法', sub: state.settings.memory.readMode === 'recent' ? '现在只读最近原文' : '现在有总结先读总结，没有就读最近原文', act: 'set-toggle-memory-read', toggle: state.settings.memory.readMode !== 'recent' })}
-            ${row(ctx, { iconName: 'search', title: '酒馆角色', sub: (state.charactersFromTavern ? `酒馆里 ${state.characters.length} 张角色卡，看设定或加进已添加` : '看酒馆里每张角色卡的设定'), act: 'set-open-cards' })}
+            ${row(ctx, { iconName: 'book', title: '手机读法', sub: state.settings.memory.readMode === 'recent' ? '只读最近原文' : '总结优先', act: 'set-toggle-memory-read', toggle: state.settings.memory.readMode !== 'recent' })}
+            ${row(ctx, { iconName: 'search', title: '酒馆角色', sub: state.charactersFromTavern ? `酒馆里 ${state.characters.length} 张角色卡` : '', act: 'set-open-cards' })}
           </div>
         </div>
 
@@ -156,16 +156,16 @@ export const settingsApp = {
           <div class="mp-group-label">生成与玩法</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'image', title: '绘图', sub: imageReady ? `${imageLabel} · ${image.model || '模型没填'}` : `${imageLabel} · 还没填${image.engine === 'custom' ? '地址' : ' Key'}`, act: 'set-open', app: 'draw' })}
-            ${row(ctx, { iconName: 'smile', title: '表情包', sub: '表情面板里那些贴纸', act: 'set-open', app: 'emoji' })}
-            ${row(ctx, { iconName: 'bookmark', title: '收藏', sub: `${(state.favorites || []).length} 条从聊天里存下来的消息`, act: 'set-open', app: 'favorites' })}
+            ${row(ctx, { iconName: 'smile', title: '表情包', act: 'set-open', app: 'emoji' })}
+            ${row(ctx, { iconName: 'bookmark', title: '收藏', sub: `${(state.favorites || []).length} 条`, act: 'set-open', app: 'favorites' })}
           </div>
         </div>
 
         <div class="mp-group">
           <div class="mp-group-label">数据与备份</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'copy', title: '导出备份', sub: '一份 json，导出时不带接口 Key', act: 'set-export' })}
-            ${row(ctx, { iconName: 'upload', title: '从备份恢复', sub: '先预检数量，确认后覆盖当前数据', act: 'set-import' })}
+            ${row(ctx, { iconName: 'copy', title: '导出备份', sub: '不含接口 Key', act: 'set-export' })}
+            ${row(ctx, { iconName: 'upload', title: '从备份恢复', sub: '确认后覆盖当前数据', act: 'set-import' })}
             ${row(ctx, { iconName: 'trash', title: '清空手机数据', sub: '联系方式、聊天、日记全部清掉', act: 'set-wipe' })}
           </div>
         </div>
@@ -173,9 +173,9 @@ export const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">高级与帮助</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'bell', title: '消息提醒', sub: '有新消息时在图标上显示红点', act: 'set-toggle-remind', toggle: state.settings.chat.remind !== false })}
-            ${row(ctx, { iconName: 'code', title: '请求调试栏', sub: state.settings.chat.debugBar ? '现在开着：输入框上方会显示 token 与请求构成' : '现在关着：需要时再打开', act: 'set-toggle-debug', toggle: state.settings.chat.debugBar === true })}
-            ${row(ctx, { iconName: 'help', title: '帮助', sub: '怎么用、快捷键、常见问题', act: 'set-open', app: 'help' })}
+            ${row(ctx, { iconName: 'bell', title: '消息提醒', act: 'set-toggle-remind', toggle: state.settings.chat.remind !== false })}
+            ${row(ctx, { iconName: 'code', title: '请求调试栏', act: 'set-toggle-debug', toggle: state.settings.chat.debugBar === true })}
+            ${row(ctx, { iconName: 'help', title: '帮助', act: 'set-open', app: 'help' })}
             ${row(ctx, { iconName: 'help', title: '关于 meme-phone', sub: `${contacts} 位联系人 · ${chatsOf(state).length} 个会话 · ${unreadTotal(state)} 条未读`, act: 'set-about' })}
           </div>
         </div>

@@ -103,6 +103,19 @@ const FONT_STACKS = {
     '"Kaiti SC", "STKaiti", KaiTi, "Noto Serif SC", serif'],
 };
 
+/* 桌面上的“我”只认用户自己的资料：主题只换壁纸 / 横幅 / 头像框，不接管昵称、头像和签名 */
+export function desktopIdentity(state) {
+  const user = state?.settings?.user || {};
+  const me = Array.isArray(state?.users)
+    ? state.users.find(item => item && item.key && item.key === user.key) || null
+    : null;
+  const myName = user.name || me?.name || '我';
+  const myAvatar = user.avatar || me?.avatarUrl || '';
+  const ownBio = String(state?.settings?.profile?.bio || '').trim();
+  const myBio = ownBio || String(me?.description || '把每天的事，记在这台小手机里。').trim();
+  return { myName, myAvatar, myBio };
+}
+
 export function applyLook(root, settings) {
   if (!root) return;
   const dress = settings?.dress || {};
@@ -219,16 +232,10 @@ export function createShell(options) {
 
   function desktopHtml() {
     const state = ctx.state;
-    const me = Array.isArray(state.users)
-      ? state.users.find(item => item && item.key && item.key === state.settings.user.key) || null
-      : null;
-    const themed = state.settings.dress?.theme === 'pixel' ? PIXEL_BUNNY : null;
-    const myName = themed ? themed.profile.name : (state.settings.user.name || me?.name || '我');
-    const myAvatar = themed ? themed.avatar : (state.settings.user.avatar || me?.avatarUrl || '');
-    const ownBio = String(state.settings.profile?.bio || '').trim();
-    const myBio = ownBio || (themed ? themed.profile.bio : String(me?.description || '把每天的事，记在这台小手机里。').trim());
+    const themeArt = state.settings.dress?.theme === 'pixel' ? PIXEL_BUNNY : null;
+    const { myName, myAvatar, myBio } = desktopIdentity(state);
     const ownBanner = String(state.settings.profile?.banner || '').trim();
-    const themedBanner = themed ? themed.banner : '';
+    const themedBanner = themeArt ? themeArt.banner : '';
     const bannerImage = ownBanner || themedBanner;
     const bannerStyle = bannerImage ? ` style="background-image:url(&quot;${bannerImage}&quot;);background-size:cover;background-position:center"` : '';
     const stampText = dateText().replace('<br>', ' · ');

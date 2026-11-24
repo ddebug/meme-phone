@@ -11652,16 +11652,13 @@ function diaryDayStatuses(state, chat) {
   const entries = diaryRoleEntries(state, chat?.contactId);
   return [...diaryDayGroups(chat)].map(([date, messages]) => {
     const entry = entries[date];
-    const mismatch = diaryEntryMismatch(state, chat, entry, messages);
-    const summarized = !mismatch;
     const hasText = Boolean(entry && typeof entry.text === 'string' && entry.text.trim());
     return {
       date,
       messages,
       messageCount: messages.length,
       entry: entry || null,
-      status: messages.length <= DIARY_SKIP_THRESHOLD ? 'skipped' : summarized ? 'summarized' : 'pending',
-      staleReason: hasText && messages.length > DIARY_SKIP_THRESHOLD && mismatch !== 'empty' ? mismatch : '',
+      status: messages.length <= DIARY_SKIP_THRESHOLD ? 'skipped' : hasText ? 'summarized' : 'pending',
     };
   });
 }
@@ -11672,7 +11669,7 @@ function diaryContextMode(state, chat, date, entry, dayMessages, latestDate = ''
   if (entry?.useOriginal) return '原文 · 本日已切回';
   if (date === latestDate) return '原文 · 最近一天';
   if (!entry?.text) return '原文 · 还没有日记';
-  if (!diaryEntryIsCurrent(state, chat, entry, dayMessages)) return '原文 · 日记待更新';
+  if (!diaryEntryIsCurrent(state, chat, entry, dayMessages)) return '原文 · 日记保留';
   return '日记 · 发送时替换原文';
 }
 
@@ -17036,10 +17033,9 @@ function settingsBody(ctx, chatId) {
   const status = [mode, `${count} 条消息`, chat.pinned ? '置顶' : '', chat.muted ? '免打扰' : ''].filter(Boolean).join(' · ');
   const diaryStatuses = diaryDayStatuses(state, chat);
   const diaryWritten = diaryStatuses.filter(item => String(item.entry?.text || '').trim()).length;
-  const diaryPending = diaryStatuses.filter(item => item.status === 'pending' && !String(item.entry?.text || '').trim()).length;
-  const diaryStale = diaryStatuses.filter(item => item.status === 'pending' && String(item.entry?.text || '').trim()).length;
+  const diaryPending = diaryStatuses.filter(item => item.status === 'pending').length;
   const diarySub = diaryWritten
-    ? `${diaryWritten} 天已写${diaryPending ? ` · ${diaryPending} 天待整理` : ''}${diaryStale ? ` · ${diaryStale} 天待更新` : ''}`
+    ? `${diaryWritten} 天已写${diaryPending ? ` · ${diaryPending} 天待整理` : ''}`
     : '按天记录这个角色和你的聊天';
   const presets = apiPresetsOf(state);
   const ownPreset = presets.find(item => item.id === chat.llmPresetId) || null;
@@ -19685,17 +19681,6 @@ function threadSettingsBox(ctx, contactId) {
     </div>`;
 }
 
-const DIARY_STALE_REASON_TEXT = {
-  'missing-source': '旧日记缺原文指纹',
-  source: '原文有改动',
-  params: '提示词/资料改过',
-};
-
-function diaryStaleNote(status) {
-  if (status?.status !== 'pending' || !String(status?.entry?.text || '').trim()) return '';
-  return DIARY_STALE_REASON_TEXT[status.staleReason] || '日记需要更新';
-}
-
 function threadCalendar(ctx, contactId, statuses) {
   const st = threadState(ctx, contactId);
   const first = parseMonth(st.month);
@@ -19743,11 +19728,10 @@ function threadHero(ctx, contact, chat, status, latestDate, busy) {
   const label = date === dayKey(new Date()) ? '今天' : `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`;
   const originalTokens = status?.messages ? formatTokens(diaryTranscriptForMessages(ctx.state, chat, status.messages)) : '0';
   const summaryTokens = text ? formatTokens(text) : '';
-  const staleNote = diaryStaleNote(status);
   return `
     <div class="mp-diary-hero">
       <div class="mp-diary-hero-top">
-        <span class="mp-diary-hero-date">${label} · ${count} 条 · ${status ? (skipped ? '不用整理' : status.status === 'summarized' ? '已整理' : text ? '待更新' : '待整理') : '没有聊天'}</span>
+        <span class="mp-diary-hero-date">${label} · ${count} 条 · ${status ? (skipped ? '不用整理' : status.status === 'summarized' ? '已整理' : '待整理') : '没有聊天'}</span>
         <div style="display:flex;gap:6px">
           <button class="mp-btn ghost" data-act="td-edit" data-contact="${esc(contact.id)}" data-date="${date}" type="button">${icon('brush')}${text ? '改写' : '写一句'}</button>
         </div>
@@ -19755,7 +19739,7 @@ function threadHero(ctx, contact, chat, status, latestDate, busy) {
       ${text
         ? `<div class="mp-diary-hero-text">${esc(text)}</div>`
         : `<div class="mp-diary-empty">${skipped ? `这一天只有 ${count} 条聊天，${DIARY_SKIP_THRESHOLD} 条以内不整理。` : count ? `这一天有 ${count} 条聊天，还没有整理成日记。` : '这一天没有聊天记录。'}</div>`}
-      <div class="mp-diary-meta"><span>上下文：${esc(mode)}</span>${staleNote ? `<span>${esc(staleNote)}</span>` : ''}<span>原文约 ${originalTokens} tk${summaryTokens ? ` · 日记约 ${summaryTokens} tk` : ''}</span></div>
+      <div class="mp-diary-meta"><span>上下文：${esc(mode)}</span><span>原文约 ${originalTokens} tk${summaryTokens ? ` · 日记约 ${summaryTokens} tk` : ''}</span></div>
       <div style="display:flex;gap:6px;margin-top:11px;flex-wrap:wrap">
         <button class="mp-btn" data-act="td-generate-one" data-contact="${esc(contact.id)}" data-date="${date}" type="button"${busy || skipped ? ' disabled' : ''}>${icon('spark')}${busy ? '正在整理…' : text ? '重写这一天' : '整理这一天'}</button>
         ${entry ? `<label class="mp-td-inline-check"><input type="checkbox" data-act="td-use-original" data-contact="${esc(contact.id)}" data-date="${date}"${entry.useOriginal ? ' checked' : ''}> 本日上下文用原文</label>` : ''}
@@ -19775,8 +19759,7 @@ function threadDayRows(ctx, contactId, chat, statuses, latestDate, busy) {
     const entry = item.entry;
     const text = String(entry?.text || '').trim();
     const mode = diaryContextMode(ctx.state, chat, item.date, entry, item.messages, latestDate);
-    const stateLabel = item.status === 'skipped' ? `${DIARY_SKIP_THRESHOLD} 条以内` : item.status === 'summarized' ? '已整理' : text ? '待更新' : '待整理';
-    const staleNote = diaryStaleNote(item);
+    const stateLabel = item.status === 'skipped' ? `${DIARY_SKIP_THRESHOLD} 条以内` : item.status === 'summarized' ? '已整理' : '待整理';
     const originalTokens = formatTokens(diaryTranscriptForMessages(ctx.state, chat, item.messages));
     const summaryTokens = text ? formatTokens(text) : '';
     const disabled = busy || item.status === 'skipped';
@@ -19785,7 +19768,7 @@ function threadDayRows(ctx, contactId, chat, statuses, latestDate, busy) {
         <input class="mp-td-check" type="checkbox" data-act="td-select" data-contact="${esc(contactId)}" data-date="${item.date}"${st.selected.has(item.date) ? ' checked' : ''}${item.status === 'skipped' ? ' disabled' : ''} aria-label="选择 ${item.date}">
         <div class="mp-td-main">
           <div class="mp-td-title">${Number(item.date.slice(5, 7))}月${Number(item.date.slice(8, 10))}日 <span class="mp-td-badge ${item.status}">${stateLabel}</span></div>
-          <div class="mp-td-sub">${item.messageCount} 条 · ${esc(mode)}${staleNote ? ` · ${esc(staleNote)}` : ''} · 原文约 ${originalTokens} tk${summaryTokens ? ` · 日记约 ${summaryTokens} tk` : ''}</div>
+          <div class="mp-td-sub">${item.messageCount} 条 · ${esc(mode)} · 原文约 ${originalTokens} tk${summaryTokens ? ` · 日记约 ${summaryTokens} tk` : ''}</div>
         </div>
         <button class="mp-btn ghost" data-act="td-generate-one" data-contact="${esc(contactId)}" data-date="${item.date}" type="button"${disabled ? ' disabled' : ''}>${busy ? '整理中…' : text ? '重写' : '整理'}</button>
       </div>`;
@@ -19834,16 +19817,13 @@ function renderThreadPage(ctx, contactId) {
       </div>`;
   }
   const target = parseMonth(st.month);
-  const waiting = statuses.filter(item => item.status === 'pending');
-  const waitingFresh = waiting.filter(item => !String(item.entry?.text || '').trim()).length;
-  const waitingStale = waiting.length - waitingFresh;
   return `
     <div class="mp-page-body">
       <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记 · 按天整理聊天，只在这个角色里保存</div>
       ${threadSettingsBox(ctx, contactId)}
       <div class="mp-td-toolbar">
         <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>
-        <span class="mp-td-toolbar-note">${waitingFresh} 天待整理${waitingStale ? ` · ${waitingStale} 天待更新` : ''}</span>
+        <span class="mp-td-toolbar-note">${statuses.filter(item => item.status === 'pending').length} 天待整理</span>
       </div>
       <div class="mp-month-bar">
         <button class="mp-icon-btn" data-act="td-prev" data-contact="${esc(contactId)}" type="button" aria-label="上个月">${icon('back')}</button>

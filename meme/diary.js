@@ -107,16 +107,13 @@ export function diaryDayStatuses(state, chat) {
   const entries = diaryRoleEntries(state, chat?.contactId);
   return [...diaryDayGroups(chat)].map(([date, messages]) => {
     const entry = entries[date];
-    const mismatch = diaryEntryMismatch(state, chat, entry, messages);
-    const summarized = !mismatch;
     const hasText = Boolean(entry && typeof entry.text === 'string' && entry.text.trim());
     return {
       date,
       messages,
       messageCount: messages.length,
       entry: entry || null,
-      status: messages.length <= DIARY_SKIP_THRESHOLD ? 'skipped' : summarized ? 'summarized' : 'pending',
-      staleReason: hasText && messages.length > DIARY_SKIP_THRESHOLD && mismatch !== 'empty' ? mismatch : '',
+      status: messages.length <= DIARY_SKIP_THRESHOLD ? 'skipped' : hasText ? 'summarized' : 'pending',
     };
   });
 }
@@ -127,7 +124,7 @@ export function diaryContextMode(state, chat, date, entry, dayMessages, latestDa
   if (entry?.useOriginal) return '原文 · 本日已切回';
   if (date === latestDate) return '原文 · 最近一天';
   if (!entry?.text) return '原文 · 还没有日记';
-  if (!diaryEntryIsCurrent(state, chat, entry, dayMessages)) return '原文 · 日记待更新';
+  if (!diaryEntryIsCurrent(state, chat, entry, dayMessages)) return '原文 · 日记保留';
   return '日记 · 发送时替换原文';
 }
 

@@ -136,7 +136,7 @@ test('diaryContextMode 各分支口径', () => {
   assert.equal(diaryContextMode(base, {}, '2026-11-10', { text: 'x', useOriginal: true }, [], ''), '原文 · 本日已切回');
   assert.equal(diaryContextMode(base, {}, '2026-11-10', { text: 'x' }, [], '2026-11-10'), '原文 · 最近一天');
   assert.equal(diaryContextMode(base, {}, '2026-11-10', {}, [], ''), '原文 · 还没有日记');
-  assert.equal(diaryContextMode(base, {}, '2026-11-10', { text: 'x' }, [], ''), '原文 · 日记待更新');
+  assert.equal(diaryContextMode(base, {}, '2026-11-10', { text: 'x' }, [], ''), '原文 · 日记保留');
 });
 
 test('diaryEntryIsCurrent：消息超阈值且原文/参数指纹一致才视为现行', () => {
@@ -178,9 +178,11 @@ test('diaryDayStatuses：跳过、待整理、已整理按原文指纹判定', (
   assert.equal(diaryDayStatuses(state, chat)[1].status, 'skipped');
   state.diary.contacts.c1['2026-11-09'] = { text: '整理好了', sourceFingerprint: diaryFingerprint(oldMessages) };
   assert.equal(diaryDayStatuses(state, chat)[0].status, 'summarized');
+  state.diary.contacts.c1['2026-11-09'] = { text: '旧正文', sourceFingerprint: '旧指纹' };
+  assert.equal(diaryDayStatuses(state, chat)[0].status, 'summarized');
 });
 
-test('diaryEntryMismatch 指出过期原因，已有正文仍标待更新', () => {
+test('diaryEntryMismatch 说明上下文为什么没替换，但已有正文仍显示已整理', () => {
   const messages = Array.from({ length: DIARY_SKIP_THRESHOLD + 1 }, (_, i) => msg('2026-11-11', { id: `x${i}`, text: `第${i}句` }));
   const state = { contacts: { c1: { name: '沈砚' } }, settings: { user: { name: '我' } }, users: [], characters: [], diary: { prompt: 'p', contacts: { c1: {} } } };
   const chat = { contactId: 'c1', messages };
@@ -191,11 +193,7 @@ test('diaryEntryMismatch 指出过期原因，已有正文仍标待更新', () =
   assert.equal(diaryEntryMismatch(state, chat, { ...entry, paramsFingerprint: '旧参数' }, messages), 'params');
 
   state.diary.contacts.c1['2026-11-11'] = { ...entry, sourceFingerprint: '旧指纹' };
-  const stale = diaryDayStatuses(state, chat).find(item => item.date === '2026-11-11');
-  assert.equal(stale.status, 'pending');
-  assert.equal(stale.staleReason, 'source');
-  state.diary.contacts.c1['2026-11-11'] = { ...entry, paramsFingerprint: '旧参数' };
-  assert.equal(diaryDayStatuses(state, chat).find(item => item.date === '2026-11-11').staleReason, 'params');
+  assert.equal(diaryDayStatuses(state, chat).find(item => item.date === '2026-11-11').status, 'summarized');
 });
 
 test('historyTranscript：旧日期已整理时替换原文，最近一天保持原文', () => {

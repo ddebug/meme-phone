@@ -345,45 +345,6 @@
   -webkit-backdrop-filter: blur(8px);
 }
 
-/* 首页左上角：直接进入最后说过话的那条会话 */
-.mp-recent-jump {
-  position: absolute;
-  z-index: 3;
-  top: 9px;
-  left: 12px;
-  max-width: calc(100% - 128px);
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, .66);
-  color: var(--accent-deep);
-  font: inherit;
-  font-size: calc(11px * var(--font-scale));
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .68);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-.mp-recent-jump::after {
-  content: "›";
-  margin-left: 1px;
-  color: var(--text-3);
-  font-weight: 600;
-  line-height: 1;
-}
-
-.mp-recent-jump:active { transform: scale(.96); }
-.mp-recent-jump .mp-i { width: 13px; height: 13px; flex: none; }
-.mp-recent-jump-label { color: var(--text-3); font-weight: 500; }
-.mp-recent-jump-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-
 .mp-profile-avatar {
   position: relative;
   z-index: 2;
@@ -530,20 +491,247 @@
 .mp-profile-loc .mp-i { width: 12px; height: 12px; }
 
 /* ------------------------------------------------------ 桌面图标网格 */
-.mp-apps {
+.mp-home-viewport {
+  position: relative;
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.mp-home-track {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  transition: transform .28s cubic-bezier(.22, .68, .38, 1);
+}
+
+.mp-home-page {
+  flex: 0 0 100%;
+  min-width: 0;
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-flow: row dense;
   justify-items: center;
   align-content: start;
-  row-gap: 8px;
-  padding: 14px 0 0;
+  column-gap: 6px;
+  row-gap: 10px;
+  padding: 14px 2px 4px;
   overflow-y: auto;
   scrollbar-width: none;
 }
 
-.mp-apps::-webkit-scrollbar { display: none; }
+.mp-home-page::-webkit-scrollbar { display: none; }
+
+.mp-home-dots {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 0 3px;
+}
+
+.mp-home-dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(82, 72, 112, .28);
+  cursor: pointer;
+  transition: transform .18s, background .18s, box-shadow .18s;
+}
+
+.mp-home-dot.is-on {
+  transform: scale(1.2);
+  background: rgba(112, 92, 188, .9);
+}
+
+.mp-home-dot.is-drop-target {
+  background: rgba(126, 106, 220, .95);
+  box-shadow: 0 0 0 4px rgba(126, 106, 220, .18);
+}
+
+.is-item-dragging .mp-home-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .82);
+  box-shadow: 0 4px 12px rgba(100, 84, 160, .22), inset 0 0 0 1px rgba(140, 120, 210, .24);
+}
+
+.is-item-dragging .mp-home-dot.is-on { background: rgba(126, 106, 220, .9); }
+
+.mp-home-page-title {
+  grid-column: 1 / -1;
+  justify-self: start;
+  align-self: center;
+  padding: 0 4px 2px;
+  font-size: calc(15px * var(--font-scale));
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: .01em;
+}
+
+.mp-home-viewport.is-swiping .mp-home-track { transition: none; }
+
+/* 两个双格屏幕小组件：各占两列，并排铺满一行 */
+.mp-home-widget {
+  grid-column: span 2;
+  width: 100%;
+  height: 92px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 12px;
+  border: 0;
+  border-radius: 20px;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mp-hw-recent {
+  background: linear-gradient(150deg, rgba(255, 240, 248, .92), rgba(238, 235, 255, .82));
+  box-shadow: 0 12px 24px rgba(120, 108, 180, .16), inset 0 0 0 1px rgba(255, 255, 255, .78);
+}
+
+.mp-hw-theme {
+  background: linear-gradient(150deg, rgba(255, 247, 210, .94), rgba(255, 255, 255, .72));
+  box-shadow: 0 12px 24px rgba(150, 130, 90, .14), inset 0 0 0 1px rgba(255, 255, 255, .78);
+}
+
+.mp-hw-theme.is-night {
+  background: linear-gradient(150deg, #4a426e, #29243f);
+  box-shadow: 0 12px 24px rgba(30, 24, 60, .3), inset 0 0 0 1px rgba(255, 255, 255, .12);
+}
+
+.mp-hw-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mp-hw-kicker {
+  font-size: calc(10px * var(--font-scale));
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--text-3);
+}
+
+.mp-hw-time {
+  flex: none;
+  font-size: calc(9.5px * var(--font-scale));
+  color: var(--text-3);
+}
+
+.mp-hw-main {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.mp-hw-avatar {
+  flex: none;
+  width: 31px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background-size: cover;
+  background-position: center;
+  color: #fff;
+  font-size: calc(13px * var(--font-scale));
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .48);
+}
+
+.mp-hw-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mp-hw-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(12.5px * var(--font-scale));
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mp-hw-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(10px * var(--font-scale));
+  color: var(--text-3);
+}
+
+.mp-hw-orb {
+  flex: none;
+  width: 31px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+}
+
+.mp-hw-theme:not(.is-night) .mp-hw-orb {
+  background: linear-gradient(150deg, #ffd870, #f4a94c);
+  box-shadow: 0 5px 12px rgba(220, 150, 60, .22);
+}
+
+.mp-hw-theme.is-night .mp-hw-orb {
+  background: rgba(255, 255, 255, .14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16);
+}
+
+.mp-hw-orb .mp-i { width: 18px; height: 18px; }
+.mp-hw-theme.is-night .mp-hw-kicker,
+.mp-hw-theme.is-night .mp-hw-time,
+.mp-hw-theme.is-night .mp-hw-preview { color: rgba(255, 255, 255, .62); }
+.mp-hw-theme.is-night .mp-hw-name { color: #fff; }
+
+[data-drag-id] {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.is-item-dragging { cursor: grabbing; }
+
+.mp-app.is-dragging,
+.mp-home-widget.is-dragging {
+  position: relative;
+  z-index: 20;
+  transition: none;
+  cursor: grabbing;
+  opacity: .9;
+}
+
+.mp-app.is-dragging .mp-tile,
+.mp-home-widget.is-dragging {
+  box-shadow: 0 24px 46px rgba(90, 74, 150, .3), inset 0 0 0 1px rgba(255, 255, 255, .72);
+}
+
+.mp-app.is-drop-target .mp-tile,
+.mp-home-widget.is-drop-target {
+  box-shadow: 0 0 0 2px rgba(139, 118, 233, .55), 0 14px 28px rgba(120, 100, 200, .24);
+}
+
+.mp-app.is-drop-target .mp-tile { transform: scale(1.03); }
+.mp-app .mp-tile { transform-origin: center; }
 
 .mp-app {
   display: flex;

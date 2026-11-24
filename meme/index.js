@@ -72,14 +72,14 @@ const APPS = {
 };
 
 const DESKTOP_APPS = [
-  { id: 'parallel', name: '平行时空', icon: 'parallel' },
-  { id: 'extras', name: '小剧场', icon: 'theater' },
-  { id: 'music', name: '音乐', icon: 'music' },
-  { id: 'draw', name: '绘图', icon: 'image' },
-  { id: 'plans', name: '计划', icon: 'plan' },
-  { id: 'dress', name: '装扮', icon: 'brush' },
-  { id: 'presets', name: '预设', icon: 'reply' },
-  { id: 'api', name: '接口', icon: 'code' },
+  { id: 'parallel', name: '平行时空', icon: 'parallel', screen: 1 },
+  { id: 'extras', name: '小剧场', icon: 'theater', screen: 1 },
+  { id: 'music', name: '音乐', icon: 'music', screen: 1 },
+  { id: 'draw', name: '绘图', icon: 'image', screen: 1 },
+  { id: 'plans', name: '计划', icon: 'plan', screen: 2 },
+  { id: 'dress', name: '装扮', icon: 'brush', screen: 2 },
+  { id: 'presets', name: '预设', icon: 'reply', screen: 2 },
+  { id: 'api', name: '接口', icon: 'code', screen: 2 },
 ];
 
 const DOCK_APPS = [

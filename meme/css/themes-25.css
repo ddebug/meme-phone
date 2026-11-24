@@ -905,7 +905,7 @@
   height: 98px;
 }
 
-.mp-root[data-mp-art="pixel"] .mp-apps {
+.mp-root[data-mp-art="pixel"] .mp-home-page {
   padding-top: 7px;
   row-gap: 5px;
 }

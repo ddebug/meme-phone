@@ -8,7 +8,7 @@
 import { icon as ico, TINT } from './icons.js';
 import { PIXEL_BUNNY } from './theme-data.js';
 import {
-  unreadTotal, dayKey, chatsOf, contactById,
+  unreadTotal, dayKey, chatsOf, contactById, lastMessage, messagePreview,
 } from './data.js';
 
 export function esc(text) {
@@ -206,6 +206,7 @@ export function createShell(options) {
     baseViewport: readViewport(),
     scroller: null,
     bioEdit: false,
+    homePage: 0,
     deviceOffset: { x: 0, y: 0 },
   };
 
@@ -237,23 +238,282 @@ export function createShell(options) {
       .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0))[0] || null;
   }
 
+  /* 两个双格小组件 + 桌面 App；布局按屏保存在 settings.desktop.pages 里。 */
+  const homeWidgets = [
+    { id: 'widget-recent', name: '最近聊天', type: 'widget' },
+    { id: 'widget-theme', name: '显示模式', type: 'widget' },
+  ];
+  const homeItems = new Map([
+    ...homeWidgets.map(item => [item.id, item]),
+    ...desktopApps.map(app => [app.id, { ...app, type: 'app' }]),
+  ]);
+  const HOME_SCREEN_COUNT = 2;
+
+  function defaultHomePages() {
+    const pages = Array.from({ length: HOME_SCREEN_COUNT }, () => []);
+    homeWidgets.forEach(item => pages[0].push(item.id));
+    desktopApps.forEach(app => pages[Number(app.screen) === 2 ? 1 : 0].push(app.id));
+    return pages;
+  }
+
+  function homePages() {
+    const fallback = defaultHomePages();
+    const raw = ctx.state?.settings?.desktop?.pages;
+    if (!Array.isArray(raw)) return fallback;
+    const pages = Array.from({ length: HOME_SCREEN_COUNT }, () => []);
+    const seen = new Set();
+    raw.slice(0, HOME_SCREEN_COUNT).forEach((list, pageIndex) => {
+      if (!Array.isArray(list)) return;
+      list.forEach(id => {
+        const key = String(id || '');
+        if (!homeItems.has(key) || seen.has(key)) return;
+        seen.add(key);
+        pages[pageIndex].push(key);
+      });
+    });
+    /* 老存档或以后新增的入口：按默认所属屏补回，不丢入口。 */
+    homeItems.forEach((item, id) => {
+      if (seen.has(id)) return;
+      const pageIndex = item.type === 'widget' || Number(item.screen) !== 2 ? 0 : 1;
+      pages[pageIndex].push(id);
+    });
+    return pages;
+  }
+
+  function saveHomePages(pages) {
+    const settings = ctx.state.settings;
+    settings.desktop = { ...(settings.desktop || {}), pages: pages.map(list => list.slice()) };
+    ctx.save();
+  }
+
+  function homePreview(chat) {
+    const last = lastMessage(chat);
+    if (!last) return '还没有消息';
+    const text = String(messagePreview(last) || '').replace(/\s+/g, ' ').trim();
+    if (!text) return last.image ? '[图片]' : '还没有消息';
+    return text.length > 22 ? `${text.slice(0, 22)}…` : text;
+  }
+
+  function recentWidgetHtml(pageIndex, recentChat, recentContact) {
+    const name = recentContact?.name || (recentChat ? '聊天' : '还没有聊天');
+    const preview = recentChat ? homePreview(recentChat) : '';
+    const stamp = recentChat ? clockText(new Date(Number(recentChat.updatedAt) || Date.now())) : '';
+    return `
+      <button class="mp-home-widget mp-hw-recent" data-drag-id="widget-recent" data-page="${pageIndex}" data-act="open-recent"${recentChat ? ` data-chat="${esc(recentChat.id)}"` : ''} type="button" aria-label="最近聊天">
+        <span class="mp-hw-top"><span class="mp-hw-kicker">最近聊天</span><span class="mp-hw-time">${esc(stamp)}</span></span>
+        <span class="mp-hw-main">
+          ${avatarHtml(name, recentContact?.avatar || '', 'mp-hw-avatar')}
+          <span class="mp-hw-copy"><span class="mp-hw-name">${esc(name)}</span><span class="mp-hw-preview">${esc(preview)}</span></span>
+        </span>
+      </button>`;
+  }
+
+  function themeWidgetHtml(pageIndex, state) {
+    const night = state.settings.theme === 'night';
+    return `
+      <button class="mp-home-widget mp-hw-theme${night ? ' is-night' : ''}" data-drag-id="widget-theme" data-page="${pageIndex}" data-act="toggle-theme" type="button" aria-label="${night ? '切换到日间模式' : '切换到夜间模式'}">
+        <span class="mp-hw-top"><span class="mp-hw-kicker">显示模式</span><span class="mp-hw-time">${night ? '夜间' : '日间'}</span></span>
+        <span class="mp-hw-main">
+          <span class="mp-hw-orb">${ico(night ? 'moon' : 'sun')}</span>
+          <span class="mp-hw-copy"><span class="mp-hw-name">${night ? '夜间模式' : '日间模式'}</span><span class="mp-hw-preview">${night ? '深色背景' : '浅色背景'}</span></span>
+        </span>
+      </button>`;
+  }
+
+  function homeItemHtml(id, pageIndex, state) {
+    const item = homeItems.get(id);
+    if (!item) return '';
+    if (id === 'widget-recent') {
+      const recentChat = recentChatOf(state);
+      const recentContact = recentChat ? contactById(state, recentChat.contactId) : null;
+      return recentWidgetHtml(pageIndex, recentChat, recentContact);
+    }
+    if (id === 'widget-theme') return themeWidgetHtml(pageIndex, state);
+    const app = item;
+    return `
+      <button class="mp-app" data-drag-id="${esc(app.id)}" data-page="${pageIndex}" data-act="open-app" data-app="${esc(app.id)}" type="button" aria-label="${esc(app.name)}">
+        ${appTileHtml(app, state)}
+        <span class="mp-app-label">${esc(app.name)}</span>
+      </button>`;
+  }
+
+  function pageIndexSafe() {
+    return Math.max(0, Math.min(HOME_SCREEN_COUNT - 1, Number(shell.homePage) || 0));
+  }
+
+  function setHomePage(index) {
+    const next = Math.max(0, Math.min(HOME_SCREEN_COUNT - 1, Number(index) || 0));
+    shell.homePage = next;
+    const track = root.querySelector('.mp-home-track');
+    if (track) track.style.transform = `translate3d(-${next * 100}%,0,0)`;
+    root.querySelectorAll('.mp-home-dot').forEach(dot => {
+      const on = Number(dot.dataset.page) === next;
+      dot.classList.toggle('is-on', on);
+      dot.setAttribute('aria-current', on ? 'true' : 'false');
+    });
+  }
+
+  /* 拖动：按落点重排当前屏；拖到页点则整项移到另一屏。 */
+  let drag = null;
+  let homeSwipe = null;
+  let suppressClickUntil = 0;
+
+  function dragHitAt(x, y, source) {
+    const node = document.elementFromPoint(x, y);
+    if (!node) return null;
+    const dot = node.closest('.mp-home-dot[data-page-drop]');
+    if (dot) return { type: 'dot', page: Number(dot.dataset.pageDrop), el: dot };
+    const item = node.closest('[data-drag-id]');
+    if (item && item.dataset.dragId !== source.id) {
+      return { type: 'item', page: Number(item.dataset.page), id: item.dataset.dragId, el: item };
+    }
+    const page = node.closest('[data-home-page]');
+    if (page) return { type: 'page', page: Number(page.dataset.homePage), el: page };
+    return null;
+  }
+
+  function clearDragMarks() {
+    root.querySelectorAll('.is-drop-target').forEach(node => node.classList.remove('is-drop-target'));
+  }
+
+  function finishDrag(event, cancelled = false) {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const current = drag;
+    drag = null;
+    root.classList.remove('is-item-dragging');
+    current.node.classList.remove('is-dragging');
+    current.node.style.transform = '';
+    clearDragMarks();
+    if (cancelled || !current.active) return;
+    suppressClickUntil = Date.now() + 400;
+    const target = dragHitAt(event.clientX, event.clientY, current);
+    if (!target) return;
+
+    const pages = homePages();
+    const sourcePage = Number(current.page);
+    const from = pages[sourcePage]?.indexOf(current.id) ?? -1;
+    if (from < 0) return;
+    const destPage = target.page;
+    if (!pages[destPage]) return;
+
+    if (target.type === 'dot' && destPage === sourcePage) return;
+    pages[sourcePage].splice(from, 1);
+    let at = pages[destPage].length;
+    if (target.type === 'item') {
+      at = pages[destPage].indexOf(target.id);
+      if (at < 0) at = pages[destPage].length;
+      const box = target.el.getBoundingClientRect();
+      if (event.clientX > box.left + box.width / 2) at += 1;
+    }
+    pages[destPage].splice(at, 0, current.id);
+    saveHomePages(pages);
+    shell.homePage = destPage;
+    render();
+  }
+
+  root.addEventListener('pointerdown', event => {
+    if (shell.stack.length || shell.sheet) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const node = event.target instanceof Element ? event.target.closest('[data-drag-id]') : null;
+    if (!node || !root.contains(node)) return;
+    drag = {
+      id: node.dataset.dragId,
+      page: Number(node.dataset.page) || 0,
+      node,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      x: event.clientX,
+      y: event.clientY,
+      active: false,
+    };
+  });
+
+  root.addEventListener('pointermove', event => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    if (!drag.active) {
+      if (Math.hypot(dx, dy) < 8) return;
+      drag.active = true;
+      drag.node.classList.add('is-dragging');
+      root.classList.add('is-item-dragging');
+      try { drag.node.setPointerCapture(event.pointerId); } catch { /* 触摸设备不支持也不影响 */ }
+    }
+    if (event.cancelable) event.preventDefault();
+    drag.x = event.clientX;
+    drag.y = event.clientY;
+    drag.node.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(1.035)`;
+    const hit = dragHitAt(event.clientX, event.clientY, drag);
+    clearDragMarks();
+    if (hit && (hit.type === 'item' || hit.type === 'dot')) hit.el.classList.add('is-drop-target');
+  });
+
+  root.addEventListener('pointerup', event => finishDrag(event));
+  root.addEventListener('pointercancel', event => finishDrag(event, true));
+
+  /* 空白处左右滑：翻到另一屏；从 App / 小组件上起手仍然是拖动，不抢手势。 */
+  function finishHomeSwipe(event, cancelled = false) {
+    if (!homeSwipe || event.pointerId !== homeSwipe.pointerId) return;
+    const current = homeSwipe;
+    homeSwipe = null;
+    current.view.classList.remove('is-swiping');
+    if (cancelled || !current.active) { setHomePage(current.startPage); return; }
+    suppressClickUntil = Date.now() + 250;
+    const dx = event.clientX - current.startX;
+    const threshold = Math.max(36, current.width * .16);
+    let next = current.startPage;
+    if (dx < -threshold && next < HOME_SCREEN_COUNT - 1) next += 1;
+    else if (dx > threshold && next > 0) next -= 1;
+    setHomePage(next);
+  }
+
+  root.addEventListener('pointerdown', event => {
+    if (drag || shell.stack.length || shell.sheet) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const node = event.target instanceof Element ? event.target : null;
+    if (!node || node.closest('[data-act], [data-drag-id], input, textarea, select')) return;
+    const view = node.closest('.mp-home-viewport');
+    if (!view) return;
+    homeSwipe = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startPage: pageIndexSafe(),
+      width: view.clientWidth || 1,
+      view,
+      active: false,
+    };
+  });
+
+  root.addEventListener('pointermove', event => {
+    if (!homeSwipe || drag || event.pointerId !== homeSwipe.pointerId) return;
+    const dx = event.clientX - homeSwipe.startX;
+    const dy = event.clientY - homeSwipe.startY;
+    if (!homeSwipe.active) {
+      if (Math.abs(dx) < 10 || Math.abs(dx) <= Math.abs(dy)) return;
+      homeSwipe.active = true;
+      homeSwipe.view.classList.add('is-swiping');
+    }
+    if (event.cancelable) event.preventDefault();
+    const track = homeSwipe.view.querySelector('.mp-home-track');
+    if (track) track.style.transform = `translate3d(${-homeSwipe.startPage * homeSwipe.width + dx}px,0,0)`;
+  });
+
+  root.addEventListener('pointerup', event => finishHomeSwipe(event));
+  root.addEventListener('pointercancel', event => finishHomeSwipe(event, true));
+
   function desktopHtml() {
     const state = ctx.state;
     const themeArt = state.settings.dress?.theme === 'pixel' ? PIXEL_BUNNY : null;
     const { myName, myAvatar, myBio } = desktopIdentity(state);
-    const recentChat = recentChatOf(state);
-    const recentContact = recentChat ? contactById(state, recentChat.contactId) : null;
     const ownBanner = String(state.settings.profile?.banner || '').trim();
     const themedBanner = themeArt ? themeArt.banner : '';
     const bannerImage = ownBanner || themedBanner;
     const bannerStyle = bannerImage ? ` style="background-image:url(&quot;${bannerImage}&quot;);background-size:cover;background-position:center"` : '';
     const stampText = dateText().replace('<br>', ' · ');
-
-    const iconButtons = desktopApps.map(app => `
-      <button class="mp-app" data-act="open-app" data-app="${app.id}" type="button" aria-label="${esc(app.name)}">
-        ${appTileHtml(app, state)}
-        <span class="mp-app-label">${esc(app.name)}</span>
-      </button>`).join('');
+    const pages = homePages();
+    const pageIndex = pageIndexSafe();
 
     const dockButtons = dockApps.map(app => {
       const badge = app.id === 'chat' ? unreadTotal(state) : 0;
@@ -263,6 +523,13 @@ export function createShell(options) {
         <span class="mp-app-label">${esc(app.name)}</span>
       </button>`;
     }).join('');
+    const homePageHtml = pages.map((ids, index) => `
+      <div class="mp-home-page" data-home-page="${index}">
+        ${index === 1 ? '<div class="mp-home-page-title">设置</div>' : ''}
+        ${ids.map(id => homeItemHtml(id, index, state)).join('')}
+      </div>`).join('');
+    const homeDotsHtml = pages.map((_, index) => `
+      <button class="mp-home-dot${index === pageIndex ? ' is-on' : ''}" data-act="home-page" data-page="${index}" data-page-drop="${index}" type="button" aria-label="第 ${index + 1} 屏" aria-current="${index === pageIndex ? 'true' : 'false'}"></button>`).join('');
 
     return `
       <div class="mp-desktop">
@@ -270,10 +537,6 @@ export function createShell(options) {
           <span class="mp-profile-banner${bannerImage ? ' is-custom' : ''}" data-act="profile-banner"${bannerStyle} title="点一下换背景图">
             <span class="mp-profile-stamp">${stampText}</span>
           </span>
-          ${recentChat ? `
-          <button class="mp-recent-jump" data-act="open-recent" data-chat="${esc(recentChat.id)}" type="button" aria-label="打开最近聊天：${esc(recentContact?.name || '')}" title="进入最近聊天">
-            ${ico('chat')}<span class="mp-recent-jump-label">最近聊天</span><span class="mp-recent-jump-name">${esc(recentContact?.name || '聊天')}</span>
-          </button>` : ''}
           <span class="mp-profile-avatar${myAvatar ? '' : ' is-empty'}" data-act="open-app" data-app="user"${myAvatar ? ` style="background-image:url(&quot;${myAvatar}&quot;)"` : ''}>${myAvatar ? '' : esc(String(myName).slice(0, 1))}</span>
           <span class="mp-profile-name" data-act="open-app" data-app="user">${esc(myName)}</span>
           ${shell.bioEdit ? `
@@ -289,7 +552,12 @@ export function createShell(options) {
         </div>
         <input id="mpProfileBanner" type="file" accept="image/*" style="position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0">
 
-        <div class="mp-apps">${iconButtons}</div>
+        <div class="mp-home-viewport">
+          <div class="mp-home-track" style="transform:translate3d(-${pageIndex * 100}%,0,0)">
+            ${homePageHtml}
+          </div>
+        </div>
+        <div class="mp-home-dots">${homeDotsHtml}</div>
 
         <div class="mp-dock">${dockButtons}</div>
       </div>`;
@@ -594,6 +862,7 @@ export function createShell(options) {
       shell.live = { inputValue: '', focus: false };
       ctx.go('thread', { chatId: chat.id });
     },
+    'home-page': (data) => { setHomePage(Number(data.page)); },
     'home': () => { shell.live = { inputValue: '', focus: false }; ctx.home(); },
     'back': () => { if (shell.sheet) ctx.closeSheet(); else ctx.back(); },
     'sheet-close': () => ctx.closeSheet(),
@@ -680,6 +949,11 @@ export function createShell(options) {
   };
 
   root.addEventListener('click', event => {
+    if (Date.now() < suppressClickUntil) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     /* 原生 <select> / <input> 的取值只走下面的 change 事件；click 阶段还没有选中值，
        不能按按钮动作执行，否则打开下拉或聚焦输入框时会被默认值保存并整页重渲染。 */
     if (event.target.closest('select[data-act], input[data-act], textarea[data-act]')) return;

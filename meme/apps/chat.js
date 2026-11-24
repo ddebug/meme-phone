@@ -523,7 +523,7 @@ function settingsBody(ctx, chatId) {
   const replyItemCount = replyItems.filter(item => item.kind === 'chat').length;
   const replyAppCount = replyItems.filter(item => item.kind === 'app').length;
   const injectedCount = replyItems.filter(item => item.kind === 'context' && item.enabled).length;
-  const replySub = `${replyName} · ${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
+  const replySub = `${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
   const behavior = behaviorSettings(state, chat);
   const historyConfig = chatHistoryFor(chat);
   const tavern = effectiveTavernHistory(state, chat, memoryPresetFor(state, chat));
@@ -547,12 +547,6 @@ function settingsBody(ctx, chatId) {
     '只改这个角色',
   ].join(' · ');
 
-  const effectiveLines = [
-    ['用哪个模型', llmName],
-    ['怎么回复', replyName],
-    ['参考什么', `酒馆记忆 ${memoryEffectiveSummary(state, chat.contactId, activeMemory)} · 小手机历史 ${phoneCountLabel}`],
-  ];
-
   return `
     <div class="mp-page-body">
 
@@ -563,11 +557,6 @@ function settingsBody(ctx, chatId) {
           <div class="mp-chat-set-sub">${esc(status)}</div>
         </div>
         ${chat.pinned ? `<span class="mp-pill">置顶</span>` : ''}
-      </div>
-
-      <div class="mp-card" style="margin-top:12px">
-        <div class="mp-card-title">这条会话实际用到的</div>
-        ${effectiveLines.map(([label, value]) => `<div class="mp-card-sub">${esc(label)}：${esc(value)}</div>`).join('')}
       </div>
 
       <div class="mp-group" style="margin-top:16px">

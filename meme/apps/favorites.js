@@ -23,7 +23,6 @@ export const favoritesApp = {
 
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">收藏</div>
         ${rows || '<div class="mp-empty">还没有收藏。<br>在聊天里长按一条消息，点「收藏这条」。</div>'}
       </div>`;
   },

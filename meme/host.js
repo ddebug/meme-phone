@@ -221,7 +221,10 @@ export async function setWorldEntryEnabled(bookName, uid, disabled) {
 /** 当前打开的酒馆聊天，用来给日记、主动消息提供素材。 */
 export async function readTavernContext() {
   const script = await loadHostScript();
-  if (!script) return { userName: '我', chat: [], characterName: '', characterAvatar: '', chatFile: '' };
+  if (!script) return {
+    userName: '我', chat: [], characterName: '', characterAvatar: '',
+    chatFile: '', chatId: '', metadata: null,
+  };
   try {
     const userName = script.name1 || script.getContext?.()?.name1 || '我';
     const chat = Array.isArray(script.chat) ? script.chat.map(line => ({
@@ -237,9 +240,14 @@ export async function readTavernContext() {
       characterName: character?.name || '',
       characterAvatar: character?.avatar || '',
       chatFile: character?.chat || '',
+      chatId: String(script.getCurrentChatId?.() || script.chatId || ''),
+      metadata: script.chatMetadata || null,
     };
   } catch {
-    return { userName: '我', chat: [], characterName: '', characterAvatar: '', chatFile: '' };
+    return {
+      userName: '我', chat: [], characterName: '', characterAvatar: '',
+      chatFile: '', chatId: '', metadata: null,
+    };
   }
 }
 
@@ -275,50 +283,61 @@ function latestScore(item) {
  * 这个角色在酒馆里关联的最新聊天。
  * 先问酒馆的聊天文件列表，挑最近一条；列表读不到就退回角色卡上的当前聊天文件。
  */
-export async function readLatestTavernChat({ name = '', avatar = '', floors = 10, includeMemory = false } = {}) {
+export async function readLatestTavernChat({
+  name = '', avatar = '', floors = 10, includeMemory = false, file = '', chatId = '',
+} = {}) {
   const script = await loadHostScript();
-  const empty = { available: false, file: '', characterName: name, lines: [], total: 0, metadata: null, messages: [] };
+  const empty = {
+    available: false, file: '', chatId: '', characterName: name,
+    lines: [], total: 0, metadata: null, messages: [],
+  };
   if (!script || !Array.isArray(script.characters)) return empty;
   const character = script.characters.find(item => item && avatar && item.avatar === avatar)
     || script.characters.find(item => item && item.name === name);
   if (!character) return empty;
 
   const headers = await hostRequestHeaders(script);
-  let file = String(character.chat || '').trim();
+  let pickedFile = String(file || '').replace(/\.jsonl$/i, '').trim();
   let latestMeta = null;
 
-  try {
-    const response = await fetch('/api/characters/chats', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ avatar_url: character.avatar || character.name }),
-      credentials: 'same-origin',
-      cache: 'no-store',
-    });
-    if (response.ok) {
-      const data = await response.json().catch(() => null);
-      const list = Array.isArray(data) ? data : Object.values(data && typeof data === 'object' ? data : {});
-      const sorted = list
-        .filter(item => item && typeof item === 'object' && (item.file_name || item.fileName))
-        .map(item => ({ ...item, file_name: item.file_name || item.fileName }))
-        .sort((a, b) => latestScore(b) - latestScore(a));
-      if (sorted.length) {
-        file = sorted[0].file_name;
-        latestMeta = sorted[0];
+  /* 指定了具体聊天文件（某角色的里世界手机）就不去猜“最新”：读的就是这一份。 */
+  if (!pickedFile) {
+    try {
+      const response = await fetch('/api/characters/chats', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ avatar_url: character.avatar || character.name }),
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      if (response.ok) {
+        const data = await response.json().catch(() => null);
+        const list = Array.isArray(data) ? data : Object.values(data && typeof data === 'object' ? data : {});
+        const sorted = list
+          .filter(item => item && typeof item === 'object' && (item.file_name || item.fileName))
+          .map(item => ({ ...item, file_name: item.file_name || item.fileName }))
+          .sort((a, b) => latestScore(b) - latestScore(a));
+        if (sorted.length) {
+          pickedFile = sorted[0].file_name;
+          latestMeta = sorted[0];
+        }
       }
-    }
-  } catch { /* 列表接口不可用就继续用角色卡上的 chat */ }
+    } catch { /* 列表接口不可用就继续用角色卡上的 chat */ }
+  } else {
+    pickedFile = String(pickedFile).replace(/\.jsonl$/i, '');
+  }
+  if (!pickedFile) pickedFile = String(character.chat || '').trim();
 
   let raw = [];
   let metadata = null;
-  if (file) {
+  if (pickedFile) {
     try {
       const response = await fetch('/api/chats/get', {
         method: 'POST',
         headers,
         body: JSON.stringify({
           ch_name: character.name,
-          file_name: String(file).replace(/\.jsonl$/i, ''),
+          file_name: String(pickedFile).replace(/\.jsonl$/i, ''),
           avatar_url: character.avatar || character.name,
         }),
         credentials: 'same-origin',
@@ -334,9 +353,11 @@ export async function readLatestTavernChat({ name = '', avatar = '', floors = 10
     } catch { raw = []; }
   }
 
-  if (!raw.length && script.characters?.[script.this_chid]?.avatar === character.avatar && Array.isArray(script.chat)) {
+  const currentKey = String(character.chat || '').replace(/\.jsonl$/i, '');
+  if (!raw.length && script.characters?.[script.this_chid]?.avatar === character.avatar
+    && Array.isArray(script.chat) && (!pickedFile || pickedFile === currentKey)) {
     raw = script.chat;
-    file = String(character.chat || '当前聊天');
+    pickedFile = String(character.chat || '当前聊天');
     metadata = script.chatMetadata || null;
   }
 
@@ -358,7 +379,8 @@ export async function readLatestTavernChat({ name = '', avatar = '', floors = 10
 
   return {
     available: Boolean(lines.length),
-    file: file || '',
+    file: pickedFile || '',
+    chatId: String(chatId || pickedFile || ''),
     characterName: character.name,
     lines,
     total: raw.length,
@@ -366,6 +388,72 @@ export async function readLatestTavernChat({ name = '', avatar = '', floors = 10
     metadata: includeMemory ? metadata : null,
     messages: includeMemory ? raw : [],
   };
+}
+
+/**
+ * 把里世界手机的一轮对话写回原聊天文件。
+ *
+ * 写法是「隐藏 system 楼层 + message.extra.memePhone」：
+ * - 不新增 user 楼层，聊天里不会多出一条“我”说的话；
+ * - 不追加到上一条正文，避免把原聊天最后一段改脏；
+ * - system 楼层在酒馆界面默认不显示，也不会被当成角色发言；
+ * - extra 里带 worldPhoneId / turnId / 剧情日期，手机下次可以按 turnId 去重。
+ *
+ * 目标聊天没在酒馆里打开时返回 queued，由世界层留在队列里等下次。
+ */
+export async function appendTavernHiddenFloor({
+  chatId = '', chatFile = '', text = '', extra = {},
+} = {}) {
+  const script = await loadHostScript();
+  if (!script) return { ok: false, queued: false, reason: '不在酒馆里，写不回聊天文件' };
+  const chat = Array.isArray(script.chat) ? script.chat : null;
+  if (!chat) return { ok: false, queued: false, reason: '拿不到酒馆当前聊天' };
+  const currentId = String(script.getCurrentChatId?.() || script.chatId || '');
+  const currentCharacter = Array.isArray(script.characters)
+    ? script.characters[script.characterId ?? script.this_chid]
+    : null;
+  const currentFile = String(currentCharacter?.chat || '');
+  const expectedId = String(chatId || '');
+  const expectedFile = String(chatFile || '').replace(/\.jsonl$/i, '');
+  const currentFileKey = currentFile.replace(/\.jsonl$/i, '');
+  if (expectedId && currentId && expectedId !== currentId && !expectedFile) {
+    return { ok: false, queued: true, reason: '目标聊天没打开' };
+  }
+  if (expectedFile && currentFileKey && expectedFile !== currentFileKey) {
+    return { ok: false, queued: true, reason: '目标聊天文件没打开' };
+  }
+  if (!expectedId && !expectedFile) return { ok: false, queued: true, reason: '没有绑定聊天文件' };
+
+  const ctx = globalThis.SillyTavern?.getContext?.() || script;
+  const save = typeof ctx.saveChat === 'function' ? ctx.saveChat.bind(ctx)
+    : typeof script.saveChat === 'function' ? script.saveChat.bind(script)
+      : null;
+  if (!save) return { ok: false, queued: false, reason: '酒馆没有提供 saveChat' };
+
+  const floor = {
+    name: 'meme-phone',
+    is_user: false,
+    is_system: true,
+    mes: String(text || ''),
+    send_date: new Date().toISOString(),
+    extra: {
+      memePhone: {
+        version: 1,
+        ...extra,
+        text: String(text || ''),
+      },
+    },
+  };
+  chat.push(floor);
+  try {
+    await save();
+    return { ok: true, queued: false, floor };
+  } catch (error) {
+    /* 保存失败就把刚推入的楼层撤掉，别让内存和文件不一致。 */
+    const index = chat.indexOf(floor);
+    if (index >= 0) chat.splice(index, 1);
+    return { ok: false, queued: false, reason: error?.message || '保存聊天失败' };
+  }
 }
 
 export async function readUserAvatar() {
@@ -456,6 +544,7 @@ export async function readOpenTavernChat() {
   const empty = {
     available: false, reason: '', characterName: '', characterAvatar: '', chatFile: '', chatId: '',
     presetName: '', forkFloor: 0, snapshot: 'live', base: [], memory: { engine: '', text: '', coverage: null },
+    metadata: null,
   };
   if (!script) return { ...empty, reason: '不在酒馆里，读不到聊天文件' };
   const chat = Array.isArray(script.chat) ? script.chat : [];
@@ -474,6 +563,7 @@ export async function readOpenTavernChat() {
     snapshot: 'live',
     base: [],
     memory: readTavernMemory(),
+    metadata: script.chatMetadata || null,
   };
 }
 

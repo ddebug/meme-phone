@@ -136,6 +136,54 @@
 .mp-status-back:active { transform: scale(.94); }
 .mp-status .mp-status-back .mp-i { width: 19px; height: 19px; }
 
+/* 双世界：里世界标签 + 翻面按钮。 */
+.mp-world-chip {
+  pointer-events: auto;
+  margin-left: 8px;
+  max-width: 190px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .52);
+  color: var(--text-2);
+  font: inherit;
+  font-size: calc(10.5px * var(--font-scale));
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.mp-flip-btn {
+  pointer-events: auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .5);
+  color: var(--accent-deep);
+  cursor: pointer;
+  transition: transform .32s ease;
+}
+
+.mp-flip-btn:active { transform: rotate(180deg) scale(.94); }
+.mp-flip-btn .mp-i { width: 15px; height: 15px; }
+
+/* 翻面时整块屏幕做一下翻转，不打断页面逻辑。 */
+.mp-screen.is-flipping { animation: mp-flip .42s ease; }
+@keyframes mp-flip {
+  0% { transform: rotateY(0); }
+  50% { transform: rotateY(88deg); }
+  51% { transform: rotateY(-88deg); }
+  100% { transform: rotateY(0); }
+}
+
 /* 返回键统一放到状态栏左边，页面里的旧返回键不再重复显示 */
 .mp-nav .mp-back[data-act="back"],
 .mp-thread-head .mp-back[data-act="back"],

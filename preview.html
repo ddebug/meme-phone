@@ -236,6 +236,54 @@ body {
 .mp-status-back:active { transform: scale(.94); }
 .mp-status .mp-status-back .mp-i { width: 19px; height: 19px; }
 
+/* 双世界：里世界标签 + 翻面按钮。 */
+.mp-world-chip {
+  pointer-events: auto;
+  margin-left: 8px;
+  max-width: 190px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .52);
+  color: var(--text-2);
+  font: inherit;
+  font-size: calc(10.5px * var(--font-scale));
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.mp-flip-btn {
+  pointer-events: auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .5);
+  color: var(--accent-deep);
+  cursor: pointer;
+  transition: transform .32s ease;
+}
+
+.mp-flip-btn:active { transform: rotate(180deg) scale(.94); }
+.mp-flip-btn .mp-i { width: 15px; height: 15px; }
+
+/* 翻面时整块屏幕做一下翻转，不打断页面逻辑。 */
+.mp-screen.is-flipping { animation: mp-flip .42s ease; }
+@keyframes mp-flip {
+  0% { transform: rotateY(0); }
+  50% { transform: rotateY(88deg); }
+  51% { transform: rotateY(-88deg); }
+  100% { transform: rotateY(0); }
+}
+
 /* 返回键统一放到状态栏左边，页面里的旧返回键不再重复显示 */
 .mp-nav .mp-back[data-act="back"],
 .mp-thread-head .mp-back[data-act="back"],
@@ -1090,6 +1138,33 @@ body {
 
 .mp-row:active { transform: scale(.988); }
 .mp-row + .mp-row { margin-top: 8px; }
+
+/* 会话行右侧的「进入里世界手机」入口：单独一颗按钮，不嵌在整行按钮里。 */
+.mp-row-shell {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.mp-row-shell + .mp-row-shell { margin-top: 8px; }
+.mp-row-shell .mp-row { flex: 1; min-width: 0; }
+.mp-row-shell .mp-row + .mp-row { margin-top: 0; }
+
+.mp-row-world {
+  flex: 0 0 auto;
+  width: 42px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-m);
+  background: var(--card);
+  color: var(--accent-deep);
+  cursor: pointer;
+  box-shadow: var(--shadow-s);
+}
+
+.mp-row-world:active { transform: scale(.96); }
+.mp-row-world .mp-i { width: 19px; height: 19px; }
 
 .mp-row-main { flex: 1; min-width: 0; }
 
@@ -9295,7 +9370,7 @@ __mods["meme/data.js"] = function(module, exports, __req){
 const { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT, DEFAULT_PROACTIVE_PROMPT, PROACTIVE_PROMPT_MAX_LENGTH } = __req("meme/preset-defaults.js");
 const { normalizeBehavior, behaviorPreview } = __req("meme/behavior.js");
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 /* 回复预设除了「怎么说」，还要决定「给模型看哪些上下文」。
  * 这一组开关沿用旧独立小手机的 QQ 预设：角色档案、用户设定、聊天记录、记忆、时间。 */
@@ -9845,6 +9920,12 @@ function emptyState() {
     friendRequests: [],
     signatures: { byContact: {} },
     dress: { accent: '#8e7bf2' },
+    /* Meta 是唯一那台；里世界按聊天 / 角色分别存实例快照。 */
+    metaPhone: null,
+    worldPhones: {},
+    phoneSurface: 'meta',
+    activeWorldId: '',
+    lastWorldId: '',
   };
 }
 
@@ -11571,6 +11652,24 @@ function normalize(raw) {
       legacy: Boolean(theater?.legacy),
     };
   }
+  /* v3：双世界。老存档读进来时，顶层这一份就是 Meta；里世界实例随后由 world 层补。 */
+  merged.version = Math.max(Number(merged.version) || 0, SCHEMA_VERSION);
+  merged.phoneSurface = ['meta', 'world'].includes(raw.phoneSurface) ? raw.phoneSurface : 'meta';
+  merged.activeWorldId = String(raw.activeWorldId || '');
+  merged.lastWorldId = String(raw.lastWorldId || '');
+  merged.worldPhones = raw.worldPhones && typeof raw.worldPhones === 'object' && !Array.isArray(raw.worldPhones)
+    ? raw.worldPhones
+    : {};
+  merged.metaPhone = raw.metaPhone && typeof raw.metaPhone === 'object' && !Array.isArray(raw.metaPhone)
+    ? raw.metaPhone
+    : null;
+  Object.values(merged.chats).forEach(chat => {
+    if (!chat || typeof chat !== 'object') return;
+    if (chat.tavernFile) chat.tavernFile = String(chat.tavernFile).replace(/\.jsonl$/i, '');
+    if (chat.tavernChatId) chat.tavernChatId = String(chat.tavernChatId);
+    if (chat.worldPhoneId) chat.worldPhoneId = String(chat.worldPhoneId);
+    if (Array.isArray(chat.syncedTurnIds)) chat.syncedTurnIds = chat.syncedTurnIds.map(String).slice(-40);
+  });
   return merged;
 }
 
@@ -12938,7 +13037,10 @@ async function setWorldEntryEnabled(bookName, uid, disabled) {
 /** 当前打开的酒馆聊天，用来给日记、主动消息提供素材。 */
 async function readTavernContext() {
   const script = await loadHostScript();
-  if (!script) return { userName: '我', chat: [], characterName: '', characterAvatar: '', chatFile: '' };
+  if (!script) return {
+    userName: '我', chat: [], characterName: '', characterAvatar: '',
+    chatFile: '', chatId: '', metadata: null,
+  };
   try {
     const userName = script.name1 || script.getContext?.()?.name1 || '我';
     const chat = Array.isArray(script.chat) ? script.chat.map(line => ({
@@ -12954,9 +13056,14 @@ async function readTavernContext() {
       characterName: character?.name || '',
       characterAvatar: character?.avatar || '',
       chatFile: character?.chat || '',
+      chatId: String(script.getCurrentChatId?.() || script.chatId || ''),
+      metadata: script.chatMetadata || null,
     };
   } catch {
-    return { userName: '我', chat: [], characterName: '', characterAvatar: '', chatFile: '' };
+    return {
+      userName: '我', chat: [], characterName: '', characterAvatar: '',
+      chatFile: '', chatId: '', metadata: null,
+    };
   }
 }
 
@@ -12992,50 +13099,61 @@ function latestScore(item) {
  * 这个角色在酒馆里关联的最新聊天。
  * 先问酒馆的聊天文件列表，挑最近一条；列表读不到就退回角色卡上的当前聊天文件。
  */
-async function readLatestTavernChat({ name = '', avatar = '', floors = 10, includeMemory = false } = {}) {
+async function readLatestTavernChat({
+  name = '', avatar = '', floors = 10, includeMemory = false, file = '', chatId = '',
+} = {}) {
   const script = await loadHostScript();
-  const empty = { available: false, file: '', characterName: name, lines: [], total: 0, metadata: null, messages: [] };
+  const empty = {
+    available: false, file: '', chatId: '', characterName: name,
+    lines: [], total: 0, metadata: null, messages: [],
+  };
   if (!script || !Array.isArray(script.characters)) return empty;
   const character = script.characters.find(item => item && avatar && item.avatar === avatar)
     || script.characters.find(item => item && item.name === name);
   if (!character) return empty;
 
   const headers = await hostRequestHeaders(script);
-  let file = String(character.chat || '').trim();
+  let pickedFile = String(file || '').replace(/\.jsonl$/i, '').trim();
   let latestMeta = null;
 
-  try {
-    const response = await fetch('/api/characters/chats', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ avatar_url: character.avatar || character.name }),
-      credentials: 'same-origin',
-      cache: 'no-store',
-    });
-    if (response.ok) {
-      const data = await response.json().catch(() => null);
-      const list = Array.isArray(data) ? data : Object.values(data && typeof data === 'object' ? data : {});
-      const sorted = list
-        .filter(item => item && typeof item === 'object' && (item.file_name || item.fileName))
-        .map(item => ({ ...item, file_name: item.file_name || item.fileName }))
-        .sort((a, b) => latestScore(b) - latestScore(a));
-      if (sorted.length) {
-        file = sorted[0].file_name;
-        latestMeta = sorted[0];
+  /* 指定了具体聊天文件（某角色的里世界手机）就不去猜“最新”：读的就是这一份。 */
+  if (!pickedFile) {
+    try {
+      const response = await fetch('/api/characters/chats', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ avatar_url: character.avatar || character.name }),
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      if (response.ok) {
+        const data = await response.json().catch(() => null);
+        const list = Array.isArray(data) ? data : Object.values(data && typeof data === 'object' ? data : {});
+        const sorted = list
+          .filter(item => item && typeof item === 'object' && (item.file_name || item.fileName))
+          .map(item => ({ ...item, file_name: item.file_name || item.fileName }))
+          .sort((a, b) => latestScore(b) - latestScore(a));
+        if (sorted.length) {
+          pickedFile = sorted[0].file_name;
+          latestMeta = sorted[0];
+        }
       }
-    }
-  } catch { /* 列表接口不可用就继续用角色卡上的 chat */ }
+    } catch { /* 列表接口不可用就继续用角色卡上的 chat */ }
+  } else {
+    pickedFile = String(pickedFile).replace(/\.jsonl$/i, '');
+  }
+  if (!pickedFile) pickedFile = String(character.chat || '').trim();
 
   let raw = [];
   let metadata = null;
-  if (file) {
+  if (pickedFile) {
     try {
       const response = await fetch('/api/chats/get', {
         method: 'POST',
         headers,
         body: JSON.stringify({
           ch_name: character.name,
-          file_name: String(file).replace(/\.jsonl$/i, ''),
+          file_name: String(pickedFile).replace(/\.jsonl$/i, ''),
           avatar_url: character.avatar || character.name,
         }),
         credentials: 'same-origin',
@@ -13051,9 +13169,11 @@ async function readLatestTavernChat({ name = '', avatar = '', floors = 10, inclu
     } catch { raw = []; }
   }
 
-  if (!raw.length && script.characters?.[script.this_chid]?.avatar === character.avatar && Array.isArray(script.chat)) {
+  const currentKey = String(character.chat || '').replace(/\.jsonl$/i, '');
+  if (!raw.length && script.characters?.[script.this_chid]?.avatar === character.avatar
+    && Array.isArray(script.chat) && (!pickedFile || pickedFile === currentKey)) {
     raw = script.chat;
-    file = String(character.chat || '当前聊天');
+    pickedFile = String(character.chat || '当前聊天');
     metadata = script.chatMetadata || null;
   }
 
@@ -13075,7 +13195,8 @@ async function readLatestTavernChat({ name = '', avatar = '', floors = 10, inclu
 
   return {
     available: Boolean(lines.length),
-    file: file || '',
+    file: pickedFile || '',
+    chatId: String(chatId || pickedFile || ''),
     characterName: character.name,
     lines,
     total: raw.length,
@@ -13083,6 +13204,72 @@ async function readLatestTavernChat({ name = '', avatar = '', floors = 10, inclu
     metadata: includeMemory ? metadata : null,
     messages: includeMemory ? raw : [],
   };
+}
+
+/**
+ * 把里世界手机的一轮对话写回原聊天文件。
+ *
+ * 写法是「隐藏 system 楼层 + message.extra.memePhone」：
+ * - 不新增 user 楼层，聊天里不会多出一条“我”说的话；
+ * - 不追加到上一条正文，避免把原聊天最后一段改脏；
+ * - system 楼层在酒馆界面默认不显示，也不会被当成角色发言；
+ * - extra 里带 worldPhoneId / turnId / 剧情日期，手机下次可以按 turnId 去重。
+ *
+ * 目标聊天没在酒馆里打开时返回 queued，由世界层留在队列里等下次。
+ */
+async function appendTavernHiddenFloor({
+  chatId = '', chatFile = '', text = '', extra = {},
+} = {}) {
+  const script = await loadHostScript();
+  if (!script) return { ok: false, queued: false, reason: '不在酒馆里，写不回聊天文件' };
+  const chat = Array.isArray(script.chat) ? script.chat : null;
+  if (!chat) return { ok: false, queued: false, reason: '拿不到酒馆当前聊天' };
+  const currentId = String(script.getCurrentChatId?.() || script.chatId || '');
+  const currentCharacter = Array.isArray(script.characters)
+    ? script.characters[script.characterId ?? script.this_chid]
+    : null;
+  const currentFile = String(currentCharacter?.chat || '');
+  const expectedId = String(chatId || '');
+  const expectedFile = String(chatFile || '').replace(/\.jsonl$/i, '');
+  const currentFileKey = currentFile.replace(/\.jsonl$/i, '');
+  if (expectedId && currentId && expectedId !== currentId && !expectedFile) {
+    return { ok: false, queued: true, reason: '目标聊天没打开' };
+  }
+  if (expectedFile && currentFileKey && expectedFile !== currentFileKey) {
+    return { ok: false, queued: true, reason: '目标聊天文件没打开' };
+  }
+  if (!expectedId && !expectedFile) return { ok: false, queued: true, reason: '没有绑定聊天文件' };
+
+  const ctx = globalThis.SillyTavern?.getContext?.() || script;
+  const save = typeof ctx.saveChat === 'function' ? ctx.saveChat.bind(ctx)
+    : typeof script.saveChat === 'function' ? script.saveChat.bind(script)
+      : null;
+  if (!save) return { ok: false, queued: false, reason: '酒馆没有提供 saveChat' };
+
+  const floor = {
+    name: 'meme-phone',
+    is_user: false,
+    is_system: true,
+    mes: String(text || ''),
+    send_date: new Date().toISOString(),
+    extra: {
+      memePhone: {
+        version: 1,
+        ...extra,
+        text: String(text || ''),
+      },
+    },
+  };
+  chat.push(floor);
+  try {
+    await save();
+    return { ok: true, queued: false, floor };
+  } catch (error) {
+    /* 保存失败就把刚推入的楼层撤掉，别让内存和文件不一致。 */
+    const index = chat.indexOf(floor);
+    if (index >= 0) chat.splice(index, 1);
+    return { ok: false, queued: false, reason: error?.message || '保存聊天失败' };
+  }
 }
 
 async function readUserAvatar() {
@@ -13173,6 +13360,7 @@ async function readOpenTavernChat() {
   const empty = {
     available: false, reason: '', characterName: '', characterAvatar: '', chatFile: '', chatId: '',
     presetName: '', forkFloor: 0, snapshot: 'live', base: [], memory: { engine: '', text: '', coverage: null },
+    metadata: null,
   };
   if (!script) return { ...empty, reason: '不在酒馆里，读不到聊天文件' };
   const chat = Array.isArray(script.chat) ? script.chat : [];
@@ -13191,6 +13379,7 @@ async function readOpenTavernChat() {
     snapshot: 'live',
     base: [],
     memory: readTavernMemory(),
+    metadata: script.chatMetadata || null,
   };
 }
 
@@ -14243,6 +14432,7 @@ exports["readWorldBook"] = readWorldBook;
 exports["setWorldEntryEnabled"] = setWorldEntryEnabled;
 exports["readTavernContext"] = readTavernContext;
 exports["readLatestTavernChat"] = readLatestTavernChat;
+exports["appendTavernHiddenFloor"] = appendTavernHiddenFloor;
 exports["readUserAvatar"] = readUserAvatar;
 exports["tavernQuietPrompt"] = tavernQuietPrompt;
 exports["generate"] = generate;
@@ -14263,6 +14453,506 @@ exports["readTavernApi"] = readTavernApi;
 exports["listTavernModels"] = listTavernModels;
 exports["probeHost"] = probeHost;
 };
+__mods["meme/world.js"] = function(module, exports, __req){
+/**
+ * meme-phone · 双世界（Meta / 里世界）
+ *
+ * 这一层只做「这台手机现在是哪条世界线」和「切走时把哪份数据收好」。
+ * 数据本身仍然住在 state 顶层：contacts / chats / theaters / diary ...
+ * 每个里世界实例各自存一份快照；Meta 永只有一份。
+ * 这样不用重写任何 App，切换时整块换掉即可。
+ */
+
+const { addContact } = __req("meme/data.js");
+const { appendTavernHiddenFloor, readLatestTavernChat, readOpenTavernChat } = __req("meme/host.js");
+
+/* 会跟着世界线走的数据。用户 / 角色卡 / 接口 Key 留在全局。 */
+const DATA_KEYS = [
+  'contacts', 'chats', 'theaters', 'lookups', 'diary', 'plans', 'extras',
+  'extrasOn', 'favorites', 'wallet', 'membership', 'appointments',
+  'friendRequests', 'signatures', 'music', 'dress',
+];
+
+/* 会跟着世界线走的外观 / 读法。 */
+const SETTINGS_KEYS = [
+  'theme', 'wallpaper', 'customWall', 'dress', 'desktop', 'profile', 'theater',
+];
+
+function clone(value) {
+  if (value == null) return value;
+  try {
+    return typeof structuredClone === 'function'
+      ? structuredClone(value)
+      : JSON.parse(JSON.stringify(value));
+  } catch {
+    return value;
+  }
+}
+
+function plain(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function captureData(state) {
+  const out = {};
+  DATA_KEYS.forEach(key => { out[key] = clone(state?.[key]); });
+  return out;
+}
+
+function restoreData(state, data) {
+  if (!plain(data)) return;
+  DATA_KEYS.forEach(key => {
+    if (data[key] !== undefined) state[key] = clone(data[key]);
+  });
+}
+
+function captureLook(state) {
+  const settings = {};
+  SETTINGS_KEYS.forEach(key => {
+    if (state?.settings?.[key] !== undefined) settings[key] = clone(state.settings[key]);
+  });
+  settings.memory = { byContact: clone(state?.settings?.memory?.byContact || {}) };
+  return { settings };
+}
+
+function restoreLook(state, look) {
+  if (!plain(look?.settings) || !state.settings) return;
+  SETTINGS_KEYS.forEach(key => {
+    if (look.settings[key] !== undefined) state.settings[key] = clone(look.settings[key]);
+  });
+  if (plain(look.settings.memory)) {
+    state.settings.memory = state.settings.memory || {};
+    state.settings.memory.byContact = clone(look.settings.memory.byContact || {});
+  }
+}
+
+/** 读一份旧存档时，把还没有双世界结构的状态补成「当前就是 Meta」。 */
+function ensurePhoneWorlds(state) {
+  if (!state || typeof state !== 'object') return state;
+  if (!plain(state.worldPhones)) state.worldPhones = {};
+  if (!state.metaPhone || !plain(state.metaPhone.data)) {
+    state.metaPhone = { data: captureData(state), look: captureLook(state), at: Date.now() };
+  }
+  if (!['meta', 'world'].includes(state.phoneSurface)) state.phoneSurface = 'meta';
+  if (!String(state.activeWorldId || '')) state.activeWorldId = '';
+  if (!String(state.lastWorldId || '')) state.lastWorldId = '';
+  if (state.phoneSurface === 'world' && !state.worldPhones[state.activeWorldId]) {
+    state.phoneSurface = 'meta';
+    state.activeWorldId = '';
+  }
+  return state;
+}
+
+function currentWorld(state) {
+  const id = String(state?.activeWorldId || '');
+  return id ? state?.worldPhones?.[id] || null : null;
+}
+
+function worldDateText(state) {
+  const world = currentWorld(state);
+  return world ? String(world.storyDate || '第 1 天') : '';
+}
+
+function worldLabel(state) {
+  const world = currentWorld(state);
+  return world ? String(world.ownerName || '里世界') : '';
+}
+
+function hashKey(key) {
+  let hash = 0;
+  const text = String(key || '');
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+function storyDateOf(metadata) {
+  const meta = plain(metadata) ? metadata : {};
+  const own = plain(meta.memePhone) ? meta.memePhone : plain(meta.meme_phone) ? meta.meme_phone : {};
+  const value = own.storyDate || meta.meme_phone_story_date || meta.worldDate || '';
+  return String(value || '').trim().slice(0, 30);
+}
+
+function emptyWorldData(state, contact, chatId, chatFile, chatChatId) {
+  const now = Date.now();
+  const contacts = {};
+  let chats = {};
+  if (contact) {
+    const seeded = addContact({ contacts: {} }, clone(contact));
+    contacts[seeded.id] = seeded;
+    chats = {
+      [chatId]: {
+        id: chatId,
+        contactId: seeded.id,
+        kind: seeded.kind === 'group' ? 'group' : 'single',
+        messages: [],
+        unread: 0,
+        draft: '',
+        pinned: false,
+        muted: false,
+        createdAt: now,
+        updatedAt: 0,
+        tavernFile: String(chatFile || ''),
+        tavernChatId: String(chatChatId || ''),
+        worldPhoneId: '',
+      },
+    };
+  }
+  return {
+    contacts,
+    chats,
+    theaters: {},
+    lookups: {},
+    diary: {
+      ...clone(state.diary || {}),
+      entries: {},
+      contacts: {},
+      lastGenerated: '',
+    },
+    plans: [],
+    extras: {},
+    extrasOn: [],
+    favorites: [],
+    wallet: { balance: 0, transactions: [] },
+    membership: { user: { type: 'none', expireAt: 0, queue: [], history: [] }, byContact: {} },
+    appointments: { byContact: {} },
+    friendRequests: [],
+    signatures: { byContact: {} },
+    music: { playlists: [], activeId: '', current: null },
+    dress: clone(state.dress || { accent: '#8e7bf2' }),
+  };
+}
+
+function ensureInstance(state, options = {}) {
+  const key = String(options.key || '').trim();
+  if (!key) return null;
+  const existing = Object.values(state.worldPhones || {}).find(item => item && item.key === key);
+  if (existing) return existing;
+
+  const id = `wp_${hashKey(key)}`;
+  if (state.worldPhones[id]) return state.worldPhones[id];
+  const contact = options.contact || null;
+  const chatId = `ch_${id}`;
+  const data = emptyWorldData(state, contact, chatId, options.chatFile, options.chatId);
+  if (contact && data.chats[chatId]) data.chats[chatId].worldPhoneId = id;
+  const instance = {
+    id,
+    key,
+    ownerName: String(options.ownerName || contact?.name || '这段聊天'),
+    ownerAvatar: String(options.ownerAvatar || contact?.avatar || ''),
+    contactId: String(contact?.id || ''),
+    sourceChatFile: String(options.chatFile || ''),
+    sourceChatId: String(options.chatId || ''),
+    storyDate: String(options.storyDate || '第 1 天').slice(0, 30),
+    kind: String(options.kind || 'chat'),
+    data,
+    look: captureLook(state),
+    syncQueue: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+  state.worldPhones[id] = instance;
+  return instance;
+}
+
+/** 当前这份内存状态属于哪台：切走前收进对应槽里。 */
+function syncActivePhone(state) {
+  if (!state) return;
+  if (state.phoneSurface === 'world') {
+    const world = currentWorld(state);
+    if (world) {
+      world.data = captureData(state);
+      world.look = captureLook(state);
+      world.updatedAt = Date.now();
+    }
+  } else if (state.metaPhone) {
+    state.metaPhone.data = captureData(state);
+    state.metaPhone.look = captureLook(state);
+    state.metaPhone.at = Date.now();
+  }
+}
+
+function activateInstance(state, instance) {
+  if (!instance) return false;
+  syncActivePhone(state);
+  restoreData(state, instance.data);
+  restoreLook(state, instance.look);
+  Object.values(state.chats || {}).forEach(chat => {
+    if (chat && !chat.worldPhoneId) chat.worldPhoneId = instance.id;
+  });
+  state.phoneSurface = 'world';
+  state.activeWorldId = instance.id;
+  state.lastWorldId = instance.id;
+  return true;
+}
+
+function activateMeta(state) {
+  if (!state.metaPhone) return false;
+  syncActivePhone(state);
+  restoreData(state, state.metaPhone.data);
+  restoreLook(state, state.metaPhone.look);
+  state.phoneSurface = 'meta';
+  state.activeWorldId = '';
+  return true;
+}
+
+function formatTurnText(world, messages) {
+  const lines = (Array.isArray(messages) ? messages : [])
+    .filter(item => item && !item.excluded)
+    .map(item => {
+      const who = item.from === 'me' ? (item.name || '我') : (world.ownerName || 'TA');
+      const body = String(item.text || (item.image ? '［图片］' : '')).trim();
+      return body ? `${who}：${body}` : '';
+    })
+    .filter(Boolean);
+  return lines.slice(-8).join('\n');
+}
+
+function worldStamp() {
+  return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function installWorld(ctx) {
+  const state = ctx.state;
+
+  const api = {
+    ensure: () => ensurePhoneWorlds(state),
+    surface: () => (state.phoneSurface === 'world' && currentWorld(state) ? 'world' : 'meta'),
+    current: () => currentWorld(state),
+    dateText: () => worldDateText(state),
+    label: () => worldLabel(state),
+    meta: () => state.metaPhone,
+    list: () => Object.values(state.worldPhones || {}).filter(Boolean),
+    syncActive: () => syncActivePhone(state),
+
+    /** 聊天里打开手机：认当前打开的酒馆聊天，同一份聊天永远回同一台里世界手机。 */
+    async openCurrentChat(options = {}) {
+      try {
+        const live = await readOpenTavernChat();
+        if (!live.available) {
+          if (options.toast) ctx.toast(live.reason || '先在酒馆里打开一段聊天');
+          return null;
+        }
+        const contact = { name: live.characterName || 'TA', avatar: live.characterAvatar || '', tavernAvatar: live.characterAvatar || '', kind: 'char' };
+        const key = `chat:${live.chatFile || live.chatId}:${live.characterAvatar || live.characterName}:main`;
+        const instance = ensureInstance(state, {
+          key,
+          contact,
+          ownerName: live.characterName,
+          ownerAvatar: live.characterAvatar,
+          chatFile: live.chatFile,
+          chatId: live.chatId,
+          storyDate: storyDateOf(live.metadata) || '第 1 天',
+          kind: 'current-chat',
+        });
+        if (!instance) return null;
+        /* 已有实例沿用用户改过的剧情日期，不被旧聊天覆盖 */
+        if (!instance.storyDate || instance.storyDate === '第 1 天') {
+          const metaDate = storyDateOf(live.metadata);
+          if (metaDate) instance.storyDate = metaDate;
+        }
+        if (!instance.contactId) {
+          const seeded = Object.values(instance.data?.chats || {})[0];
+          instance.contactId = String(seeded?.contactId || '');
+        }
+        activateInstance(state, instance);
+        await api.flushPending(instance);
+        if (options.save !== false) ctx.save();
+        if (options.render !== false) ctx.rerender();
+        return instance;
+      } catch (error) {
+        if (options.toast) ctx.toast(error?.message || '这台里世界手机没打开');
+        return null;
+      }
+    },
+
+    /** 从 Meta 的会话 / 联系人打开某角色的里世界手机：读这个角色最近一份聊天。 */
+    async openForContact(contact, options = {}) {
+      if (!contact) return null;
+      try {
+        const latest = await readLatestTavernChat({
+          name: contact.name,
+          avatar: contact.tavernAvatar || contact.avatar || '',
+          floors: 0,
+          includeMemory: true,
+        });
+        const file = latest?.available ? latest.file : '';
+        const key = `char:${contact.tavernAvatar || contact.avatar || contact.name}:${file || 'latest'}`;
+        const instance = ensureInstance(state, {
+          key,
+          contact: {
+            get id() { return contact.id; },
+            name: contact.name,
+            avatar: contact.avatar,
+            tavernAvatar: contact.tavernAvatar,
+            kind: contact.kind,
+          },
+          ownerName: contact.name,
+          ownerAvatar: contact.avatar,
+          chatFile: file,
+          chatId: latest?.file || '',
+          storyDate: storyDateOf(latest?.metadata) || '第 1 天',
+          kind: 'contact',
+        });
+        if (!instance) return null;
+        instance.sourceChatFile = file || instance.sourceChatFile;
+        activateInstance(state, instance);
+        await api.flushPending(instance);
+        ctx.save();
+        if (typeof ctx.home === 'function') ctx.home(); else ctx.rerender();
+        if (!latest?.available) ctx.toast('没找到 TA 最近的酒馆聊天，先当成一条新世界线');
+        return instance;
+      } catch (error) {
+        ctx.toast(error?.message || '这台里世界手机没打开');
+        return null;
+      }
+    },
+
+    activate(id) {
+      const instance = state.worldPhones?.[id];
+      if (!instance) return false;
+      const ok = activateInstance(state, instance);
+      if (ok) {
+        ctx.save();
+        ctx.rerender();
+      }
+      return ok;
+    },
+
+    /** 翻面：里世界 ⇄ Meta。 */
+    flip() {
+      if (state.phoneSurface === 'world') {
+        activateMeta(state);
+      } else {
+        const last = state.worldPhones?.[state.lastWorldId] || currentWorld(state);
+        if (last) activateInstance(state, last);
+        else {
+          ctx.toast('先在聊天里打开一台里世界手机');
+          return false;
+        }
+      }
+      ctx.save();
+      ctx.rerender();
+      return true;
+    },
+
+    editStoryDate() {
+      const world = currentWorld(state);
+      if (!world) return;
+      ctx.openSheet({
+        kind: 'form',
+        title: '这条世界线的剧情日期',
+        note: '只改这台里世界手机显示的日期；状态栏右边的钟点仍然跟着现实走。',
+        fields: [{
+          name: 'storyDate',
+          label: '剧情日期',
+          value: world.storyDate || '第 1 天',
+          placeholder: '例如 第 3 天 / 霜月十二日',
+          maxLength: 30,
+        }],
+        confirm: '保存',
+        onForm: values => {
+          const next = String(values.storyDate || '').trim().slice(0, 30);
+          world.storyDate = next || '第 1 天';
+          ctx.save();
+          ctx.rerender();
+          ctx.toast('剧情日期改好了');
+        },
+      });
+    },
+
+    /** 把一个生成轮次写回原聊天文件：隐藏 system 楼层 + extra + 待写队列。 */
+    async syncTurn(chat, turnId, messages) {
+      const world = currentWorld(state);
+      if (!world || state.phoneSurface !== 'world' || !chat || !turnId) return;
+      if (!world.sourceChatFile && !world.sourceChatId) return;
+      if (Array.isArray(chat.syncedTurnIds) && chat.syncedTurnIds.includes(turnId)) return;
+      const text = formatTurnText(world, messages);
+      if (!text) return;
+      const payload = {
+        turnId,
+        chatId: chat.id,
+        text,
+        stamp: worldStamp(),
+        storyDate: world.storyDate || '',
+        at: Date.now(),
+      };
+      world.syncQueue = Array.isArray(world.syncQueue) ? world.syncQueue : [];
+      world.syncQueue.push(payload);
+      await api.flushPending(world, chat);
+    },
+
+    async flushPending(instance = currentWorld(state), chat = null) {
+      const world = instance;
+      if (!world || !Array.isArray(world.syncQueue) || !world.syncQueue.length) return;
+      for (const item of world.syncQueue.slice()) {
+        try {
+          const result = await appendTavernHiddenFloor({
+            chatId: world.sourceChatId,
+            chatFile: world.sourceChatFile,
+            text: item.text,
+            extra: {
+              worldPhoneId: world.id,
+              worldKey: world.key,
+              turnId: item.turnId,
+              storyDate: item.storyDate,
+              clock: item.stamp,
+            },
+          });
+          if (!result?.ok) {
+            if (result?.queued) break;
+            throw new Error(result?.reason || '写回失败');
+          }
+          world.syncQueue = world.syncQueue.filter(entry => entry.turnId !== item.turnId);
+          const target = chat || Object.values(state.chats || {}).find(entry => entry && entry.id === item.chatId);
+          if (target) {
+            if (!Array.isArray(target.syncedTurnIds)) target.syncedTurnIds = [];
+            if (!target.syncedTurnIds.includes(item.turnId)) target.syncedTurnIds.push(item.turnId);
+          }
+          world.lastSyncAt = Date.now();
+        } catch (error) {
+          /* 目标聊天没在酒馆里打开时先留在队列，等下次激活这台手机再写。 */
+          world.lastSyncError = error?.message || '写回失败';
+          break;
+        }
+      }
+      ctx.save();
+    },
+  };
+
+  ctx.world = api;
+  ensurePhoneWorlds(state);
+  return api;
+}
+
+function createWorldPhoneForTests(state, options) {
+  ensurePhoneWorlds(state);
+  return ensureInstance(state, options);
+}
+
+function activateWorldForTests(state, id) {
+  return activateInstance(state, state.worldPhones?.[id]);
+}
+
+function activateMetaForTests(state) {
+  return activateMeta(state);
+}
+
+exports["captureData"] = captureData;
+exports["restoreData"] = restoreData;
+exports["captureLook"] = captureLook;
+exports["restoreLook"] = restoreLook;
+exports["ensurePhoneWorlds"] = ensurePhoneWorlds;
+exports["currentWorld"] = currentWorld;
+exports["worldDateText"] = worldDateText;
+exports["worldLabel"] = worldLabel;
+exports["syncActivePhone"] = syncActivePhone;
+exports["installWorld"] = installWorld;
+exports["createWorldPhoneForTests"] = createWorldPhoneForTests;
+exports["activateWorldForTests"] = activateWorldForTests;
+exports["activateMetaForTests"] = activateMetaForTests;
+};
 __mods["meme/icons.js"] = function(module, exports, __req){
 /**
  * meme-phone · 图标
@@ -14272,6 +14962,7 @@ __mods["meme/icons.js"] = function(module, exports, __req){
 const P = {
   chat: '<path d="M4 11.5c0-3.6 3.6-6.5 8-6.5s8 2.9 8 6.5-3.6 6.5-8 6.5c-1 0-2-.1-2.9-.4"/><path d="M4 11.5c0 1.3.6 2.5 1.6 3.5L5 19l3.6-1.4"/>',
   contacts: '<circle cx="9" cy="9" r="3.2"/><path d="M3.6 18.4c.5-2.7 2.7-4.3 5.4-4.3s4.9 1.6 5.4 4.3"/><circle cx="17" cy="10" r="2.3"/><path d="M16 14.6c2.4 0 4.2 1.3 4.6 3.6"/>',
+  phone: '<rect x="7" y="3.2" width="10" height="17.6" rx="3"/><path d="M10.4 18.2h3.2"/><path d="M10.2 6.2h3.6"/>',
   diary: '<path d="M5.5 4.5h9.5a2.5 2.5 0 0 1 2.5 2.5v12.5H8a2.5 2.5 0 0 1-2.5-2.5z"/><path d="M8.5 4.5v15"/><path d="M11.4 9h3.6M11.4 12.6h3.6"/>',
   settings: '<circle cx="12" cy="12" r="2.9"/><path d="M12 3.8v2.2M12 18v2.2M4.6 12H3M21 12h-1.6M6.9 6.9l1.5 1.5M15.6 15.6l1.5 1.5M17.1 6.9l-1.5 1.5M8.4 15.6l-1.5 1.5"/>',
   theater: '<path d="M4 8.4h16v9.2a1.6 1.6 0 0 1-1.6 1.6H5.6A1.6 1.6 0 0 1 4 17.6z"/><path d="M4.6 5.2h14.8l-1 3.2H5.6z"/><path d="M8.6 12.6h2M13.4 12.6h2"/>',
@@ -14353,7 +15044,7 @@ const TINT = {
 const ICON_NAMES = Object.keys(P);
 
 const ICON_LABELS = {
-  chat: '聊天气泡', contacts: '联系人', diary: '日记本', settings: '齿轮',
+  chat: '聊天气泡', contacts: '联系人', phone: '手机', diary: '日记本', settings: '齿轮',
   theater: '小剧场', parallel: '平行时空', bookmark: '书签', smile: '笑脸', plan: '清单',
   brush: '画笔', help: '问号', back: '左箭头', home: '房子',
   chevron: '下箭头', close: '关闭', plus: '加号', send: '纸飞机', stop: '停止',
@@ -14970,7 +15661,9 @@ function createShell(options) {
     const themedBanner = themeArt ? themeArt.banner : '';
     const bannerImage = ownBanner || themedBanner;
     const bannerStyle = bannerImage ? ` style="background-image:url(&quot;${bannerImage}&quot;);background-size:cover;background-position:center"` : '';
-    const stampText = dateText().replace('<br>', ' · ');
+    const stampText = ctx.world?.surface?.() === 'world'
+      ? (ctx.world.dateText?.() || '第 1 天')
+      : dateText().replace('<br>', ' · ');
     const pages = homePages();
     const pageIndex = pageIndexSafe();
 
@@ -15188,6 +15881,7 @@ function createShell(options) {
       : null;
     root.className = 'mp-root';
     root.dataset.mpTheme = status;
+    root.dataset.mpSurface = ctx.world?.surface?.() || 'meta';
     applyWall(root, state.settings);
     applyLook(root, state.settings);
     /* 先算一次布局：整机高度与缩放一起写进首帧，避免开手机时先按 844 高闪一下再收 */
@@ -15202,8 +15896,16 @@ function createShell(options) {
             <div class="mp-wallpaper"></div>
             <div class="mp-scrim"></div>
             <div class="mp-status">
-              <span class="mp-status-left">${shell.stack.length && !shell.sheet ? `<button class="mp-status-back" data-act="back" type="button" aria-label="返回">${ico('back')}</button>` : ''}</span>
-              <span class="mp-status-right">${clockText()}</span>
+              <span class="mp-status-left">
+                ${shell.stack.length && !shell.sheet ? `<button class="mp-status-back" data-act="back" type="button" aria-label="返回">${ico('back')}</button>` : ''}
+                ${ctx.world?.surface?.() === 'world'
+                  ? `<button class="mp-world-chip" data-act="world-date" type="button" title="改剧情日期">${esc(ctx.world.label?.() || '里世界')}</button>`
+                  : ''}
+              </span>
+              <span class="mp-status-right">
+                <button class="mp-flip-btn" data-act="flip" type="button" aria-label="翻面">${ico('refresh')}</button>
+                <span>${clockText()}</span>
+              </span>
             </div>
             ${shell.stack.length ? pageHtml() : desktopHtml()}
             ${sheetHtml()}
@@ -15404,6 +16106,16 @@ function createShell(options) {
       render();
       ctx.save();
     },
+    'flip': () => {
+      const ok = ctx.world?.flip?.();
+      if (!ok) return;
+      const screen = root.querySelector('.mp-screen');
+      if (screen) {
+        screen.classList.add('is-flipping');
+        setTimeout(() => screen.classList.remove('is-flipping'), 460);
+      }
+    },
+    'world-date': () => { ctx.world?.editStoryDate?.(); },
   };
 
   root.addEventListener('click', event => {
@@ -16192,6 +16904,9 @@ async function buildMemoryContext(state, chat, limit = 1200) {
       avatar: contact.tavernAvatar || '',
       floors: readFloors,
       includeMemory: true,
+      /* 里世界手机绑定了具体聊天文件：读那一份，不要退成“这个角色最新一份”。 */
+      file: chat?.tavernFile || '',
+      chatId: chat?.tavernChatId || chat?.tavernFile || '',
     })
     : null;
 
@@ -16707,7 +17422,7 @@ __mods["meme/apps/chat.js"] = function(module, exports, __req){
 
 const { icon } = __req("meme/icons.js");
 const {
-  chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
+  chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, contactsOf,
   wakeAllowed, messagePreview, addExtrasEntry, theaterKindFor, THEATER_KINDS, theaterKindById,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, replyContextFor, normalizeReplyItems,
@@ -17256,7 +17971,6 @@ function settingsBody(ctx, chatId) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-subtitle" style="margin-top:0">聊天设置</div>
 
       <div class="mp-chat-set-head">
         ${avatarHtml(contact?.name || '?', contact?.avatar)}
@@ -17382,21 +18096,27 @@ function listBody(ctx) {
       ? `${message.from === 'me' ? '我：' : ''}${messagePreview(message)}`
       : '还没有消息，说点什么吧。';
     return `
-      <button class="mp-row" data-act="open-thread" data-chat="${chat.id}" data-hold="chat-menu" type="button">
-        ${avatarHtml(contact.name, contact.avatar)}
-        <div class="mp-row-main">
-          <div class="mp-row-name">
-            ${esc(contact.name)}
-            ${chat.pinned ? `<span class="mp-pill plain">${icon('pin')}</span>` : ''}
-            ${contact.kind === 'group' ? '<span class="mp-pill plain">群</span>' : ''}
+      <div class="mp-row-shell">
+        <button class="mp-row" data-act="open-thread" data-chat="${chat.id}" data-hold="chat-menu" type="button">
+          ${avatarHtml(contact.name, contact.avatar)}
+          <div class="mp-row-main">
+            <div class="mp-row-name">
+              ${esc(contact.name)}
+              ${chat.pinned ? `<span class="mp-pill plain">${icon('pin')}</span>` : ''}
+              ${contact.kind === 'group' ? '<span class="mp-pill plain">群</span>' : ''}
+            </div>
+            <div class="mp-row-sub">${esc(preview)}</div>
           </div>
-          <div class="mp-row-sub">${esc(preview)}</div>
-        </div>
-        <div class="mp-row-side">
-          <span>${chat.updatedAt ? shortText(chat.updatedAt) : ''}</span>
-          ${chat.unread && !chat.muted ? `<span class="mp-badge-count">${chat.unread > 99 ? '99+' : chat.unread}</span>` : ''}
-        </div>
-      </button>`;
+          <div class="mp-row-side">
+            <span>${chat.updatedAt ? shortText(chat.updatedAt) : ''}</span>
+            ${chat.unread && !chat.muted ? `<span class="mp-badge-count">${chat.unread > 99 ? '99+' : chat.unread}</span>` : ''}
+          </div>
+        </button>
+        ${contact.kind === 'group' ? '' : `
+        <button class="mp-row-world" data-act="world-open" data-contact="${contact.id}" type="button" aria-label="打开 ${esc(contact.name)} 的里世界手机" title="进入 TA 的里世界手机">
+          ${icon('phone')}
+        </button>`}
+      </div>`;
   }).join('');
 
   return `
@@ -17405,7 +18125,6 @@ function listBody(ctx) {
         <span style="flex:1"></span>
         <button class="mp-icon-btn" data-act="chat-new" type="button" aria-label="新建会话">${icon('plus')}</button>
       </div>
-      <div class="mp-subtitle">聊天 · ${chats.length} 个会话 · ${unreadTotal(state)} 条未读</div>
       ${rows || '<div class="mp-empty">还没有会话。<br>先去「通讯录」把角色加进来。</div>'}
     </div>`;
 }
@@ -17977,6 +18696,14 @@ async function runGeneration(ctx, chat, contact, options = {}) {
     });
     ctx.toast('这轮的小剧场收进 App 了');
   }
+  /* 里世界手机：把这一轮（我发的 + TA 回的）写回原聊天文件的隐藏楼层。
+     写不进就留在世界实例的队列里，下次打开这条世界线再试。 */
+  if (firstSaved && kind === 'reply' && !replaceIds.length && ctx.world?.syncTurn) {
+    const turnMessages = chat.messages.filter(item => item.turnId === turnId || pendingIds.includes(item.id));
+    ctx.world.syncTurn(chat, turnId, turnMessages).catch(error => {
+      ctx.toast(error?.message || '这轮没写回聊天文件');
+    });
+  }
   ctx.save();
   ctx.rerender();
   scrollToBottom(ctx);
@@ -18011,6 +18738,14 @@ const chatApp = {
       ctx.shell.live = { inputValue: chat?.draft || '', focus: false };
       ctx.go('thread', { chatId: data.chat });
       setTimeout(() => scrollToBottom(ctx), 30);
+      return true;
+    }
+
+    if (act === 'world-open') {
+      const contact = contactById(ctx.state, data.contact);
+      if (!contact) return true;
+      if (typeof ctx.world?.openForContact !== 'function') { ctx.toast('这个环境还没有里世界手机'); return true; }
+      ctx.world.openForContact(contact, { source: 'meta' });
       return true;
     }
 
@@ -19141,7 +19876,6 @@ const parallelApp = {
     return `
       <div class="mp-page-body">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <div class="mp-subtitle" style="margin-top:0;flex:1">平行时空</div>
           <button class="mp-icon-btn" data-act="branch-new" type="button" aria-label="从当前聊天开一场">${icon('plus')}</button>
         </div>
         ${cards || '<div class="mp-empty">还没有开过场。<br>先在酒馆打开一个聊天，再点右上角的「+」——会从那个聊天当前的最后一楼分出来，预设、角色卡、世界书和记忆都用酒馆原来那套。</div>'}
@@ -19519,7 +20253,6 @@ const favoritesApp = {
 
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">收藏</div>
         ${rows || '<div class="mp-empty">还没有收藏。<br>在聊天里长按一条消息，点「收藏这条」。</div>'}
       </div>`;
   },
@@ -19705,7 +20438,6 @@ function renderPage(ctx, params = {}) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-subtitle" style="margin-top:0">${contactId ? `${esc(contact?.name || 'TA')}的日记` : '日记'}</div>
       <div class="mp-month-bar">
         <button class="mp-icon-btn" data-act="diary-prev" data-contact="${esc(contactId)}" type="button" aria-label="上个月">${icon('back')}</button>
         <span class="mp-month">${target.getFullYear()} 年 ${target.getMonth() + 1} 月</span>
@@ -19973,7 +20705,6 @@ function renderThreadPage(ctx, contactId) {
   if (!statuses.length) {
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记</div>
         ${threadSettingsBox(ctx, contactId)}
         <div class="mp-td-toolbar">
           <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>
@@ -19984,7 +20715,6 @@ function renderThreadPage(ctx, contactId) {
   const target = parseMonth(st.month);
   return `
     <div class="mp-page-body">
-      <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记</div>
       ${threadSettingsBox(ctx, contactId)}
       <div class="mp-td-toolbar">
         <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>
@@ -20382,7 +21112,6 @@ const contactsApp = {
             ? `<button class="mp-icon-btn" data-act="char-search" type="button" aria-label="查角色">${icon('search')}</button>`
             : `<button class="mp-icon-btn" data-act="contact-add" type="button" aria-label="添加">${icon('plus')}</button>`}
         </div>
-        <div class="mp-subtitle">${tab === 'cards' ? '酒馆角色' : `已添加 · ${contacts.length} 位`}</div>
 
         <div class="mp-seg" style="margin:2px 0 12px">
           <button class="${tab === 'contacts' ? 'on' : ''}" data-act="contacts-tab" data-tab="contacts" type="button">已添加</button>
@@ -20532,7 +21261,10 @@ const contactApp = {
           <button class="mp-btn accent" data-act="contact-chat" data-contact="${contact.id}" type="button" style="flex:1">${icon('chat')}发消息</button>
           <button class="mp-btn" data-act="contact-extras" data-contact="${contact.id}" type="button" style="flex:1">${icon('theater')}小剧场 ${extras.length || ''}</button>
         </div>
-        ${contact.kind === 'group' ? '' : `<button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button">${icon('search')}查 TA 的手机</button>`}
+        ${contact.kind === 'group' ? '' : `<div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button" style="flex:1">${icon('search')}查 TA 的手机</button>
+          <button class="mp-btn" data-act="contact-world" data-contact="${contact.id}" type="button" style="flex:1">${icon('phone')}里世界手机</button>
+        </div>`}
         <div class="mp-group">
           <div class="mp-group-label">TA 的状态</div>
           <div class="mp-group-box">
@@ -20594,9 +21326,18 @@ const contactApp = {
       return true;
     }
 
+    if (act === 'contact-world') {
+      if (!contact) return true;
+      if (typeof ctx.world?.openForContact !== 'function') { ctx.toast('这个环境还没有里世界手机'); return true; }
+      ctx.world.openForContact(contact);
+      return true;
+    }
+
     if (act === 'contact-phone') {
       if (!contact) return true;
       ctx.go('p-charphone', { contactId: contact.id });
+      /* 先打开本机这份，后台去抓这个角色最近的酒馆聊天，抓到了再换成真的。 */
+      Promise.resolve(ctx.prepareCharPhone?.(contact)).catch(() => {});
       return true;
     }
 
@@ -20808,15 +21549,36 @@ const settingsApp = {
     const apiReady = host.hasGenerate;
     const customProactivePrompt = Boolean(normalizeProactivePrompt(state.settings.proactive.prompt));
 
+    const worlds = ctx.world?.list?.() || [];
+    const currentWorld = ctx.world?.current?.() || null;
+
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">设置</div>
 
         <div class="mp-group">
           <div class="mp-group-label">身份与外观</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'contacts', title: '用户', value: state.settings.user.name || '还没选', act: 'set-open', app: 'user' })}
             ${row(ctx, { iconName: 'brush', title: '装扮与主题', act: 'set-open-dress' })}
+          </div>
+        </div>
+
+        <div class="mp-group">
+          <div class="mp-group-label">双世界</div>
+          <div class="mp-group-box">
+            ${row(ctx, {
+              iconName: 'phone',
+              title: currentWorld ? `里世界手机 · ${currentWorld.ownerName || '这一条'}` : '里世界手机',
+              sub: currentWorld ? `${currentWorld.storyDate || '第 1 天'} · ${worlds.length} 条世界线` : `${worlds.length} 条世界线 · 现在在 Meta`,
+              act: 'set-world-list',
+            })}
+            ${row(ctx, {
+              iconName: 'refresh',
+              title: currentWorld ? '翻回 Meta 手机' : '回到上一次的里世界手机',
+              sub: currentWorld ? 'Meta 用现实时间，不读这条聊天的记忆' : '只有一台 Meta，多个里世界各自隔离',
+              act: 'set-world-flip',
+            })}
+            ${row(ctx, { iconName: 'parallel', title: '创建番外', sub: '从当前这台里世界手机的聊天分一条时间线', act: 'set-world-branch' })}
           </div>
         </div>
 
@@ -20887,6 +21649,36 @@ const settingsApp = {
     const state = ctx.state;
 
     if (act === 'set-open-dress') { ctx.go('app-dress'); return true; }
+    if (act === 'set-world-list') {
+      const worlds = ctx.world?.list?.() || [];
+      if (!worlds.length) { ctx.toast('还没有里世界手机；先在酒馆聊天里打开一次手机'); return true; }
+      const active = ctx.world?.current?.()?.id || '';
+      ctx.openSheet({
+        title: `里世界手机 · ${worlds.length} 台`,
+        note: '每台绑一个酒馆聊天文件；切过去只换这一台的数据，Meta 不动。',
+        items: worlds
+          .slice()
+          .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0))
+          .slice(0, 20)
+          .map(world => ({
+            label: `${world.ownerName || '这一条'} · ${world.storyDate || '第 1 天'}`,
+            value: world.id,
+            icon: 'phone',
+            note: [world.sourceChatFile ? `《${world.sourceChatFile}》` : '没有绑定聊天', world.id === active ? '当前这台' : ''].filter(Boolean).join(' · '),
+          })),
+        onPick: (id) => {
+          const world = ctx.world?.activate?.(id);
+          if (world) ctx.home?.();
+        },
+      });
+      return true;
+    }
+    if (act === 'set-world-flip') {
+      ctx.world?.flip?.();
+      ctx.home?.();
+      return true;
+    }
+    if (act === 'set-world-branch') { ctx.go('app-parallel'); return true; }
     if (act === 'set-open-appearance') { ctx.go('app-appearance'); return true; }
     if (act === 'set-open-cards') { ctx.go('app-contacts', { tab: 'cards' }); return true; }
 
@@ -21200,7 +21992,7 @@ const extrasApp = {
         </button>`;
       }).join('')}`).join('');
 
-    return `<div class="mp-page-body">${head('小剧场', '')}${filterBar}${cards || '<div class="mp-empty">这个类型还没有片段。<br>在加号菜单的「小剧场」里打开开关，聊完就会自动收到一段。</div>'}</div>`;
+    return `<div class="mp-page-body">${filterBar}${cards || '<div class="mp-empty">这个类型还没有片段。<br>在加号菜单的「小剧场」里打开开关，聊完就会自动收到一段。</div>'}</div>`;
   },
 
   handle(ctx, act, data) {
@@ -21278,7 +22070,6 @@ const extrasSwitchApp = {
 
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">小剧场</div>
         ${kindPicker}
         <button class="mp-row" data-act="extras-toggle-all" type="button" style="width:100%;margin-top:10px">
           <span class="mp-set-ico">${icon('theater')}</span>
@@ -21451,7 +22242,6 @@ const emojiApp = {
     const list = ctx.state.emoji;
     return `
       <div class="mp-page-body">
-        ${head('表情', '')}
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px">
           ${list.map(item => `
             <button class="mp-card" data-act="emoji-pick" data-id="${item.id}" type="button" style="margin:0;padding:12px 4px;text-align:center;border:0;font:inherit;cursor:pointer">
@@ -21523,7 +22313,6 @@ const plansApp = {
     const statusText = { pending: '等回应', accepted: '已接受', rejected: '已拒绝', completed: '已完成' };
     return `
       <div class="mp-page-body">
-        ${head('计划', '')}
         <div class="mp-group">
           <div class="mp-group-label">和角色的约定 · ${appointments.length}</div>
           <div class="mp-group-box">
@@ -21681,7 +22470,6 @@ const dressApp = {
     ];
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">装扮</div>
         <div class="mp-dress-hero">
           <div class="mp-dress-aa">Aa</div>
           <div class="mp-dress-hero-text">
@@ -21879,7 +22667,6 @@ const helpApp = {
   render() {
     return `
       <div class="mp-page-body">
-        ${head('帮助', '')}
         <div class="mp-card" style="font-size: calc(12.5px * var(--font-scale));line-height: calc(1.95 * var(--line-scale));color:var(--text-2)">
           <b style="color:var(--text)">桌面</b><br>
           左上是大字时钟和昨日日记，点它进日记。<br>
@@ -22408,8 +23195,7 @@ const drawApp = {
         <span style="flex:1"></span>
       </div>
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">绘图：${ep.engine === 'novelai' ? 'NovelAI 官方' : ep.engine === 'doubao' ? '豆包 Seedream · 火山方舟' : '自定义接口'}</div>
-
+        
         <div class="mp-draw-state${ready ? ' is-on' : ''}">
           ${icon(ready ? 'spark' : 'help')}
           <span>${ready
@@ -23841,7 +24627,6 @@ const apiListApp = {
         <span style="flex:1"></span>
       </div>
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">聊天接口</div>
 
         <section class="mp-ios-card mp-api-scheme" aria-label="当前聊天方案">
           <div class="mp-api-sec-head is-inside">
@@ -24298,10 +25083,6 @@ const { icon } = __req("meme/icons.js");
 const { esc, avatarHtml } = __req("meme/shell.js");
 const { walletBalance, userMembership, membershipLabel } = __req("meme/behavior-domains.js");
 
-function head(title, sub) {
-  return `<div class="mp-subtitle" style="margin-top:2px">${esc(title)}${sub ? ` · ${esc(sub)}` : ''}</div>`;
-}
-
 function usersOf(state) {
   return Array.isArray(state.users) ? state.users : [];
 }
@@ -24358,7 +25139,6 @@ const userListApp = {
 
     return `
       <div class="mp-page-body">
-        ${head('用户', '')}
 
         <div class="mp-draw-state${fromTavern ? ' is-on' : ''}">
           ${icon('contacts')}
@@ -24374,7 +25154,6 @@ const userListApp = {
               <option value="pin"${mode === 'pin' ? ' selected' : ''}>固定一位${pinned ? ` · ${esc(pinned.name)}` : ''}</option>
             </select>${icon('chevron')}
           </div>
-          <div class="mp-subtitle" style="margin-top:6px;font-size:calc(11px * var(--font-scale))">${mode === 'follow' ? '' : (pinned ? `固定用 ${esc(pinned.name)}` : '')}</div>
         </div>
 
         <div class="mp-group">
@@ -25475,6 +26254,53 @@ function ensureLookup(state, contact) {
   return state.lookups[contact.id];
 }
 
+/**
+ * 把角色的真实酒馆最近聊天塞进「TA 的手机」。
+ * 手机主人是角色：消息里 is_user 的那条是“我”发的，在 TA 手机里显示在左侧；
+ * 不是酒馆用户那条，才是 TA 自己发出去的。
+ */
+function applyTavernChat(lookup, contact, latest, state) {
+  if (!lookup || !latest) return lookup;
+  const raw = Array.isArray(latest.messages) ? latest.messages : [];
+  const visible = raw.filter(line => line && !line.is_system && typeof line.mes === 'string' && line.mes.trim());
+  const lines = Array.isArray(latest.lines) && latest.lines.length
+    ? latest.lines
+    : visible.slice(-60).map(line => ({
+      isUser: Boolean(line.is_user),
+      name: line.name || '',
+      text: String(line.mes || '').trim(),
+    }));
+  const msgs = lines.slice(-60).map((line, index) => {
+    const source = visible[visible.length - lines.length + index] || null;
+    const stamp = source?.send_date ? new Date(String(source.send_date)) : null;
+    return {
+      me: !line.isUser,
+      text: line.text,
+      at: stamp && Number.isFinite(stamp.getTime())
+        ? `${String(stamp.getHours()).padStart(2, '0')}:${String(stamp.getMinutes()).padStart(2, '0')}`
+        : '',
+    };
+  }).filter(item => item.text);
+  const chatter = state?.settings?.user?.name || '我';
+  lookup.chats = [
+    {
+      id: 'tavern-real',
+      peer: contact.name,
+      tag: latest.file ? `酒馆 · ${latest.file}` : '酒馆最近聊天',
+      unread: 1,
+      msgs: msgs.length ? msgs : [{ me: false, text: '还没有最近聊天', at: '' }],
+      real: true,
+    },
+    ...(Array.isArray(lookup.chats) ? lookup.chats.filter(item => item.id !== 'tavern-real') : []),
+  ];
+  lookup.contacts = [
+    { name: chatter, note: '我', group: false },
+    ...(Array.isArray(lookup.contacts) ? lookup.contacts : []),
+  ];
+  lookup.real = { file: latest.file || '', count: lines.length };
+  return lookup;
+}
+
 function tabsHtml(active) {
   const tabs = [
     ['chat', '聊天', 'chat'],
@@ -25566,7 +26392,7 @@ const charPhoneApp = {
     return `
       <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button>
         <span style="flex:1"></span>
-        <span class="mp-cp-badge">${generating ? '正在现编…' : 'TA 的手机'}</span>
+        <span class="mp-cp-badge">${generating ? '正在现编…' : data.real ? `最近聊天 · ${data.real.count} 条` : 'TA 的手机'}</span>
       </div>
       <div class="mp-page-body">
         ${head}
@@ -25654,6 +26480,7 @@ const charPhoneThreadApp = {
 
 exports["buildLocal"] = buildLocal;
 exports["ensureLookup"] = ensureLookup;
+exports["applyTavernChat"] = applyTavernChat;
 exports["charPhoneApp"] = charPhoneApp;
 exports["charPhoneThreadApp"] = charPhoneThreadApp;
 };
@@ -26449,9 +27276,6 @@ const musicApp = {
     return `
       <div class="mp-page-body mp-music">
         <div class="mp-music-hero">
-          <div>
-            <div class="mp-subtitle" style="margin-top:2px">音乐</div>
-          </div>
           <button class="mp-icon-btn" data-act="music-import" type="button" aria-label="导入歌单">${icon('plus')}</button>
         </div>
         ${playerHtml(ctx, ctx.state)}
@@ -26831,7 +27655,6 @@ function renderPage(ctx) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-subtitle" style="margin-top:0">酒馆记忆</div>
 
       <div class="mp-group-head" style="margin-top:16px">
         <div class="mp-group-label">当前读取</div>
@@ -27623,7 +28446,6 @@ const presetsApp = {
         <button class="mp-icon-btn" data-act="reply-new" type="button" aria-label="新建预设" title="新建预设">${icon('plus')}</button>
       </div>
       <div class="mp-page-body">
-        <div class="mp-subtitle">回复预设</div>
 
         ${creating ? `
         <div class="mp-group mp-api-inline" style="margin-top:12px">
@@ -27800,7 +28622,6 @@ const replyPresetApp = {
         <button class="mp-icon-btn" data-act="reply-del" type="button" title="删除">${icon('trash')}</button>
       </div>
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">回复预设${isActive ? ' · 手机现在用这套' : ''}</div>
 
         ${deleting ? `
         <div class="mp-group mp-api-inline is-danger" style="margin-top:12px">
@@ -28923,7 +29744,19 @@ function userBlock(state) {
   ].filter(Boolean).join('\n');
 }
 
-function clockBlock(now = new Date()) {
+function clockBlock(state = null, now = new Date()) {
+  const world = state?.phoneSurface === 'world' && state.activeWorldId
+    ? state.worldPhones?.[state.activeWorldId]
+    : null;
+  const clock = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  if (world) {
+    return [
+      '【时间信息】',
+      `剧情日期：${world.storyDate || '第 1 天'}`,
+      `现在的钟点：${clock}（这个数字跟现实走，日期跟剧情走）`,
+      '角色的手机能看到时间，可以据此判断时段、对方状态和聊天间隔；不要擅自把日期往后跳。',
+    ].join('\n');
+  }
   const text = now.toLocaleString('zh-CN', {
     month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
   });
@@ -29082,7 +29915,7 @@ async function contextBlockFor(item, state, chat, contact, context, memoryText, 
     const text = memoryText ? `【历史酒馆消息】\n${memoryText}` : '';
     return { text, status: text ? 'injected' : 'empty', reason: text ? '' : '这个会话还没读到记忆' };
   }
-  if (key === 'time') return { text: clockBlock(), status: 'injected', reason: '' };
+  if (key === 'time') return { text: clockBlock(state), status: 'injected', reason: '' };
   if (key === 'history') {
     const limit = effectivePhoneHistoryLimit(chat, context);
     const lastId = ctxOpts.omitLast ? (chat.messages?.[chat.messages.length - 1]?.id || '') : '';
@@ -29119,8 +29952,10 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
     : replyItemsFor(state, chat);
   const messages = [];
   const reportItems = [];
+  /* Meta 手机不读酒馆记忆：那边是现实时间里的另一条线，不该被任何角色的剧情记忆污染。 */
+  const metaSurface = state?.phoneSurface === 'meta';
 
-  if (options.memoryText === undefined && context.memory && chat) {
+  if (!metaSurface && options.memoryText === undefined && context.memory && chat) {
     try {
       const story = await buildMemoryContext(state, chat, 0);
       options.memoryText = String(story?.text || '');
@@ -29128,7 +29963,7 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
       options.memoryText = '';
     }
   }
-  const memoryText = String(options.memoryText || '');
+  const memoryText = metaSurface ? '' : String(options.memoryText || '');
 
   if (options.lead) messages.push({ role: 'system', content: options.lead, source: '场景提示', group: 'rule' });
 
@@ -29277,11 +30112,12 @@ __mods["meme/index.js"] = function(module, exports, __req){
 const { createStore } = __req("meme/store.js");
 const { normalize, emptyState, demoState, syncTavernContacts, chatFor, chatsOf, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks, dayKey, theatersOf, setContactAvatar } = __req("meme/data.js");
 const { createShell, applyWall, applyLook } = __req("meme/shell.js");
-const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost, countTextTokens } = __req("meme/host.js");
+const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost, countTextTokens, readLatestTavernChat, readOpenTavernChat } = __req("meme/host.js");
 const { chatApp, threadApp, threadSettingsApp } = __req("meme/apps/chat.js");
 const { favoritesApp } = __req("meme/apps/favorites.js");
 const { photoApp } = __req("meme/apps/photo.js");
 const { buildMemoryContext } = __req("meme/memory.js");
+const { installWorld, ensurePhoneWorlds, captureData, captureLook } = __req("meme/world.js");
 const { buildReplyMessages, transcript, replyLead, proactiveLead, diaryTranscriptForMessages, characterBlock, sceneBlock, userBlock } = __req("meme/reply-context.js");
 const { behaviorPrompt, behaviorSettings, parseBehaviorReply } = __req("meme/behavior.js");
 const { DIARY_OUTPUT_PROTOCOL, diaryFingerprint, diaryContextMessages, diaryParamsFingerprint } = __req("meme/diary.js");
@@ -29293,7 +30129,7 @@ const { apiListApp } = __req("meme/apps/api.js");
 const { userListApp, userEditApp } = __req("meme/apps/user.js");
 const { walletApp } = __req("meme/apps/wallet.js");
 const { characterApp } = __req("meme/apps/characters.js");
-const { charPhoneApp, charPhoneThreadApp, ensureLookup } = __req("meme/apps/charphone.js");
+const { charPhoneApp, charPhoneThreadApp, ensureLookup, applyTavernChat } = __req("meme/apps/charphone.js");
 const { musicApp, musicPlaylistApp, stopMusic } = __req("meme/apps/music.js");
 const { memoryPresetsApp } = __req("meme/apps/memory.js");
 const { presetsApp, replyPresetApp } = __req("meme/apps/presets.js");
@@ -29664,6 +30500,8 @@ function initMemePhone(options = {}) {
     });
     const raw = await store.init();
     const state = normalize(raw || (demo ? demoState() : emptyState()));
+    /* 双世界：老存档读进来先认成 Meta；具体里世界实例在打开手机时补。 */
+    if (!state.metaPhone) ensurePhoneWorlds(state);
     store.replace(state);
 
     /* 第一次在酒馆里打开：把角色同步成联系人 */
@@ -29691,6 +30529,11 @@ function initMemePhone(options = {}) {
           store.touch();
         }
       } catch { /* 读不到角色卡就等用户手动同步 */ }
+    }
+    /* 同步过联系人和角色卡后，把 Meta 那份快照补成最新；否则 Meta 会少一批联系人。 */
+    if (state.metaPhone && state.phoneSurface === 'meta') {
+      state.metaPhone.data = captureData(state);
+      state.metaPhone.look = captureLook(state);
     }
     return state;
   })().catch(error => { initPromise = null; throw error; });
@@ -29762,6 +30605,14 @@ async function openMemePhone(options = {}) {
     writeUser: writeTavernPersona,
     readApi: readTavernApi,
     listModels: listTavernModels,
+    readLatestChat: (contact, options = {}) => readLatestTavernChat({
+      name: contact?.name || '',
+      avatar: contact?.tavernAvatar || contact?.avatar || '',
+      floors: options.floors ?? 0,
+      includeMemory: options.includeMemory !== false,
+      file: options.file || contact?.tavernFile || '',
+    }),
+    readOpenChat: readOpenTavernChat,
   };
 
   rootEl = document.createElement('div');
@@ -29776,6 +30627,7 @@ async function openMemePhone(options = {}) {
     epoch: () => stateEpoch,
     demo: () => demoMode,
     save: () => {
+      ctx.world?.syncActive?.();
       return store.touch().then(() => true).catch(error => {
         ctx.toast?.(error.message || '保存失败，先去设置里导出备份');
         return false;
@@ -29783,10 +30635,12 @@ async function openMemePhone(options = {}) {
     },
     reset: async () => {
       const next = emptyState();
+      ensurePhoneWorlds(next);
       stateEpoch += 1;
       store.replace(next);
       ctx.state = next;
       ctx.ai = makeAi(getCurrentState);
+      installWorld(ctx);
       try {
         await store.flush();
         ctx.toast?.('已经清空');
@@ -29807,9 +30661,37 @@ async function openMemePhone(options = {}) {
       }
     },
     onClose: () => closeMemePhone(),
+    /* 打开「TA 的手机」前先抓这个角色最近一份酒馆聊天；抓不到就继续用本机假资料。 */
+    prepareCharPhone: async (contact) => {
+      if (!contact || state.lookups?.[contact.id]?.realAt) return null;
+      try {
+        const latest = await readLatestTavernChat({
+          name: contact.name,
+          avatar: contact.tavernAvatar || contact.avatar || '',
+          floors: 0,
+          includeMemory: true,
+        });
+        if (!latest?.available) return null;
+        const lookup = ensureLookup(state, contact);
+        applyTavernChat(lookup, contact, latest, state);
+        lookup.realAt = Date.now();
+        lookup.realFile = latest.file || '';
+        lookup.realCount = latest.lines.length;
+        ctx.save();
+        ctx.rerender?.();
+        return lookup;
+      } catch { return null; }
+    },
   };
 
   shellApi = createShell({ root: rootEl, ctx, apps: APPS, desktopApps: DESKTOP_APPS, dockApps: DOCK_APPS });
+
+  /* 双世界：在聊天里打开手机默认进这台聊天的里世界；不在聊天里就是 Meta。 */
+  installWorld(ctx);
+  try {
+    await ctx.world.openCurrentChat({ save: false, render: false });
+  } catch { /* 宿主没聊天时保持 Meta */ }
+  shellApi.render();
 
   /* 主题与壁纸 */
   applyTheme(state, rootEl);
@@ -30198,6 +31080,7 @@ async function importState(raw) {
   try {
     const old = getCurrentState();
     next = normalizeBackup(raw);
+    ensurePhoneWorlds(next);
     carryMissingCredentials(old, next);
   } catch (error) {
     return { ok: false, error: error.message || '备份格式不对，当前数据未改动' };
@@ -30207,6 +31090,7 @@ async function importState(raw) {
   if (ctx) {
     ctx.state = next;
     ctx.ai = makeAi(getCurrentState);
+    installWorld(ctx);
   }
   try {
     await store.flush();

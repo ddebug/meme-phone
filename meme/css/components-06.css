@@ -19,6 +19,33 @@
 .mp-row:active { transform: scale(.988); }
 .mp-row + .mp-row { margin-top: 8px; }
 
+/* 会话行右侧的「进入里世界手机」入口：单独一颗按钮，不嵌在整行按钮里。 */
+.mp-row-shell {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.mp-row-shell + .mp-row-shell { margin-top: 8px; }
+.mp-row-shell .mp-row { flex: 1; min-width: 0; }
+.mp-row-shell .mp-row + .mp-row { margin-top: 0; }
+
+.mp-row-world {
+  flex: 0 0 auto;
+  width: 42px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-m);
+  background: var(--card);
+  color: var(--accent-deep);
+  cursor: pointer;
+  box-shadow: var(--shadow-s);
+}
+
+.mp-row-world:active { transform: scale(.96); }
+.mp-row-world .mp-i { width: 19px; height: 19px; }
+
 .mp-row-main { flex: 1; min-width: 0; }
 
 .mp-row-name {

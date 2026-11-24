@@ -789,9 +789,6 @@ export const musicApp = {
     return `
       <div class="mp-page-body mp-music">
         <div class="mp-music-hero">
-          <div>
-            <div class="mp-subtitle" style="margin-top:2px">音乐</div>
-          </div>
           <button class="mp-icon-btn" data-act="music-import" type="button" aria-label="导入歌单">${icon('plus')}</button>
         </div>
         ${playerHtml(ctx, ctx.state)}

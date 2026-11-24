@@ -73,7 +73,7 @@ export const extrasApp = {
         </button>`;
       }).join('')}`).join('');
 
-    return `<div class="mp-page-body">${head('小剧场', '')}${filterBar}${cards || '<div class="mp-empty">这个类型还没有片段。<br>在加号菜单的「小剧场」里打开开关，聊完就会自动收到一段。</div>'}</div>`;
+    return `<div class="mp-page-body">${filterBar}${cards || '<div class="mp-empty">这个类型还没有片段。<br>在加号菜单的「小剧场」里打开开关，聊完就会自动收到一段。</div>'}</div>`;
   },
 
   handle(ctx, act, data) {
@@ -151,7 +151,6 @@ export const extrasSwitchApp = {
 
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">小剧场</div>
         ${kindPicker}
         <button class="mp-row" data-act="extras-toggle-all" type="button" style="width:100%;margin-top:10px">
           <span class="mp-set-ico">${icon('theater')}</span>
@@ -324,7 +323,6 @@ export const emojiApp = {
     const list = ctx.state.emoji;
     return `
       <div class="mp-page-body">
-        ${head('表情', '')}
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px">
           ${list.map(item => `
             <button class="mp-card" data-act="emoji-pick" data-id="${item.id}" type="button" style="margin:0;padding:12px 4px;text-align:center;border:0;font:inherit;cursor:pointer">
@@ -396,7 +394,6 @@ export const plansApp = {
     const statusText = { pending: '等回应', accepted: '已接受', rejected: '已拒绝', completed: '已完成' };
     return `
       <div class="mp-page-body">
-        ${head('计划', '')}
         <div class="mp-group">
           <div class="mp-group-label">和角色的约定 · ${appointments.length}</div>
           <div class="mp-group-box">
@@ -554,7 +551,6 @@ export const dressApp = {
     ];
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">装扮</div>
         <div class="mp-dress-hero">
           <div class="mp-dress-aa">Aa</div>
           <div class="mp-dress-hero-text">
@@ -752,7 +748,6 @@ export const helpApp = {
   render() {
     return `
       <div class="mp-page-body">
-        ${head('帮助', '')}
         <div class="mp-card" style="font-size: calc(12.5px * var(--font-scale));line-height: calc(1.95 * var(--line-scale));color:var(--text-2)">
           <b style="color:var(--text)">桌面</b><br>
           左上是大字时钟和昨日日记，点它进日记。<br>

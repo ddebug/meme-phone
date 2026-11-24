@@ -149,6 +149,9 @@ export async function buildMemoryContext(state, chat, limit = 1200) {
       avatar: contact.tavernAvatar || '',
       floors: readFloors,
       includeMemory: true,
+      /* 里世界手机绑定了具体聊天文件：读那一份，不要退成“这个角色最新一份”。 */
+      file: chat?.tavernFile || '',
+      chatId: chat?.tavernChatId || chat?.tavernFile || '',
     })
     : null;
 

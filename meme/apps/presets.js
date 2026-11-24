@@ -540,7 +540,6 @@ export const presetsApp = {
         <button class="mp-icon-btn" data-act="reply-new" type="button" aria-label="新建预设" title="新建预设">${icon('plus')}</button>
       </div>
       <div class="mp-page-body">
-        <div class="mp-subtitle">回复预设</div>
 
         ${creating ? `
         <div class="mp-group mp-api-inline" style="margin-top:12px">
@@ -717,7 +716,6 @@ export const replyPresetApp = {
         <button class="mp-icon-btn" data-act="reply-del" type="button" title="删除">${icon('trash')}</button>
       </div>
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">回复预设${isActive ? ' · 手机现在用这套' : ''}</div>
 
         ${deleting ? `
         <div class="mp-group mp-api-inline is-danger" style="margin-top:12px">

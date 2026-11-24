@@ -336,7 +336,19 @@ export function userBlock(state) {
   ].filter(Boolean).join('\n');
 }
 
-export function clockBlock(now = new Date()) {
+export function clockBlock(state = null, now = new Date()) {
+  const world = state?.phoneSurface === 'world' && state.activeWorldId
+    ? state.worldPhones?.[state.activeWorldId]
+    : null;
+  const clock = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  if (world) {
+    return [
+      '【时间信息】',
+      `剧情日期：${world.storyDate || '第 1 天'}`,
+      `现在的钟点：${clock}（这个数字跟现实走，日期跟剧情走）`,
+      '角色的手机能看到时间，可以据此判断时段、对方状态和聊天间隔；不要擅自把日期往后跳。',
+    ].join('\n');
+  }
   const text = now.toLocaleString('zh-CN', {
     month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
   });
@@ -495,7 +507,7 @@ async function contextBlockFor(item, state, chat, contact, context, memoryText, 
     const text = memoryText ? `【历史酒馆消息】\n${memoryText}` : '';
     return { text, status: text ? 'injected' : 'empty', reason: text ? '' : '这个会话还没读到记忆' };
   }
-  if (key === 'time') return { text: clockBlock(), status: 'injected', reason: '' };
+  if (key === 'time') return { text: clockBlock(state), status: 'injected', reason: '' };
   if (key === 'history') {
     const limit = effectivePhoneHistoryLimit(chat, context);
     const lastId = ctxOpts.omitLast ? (chat.messages?.[chat.messages.length - 1]?.id || '') : '';
@@ -532,8 +544,10 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
     : replyItemsFor(state, chat);
   const messages = [];
   const reportItems = [];
+  /* Meta 手机不读酒馆记忆：那边是现实时间里的另一条线，不该被任何角色的剧情记忆污染。 */
+  const metaSurface = state?.phoneSurface === 'meta';
 
-  if (options.memoryText === undefined && context.memory && chat) {
+  if (!metaSurface && options.memoryText === undefined && context.memory && chat) {
     try {
       const story = await buildMemoryContext(state, chat, 0);
       options.memoryText = String(story?.text || '');
@@ -541,7 +555,7 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
       options.memoryText = '';
     }
   }
-  const memoryText = String(options.memoryText || '');
+  const memoryText = metaSurface ? '' : String(options.memoryText || '');
 
   if (options.lead) messages.push({ role: 'system', content: options.lead, source: '场景提示', group: 'rule' });
 

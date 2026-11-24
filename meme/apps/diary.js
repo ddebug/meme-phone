@@ -116,7 +116,6 @@ function renderPage(ctx, params = {}) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-subtitle" style="margin-top:0">${contactId ? `${esc(contact?.name || 'TA')}的日记` : '日记'}</div>
       <div class="mp-month-bar">
         <button class="mp-icon-btn" data-act="diary-prev" data-contact="${esc(contactId)}" type="button" aria-label="上个月">${icon('back')}</button>
         <span class="mp-month">${target.getFullYear()} 年 ${target.getMonth() + 1} 月</span>
@@ -384,7 +383,6 @@ function renderThreadPage(ctx, contactId) {
   if (!statuses.length) {
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记</div>
         ${threadSettingsBox(ctx, contactId)}
         <div class="mp-td-toolbar">
           <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>
@@ -395,7 +393,6 @@ function renderThreadPage(ctx, contactId) {
   const target = parseMonth(st.month);
   return `
     <div class="mp-page-body">
-      <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记</div>
       ${threadSettingsBox(ctx, contactId)}
       <div class="mp-td-toolbar">
         <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>

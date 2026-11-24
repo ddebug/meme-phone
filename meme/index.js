@@ -6,11 +6,12 @@
 import { createStore } from './store.js';
 import { normalize, emptyState, demoState, syncTavernContacts, chatFor, chatsOf, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks, dayKey, theatersOf, setContactAvatar } from './data.js';
 import { createShell, applyWall, applyLook } from './shell.js';
-import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost, countTextTokens } from './host.js';
+import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost, countTextTokens, readLatestTavernChat, readOpenTavernChat } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { favoritesApp } from './apps/favorites.js';
 import { photoApp } from './apps/photo.js';
 import { buildMemoryContext } from './memory.js';
+import { installWorld, ensurePhoneWorlds, captureData, captureLook } from './world.js';
 import { buildReplyMessages, transcript, replyLead, proactiveLead, diaryTranscriptForMessages, characterBlock, sceneBlock, userBlock } from './reply-context.js';
 import { behaviorPrompt, behaviorSettings, parseBehaviorReply } from './behavior.js';
 import { DIARY_OUTPUT_PROTOCOL, diaryFingerprint, diaryContextMessages, diaryParamsFingerprint } from './diary.js';
@@ -22,7 +23,7 @@ import { apiListApp } from './apps/api.js';
 import { userListApp, userEditApp } from './apps/user.js';
 import { walletApp } from './apps/wallet.js';
 import { characterApp } from './apps/characters.js';
-import { charPhoneApp, charPhoneThreadApp, ensureLookup } from './apps/charphone.js';
+import { charPhoneApp, charPhoneThreadApp, ensureLookup, applyTavernChat } from './apps/charphone.js';
 import { musicApp, musicPlaylistApp, stopMusic } from './apps/music.js';
 import { memoryPresetsApp } from './apps/memory.js';
 import { presetsApp, replyPresetApp } from './apps/presets.js';
@@ -393,6 +394,8 @@ export function initMemePhone(options = {}) {
     });
     const raw = await store.init();
     const state = normalize(raw || (demo ? demoState() : emptyState()));
+    /* 双世界：老存档读进来先认成 Meta；具体里世界实例在打开手机时补。 */
+    if (!state.metaPhone) ensurePhoneWorlds(state);
     store.replace(state);
 
     /* 第一次在酒馆里打开：把角色同步成联系人 */
@@ -420,6 +423,11 @@ export function initMemePhone(options = {}) {
           store.touch();
         }
       } catch { /* 读不到角色卡就等用户手动同步 */ }
+    }
+    /* 同步过联系人和角色卡后，把 Meta 那份快照补成最新；否则 Meta 会少一批联系人。 */
+    if (state.metaPhone && state.phoneSurface === 'meta') {
+      state.metaPhone.data = captureData(state);
+      state.metaPhone.look = captureLook(state);
     }
     return state;
   })().catch(error => { initPromise = null; throw error; });
@@ -491,6 +499,14 @@ export async function openMemePhone(options = {}) {
     writeUser: writeTavernPersona,
     readApi: readTavernApi,
     listModels: listTavernModels,
+    readLatestChat: (contact, options = {}) => readLatestTavernChat({
+      name: contact?.name || '',
+      avatar: contact?.tavernAvatar || contact?.avatar || '',
+      floors: options.floors ?? 0,
+      includeMemory: options.includeMemory !== false,
+      file: options.file || contact?.tavernFile || '',
+    }),
+    readOpenChat: readOpenTavernChat,
   };
 
   rootEl = document.createElement('div');
@@ -505,6 +521,7 @@ export async function openMemePhone(options = {}) {
     epoch: () => stateEpoch,
     demo: () => demoMode,
     save: () => {
+      ctx.world?.syncActive?.();
       return store.touch().then(() => true).catch(error => {
         ctx.toast?.(error.message || '保存失败，先去设置里导出备份');
         return false;
@@ -512,10 +529,12 @@ export async function openMemePhone(options = {}) {
     },
     reset: async () => {
       const next = emptyState();
+      ensurePhoneWorlds(next);
       stateEpoch += 1;
       store.replace(next);
       ctx.state = next;
       ctx.ai = makeAi(getCurrentState);
+      installWorld(ctx);
       try {
         await store.flush();
         ctx.toast?.('已经清空');
@@ -536,9 +555,37 @@ export async function openMemePhone(options = {}) {
       }
     },
     onClose: () => closeMemePhone(),
+    /* 打开「TA 的手机」前先抓这个角色最近一份酒馆聊天；抓不到就继续用本机假资料。 */
+    prepareCharPhone: async (contact) => {
+      if (!contact || state.lookups?.[contact.id]?.realAt) return null;
+      try {
+        const latest = await readLatestTavernChat({
+          name: contact.name,
+          avatar: contact.tavernAvatar || contact.avatar || '',
+          floors: 0,
+          includeMemory: true,
+        });
+        if (!latest?.available) return null;
+        const lookup = ensureLookup(state, contact);
+        applyTavernChat(lookup, contact, latest, state);
+        lookup.realAt = Date.now();
+        lookup.realFile = latest.file || '';
+        lookup.realCount = latest.lines.length;
+        ctx.save();
+        ctx.rerender?.();
+        return lookup;
+      } catch { return null; }
+    },
   };
 
   shellApi = createShell({ root: rootEl, ctx, apps: APPS, desktopApps: DESKTOP_APPS, dockApps: DOCK_APPS });
+
+  /* 双世界：在聊天里打开手机默认进这台聊天的里世界；不在聊天里就是 Meta。 */
+  installWorld(ctx);
+  try {
+    await ctx.world.openCurrentChat({ save: false, render: false });
+  } catch { /* 宿主没聊天时保持 Meta */ }
+  shellApi.render();
 
   /* 主题与壁纸 */
   applyTheme(state, rootEl);
@@ -927,6 +974,7 @@ export async function importState(raw) {
   try {
     const old = getCurrentState();
     next = normalizeBackup(raw);
+    ensurePhoneWorlds(next);
     carryMissingCredentials(old, next);
   } catch (error) {
     return { ok: false, error: error.message || '备份格式不对，当前数据未改动' };
@@ -936,6 +984,7 @@ export async function importState(raw) {
   if (ctx) {
     ctx.state = next;
     ctx.ai = makeAi(getCurrentState);
+    installWorld(ctx);
   }
   try {
     await store.flush();

@@ -9,10 +9,6 @@ import { icon } from '../icons.js';
 import { esc, avatarHtml } from '../shell.js';
 import { walletBalance, userMembership, membershipLabel } from '../behavior-domains.js';
 
-function head(title, sub) {
-  return `<div class="mp-subtitle" style="margin-top:2px">${esc(title)}${sub ? ` · ${esc(sub)}` : ''}</div>`;
-}
-
 function usersOf(state) {
   return Array.isArray(state.users) ? state.users : [];
 }
@@ -69,7 +65,6 @@ export const userListApp = {
 
     return `
       <div class="mp-page-body">
-        ${head('用户', '')}
 
         <div class="mp-draw-state${fromTavern ? ' is-on' : ''}">
           ${icon('contacts')}
@@ -85,7 +80,6 @@ export const userListApp = {
               <option value="pin"${mode === 'pin' ? ' selected' : ''}>固定一位${pinned ? ` · ${esc(pinned.name)}` : ''}</option>
             </select>${icon('chevron')}
           </div>
-          <div class="mp-subtitle" style="margin-top:6px;font-size:calc(11px * var(--font-scale))">${mode === 'follow' ? '' : (pinned ? `固定用 ${esc(pinned.name)}` : '')}</div>
         </div>
 
         <div class="mp-group">

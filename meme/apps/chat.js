@@ -5,7 +5,7 @@
 
 import { icon } from '../icons.js';
 import {
-  chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, unreadTotal, contactsOf,
+  chatsOf, chatById, lastMessage, contactById, pushMessage, chatFor, contactsOf,
   wakeAllowed, messagePreview, addExtrasEntry, theaterKindFor, THEATER_KINDS, theaterKindById,
   apiPresetsOf, memoryPresetsOf, memoryPresetFor,
   replyPresetsOf, replyPresetFor, replyContextFor, normalizeReplyItems,
@@ -554,7 +554,6 @@ function settingsBody(ctx, chatId) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-subtitle" style="margin-top:0">聊天设置</div>
 
       <div class="mp-chat-set-head">
         ${avatarHtml(contact?.name || '?', contact?.avatar)}
@@ -680,21 +679,27 @@ function listBody(ctx) {
       ? `${message.from === 'me' ? '我：' : ''}${messagePreview(message)}`
       : '还没有消息，说点什么吧。';
     return `
-      <button class="mp-row" data-act="open-thread" data-chat="${chat.id}" data-hold="chat-menu" type="button">
-        ${avatarHtml(contact.name, contact.avatar)}
-        <div class="mp-row-main">
-          <div class="mp-row-name">
-            ${esc(contact.name)}
-            ${chat.pinned ? `<span class="mp-pill plain">${icon('pin')}</span>` : ''}
-            ${contact.kind === 'group' ? '<span class="mp-pill plain">群</span>' : ''}
+      <div class="mp-row-shell">
+        <button class="mp-row" data-act="open-thread" data-chat="${chat.id}" data-hold="chat-menu" type="button">
+          ${avatarHtml(contact.name, contact.avatar)}
+          <div class="mp-row-main">
+            <div class="mp-row-name">
+              ${esc(contact.name)}
+              ${chat.pinned ? `<span class="mp-pill plain">${icon('pin')}</span>` : ''}
+              ${contact.kind === 'group' ? '<span class="mp-pill plain">群</span>' : ''}
+            </div>
+            <div class="mp-row-sub">${esc(preview)}</div>
           </div>
-          <div class="mp-row-sub">${esc(preview)}</div>
-        </div>
-        <div class="mp-row-side">
-          <span>${chat.updatedAt ? shortText(chat.updatedAt) : ''}</span>
-          ${chat.unread && !chat.muted ? `<span class="mp-badge-count">${chat.unread > 99 ? '99+' : chat.unread}</span>` : ''}
-        </div>
-      </button>`;
+          <div class="mp-row-side">
+            <span>${chat.updatedAt ? shortText(chat.updatedAt) : ''}</span>
+            ${chat.unread && !chat.muted ? `<span class="mp-badge-count">${chat.unread > 99 ? '99+' : chat.unread}</span>` : ''}
+          </div>
+        </button>
+        ${contact.kind === 'group' ? '' : `
+        <button class="mp-row-world" data-act="world-open" data-contact="${contact.id}" type="button" aria-label="打开 ${esc(contact.name)} 的里世界手机" title="进入 TA 的里世界手机">
+          ${icon('phone')}
+        </button>`}
+      </div>`;
   }).join('');
 
   return `
@@ -703,7 +708,6 @@ function listBody(ctx) {
         <span style="flex:1"></span>
         <button class="mp-icon-btn" data-act="chat-new" type="button" aria-label="新建会话">${icon('plus')}</button>
       </div>
-      <div class="mp-subtitle">聊天 · ${chats.length} 个会话 · ${unreadTotal(state)} 条未读</div>
       ${rows || '<div class="mp-empty">还没有会话。<br>先去「通讯录」把角色加进来。</div>'}
     </div>`;
 }
@@ -1275,6 +1279,14 @@ async function runGeneration(ctx, chat, contact, options = {}) {
     });
     ctx.toast('这轮的小剧场收进 App 了');
   }
+  /* 里世界手机：把这一轮（我发的 + TA 回的）写回原聊天文件的隐藏楼层。
+     写不进就留在世界实例的队列里，下次打开这条世界线再试。 */
+  if (firstSaved && kind === 'reply' && !replaceIds.length && ctx.world?.syncTurn) {
+    const turnMessages = chat.messages.filter(item => item.turnId === turnId || pendingIds.includes(item.id));
+    ctx.world.syncTurn(chat, turnId, turnMessages).catch(error => {
+      ctx.toast(error?.message || '这轮没写回聊天文件');
+    });
+  }
   ctx.save();
   ctx.rerender();
   scrollToBottom(ctx);
@@ -1309,6 +1321,14 @@ export const chatApp = {
       ctx.shell.live = { inputValue: chat?.draft || '', focus: false };
       ctx.go('thread', { chatId: data.chat });
       setTimeout(() => scrollToBottom(ctx), 30);
+      return true;
+    }
+
+    if (act === 'world-open') {
+      const contact = contactById(ctx.state, data.contact);
+      if (!contact) return true;
+      if (typeof ctx.world?.openForContact !== 'function') { ctx.toast('这个环境还没有里世界手机'); return true; }
+      ctx.world.openForContact(contact, { source: 'meta' });
       return true;
     }
 

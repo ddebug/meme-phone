@@ -240,6 +240,53 @@ export function ensureLookup(state, contact) {
   return state.lookups[contact.id];
 }
 
+/**
+ * 把角色的真实酒馆最近聊天塞进「TA 的手机」。
+ * 手机主人是角色：消息里 is_user 的那条是“我”发的，在 TA 手机里显示在左侧；
+ * 不是酒馆用户那条，才是 TA 自己发出去的。
+ */
+export function applyTavernChat(lookup, contact, latest, state) {
+  if (!lookup || !latest) return lookup;
+  const raw = Array.isArray(latest.messages) ? latest.messages : [];
+  const visible = raw.filter(line => line && !line.is_system && typeof line.mes === 'string' && line.mes.trim());
+  const lines = Array.isArray(latest.lines) && latest.lines.length
+    ? latest.lines
+    : visible.slice(-60).map(line => ({
+      isUser: Boolean(line.is_user),
+      name: line.name || '',
+      text: String(line.mes || '').trim(),
+    }));
+  const msgs = lines.slice(-60).map((line, index) => {
+    const source = visible[visible.length - lines.length + index] || null;
+    const stamp = source?.send_date ? new Date(String(source.send_date)) : null;
+    return {
+      me: !line.isUser,
+      text: line.text,
+      at: stamp && Number.isFinite(stamp.getTime())
+        ? `${String(stamp.getHours()).padStart(2, '0')}:${String(stamp.getMinutes()).padStart(2, '0')}`
+        : '',
+    };
+  }).filter(item => item.text);
+  const chatter = state?.settings?.user?.name || '我';
+  lookup.chats = [
+    {
+      id: 'tavern-real',
+      peer: contact.name,
+      tag: latest.file ? `酒馆 · ${latest.file}` : '酒馆最近聊天',
+      unread: 1,
+      msgs: msgs.length ? msgs : [{ me: false, text: '还没有最近聊天', at: '' }],
+      real: true,
+    },
+    ...(Array.isArray(lookup.chats) ? lookup.chats.filter(item => item.id !== 'tavern-real') : []),
+  ];
+  lookup.contacts = [
+    { name: chatter, note: '我', group: false },
+    ...(Array.isArray(lookup.contacts) ? lookup.contacts : []),
+  ];
+  lookup.real = { file: latest.file || '', count: lines.length };
+  return lookup;
+}
+
 function tabsHtml(active) {
   const tabs = [
     ['chat', '聊天', 'chat'],
@@ -331,7 +378,7 @@ export const charPhoneApp = {
     return `
       <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button>
         <span style="flex:1"></span>
-        <span class="mp-cp-badge">${generating ? '正在现编…' : 'TA 的手机'}</span>
+        <span class="mp-cp-badge">${generating ? '正在现编…' : data.real ? `最近聊天 · ${data.real.count} 条` : 'TA 的手机'}</span>
       </div>
       <div class="mp-page-body">
         ${head}

@@ -8,7 +8,7 @@
 import { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT, DEFAULT_PROACTIVE_PROMPT, PROACTIVE_PROMPT_MAX_LENGTH } from './preset-defaults.js';
 import { normalizeBehavior, behaviorPreview } from './behavior.js';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /* 回复预设除了「怎么说」，还要决定「给模型看哪些上下文」。
  * 这一组开关沿用旧独立小手机的 QQ 预设：角色档案、用户设定、聊天记录、记忆、时间。 */
@@ -558,6 +558,12 @@ export function emptyState() {
     friendRequests: [],
     signatures: { byContact: {} },
     dress: { accent: '#8e7bf2' },
+    /* Meta 是唯一那台；里世界按聊天 / 角色分别存实例快照。 */
+    metaPhone: null,
+    worldPhones: {},
+    phoneSurface: 'meta',
+    activeWorldId: '',
+    lastWorldId: '',
   };
 }
 
@@ -2284,5 +2290,23 @@ export function normalize(raw) {
       legacy: Boolean(theater?.legacy),
     };
   }
+  /* v3：双世界。老存档读进来时，顶层这一份就是 Meta；里世界实例随后由 world 层补。 */
+  merged.version = Math.max(Number(merged.version) || 0, SCHEMA_VERSION);
+  merged.phoneSurface = ['meta', 'world'].includes(raw.phoneSurface) ? raw.phoneSurface : 'meta';
+  merged.activeWorldId = String(raw.activeWorldId || '');
+  merged.lastWorldId = String(raw.lastWorldId || '');
+  merged.worldPhones = raw.worldPhones && typeof raw.worldPhones === 'object' && !Array.isArray(raw.worldPhones)
+    ? raw.worldPhones
+    : {};
+  merged.metaPhone = raw.metaPhone && typeof raw.metaPhone === 'object' && !Array.isArray(raw.metaPhone)
+    ? raw.metaPhone
+    : null;
+  Object.values(merged.chats).forEach(chat => {
+    if (!chat || typeof chat !== 'object') return;
+    if (chat.tavernFile) chat.tavernFile = String(chat.tavernFile).replace(/\.jsonl$/i, '');
+    if (chat.tavernChatId) chat.tavernChatId = String(chat.tavernChatId);
+    if (chat.worldPhoneId) chat.worldPhoneId = String(chat.worldPhoneId);
+    if (Array.isArray(chat.syncedTurnIds)) chat.syncedTurnIds = chat.syncedTurnIds.map(String).slice(-40);
+  });
   return merged;
 }

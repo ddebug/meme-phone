@@ -100,7 +100,6 @@ export const contactsApp = {
             ? `<button class="mp-icon-btn" data-act="char-search" type="button" aria-label="查角色">${icon('search')}</button>`
             : `<button class="mp-icon-btn" data-act="contact-add" type="button" aria-label="添加">${icon('plus')}</button>`}
         </div>
-        <div class="mp-subtitle">${tab === 'cards' ? '酒馆角色' : `已添加 · ${contacts.length} 位`}</div>
 
         <div class="mp-seg" style="margin:2px 0 12px">
           <button class="${tab === 'contacts' ? 'on' : ''}" data-act="contacts-tab" data-tab="contacts" type="button">已添加</button>
@@ -250,7 +249,10 @@ export const contactApp = {
           <button class="mp-btn accent" data-act="contact-chat" data-contact="${contact.id}" type="button" style="flex:1">${icon('chat')}发消息</button>
           <button class="mp-btn" data-act="contact-extras" data-contact="${contact.id}" type="button" style="flex:1">${icon('theater')}小剧场 ${extras.length || ''}</button>
         </div>
-        ${contact.kind === 'group' ? '' : `<button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button">${icon('search')}查 TA 的手机</button>`}
+        ${contact.kind === 'group' ? '' : `<div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button" style="flex:1">${icon('search')}查 TA 的手机</button>
+          <button class="mp-btn" data-act="contact-world" data-contact="${contact.id}" type="button" style="flex:1">${icon('phone')}里世界手机</button>
+        </div>`}
         <div class="mp-group">
           <div class="mp-group-label">TA 的状态</div>
           <div class="mp-group-box">
@@ -312,9 +314,18 @@ export const contactApp = {
       return true;
     }
 
+    if (act === 'contact-world') {
+      if (!contact) return true;
+      if (typeof ctx.world?.openForContact !== 'function') { ctx.toast('这个环境还没有里世界手机'); return true; }
+      ctx.world.openForContact(contact);
+      return true;
+    }
+
     if (act === 'contact-phone') {
       if (!contact) return true;
       ctx.go('p-charphone', { contactId: contact.id });
+      /* 先打开本机这份，后台去抓这个角色最近的酒馆聊天，抓到了再换成真的。 */
+      Promise.resolve(ctx.prepareCharPhone?.(contact)).catch(() => {});
       return true;
     }
 

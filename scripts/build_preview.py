@@ -19,6 +19,7 @@ MODULES = [
     "meme/behavior-domains.js",
     "meme/store.js",
     "meme/host.js",
+    "meme/world.js",
     "meme/icons.js",
     "meme/theme-data.js",
     "meme/shell.js",

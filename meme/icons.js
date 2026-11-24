@@ -6,6 +6,7 @@
 const P = {
   chat: '<path d="M4 11.5c0-3.6 3.6-6.5 8-6.5s8 2.9 8 6.5-3.6 6.5-8 6.5c-1 0-2-.1-2.9-.4"/><path d="M4 11.5c0 1.3.6 2.5 1.6 3.5L5 19l3.6-1.4"/>',
   contacts: '<circle cx="9" cy="9" r="3.2"/><path d="M3.6 18.4c.5-2.7 2.7-4.3 5.4-4.3s4.9 1.6 5.4 4.3"/><circle cx="17" cy="10" r="2.3"/><path d="M16 14.6c2.4 0 4.2 1.3 4.6 3.6"/>',
+  phone: '<rect x="7" y="3.2" width="10" height="17.6" rx="3"/><path d="M10.4 18.2h3.2"/><path d="M10.2 6.2h3.6"/>',
   diary: '<path d="M5.5 4.5h9.5a2.5 2.5 0 0 1 2.5 2.5v12.5H8a2.5 2.5 0 0 1-2.5-2.5z"/><path d="M8.5 4.5v15"/><path d="M11.4 9h3.6M11.4 12.6h3.6"/>',
   settings: '<circle cx="12" cy="12" r="2.9"/><path d="M12 3.8v2.2M12 18v2.2M4.6 12H3M21 12h-1.6M6.9 6.9l1.5 1.5M15.6 15.6l1.5 1.5M17.1 6.9l-1.5 1.5M8.4 15.6l-1.5 1.5"/>',
   theater: '<path d="M4 8.4h16v9.2a1.6 1.6 0 0 1-1.6 1.6H5.6A1.6 1.6 0 0 1 4 17.6z"/><path d="M4.6 5.2h14.8l-1 3.2H5.6z"/><path d="M8.6 12.6h2M13.4 12.6h2"/>',
@@ -87,7 +88,7 @@ export const TINT = {
 export const ICON_NAMES = Object.keys(P);
 
 export const ICON_LABELS = {
-  chat: '聊天气泡', contacts: '联系人', diary: '日记本', settings: '齿轮',
+  chat: '聊天气泡', contacts: '联系人', phone: '手机', diary: '日记本', settings: '齿轮',
   theater: '小剧场', parallel: '平行时空', bookmark: '书签', smile: '笑脸', plan: '清单',
   brush: '画笔', help: '问号', back: '左箭头', home: '房子',
   chevron: '下箭头', close: '关闭', plus: '加号', send: '纸飞机', stop: '停止',

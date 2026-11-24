@@ -40,8 +40,24 @@ test('requestStats 优先使用消息自带的 group，不依赖用户改过的�
   assert.equal(stats.rows[1].group.key, 'phone');
 });
 
+test('Meta 手机不把酒馆记忆注进回复', async () => {
+  const state = demoState();
+  state.phoneSurface = 'meta';
+  const chat = state.chats[Object.keys(state.chats)[0]];
+  const contact = state.contacts[chat.contactId];
+  const built = await buildReplyMessages(state, chat, contact, {
+    memoryText: '这段酒馆记忆不该出现',
+    omitLastUser: true,
+  });
+  const item = built.report.items.find(entry => entry.label === '历史酒馆消息');
+  assert.equal(item?.status, 'empty');
+  assert.ok(!built.messages.some(message => String(message.content || '').includes('这段酒馆记忆不该出现')));
+});
+
 test('实际组装后酒馆历史与小手机历史分开统计，字符数与注入内容一致', async () => {
   const state = demoState();
+  /* Meta 手机按设计不读酒馆记忆；这条统计用例测的是里世界这条线。 */
+  state.phoneSurface = 'world';
   const chat = state.chats[Object.keys(state.chats)[0]];
   const contact = state.contacts[chat.contactId];
   const built = await buildReplyMessages(state, chat, contact, {

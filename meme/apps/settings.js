@@ -99,15 +99,36 @@ export const settingsApp = {
     const apiReady = host.hasGenerate;
     const customProactivePrompt = Boolean(normalizeProactivePrompt(state.settings.proactive.prompt));
 
+    const worlds = ctx.world?.list?.() || [];
+    const currentWorld = ctx.world?.current?.() || null;
+
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">设置</div>
 
         <div class="mp-group">
           <div class="mp-group-label">身份与外观</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'contacts', title: '用户', value: state.settings.user.name || '还没选', act: 'set-open', app: 'user' })}
             ${row(ctx, { iconName: 'brush', title: '装扮与主题', act: 'set-open-dress' })}
+          </div>
+        </div>
+
+        <div class="mp-group">
+          <div class="mp-group-label">双世界</div>
+          <div class="mp-group-box">
+            ${row(ctx, {
+              iconName: 'phone',
+              title: currentWorld ? `里世界手机 · ${currentWorld.ownerName || '这一条'}` : '里世界手机',
+              sub: currentWorld ? `${currentWorld.storyDate || '第 1 天'} · ${worlds.length} 条世界线` : `${worlds.length} 条世界线 · 现在在 Meta`,
+              act: 'set-world-list',
+            })}
+            ${row(ctx, {
+              iconName: 'refresh',
+              title: currentWorld ? '翻回 Meta 手机' : '回到上一次的里世界手机',
+              sub: currentWorld ? 'Meta 用现实时间，不读这条聊天的记忆' : '只有一台 Meta，多个里世界各自隔离',
+              act: 'set-world-flip',
+            })}
+            ${row(ctx, { iconName: 'parallel', title: '创建番外', sub: '从当前这台里世界手机的聊天分一条时间线', act: 'set-world-branch' })}
           </div>
         </div>
 
@@ -178,6 +199,36 @@ export const settingsApp = {
     const state = ctx.state;
 
     if (act === 'set-open-dress') { ctx.go('app-dress'); return true; }
+    if (act === 'set-world-list') {
+      const worlds = ctx.world?.list?.() || [];
+      if (!worlds.length) { ctx.toast('还没有里世界手机；先在酒馆聊天里打开一次手机'); return true; }
+      const active = ctx.world?.current?.()?.id || '';
+      ctx.openSheet({
+        title: `里世界手机 · ${worlds.length} 台`,
+        note: '每台绑一个酒馆聊天文件；切过去只换这一台的数据，Meta 不动。',
+        items: worlds
+          .slice()
+          .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0))
+          .slice(0, 20)
+          .map(world => ({
+            label: `${world.ownerName || '这一条'} · ${world.storyDate || '第 1 天'}`,
+            value: world.id,
+            icon: 'phone',
+            note: [world.sourceChatFile ? `《${world.sourceChatFile}》` : '没有绑定聊天', world.id === active ? '当前这台' : ''].filter(Boolean).join(' · '),
+          })),
+        onPick: (id) => {
+          const world = ctx.world?.activate?.(id);
+          if (world) ctx.home?.();
+        },
+      });
+      return true;
+    }
+    if (act === 'set-world-flip') {
+      ctx.world?.flip?.();
+      ctx.home?.();
+      return true;
+    }
+    if (act === 'set-world-branch') { ctx.go('app-parallel'); return true; }
     if (act === 'set-open-appearance') { ctx.go('app-appearance'); return true; }
     if (act === 'set-open-cards') { ctx.go('app-contacts', { tab: 'cards' }); return true; }
 

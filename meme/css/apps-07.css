@@ -329,6 +329,25 @@
   box-shadow: 0 0 0 2px rgba(255, 255, 255, .92);
 }
 
+/* 通讯录资料页的头像：右下角一枚小相机，点开换图 */
+.mp-avatar-camera {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  background: rgba(38, 30, 58, .72);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(28, 20, 44, .28);
+  backdrop-filter: blur(2px);
+}
+.mp-avatar-camera .mp-i { width: 11px; height: 11px; }
+.mp-avatar-btn:active .mp-avatar-camera { transform: scale(.9); }
+
 /* 心理活动面板（从头像点进来） */
 .mp-mind { display: flex; flex-direction: column; gap: 11px; }
 .mp-mind-head { display: flex; align-items: center; gap: 9px; }

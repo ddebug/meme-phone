@@ -4,7 +4,7 @@
  */
 
 import { createStore } from './store.js';
-import { normalize, emptyState, demoState, syncTavernContacts, chatFor, chatsOf, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks, dayKey, theatersOf } from './data.js';
+import { normalize, emptyState, demoState, syncTavernContacts, chatFor, chatsOf, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks, dayKey, theatersOf, setContactAvatar } from './data.js';
 import { createShell, applyWall, applyLook } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost, countTextTokens } from './host.js';
 import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
@@ -649,6 +649,38 @@ export async function openMemePhone(options = {}) {
     ctx.toast('顶栏背景图换好了');
   }
 
+  /* 角色头像：居中裁成方图、缩到 320px，压成 webp 只存在小手机里 */
+  async function useContactAvatar(file, contactId) {
+    const contact = state.contacts?.[contactId];
+    if (!contact) { ctx.toast('找不到这个联系人'); return; }
+    const looksImage = (file?.type && file.type.startsWith('image/')) || /\.(jpg|jpeg|png|webp|gif|bmp)$/i.test(file?.name || '');
+    if (!looksImage) { ctx.toast('请选一张图片'); return; }
+    const img = await new Promise((resolve, reject) => {
+      const image = new Image();
+      const url = URL.createObjectURL(file);
+      image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+      image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读不出来')); };
+      image.src = url;
+    });
+    const side = Math.min(img.width, img.height);
+    const sx = Math.max(0, (img.width - side) / 2);
+    const sy = Math.max(0, (img.height - side) / 2);
+    const canvas = document.createElement('canvas');
+    canvas.width = 320;
+    canvas.height = 320;
+    const painter = canvas.getContext('2d');
+    if (!painter) throw new Error('画布不可用');
+    painter.drawImage(img, sx, sy, side, side, 0, 0, 320, 320);
+    let dataUrl = canvas.toDataURL('image/webp', 0.88);
+    /* WebP 不被支持时 toDataURL 会退回 PNG，太大就再压一道 */
+    if (!dataUrl.startsWith('data:image/webp')) dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+    if (dataUrl.length > 160000) dataUrl = canvas.toDataURL('image/jpeg', 0.62);
+    setContactAvatar(state, contact, dataUrl);
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(`${contact.name}的头像换好了`);
+  }
+
   /* 聊天照片：长边压到 1000px、JPEG 0.78，再存进会话 */
   async function useMessagePhoto(file, chatId) {
     if (!chatId) return;
@@ -700,6 +732,12 @@ export async function openMemePhone(options = {}) {
       if (file) useCustomBanner(file).catch(error => ctx.toast(error.message || '换背景图失败'));
       return;
     }
+    if (id === 'mpContactAvatar') {
+      const contactId = event.target?.dataset?.contact || '';
+      event.target.value = '';
+      if (file && contactId) useContactAvatar(file, contactId).catch(error => ctx.toast(error.message || '头像没换成'));
+      return;
+    }
     if (id === 'mpIconFile') {
       const appId = event.target?.dataset?.app;
       event.target.value = '';
@@ -710,13 +748,15 @@ export async function openMemePhone(options = {}) {
   const docRef = rootEl.ownerDocument;
   const onDocChange = event => {
     const id = event.target?.id;
-    if (id !== 'mpProfileBanner' && id !== 'mpMsgPhoto') return;
+    if (id !== 'mpProfileBanner' && id !== 'mpMsgPhoto' && id !== 'mpContactAvatar') return;
     const file = event.target.files?.[0];
     const chatId = event.target?.dataset?.chat || '';
+    const contactId = event.target?.dataset?.contact || '';
     event.target.value = '';
     if (!file) return;
     if (id === 'mpProfileBanner') useCustomBanner(file).catch(error => ctx.toast(error.message || '换背景图失败'));
     if (id === 'mpMsgPhoto') useMessagePhoto(file, chatId).catch(error => ctx.toast(error.message || '照片没发出去'));
+    if (id === 'mpContactAvatar') useContactAvatar(file, contactId).catch(error => ctx.toast(error.message || '头像没换成'));
   };
   docRef?.addEventListener('change', onDocChange, true);
   docChangeTarget = docRef || null;

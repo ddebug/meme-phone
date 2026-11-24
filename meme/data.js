@@ -628,6 +628,31 @@ export function contactsOf(state) {
   return Object.values(state.contacts);
 }
 
+/**
+ * 在小手机里换 TA 的头像：存一张压缩后的图，并打上自定义标记，
+ * 之后同步酒馆角色卡时不再被卡片的原头像覆盖。
+ */
+export function setContactAvatar(state, contact, dataUrl) {
+  const image = String(dataUrl || '').trim();
+  if (!contact || !image) return false;
+  /* 第一次换之前先把酒馆那张记下来，之后想还原就不用非等角色卡同步 */
+  if (!contact.avatarCustom) contact.tavernAvatarUrl = contact.avatar || '';
+  contact.avatar = image;
+  contact.avatarCustom = true;
+  return true;
+}
+
+/** 用回酒馆角色卡那张头像；找不到卡片就退回换头像之前记下的那张。 */
+export function clearContactAvatar(state, contact) {
+  if (!contact) return false;
+  const cards = Array.isArray(state?.characters) ? state.characters : [];
+  const card = cards.find(item => item.avatar && item.avatar === contact.tavernAvatar);
+  contact.avatar = card?.avatarUrl || contact.tavernAvatarUrl || '';
+  delete contact.avatarCustom;
+  delete contact.tavernAvatarUrl;
+  return true;
+}
+
 export function contactById(state, id) {
   return state.contacts[id] || null;
 }
@@ -1336,7 +1361,8 @@ export function syncTavernContacts(state, tavernCharacters = []) {
       if (!existing.cardName) existing.cardName = character.name;
       if (!renamed) existing.name = character.name;
       existing.tavernAvatar = key;
-      existing.avatar = character.avatarUrl || existing.avatar;
+      /* 用户在小手机里换过头像就留着，别被卡片原图顶掉 */
+      if (!existing.avatarCustom) existing.avatar = character.avatarUrl || existing.avatar;
       continue;
     }
     addContact(state, {

@@ -3,7 +3,7 @@
  */
 
 import { icon } from '../icons.js';
-import { contactsOf, contactById, chatFor, chatById, lastMessage, addContact, syncTavernContacts, linkContactCards, characterCardFor } from '../data.js';
+import { contactsOf, contactById, chatFor, chatById, lastMessage, addContact, syncTavernContacts, linkContactCards, characterCardFor, clearContactAvatar } from '../data.js';
 import { avatarHtml, esc, shortText } from '../shell.js';
 import { pendingFriendRequests, respondFriendRequest, contactMembership, membershipLabel, signatureHistory } from '../behavior-domains.js';
 import { charactersPanel, charactersHandle, characterDetailHtml, characterCardHandle } from './characters.js';
@@ -16,6 +16,36 @@ function groupOf(contact) {
 
 /* 路由参数只在进入这一页时用一次；之后再点页签切换，不会被旧的 params 拽回去 */
 let tabParamUsed = null;
+
+/* 换头像：选图交给页面里那个隐藏 input，压缩与写入在 index.js 的 change 监听里做 */
+function openAvatarSheet(ctx, contact) {
+  const items = [
+    { label: '从相册里选一张', value: 'pick', icon: 'image', note: '会裁成方图、压小后只存在这台小手机里' },
+  ];
+  if (contact.avatarCustom) {
+    items.push({ label: '用回酒馆里的头像', value: 'reset', icon: 'refresh' });
+  }
+  ctx.openSheet({
+    title: `换「${contact.name}」的头像`,
+    items,
+    onPick: (value) => {
+      if (value === 'pick') {
+        const input = document.getElementById('mpContactAvatar');
+        if (!input) { ctx.toast('没找到选图入口，重开这一页再试'); return; }
+        input.dataset.contact = contact.id;
+        input.value = '';
+        input.click();
+        return;
+      }
+      if (value === 'reset') {
+        clearContactAvatar(ctx.state, contact);
+        ctx.save();
+        ctx.rerender();
+        ctx.toast('已换回酒馆里的头像');
+      }
+    },
+  });
+}
 
 export const contactsApp = {
   id: 'contacts', name: '通讯录', icon: 'contacts',
@@ -200,7 +230,12 @@ export const contactApp = {
       </div>
       <div class="mp-page-body">
         <div style="display:flex;align-items:center;gap:14px;padding:4px 4px 18px">
-          ${avatarHtml(contact.name, contact.avatar, 'mp-avatar lg')}
+          <button class="mp-avatar-btn" data-act="contact-avatar" data-contact="${contact.id}" type="button" aria-label="换「${esc(contact.name)}」的头像">
+            <span class="mp-avatar-wrap">
+              ${avatarHtml(contact.name, contact.avatar, 'mp-avatar lg')}
+              <i class="mp-avatar-camera" aria-hidden="true">${icon('image')}</i>
+            </span>
+          </button>
           <div style="flex:1;min-width:0">
             <div style="font-size: calc(20px * var(--font-scale));font-weight:600;letter-spacing:-.02em">${esc(contact.name)}</div>
             <div style="font-size: calc(12px * var(--font-scale));color:var(--text-3);margin-top:3px">${esc(contact.signature || '还没有签名')}</div>
@@ -239,7 +274,8 @@ export const contactApp = {
           <div class="mp-card-sub">酒馆里删掉了这张卡，或者卡片改了名/换了头像。聊天记录都在，重新关联一下就能继续读卡和记忆。</div>
           <button class="mp-btn" data-act="contact-rebind" data-contact="${contact.id}" type="button" style="margin-top:10px">${icon('refresh')}<span>重新关联角色卡</span></button>
         </div>` : '')}
-      </div>`;
+      </div>
+      <input id="mpContactAvatar" type="file" accept="image/*" data-contact="${contact.id}" style="position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0">`;
   },
 
   handle(ctx, act, data) {
@@ -267,6 +303,12 @@ export const contactApp = {
 
     if (act === 'contact-extras') {
       ctx.go('app-extras', { contactId: data.contact });
+      return true;
+    }
+
+    if (act === 'contact-avatar') {
+      if (!contact) return true;
+      openAvatarSheet(ctx, contact);
       return true;
     }
 
@@ -308,11 +350,16 @@ export const contactApp = {
       ctx.openSheet({
         title: contact.name,
         items: [
+          { label: '换 TA 的头像', value: 'avatar', icon: 'image' },
           { label: '改个备注', value: 'rename', icon: 'brush' },
           { label: '换一句签名', value: 'sign', icon: 'reply' },
           { label: '从通讯录里删掉', value: 'delete', icon: 'trash', danger: true },
         ],
         onPick: (value) => {
+          if (value === 'avatar') {
+            openAvatarSheet(ctx, contact);
+            return;
+          }
           if (value === 'rename') {
             ctx.openSheet({
               kind: 'text', title: '名字', value: contact.name, confirm: '改好',

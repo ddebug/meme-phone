@@ -29,15 +29,14 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .10);
 }
 
-.mp-root[data-mp-theme="night"] .mp-hw-recent {
-  background: linear-gradient(150deg, rgba(60, 52, 92, .94), rgba(35, 30, 58, .84));
+/* 首页两个小组件：夜间统一成深色玻璃卡，不跟着「显示模式」那个按钮的 is-night 单独走 */
+.mp-root[data-mp-theme="night"] :is(.mp-hw-recent, .mp-hw-theme) {
+  background: linear-gradient(150deg, rgba(58, 52, 84, .94), rgba(32, 28, 50, .86));
   box-shadow: 0 12px 24px rgba(0, 0, 0, .3), inset 0 0 0 1px rgba(255, 255, 255, .10);
 }
 
-.mp-root[data-mp-theme="night"] .mp-hw-recent .mp-hw-name { color: #fff; }
-.mp-root[data-mp-theme="night"] .mp-hw-recent .mp-hw-kicker,
-.mp-root[data-mp-theme="night"] .mp-hw-recent .mp-hw-time,
-.mp-root[data-mp-theme="night"] .mp-hw-recent .mp-hw-preview { color: rgba(255, 255, 255, .6); }
+.mp-root[data-mp-theme="night"] :is(.mp-hw-recent, .mp-hw-theme) .mp-hw-name { color: #fff; }
+.mp-root[data-mp-theme="night"] :is(.mp-hw-recent, .mp-hw-theme) :is(.mp-hw-kicker, .mp-hw-time, .mp-hw-preview) { color: rgba(255, 255, 255, .6); }
 .mp-root[data-mp-theme="night"] .mp-home-dot:not(.is-on)::before {
   background: rgba(255, 255, 255, .2);
 }

@@ -124,6 +124,7 @@
 /* ------------------------------------------------ 3. 桌面 / 面板 / 列表底 */
 .mp-root[data-mp-skin="frost"] :is(
   .mp-widget, .mp-profile, .mp-di-card,
+  .mp-home-widget,
   .mp-row, .mp-group-box, .mp-card, .mp-diary-hero, .mp-diary-card,
   .mp-chat-set-head, .mp-extra-source, .mp-quote-chip, .mp-sheet,
   .mp-theme-card, .mp-dress-hero, .mp-dress-toggle, .mp-dress-app-grid,
@@ -141,7 +142,7 @@
   -webkit-backdrop-filter: blur(20px) saturate(.55);
 }
 
-.mp-root[data-mp-skin="frost"] :is(.mp-widget, .mp-profile, .mp-sheet, .mp-music-player, .mp-dress-hero, .mp-ios-card, .mp-icon-preview) {
+.mp-root[data-mp-skin="frost"] :is(.mp-widget, .mp-profile, .mp-sheet, .mp-music-player, .mp-dress-hero, .mp-ios-card, .mp-icon-preview, .mp-home-widget) {
   border-radius: 22px;
 }
 
@@ -699,6 +700,7 @@
 /* frost 夜间面板与按钮 */
 .mp-root[data-mp-skin="frost"][data-mp-theme="night"] :is(
   .mp-widget, .mp-profile, .mp-di-card,
+  .mp-home-widget,
   .mp-row, .mp-group-box, .mp-card, .mp-diary-hero, .mp-diary-card,
   .mp-chat-set-head, .mp-extra-source, .mp-quote-chip, .mp-sheet,
   .mp-theme-card, .mp-dress-hero, .mp-dress-toggle, .mp-dress-app-grid,

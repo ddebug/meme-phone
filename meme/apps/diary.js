@@ -274,7 +274,8 @@ function threadCalendar(ctx, contactId, statuses) {
         : entry?.text ? '<span class="mark is-stale"></span>' : '';
     cells.push(`<button type="button" class="${isSel ? 'sel' : ''}${summarized ? ' has' : ''}${pending ? ' is-pending' : ''}${key === today ? ' today' : ''}" data-act="td-day" data-contact="${esc(contactId)}" data-day="${key}">${day}${mark}</button>`);
   }
-  return `<div class="mp-cal">${cells.join('')}</div>`;
+  return `<div class="mp-cal">${cells.join('')}</div>
+    <div class="mp-cal-legend"><span><i class="lg-done"></i>已整理</span><span><i class="lg-pending"></i>待整理</span></div>`;
 }
 
 function formatTokens(text) {

@@ -326,6 +326,11 @@
   background: #3a3a3c;
 }
 
+.mp-root[data-mp-skin="frost"] .mp-cal button .mark.is-pending {
+  background: transparent;
+  border-color: #e5932a;
+}
+
 /* 设置行 / 分组 / 图标 */
 .mp-root[data-mp-skin="frost"] .mp-set-row {
   background: transparent;

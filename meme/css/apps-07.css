@@ -1067,11 +1067,43 @@
   position: absolute;
   bottom: 5px;
   left: 50%;
-  width: 3.5px;
-  height: 3.5px;
-  border-radius: 2px;
-  background: var(--pink);
+  width: 5px;
+  height: 5px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--mint);
   transform: translateX(-50%);
+}
+
+.mp-cal-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -7px 0 12px;
+  padding-left: 2px;
+  font-size: calc(10px * var(--font-scale));
+  color: var(--text-4);
+}
+
+.mp-cal-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.mp-cal-legend i {
+  width: 6px;
+  height: 6px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--mint);
+}
+
+.mp-cal-legend i.lg-pending {
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--warn);
+  background: transparent;
 }
 
 .mp-diary-card {
@@ -1336,7 +1368,12 @@
 .mp-td-original summary { cursor: pointer; color: var(--text-3); }
 .mp-td-original > div { margin-top: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
 
-.mp-cal button .mark.is-pending { background: #f5a623; }
+.mp-cal button .mark.is-pending {
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--warn);
+  background: transparent;
+}
 .mp-cal button .mark.is-stale { background: var(--text-4); }
 
 /* ------------------------------------------------------------ 设置页 */

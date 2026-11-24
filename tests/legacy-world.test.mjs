@@ -22,7 +22,7 @@ function worldPhone(id, overrides = {}) {
         c1: {
           id: 'c1',
           contactId: 'c1',
-          messages: [{ id: `${id}_m1`, from: 'them', text: '里世界的话', at: 1 }],
+          messages: [{ id: `${id}_m1`, from: 'them', text: '同层小手机的话', at: 1 }],
         },
       },
     },
@@ -39,13 +39,13 @@ function baseRaw(overrides = {}) {
   };
 }
 
-test('旧存档停在里世界：顶层聊天补 world 标记，metaPhone 的聊天回到普通会话', () => {
+test('旧存档停在同层小手机：顶层聊天补 world 标记，metaPhone 的聊天回到普通会话', () => {
   const raw = baseRaw({
     phoneSurface: 'world',
     activeWorldId: 'w1',
     contacts: { c1: { id: 'c1', name: '沈砚', avatar: 'a.png' } },
     chats: {
-      c1: { id: 'c1', contactId: 'c1', messages: [{ id: 'wm1', from: 'them', text: '顶层里世界', at: 1 }] },
+      c1: { id: 'c1', contactId: 'c1', messages: [{ id: 'wm1', from: 'them', text: '顶层同层小手机', at: 1 }] },
     },
     metaPhone: {
       data: {
@@ -59,7 +59,7 @@ test('旧存档停在里世界：顶层聊天补 world 标记，metaPhone 的聊
   const changed = migrateLegacyWorlds(raw, state);
 
   assert.equal(changed, true);
-  assert.equal(state.chats.c1.messages[0].text, '顶层里世界');
+  assert.equal(state.chats.c1.messages[0].text, '顶层同层小手机');
   assert.equal(isWorldChat(state.chats.c1), true);
   assert.equal(state.chats.c1.world.chatFile, 'world-w1');
   assert.equal(state.chats.c1.world.ownerName, '沈砚');
@@ -69,11 +69,11 @@ test('旧存档停在里世界：顶层聊天补 world 标记，metaPhone 的聊
   assert.equal(Object.keys(state.chats).length, 2);
   assert.equal(state.legacyWorldsMerged, true);
 
-  /* 迁完两个 App 各自能看到：Meta 列表有阿蓝，里世界列表有沈砚。 */
+  /* 迁完两个 App 各自能看到：Meta 列表有阿蓝，同层小手机列表有沈砚。 */
   const metaList = chatApp.render({ state });
   const worldList = worldChatApp.render({ state });
   assert.match(metaList, /阿蓝/);
-  assert.doesNotMatch(metaList, /里世界的话/);
+  assert.doesNotMatch(metaList, /同层小手机的话/);
   assert.match(worldList, /沈砚/);
   assert.match(worldList, /第 3 天/);
 });

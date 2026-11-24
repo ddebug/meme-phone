@@ -15,12 +15,12 @@ function stateWithMeta() {
   return { state, contact, meta };
 }
 
-test('里世界和 Meta 是两个聊天 App，列表互不混入', () => {
+test('同层小手机和 Meta 是两个聊天 App，列表互不混入', () => {
   const { state, contact } = stateWithMeta();
   const world = createWorldChatForTests(state, {
     contact, chatFile: 'file-split', chatId: 'file-split', storyDate: '第 2 天',
   });
-  world.messages.push({ id: 'w1', from: 'them', text: '里世界的话', at: Date.now() });
+  world.messages.push({ id: 'w1', from: 'them', text: '同层小手机的话', at: Date.now() });
   const ctx = { state, shell: {} };
   const metaList = chatApp.render(ctx);
   const worldList = worldChatApp.render(ctx);
@@ -33,7 +33,7 @@ test('里世界和 Meta 是两个聊天 App，列表互不混入', () => {
   assert.equal(worldChatApp.id, 'worldchat');
 });
 
-test('里世界聊天就是普通会话，只多绑一份酒馆聊天文件', () => {
+test('同层小手机就是普通会话，只多绑一份酒馆聊天文件', () => {
   const { state, contact, meta } = stateWithMeta();
   const world = createWorldChatForTests(state, {
     contact,
@@ -51,7 +51,7 @@ test('里世界聊天就是普通会话，只多绑一份酒馆聊天文件', ()
   assert.equal(isWorldChat(meta), false);
 });
 
-test('同一份酒馆聊天不会重复开；Meta 会话也不会被里世界聊天顶掉', () => {
+test('同一份酒馆聊天不会重复开；Meta 会话也不会被同层小手机顶掉', () => {
   const { state, contact } = stateWithMeta();
   const first = createWorldChatForTests(state, {
     contact, chatFile: 'file-b', chatId: 'file-b',
@@ -66,7 +66,7 @@ test('同一份酒馆聊天不会重复开；Meta 会话也不会被里世界聊
   assert.notEqual(meta.id, first.id);
 });
 
-test('里世界聊天是剧情日期 + 现实钟点；普通会话仍是现实日期', () => {
+test('同层小手机是剧情日期 + 现实钟点；普通会话仍是现实日期', () => {
   const { state, contact, meta } = stateWithMeta();
   const world = createWorldChatForTests(state, {
     contact, chatFile: 'file-a', chatId: 'file-a', storyDate: '第 3 天',
@@ -116,7 +116,7 @@ test('从当前酒馆聊天新建时，会话真的挂到那个联系人上', as
   delete globalThis.SillyTavern;
 });
 
-test('状态栏的里世界标签只在打开里世界聊天时出现', () => {
+test('状态栏的同层小手机标签只在打开同层小手机时出现', () => {
   const { state, contact, meta } = stateWithMeta();
   const world = createWorldChatForTests(state, {
     contact, chatFile: 'file-d', chatId: 'file-d', storyDate: '第 5 天',
@@ -130,5 +130,5 @@ test('状态栏的里世界标签只在打开里世界聊天时出现', () => {
 
   ctx.shell.stack.push({ view: 'thread', params: { chatId: world.id } });
   assert.equal(ctx.world.active()?.id, world.id);
-  assert.equal(ctx.world.label(world), '里世界 · 第 5 天');
+  assert.equal(ctx.world.label(world), '同层小手机 · 第 5 天');
 });

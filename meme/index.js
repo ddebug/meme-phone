@@ -88,7 +88,7 @@ const DESKTOP_APPS = [
 
 const DOCK_APPS = [
   { id: 'chat', name: '聊天', icon: 'chat' },
-  { id: 'worldchat', name: '里世界', icon: 'chat-world' },
+  { id: 'worldchat', name: '同层小手机', icon: 'chat-world' },
   { id: 'contacts', name: '通讯录', icon: 'contacts' },
   { id: 'settings', name: '设置', icon: 'settings' },
 ];
@@ -126,7 +126,7 @@ function makeAi(getState) {
     const ctxSettings = replyContextFor(state, chat);
     /* 0 = 不限制：酒馆记忆和手机历史都按全量送，不再用本地预算截断。 */
     const memoryLimit = 0;
-    /* Meta 手机按设计完全不碰酒馆记忆；只有绑了酒馆文件的里世界聊天才读。 */
+    /* Meta 手机按设计完全不碰酒馆记忆；只有绑了酒馆文件的同层小手机才读。 */
     const isMetaPhone = !isWorldChat(chat);
     const storyBlock = !isMetaPhone && ctxSettings.memory
       ? await story(state, chat, memoryLimit)
@@ -445,8 +445,8 @@ export function getState() {
 /* ------------------------------------------------------------ 打开界面 */
 
 /**
- * 在酒馆聊天里打开手机时，直接落到“这段聊天对应的里世界聊天”。
- * 不翻整台手机；只是把窗口栈设成 里世界列表 → 对应会话。
+ * 在酒馆聊天里打开手机时，直接落到“这段聊天对应的同层小手机”。
+ * 不翻整台手机；只是把窗口栈设成 同层小手机列表 → 对应会话。
  */
 async function enterWorldFromHost() {
   if (!ctx?.world || !ctx?.shell) return false;
@@ -462,7 +462,7 @@ async function enterWorldFromHost() {
     ctx.shell.stack.push({ view: 'thread', params: { chatId: located.chat.id } });
     return true;
   }
-  /* 当前聊天还没有里世界：回普通聊天列表。历史都在那里，别用一条新建的空里世界挡住。 */
+  /* 当前聊天还没有同层小手机：回普通聊天列表。历史都在那里，别用一条新建的空同层小手机挡住。 */
   ctx.shell.stack.push({ view: 'app-chat', params: {} });
   return true;
 }
@@ -610,7 +610,7 @@ export async function openMemePhone(options = {}) {
 
   shellApi = createShell({ root: rootEl, ctx, apps: APPS, desktopApps: DESKTOP_APPS, dockApps: DOCK_APPS });
 
-  /* 里世界是独立的第二个聊天 App；在酒馆里打开手机时直接落到当前聊天那一条。 */
+  /* 同层小手机是独立的第二个聊天 App；在酒馆里打开手机时直接落到当前聊天那一条。 */
   installWorld(ctx);
   try { await enterWorldFromHost(); } catch { /* 没有宿主上下文就停在桌面 */ }
   shellApi.render();

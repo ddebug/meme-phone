@@ -19,7 +19,7 @@
 .mp-row:active { transform: scale(.988); }
 .mp-row + .mp-row { margin-top: 8px; }
 
-/* 里世界 App 自己的页头：不跟 Meta 聊天混在同一张列表里。 */
+/* 同层小手机 App 自己的页头：不跟 Meta 聊天混在同一张列表里。 */
 .mp-world-app-head {
   display: flex;
   align-items: center;

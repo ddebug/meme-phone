@@ -1,8 +1,8 @@
 /**
- * meme-phone · 里世界聊天
+ * meme-phone · 同层小手机
  *
  * 不做整台手机翻面，也不是另一套通讯录：
- * 每一条里世界聊天就是一个普通会话，额外绑一个酒馆聊天文件。
+ * 每一条同层小手机就是一个普通会话，额外绑一个酒馆聊天文件。
  * - 打开它时读那一份酒馆聊天记忆；
  * - 时间显示剧情日期 + 现实钟点；
  * - 聊完写回原聊天文件的隐藏 system 楼层；
@@ -83,7 +83,7 @@ function markDirty(ctx, chat) {
   ctx.save();
 }
 
-/* 同一个里世界会话同时只跑一个写回，避免同一轮被并发保存两次。 */
+/* 同一个同层小手机会话同时只跑一个写回，避免同一轮被并发保存两次。 */
 const flushingChats = new WeakSet();
 
 export function installWorld(ctx) {
@@ -95,10 +95,10 @@ export function installWorld(ctx) {
     dateText(chat) { return isWorldChat(chat) ? storyDateOf(chat) : ''; },
     label(chat) {
       if (!isWorldChat(chat)) return '';
-      return `里世界 · ${storyDateOf(chat)}`;
+      return `同层小手机 · ${storyDateOf(chat)}`;
     },
 
-    /** 当前停在哪条里世界聊天：状态栏的小标签用这个。 */
+    /** 当前停在哪条同层小手机：状态栏的小标签用这个。 */
     active() {
       const stack = ctx.shell?.stack || [];
       const entry = stack[stack.length - 1];
@@ -114,8 +114,8 @@ export function installWorld(ctx) {
     },
 
     /**
-     * 只找当前酒馆聊天对应的里世界，不新建。
-     * 打开手机时用这个：有就落进里世界；没有就回普通聊天列表，别凭空造一条空的把历史盖住。
+     * 只找当前酒馆聊天对应的同层小手机，不新建。
+     * 打开手机时用这个：有就落进同层小手机；没有就回普通聊天列表，别凭空造一条空的把历史盖住。
      */
     async locateCurrent() {
       try {
@@ -127,7 +127,7 @@ export function installWorld(ctx) {
       }
     },
 
-    /** 在酒馆当前打开的那份聊天上开一条里世界聊天；同一份文件不会重复开。 */
+    /** 在酒馆当前打开的那份聊天上开一条同层小手机；同一份文件不会重复开。 */
     async createFromCurrent(options = {}) {
       const say = options.silent ? () => {} : message => ctx.toast(message);
       try {
@@ -156,9 +156,9 @@ export function installWorld(ctx) {
             storyDate: storyDateFromMetadata(host.metadata) || '第 1 天',
             origin: 'current-chat',
           });
-          say(`里世界聊天已绑定《${host.chatFile || '当前聊天'}》`);
+          say(`同层小手机已绑定《${host.chatFile || '当前聊天'}》`);
         } else if (!options.silent) {
-          say('这条聊天已经有一场里世界了');
+          say('这条聊天已经有一台同层小手机了');
         }
         markDirty(ctx, chat);
         if (options.open !== false) {
@@ -166,7 +166,7 @@ export function installWorld(ctx) {
         }
         return chat;
       } catch (error) {
-        say(error?.message || '里世界聊天没开成');
+        say(error?.message || '同层小手机没开成');
         return null;
       }
     },
@@ -196,7 +196,7 @@ export function installWorld(ctx) {
             storyDate: storyDateFromMetadata(latest.metadata) || '第 1 天',
             origin: 'contact',
           });
-          ctx.toast(`用 TA 最近的《${latest.file}》开了一场里世界聊天`);
+          ctx.toast(`用 TA 最近的《${latest.file}》开了一台同层小手机`);
         }
         markDirty(ctx, chat);
         if (options.open !== false) {
@@ -204,7 +204,7 @@ export function installWorld(ctx) {
         }
         return chat;
       } catch (error) {
-        ctx.toast(error?.message || '里世界聊天没开成');
+        ctx.toast(error?.message || '同层小手机没开成');
         return null;
       }
     },
@@ -230,7 +230,7 @@ export function installWorld(ctx) {
       if (!isWorldChat(chat)) return;
       ctx.openSheet({
         kind: 'form',
-        title: '这条里世界聊天的剧情日期',
+        title: '这条同层小手机的剧情日期',
         note: '只影响这条聊天显示的日期；状态栏右边的钟点仍然跟现实走。',
         fields: [{
           name: 'storyDate',
@@ -311,7 +311,7 @@ export function installWorld(ctx) {
   return api;
 }
 
-/** 测试用：不依赖酒馆宿主，直接在某个联系人上开一条里世界聊天。 */
+/** 测试用：不依赖酒馆宿主，直接在某个联系人上开一条同层小手机。 */
 export function createWorldChatForTests(state, { contact, ...info }) {
   return createWorldChat(state, {
     contact,

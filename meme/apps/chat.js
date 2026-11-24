@@ -681,7 +681,7 @@ function listBody(ctx, mode = 'meta') {
         <div class="mp-row-main">
           <div class="mp-row-name">
             ${esc(contact.name)}
-            ${worldMode ? '<span class="mp-pill world">里世界</span>' : ''}
+            ${worldMode ? '<span class="mp-pill world">同层小手机</span>' : ''}
             ${chat.pinned ? `<span class="mp-pill plain">${icon('pin')}</span>` : ''}
             ${contact.kind === 'group' ? '<span class="mp-pill plain">群</span>' : ''}
           </div>
@@ -699,12 +699,12 @@ function listBody(ctx, mode = 'meta') {
       <div class="mp-page-body">
         <div class="mp-world-app-head">
           <div>
-            <div class="mp-world-app-title">里世界</div>
+            <div class="mp-world-app-title">同层小手机</div>
             <div class="mp-world-app-sub">只连着酒馆里那几段聊天</div>
           </div>
           <button class="mp-icon-btn" data-act="world-new" type="button" aria-label="从当前酒馆聊天新建">${icon('plus')}</button>
         </div>
-        ${rows || '<div class="mp-empty">还没有对应的里世界聊天。<br>在酒馆打开一段聊天后，点右上角 + 新建。</div>'}
+        ${rows || '<div class="mp-empty">还没有对应的同层小手机。<br>在酒馆打开一段聊天后，点右上角 + 新建。</div>'}
       </div>`;
   }
 
@@ -833,7 +833,7 @@ function threadBody(ctx, chatId) {
         <div style="flex:1;min-width:0">
           <div class="mp-thread-name">${esc(contact?.name || '')}</div>
           <div class="mp-thread-status">${isWorldChat(chat)
-            ? `<button class="mp-thread-world" data-act="world-date" data-chat="${chat.id}" type="button" title="改剧情日期">${icon('book')}<span>里世界 · ${esc(storyDateOf(chat))}</span></button><span class="mp-thread-file">《${esc(chat.world.chatFile || '未命名聊天')}》</span>`
+            ? `<button class="mp-thread-world" data-act="world-date" data-chat="${chat.id}" type="button" title="改剧情日期">${icon('book')}<span>同层小手机 · ${esc(storyDateOf(chat))}</span></button><span class="mp-thread-file">《${esc(chat.world.chatFile || '未命名聊天')}》</span>`
             : `<span class="mp-dot"></span>${esc(contact?.signature || '在线')}`}</div>
         </div>
         <button class="mp-icon-btn" data-act="thread-settings" data-chat="${chat.id}" type="button" aria-label="聊天设置">${icon('settings')}</button>
@@ -1288,7 +1288,7 @@ async function runGeneration(ctx, chat, contact, options = {}) {
     });
     ctx.toast('这轮的小剧场收进 App 了');
   }
-  /* 里世界聊天：把这一轮（我发的 + TA 回的）写回它绑定的那份聊天文件。
+  /* 同层小手机：把这一轮（我发的 + TA 回的）写回它绑定的那份聊天文件。
      写不进就留在 chat.world.queue 里，下次打开这条聊天再试。 */
   if (firstSaved && kind === 'reply' && !replaceIds.length && ctx.world?.syncTurn) {
     const turnMessages = chat.messages.filter(item => item.turnId === turnId || pendingIds.includes(item.id));
@@ -1335,7 +1335,7 @@ export const chatApp = {
     }
 
     if (act === 'world-new') {
-      if (typeof ctx.world?.createFromCurrent !== 'function') { ctx.toast('这个环境还没有里世界聊天'); return true; }
+      if (typeof ctx.world?.createFromCurrent !== 'function') { ctx.toast('这个环境还没有同层小手机'); return true; }
       ctx.world.createFromCurrent();
       return true;
     }
@@ -1343,7 +1343,7 @@ export const chatApp = {
     if (act === 'world-open') {
       const contact = contactById(ctx.state, data.contact);
       if (!contact) return true;
-      if (typeof ctx.world?.openForContact !== 'function') { ctx.toast('这个环境还没有里世界聊天'); return true; }
+      if (typeof ctx.world?.openForContact !== 'function') { ctx.toast('这个环境还没有同层小手机'); return true; }
       ctx.world.openForContact(contact, { source: 'meta' });
       return true;
     }
@@ -1403,9 +1403,9 @@ export const chatApp = {
   },
 };
 
-/* 第二个聊天 App：只装里世界会话，和 Meta 聊天彻底分开。 */
+/* 第二个聊天 App：只装同层小手机会话，和 Meta 聊天彻底分开。 */
 export const worldChatApp = {
-  id: 'worldchat', name: '里世界', icon: 'chat-world',
+  id: 'worldchat', name: '同层小手机', icon: 'chat-world',
 
   render(ctx) {
     activeThreadId = '';

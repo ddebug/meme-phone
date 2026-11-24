@@ -471,7 +471,7 @@ export function emptyState() {
       theater: { kind: 'daily' },
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
-      /* 里世界：默认在酒馆聊天里打开手机时，直接进当前聊天对应的里世界 */
+      /* 同层小手机：默认在酒馆聊天里打开手机时，直接进当前聊天对应的同层小手机 */
       world: { autoEnter: true },
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5, prompt: '' },
       chat: {
@@ -2378,7 +2378,7 @@ export function normalize(raw) {
       legacy: Boolean(theater?.legacy),
     };
   }
-  /* v3：里世界聊天。旧版整机双世界的快照字段留在存档里，但运行层不再读。 */
+  /* v3：同层小手机。旧版整机双世界的快照字段留在存档里，但运行层不再读。 */
   merged.version = Math.max(Number(merged.version) || 0, SCHEMA_VERSION);
   Object.values(merged.chats).forEach(chat => {
     if (!chat || typeof chat !== 'object') return;

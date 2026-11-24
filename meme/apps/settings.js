@@ -113,18 +113,18 @@ export const settingsApp = {
         </div>
 
         <div class="mp-group">
-          <div class="mp-group-label">里世界聊天</div>
+          <div class="mp-group-label">同层小手机</div>
           <div class="mp-group-box">
             ${row(ctx, {
               iconName: 'chat-world',
               title: '默认进入聊天记录聊天',
-              sub: '打开手机时直接落到当前酒馆聊天对应的里世界',
+              sub: '打开手机时直接落到当前酒馆聊天对应的同层小手机',
               act: 'set-toggle-world-auto',
               toggle: state.settings.world?.autoEnter !== false,
             })}
             ${row(ctx, {
               iconName: 'book',
-              title: '里世界聊天',
+              title: '同层小手机列表',
               sub: worlds.length ? `${worlds.length} 条 · 每条单独绑一份酒馆聊天记录` : '还没有 · 从当前酒馆聊天新建',
               act: 'set-world-list',
             })}
@@ -206,9 +206,9 @@ export const settingsApp = {
     if (act === 'set-open-dress') { ctx.go('app-dress'); return true; }
     if (act === 'set-world-list') {
       const worlds = ctx.world?.list?.() || [];
-      if (!worlds.length) { ctx.toast('还没有里世界聊天；先在酒馆打开一段聊天，再从当前聊天新建'); return true; }
+      if (!worlds.length) { ctx.toast('还没有同层小手机；先在酒馆打开一段聊天，再从当前聊天新建'); return true; }
       ctx.openSheet({
-        title: `里世界聊天 · ${worlds.length} 条`,
+        title: `同层小手机 · ${worlds.length} 条`,
         note: '每一条都单独绑一份酒馆聊天记录：只读那份记忆，只写回那份。',
         items: worlds
           .slice()
@@ -238,8 +238,8 @@ export const settingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(state.settings.world.autoEnter
-        ? '以后打开手机直接进当前聊天对应的里世界'
-        : '以后打开手机停在桌面，不自动进里世界');
+        ? '以后打开手机直接进当前聊天对应的同层小手机'
+        : '以后打开手机停在桌面，不自动进同层小手机');
       return true;
     }
     if (act === 'set-open-appearance') { ctx.go('app-appearance'); return true; }

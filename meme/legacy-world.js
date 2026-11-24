@@ -4,12 +4,12 @@
  * 5ce6ce3 那一版是「整台手机双世界」：
  *   - 当前激活那台的数据放在顶层 contacts / chats / ...
  *   - Meta 快照放在 metaPhone.data
- *   - 每条里世界快照放在 worldPhones[id].data
+ *   - 每条同层小手机快照放在 worldPhones[id].data
  *   - phoneSurface / activeWorldId 记录当时停在哪一面
  *
  * 后来改成两个聊天 App 后，运行层只读顶层 chats，旧快照留在存档里没人读，
  * 用户升级后就会看到「聊天历史不见了」。这里在首次加载旧存档时把三份数据并回：
- *   - 顶层是里世界 → 顶层聊天补上 chat.world 标记；metaPhone.data 的聊天作为普通会话
+ *   - 顶层是同层小手机 → 顶层聊天补上 chat.world 标记；metaPhone.data 的聊天作为普通会话
  *   - 顶层是 Meta → 顶层保持普通会话；worldPhones[*].data 的聊天补上 chat.world
  *   - 联系人按 id 合并，重名不同人时给迁移过来的联系人换 id，并改掉对应 chat.contactId
  *
@@ -143,7 +143,7 @@ export function migrateLegacyWorlds(raw, state) {
   const surfaceWorld = raw.phoneSurface === 'world' && isMap(activeEntry?.data);
 
   if (surfaceWorld) {
-    /* 顶层就是当前这台里世界手机：直接给顶层聊天补 world 标记，不复制。 */
+    /* 顶层就是当前这台同层小手机：直接给顶层聊天补 world 标记，不复制。 */
     mergeChats(state, state.chats, {}, activeEntry, {
       rename: false, asWorld: true, inPlace: true,
     });
@@ -154,7 +154,7 @@ export function migrateLegacyWorlds(raw, state) {
       });
     }
   } else {
-    /* 顶层是 Meta：保持普通会话，把每条里世界快照并进来。 */
+    /* 顶层是 Meta：保持普通会话，把每条同层小手机快照并进来。 */
     for (const { key, instance } of worldList) {
       if (hasWorldFile(state, instance)) continue;
       const prefix = `world_${key || instance.id || 'x'}`;
@@ -163,7 +163,7 @@ export function migrateLegacyWorlds(raw, state) {
     }
   }
 
-  /* 顶层是里世界时，其它里世界快照也要并进来，不能只恢复当前那台。 */
+  /* 顶层是同层小手机时，其它同层小手机快照也要并进来，不能只恢复当前那台。 */
   if (surfaceWorld) {
     for (const { key, instance } of worldList) {
       if (String(key) === activeId || String(instance.id || '') === activeId) continue;

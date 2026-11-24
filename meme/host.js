@@ -364,7 +364,7 @@ export async function readLatestTavernChat({
   let pickedFile = String(file || '').replace(/\.jsonl$/i, '').trim();
   let latestMeta = null;
 
-  /* 指定了具体聊天文件（某条里世界聊天）就不去猜“最新”：读的就是这一份。 */
+  /* 指定了具体聊天文件（某条同层小手机）就不去猜“最新”：读的就是这一份。 */
   if (!pickedFile) {
     try {
       const response = await fetch('/api/characters/chats', {
@@ -455,7 +455,7 @@ export async function readLatestTavernChat({
 }
 
 /**
- * 把里世界聊天的一轮对话写回原聊天文件。
+ * 把同层小手机的一轮对话写回原聊天文件。
  *
  * 写法是「隐藏 system 楼层 + message.extra.memePhone」：
  * - 不新增 user 楼层，聊天里不会多出一条“我”说的话；

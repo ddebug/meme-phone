@@ -796,7 +796,7 @@ export function createShell(options) {
               <span class="mp-status-left">
                 ${shell.stack.length && !shell.sheet ? `<button class="mp-status-back" data-act="back" type="button" aria-label="返回">${ico('back')}</button>` : ''}
                 ${activeWorld
-                  ? `<button class="mp-world-chip" data-act="world-date" data-chat="${esc(activeWorld.id)}" type="button" title="改剧情日期">${esc(ctx.world.label?.(activeWorld) || '里世界')}</button>`
+                  ? `<button class="mp-world-chip" data-act="world-date" data-chat="${esc(activeWorld.id)}" type="button" title="改剧情日期">${esc(ctx.world.label?.(activeWorld) || '同层小手机')}</button>`
                   : ''}
               </span>
               <span class="mp-status-right">

@@ -543,7 +543,7 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
     : replyItemsFor(state, chat);
   const messages = [];
   const reportItems = [];
-  /* 只有绑了酒馆文件的里世界聊天读记忆；Meta 普通会话不碰酒馆。 */
+  /* 只有绑了酒馆文件的同层小手机读记忆；Meta 普通会话不碰酒馆。 */
   const memoryAllowed = isWorldChat(chat);
 
   if (memoryAllowed && options.memoryText === undefined && context.memory && chat) {

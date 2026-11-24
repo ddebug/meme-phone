@@ -236,7 +236,7 @@ body {
 .mp-status-back:active { transform: scale(.94); }
 .mp-status .mp-status-back .mp-i { width: 19px; height: 19px; }
 
-/* 里世界聊天：状态栏只显示当前这条的剧情日期，不再有翻面按钮。 */
+/* 同层小手机：状态栏只显示当前这条的剧情日期，不再有翻面按钮。 */
 .mp-world-chip {
   pointer-events: auto;
   margin-left: 8px;
@@ -258,7 +258,7 @@ body {
   -webkit-backdrop-filter: blur(12px);
 }
 
-/* 聊天页头部：里世界 · 第 N 天 + 绑定的聊天文件。 */
+/* 聊天页头部：同层小手机 · 第 N 天 + 绑定的聊天文件。 */
 .mp-thread-world {
   display: inline-flex;
   align-items: center;
@@ -1139,7 +1139,7 @@ body {
 .mp-row:active { transform: scale(.988); }
 .mp-row + .mp-row { margin-top: 8px; }
 
-/* 里世界 App 自己的页头：不跟 Meta 聊天混在同一张列表里。 */
+/* 同层小手机 App 自己的页头：不跟 Meta 聊天混在同一张列表里。 */
 .mp-world-app-head {
   display: flex;
   align-items: center;
@@ -9878,7 +9878,7 @@ function emptyState() {
       theater: { kind: 'daily' },
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
-      /* 里世界：默认在酒馆聊天里打开手机时，直接进当前聊天对应的里世界 */
+      /* 同层小手机：默认在酒馆聊天里打开手机时，直接进当前聊天对应的同层小手机 */
       world: { autoEnter: true },
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5, prompt: '' },
       chat: {
@@ -11785,7 +11785,7 @@ function normalize(raw) {
       legacy: Boolean(theater?.legacy),
     };
   }
-  /* v3：里世界聊天。旧版整机双世界的快照字段留在存档里，但运行层不再读。 */
+  /* v3：同层小手机。旧版整机双世界的快照字段留在存档里，但运行层不再读。 */
   merged.version = Math.max(Number(merged.version) || 0, SCHEMA_VERSION);
   Object.values(merged.chats).forEach(chat => {
     if (!chat || typeof chat !== 'object') return;
@@ -13311,7 +13311,7 @@ async function readLatestTavernChat({
   let pickedFile = String(file || '').replace(/\.jsonl$/i, '').trim();
   let latestMeta = null;
 
-  /* 指定了具体聊天文件（某条里世界聊天）就不去猜“最新”：读的就是这一份。 */
+  /* 指定了具体聊天文件（某条同层小手机）就不去猜“最新”：读的就是这一份。 */
   if (!pickedFile) {
     try {
       const response = await fetch('/api/characters/chats', {
@@ -13402,7 +13402,7 @@ async function readLatestTavernChat({
 }
 
 /**
- * 把里世界聊天的一轮对话写回原聊天文件。
+ * 把同层小手机的一轮对话写回原聊天文件。
  *
  * 写法是「隐藏 system 楼层 + message.extra.memePhone」：
  * - 不新增 user 楼层，聊天里不会多出一条“我”说的话；
@@ -14698,10 +14698,10 @@ exports["probeHost"] = probeHost;
 };
 __mods["meme/world.js"] = function(module, exports, __req){
 /**
- * meme-phone · 里世界聊天
+ * meme-phone · 同层小手机
  *
  * 不做整台手机翻面，也不是另一套通讯录：
- * 每一条里世界聊天就是一个普通会话，额外绑一个酒馆聊天文件。
+ * 每一条同层小手机就是一个普通会话，额外绑一个酒馆聊天文件。
  * - 打开它时读那一份酒馆聊天记忆；
  * - 时间显示剧情日期 + 现实钟点；
  * - 聊完写回原聊天文件的隐藏 system 楼层；
@@ -14782,7 +14782,7 @@ function markDirty(ctx, chat) {
   ctx.save();
 }
 
-/* 同一个里世界会话同时只跑一个写回，避免同一轮被并发保存两次。 */
+/* 同一个同层小手机会话同时只跑一个写回，避免同一轮被并发保存两次。 */
 const flushingChats = new WeakSet();
 
 function installWorld(ctx) {
@@ -14794,10 +14794,10 @@ function installWorld(ctx) {
     dateText(chat) { return isWorldChat(chat) ? storyDateOf(chat) : ''; },
     label(chat) {
       if (!isWorldChat(chat)) return '';
-      return `里世界 · ${storyDateOf(chat)}`;
+      return `同层小手机 · ${storyDateOf(chat)}`;
     },
 
-    /** 当前停在哪条里世界聊天：状态栏的小标签用这个。 */
+    /** 当前停在哪条同层小手机：状态栏的小标签用这个。 */
     active() {
       const stack = ctx.shell?.stack || [];
       const entry = stack[stack.length - 1];
@@ -14813,8 +14813,8 @@ function installWorld(ctx) {
     },
 
     /**
-     * 只找当前酒馆聊天对应的里世界，不新建。
-     * 打开手机时用这个：有就落进里世界；没有就回普通聊天列表，别凭空造一条空的把历史盖住。
+     * 只找当前酒馆聊天对应的同层小手机，不新建。
+     * 打开手机时用这个：有就落进同层小手机；没有就回普通聊天列表，别凭空造一条空的把历史盖住。
      */
     async locateCurrent() {
       try {
@@ -14826,7 +14826,7 @@ function installWorld(ctx) {
       }
     },
 
-    /** 在酒馆当前打开的那份聊天上开一条里世界聊天；同一份文件不会重复开。 */
+    /** 在酒馆当前打开的那份聊天上开一条同层小手机；同一份文件不会重复开。 */
     async createFromCurrent(options = {}) {
       const say = options.silent ? () => {} : message => ctx.toast(message);
       try {
@@ -14855,9 +14855,9 @@ function installWorld(ctx) {
             storyDate: storyDateFromMetadata(host.metadata) || '第 1 天',
             origin: 'current-chat',
           });
-          say(`里世界聊天已绑定《${host.chatFile || '当前聊天'}》`);
+          say(`同层小手机已绑定《${host.chatFile || '当前聊天'}》`);
         } else if (!options.silent) {
-          say('这条聊天已经有一场里世界了');
+          say('这条聊天已经有一台同层小手机了');
         }
         markDirty(ctx, chat);
         if (options.open !== false) {
@@ -14865,7 +14865,7 @@ function installWorld(ctx) {
         }
         return chat;
       } catch (error) {
-        say(error?.message || '里世界聊天没开成');
+        say(error?.message || '同层小手机没开成');
         return null;
       }
     },
@@ -14895,7 +14895,7 @@ function installWorld(ctx) {
             storyDate: storyDateFromMetadata(latest.metadata) || '第 1 天',
             origin: 'contact',
           });
-          ctx.toast(`用 TA 最近的《${latest.file}》开了一场里世界聊天`);
+          ctx.toast(`用 TA 最近的《${latest.file}》开了一台同层小手机`);
         }
         markDirty(ctx, chat);
         if (options.open !== false) {
@@ -14903,7 +14903,7 @@ function installWorld(ctx) {
         }
         return chat;
       } catch (error) {
-        ctx.toast(error?.message || '里世界聊天没开成');
+        ctx.toast(error?.message || '同层小手机没开成');
         return null;
       }
     },
@@ -14929,7 +14929,7 @@ function installWorld(ctx) {
       if (!isWorldChat(chat)) return;
       ctx.openSheet({
         kind: 'form',
-        title: '这条里世界聊天的剧情日期',
+        title: '这条同层小手机的剧情日期',
         note: '只影响这条聊天显示的日期；状态栏右边的钟点仍然跟现实走。',
         fields: [{
           name: 'storyDate',
@@ -15010,7 +15010,7 @@ function installWorld(ctx) {
   return api;
 }
 
-/** 测试用：不依赖酒馆宿主，直接在某个联系人上开一条里世界聊天。 */
+/** 测试用：不依赖酒馆宿主，直接在某个联系人上开一条同层小手机。 */
 function createWorldChatForTests(state, { contact, ...info }) {
   return createWorldChat(state, {
     contact,
@@ -15033,12 +15033,12 @@ __mods["meme/legacy-world.js"] = function(module, exports, __req){
  * 5ce6ce3 那一版是「整台手机双世界」：
  *   - 当前激活那台的数据放在顶层 contacts / chats / ...
  *   - Meta 快照放在 metaPhone.data
- *   - 每条里世界快照放在 worldPhones[id].data
+ *   - 每条同层小手机快照放在 worldPhones[id].data
  *   - phoneSurface / activeWorldId 记录当时停在哪一面
  *
  * 后来改成两个聊天 App 后，运行层只读顶层 chats，旧快照留在存档里没人读，
  * 用户升级后就会看到「聊天历史不见了」。这里在首次加载旧存档时把三份数据并回：
- *   - 顶层是里世界 → 顶层聊天补上 chat.world 标记；metaPhone.data 的聊天作为普通会话
+ *   - 顶层是同层小手机 → 顶层聊天补上 chat.world 标记；metaPhone.data 的聊天作为普通会话
  *   - 顶层是 Meta → 顶层保持普通会话；worldPhones[*].data 的聊天补上 chat.world
  *   - 联系人按 id 合并，重名不同人时给迁移过来的联系人换 id，并改掉对应 chat.contactId
  *
@@ -15172,7 +15172,7 @@ function migrateLegacyWorlds(raw, state) {
   const surfaceWorld = raw.phoneSurface === 'world' && isMap(activeEntry?.data);
 
   if (surfaceWorld) {
-    /* 顶层就是当前这台里世界手机：直接给顶层聊天补 world 标记，不复制。 */
+    /* 顶层就是当前这台同层小手机：直接给顶层聊天补 world 标记，不复制。 */
     mergeChats(state, state.chats, {}, activeEntry, {
       rename: false, asWorld: true, inPlace: true,
     });
@@ -15183,7 +15183,7 @@ function migrateLegacyWorlds(raw, state) {
       });
     }
   } else {
-    /* 顶层是 Meta：保持普通会话，把每条里世界快照并进来。 */
+    /* 顶层是 Meta：保持普通会话，把每条同层小手机快照并进来。 */
     for (const { key, instance } of worldList) {
       if (hasWorldFile(state, instance)) continue;
       const prefix = `world_${key || instance.id || 'x'}`;
@@ -15192,7 +15192,7 @@ function migrateLegacyWorlds(raw, state) {
     }
   }
 
-  /* 顶层是里世界时，其它里世界快照也要并进来，不能只恢复当前那台。 */
+  /* 顶层是同层小手机时，其它同层小手机快照也要并进来，不能只恢复当前那台。 */
   if (surfaceWorld) {
     for (const { key, instance } of worldList) {
       if (String(key) === activeId || String(instance.id || '') === activeId) continue;
@@ -16216,7 +16216,7 @@ function createShell(options) {
               <span class="mp-status-left">
                 ${shell.stack.length && !shell.sheet ? `<button class="mp-status-back" data-act="back" type="button" aria-label="返回">${ico('back')}</button>` : ''}
                 ${activeWorld
-                  ? `<button class="mp-world-chip" data-act="world-date" data-chat="${esc(activeWorld.id)}" type="button" title="改剧情日期">${esc(ctx.world.label?.(activeWorld) || '里世界')}</button>`
+                  ? `<button class="mp-world-chip" data-act="world-date" data-chat="${esc(activeWorld.id)}" type="button" title="改剧情日期">${esc(ctx.world.label?.(activeWorld) || '同层小手机')}</button>`
                   : ''}
               </span>
               <span class="mp-status-right">
@@ -17212,7 +17212,7 @@ async function buildMemoryContext(state, chat, limit = 1200) {
       avatar: contact.tavernAvatar || '',
       floors: readFloors,
       includeMemory: true,
-      /* 里世界聊天绑定了具体聊天文件：读那一份，不要退成“这个角色最新一份”。 */
+      /* 同层小手机绑定了具体聊天文件：读那一份，不要退成“这个角色最新一份”。 */
       file: chat?.world?.chatFile || chat?.tavernFile || '',
       chatId: chat?.world?.chatId || chat?.tavernChatId || chat?.world?.chatFile || chat?.tavernFile || '',
     })
@@ -18406,7 +18406,7 @@ function listBody(ctx, mode = 'meta') {
         <div class="mp-row-main">
           <div class="mp-row-name">
             ${esc(contact.name)}
-            ${worldMode ? '<span class="mp-pill world">里世界</span>' : ''}
+            ${worldMode ? '<span class="mp-pill world">同层小手机</span>' : ''}
             ${chat.pinned ? `<span class="mp-pill plain">${icon('pin')}</span>` : ''}
             ${contact.kind === 'group' ? '<span class="mp-pill plain">群</span>' : ''}
           </div>
@@ -18424,12 +18424,12 @@ function listBody(ctx, mode = 'meta') {
       <div class="mp-page-body">
         <div class="mp-world-app-head">
           <div>
-            <div class="mp-world-app-title">里世界</div>
+            <div class="mp-world-app-title">同层小手机</div>
             <div class="mp-world-app-sub">只连着酒馆里那几段聊天</div>
           </div>
           <button class="mp-icon-btn" data-act="world-new" type="button" aria-label="从当前酒馆聊天新建">${icon('plus')}</button>
         </div>
-        ${rows || '<div class="mp-empty">还没有对应的里世界聊天。<br>在酒馆打开一段聊天后，点右上角 + 新建。</div>'}
+        ${rows || '<div class="mp-empty">还没有对应的同层小手机。<br>在酒馆打开一段聊天后，点右上角 + 新建。</div>'}
       </div>`;
   }
 
@@ -18558,7 +18558,7 @@ function threadBody(ctx, chatId) {
         <div style="flex:1;min-width:0">
           <div class="mp-thread-name">${esc(contact?.name || '')}</div>
           <div class="mp-thread-status">${isWorldChat(chat)
-            ? `<button class="mp-thread-world" data-act="world-date" data-chat="${chat.id}" type="button" title="改剧情日期">${icon('book')}<span>里世界 · ${esc(storyDateOf(chat))}</span></button><span class="mp-thread-file">《${esc(chat.world.chatFile || '未命名聊天')}》</span>`
+            ? `<button class="mp-thread-world" data-act="world-date" data-chat="${chat.id}" type="button" title="改剧情日期">${icon('book')}<span>同层小手机 · ${esc(storyDateOf(chat))}</span></button><span class="mp-thread-file">《${esc(chat.world.chatFile || '未命名聊天')}》</span>`
             : `<span class="mp-dot"></span>${esc(contact?.signature || '在线')}`}</div>
         </div>
         <button class="mp-icon-btn" data-act="thread-settings" data-chat="${chat.id}" type="button" aria-label="聊天设置">${icon('settings')}</button>
@@ -19013,7 +19013,7 @@ async function runGeneration(ctx, chat, contact, options = {}) {
     });
     ctx.toast('这轮的小剧场收进 App 了');
   }
-  /* 里世界聊天：把这一轮（我发的 + TA 回的）写回它绑定的那份聊天文件。
+  /* 同层小手机：把这一轮（我发的 + TA 回的）写回它绑定的那份聊天文件。
      写不进就留在 chat.world.queue 里，下次打开这条聊天再试。 */
   if (firstSaved && kind === 'reply' && !replaceIds.length && ctx.world?.syncTurn) {
     const turnMessages = chat.messages.filter(item => item.turnId === turnId || pendingIds.includes(item.id));
@@ -19060,7 +19060,7 @@ const chatApp = {
     }
 
     if (act === 'world-new') {
-      if (typeof ctx.world?.createFromCurrent !== 'function') { ctx.toast('这个环境还没有里世界聊天'); return true; }
+      if (typeof ctx.world?.createFromCurrent !== 'function') { ctx.toast('这个环境还没有同层小手机'); return true; }
       ctx.world.createFromCurrent();
       return true;
     }
@@ -19068,7 +19068,7 @@ const chatApp = {
     if (act === 'world-open') {
       const contact = contactById(ctx.state, data.contact);
       if (!contact) return true;
-      if (typeof ctx.world?.openForContact !== 'function') { ctx.toast('这个环境还没有里世界聊天'); return true; }
+      if (typeof ctx.world?.openForContact !== 'function') { ctx.toast('这个环境还没有同层小手机'); return true; }
       ctx.world.openForContact(contact, { source: 'meta' });
       return true;
     }
@@ -19128,9 +19128,9 @@ const chatApp = {
   },
 };
 
-/* 第二个聊天 App：只装里世界会话，和 Meta 聊天彻底分开。 */
+/* 第二个聊天 App：只装同层小手机会话，和 Meta 聊天彻底分开。 */
 const worldChatApp = {
-  id: 'worldchat', name: '里世界', icon: 'chat-world',
+  id: 'worldchat', name: '同层小手机', icon: 'chat-world',
 
   render(ctx) {
     activeThreadId = '';
@@ -21984,7 +21984,7 @@ const contactApp = {
         </div>
         ${contact.kind === 'group' ? '' : `<div style="display:flex;gap:8px;margin-bottom:10px">
           <button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button" style="flex:1">${icon('search')}查 TA 的手机</button>
-          <button class="mp-btn" data-act="contact-world" data-contact="${contact.id}" type="button" style="flex:1">${icon('book')}里世界聊天</button>
+          <button class="mp-btn" data-act="contact-world" data-contact="${contact.id}" type="button" style="flex:1">${icon('book')}同层小手机</button>
         </div>`}
         <div class="mp-group">
           <div class="mp-group-label">TA 的状态</div>
@@ -22049,7 +22049,7 @@ const contactApp = {
 
     if (act === 'contact-world') {
       if (!contact) return true;
-      if (typeof ctx.world?.openForContact !== 'function') { ctx.toast('这个环境还没有里世界聊天'); return true; }
+      if (typeof ctx.world?.openForContact !== 'function') { ctx.toast('这个环境还没有同层小手机'); return true; }
       ctx.world.openForContact(contact);
       return true;
     }
@@ -22284,18 +22284,18 @@ const settingsApp = {
         </div>
 
         <div class="mp-group">
-          <div class="mp-group-label">里世界聊天</div>
+          <div class="mp-group-label">同层小手机</div>
           <div class="mp-group-box">
             ${row(ctx, {
               iconName: 'chat-world',
               title: '默认进入聊天记录聊天',
-              sub: '打开手机时直接落到当前酒馆聊天对应的里世界',
+              sub: '打开手机时直接落到当前酒馆聊天对应的同层小手机',
               act: 'set-toggle-world-auto',
               toggle: state.settings.world?.autoEnter !== false,
             })}
             ${row(ctx, {
               iconName: 'book',
-              title: '里世界聊天',
+              title: '同层小手机列表',
               sub: worlds.length ? `${worlds.length} 条 · 每条单独绑一份酒馆聊天记录` : '还没有 · 从当前酒馆聊天新建',
               act: 'set-world-list',
             })}
@@ -22377,9 +22377,9 @@ const settingsApp = {
     if (act === 'set-open-dress') { ctx.go('app-dress'); return true; }
     if (act === 'set-world-list') {
       const worlds = ctx.world?.list?.() || [];
-      if (!worlds.length) { ctx.toast('还没有里世界聊天；先在酒馆打开一段聊天，再从当前聊天新建'); return true; }
+      if (!worlds.length) { ctx.toast('还没有同层小手机；先在酒馆打开一段聊天，再从当前聊天新建'); return true; }
       ctx.openSheet({
-        title: `里世界聊天 · ${worlds.length} 条`,
+        title: `同层小手机 · ${worlds.length} 条`,
         note: '每一条都单独绑一份酒馆聊天记录：只读那份记忆，只写回那份。',
         items: worlds
           .slice()
@@ -22409,8 +22409,8 @@ const settingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(state.settings.world.autoEnter
-        ? '以后打开手机直接进当前聊天对应的里世界'
-        : '以后打开手机停在桌面，不自动进里世界');
+        ? '以后打开手机直接进当前聊天对应的同层小手机'
+        : '以后打开手机停在桌面，不自动进同层小手机');
       return true;
     }
     if (act === 'set-open-appearance') { ctx.go('app-appearance'); return true; }
@@ -30658,7 +30658,7 @@ async function buildReplyMessages(state, chat, contact, options = {}) {
     : replyItemsFor(state, chat);
   const messages = [];
   const reportItems = [];
-  /* 只有绑了酒馆文件的里世界聊天读记忆；Meta 普通会话不碰酒馆。 */
+  /* 只有绑了酒馆文件的同层小手机读记忆；Meta 普通会话不碰酒馆。 */
   const memoryAllowed = isWorldChat(chat);
 
   if (memoryAllowed && options.memoryText === undefined && context.memory && chat) {
@@ -30900,7 +30900,7 @@ const DESKTOP_APPS = [
 
 const DOCK_APPS = [
   { id: 'chat', name: '聊天', icon: 'chat' },
-  { id: 'worldchat', name: '里世界', icon: 'chat-world' },
+  { id: 'worldchat', name: '同层小手机', icon: 'chat-world' },
   { id: 'contacts', name: '通讯录', icon: 'contacts' },
   { id: 'settings', name: '设置', icon: 'settings' },
 ];
@@ -30938,7 +30938,7 @@ function makeAi(getState) {
     const ctxSettings = replyContextFor(state, chat);
     /* 0 = 不限制：酒馆记忆和手机历史都按全量送，不再用本地预算截断。 */
     const memoryLimit = 0;
-    /* Meta 手机按设计完全不碰酒馆记忆；只有绑了酒馆文件的里世界聊天才读。 */
+    /* Meta 手机按设计完全不碰酒馆记忆；只有绑了酒馆文件的同层小手机才读。 */
     const isMetaPhone = !isWorldChat(chat);
     const storyBlock = !isMetaPhone && ctxSettings.memory
       ? await story(state, chat, memoryLimit)
@@ -31257,8 +31257,8 @@ function getState() {
 /* ------------------------------------------------------------ 打开界面 */
 
 /**
- * 在酒馆聊天里打开手机时，直接落到“这段聊天对应的里世界聊天”。
- * 不翻整台手机；只是把窗口栈设成 里世界列表 → 对应会话。
+ * 在酒馆聊天里打开手机时，直接落到“这段聊天对应的同层小手机”。
+ * 不翻整台手机；只是把窗口栈设成 同层小手机列表 → 对应会话。
  */
 async function enterWorldFromHost() {
   if (!ctx?.world || !ctx?.shell) return false;
@@ -31274,7 +31274,7 @@ async function enterWorldFromHost() {
     ctx.shell.stack.push({ view: 'thread', params: { chatId: located.chat.id } });
     return true;
   }
-  /* 当前聊天还没有里世界：回普通聊天列表。历史都在那里，别用一条新建的空里世界挡住。 */
+  /* 当前聊天还没有同层小手机：回普通聊天列表。历史都在那里，别用一条新建的空同层小手机挡住。 */
   ctx.shell.stack.push({ view: 'app-chat', params: {} });
   return true;
 }
@@ -31422,7 +31422,7 @@ async function openMemePhone(options = {}) {
 
   shellApi = createShell({ root: rootEl, ctx, apps: APPS, desktopApps: DESKTOP_APPS, dockApps: DOCK_APPS });
 
-  /* 里世界是独立的第二个聊天 App；在酒馆里打开手机时直接落到当前聊天那一条。 */
+  /* 同层小手机是独立的第二个聊天 App；在酒馆里打开手机时直接落到当前聊天那一条。 */
   installWorld(ctx);
   try { await enterWorldFromHost(); } catch { /* 没有宿主上下文就停在桌面 */ }
   shellApi.render();

@@ -540,7 +540,7 @@ export function emptyState() {
     chats: {},
     /* 平行时空：从某个酒馆聊天文件分出来的分支，只存在这台小手机里 */
     theaters: {},
-    diary: { enabled: true, entries: {}, contacts: {}, prompt: DEFAULT_DIARY_PROMPT, lastGenerated: '' },
+    diary: { enabled: true, pastOnly: true, entries: {}, contacts: {}, prompt: DEFAULT_DIARY_PROMPT, lastGenerated: '' },
     emoji: DEFAULT_EMOJI.map((item, index) => ({ id: `e${index + 1}`, ...item })),
     plans: [],
     music: {
@@ -1840,6 +1840,7 @@ export function normalize(raw) {
       ...base.diary,
       ...(raw.diary || {}),
       enabled: raw.diary?.enabled !== false,
+      pastOnly: raw.diary?.pastOnly !== false,
       prompt: diaryPromptFor(raw.diary?.prompt, base.diary.prompt),
       entries: { ...(raw.diary?.entries || {}) },
       contacts: {},

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   diaryFingerprint,
   diaryMessages,
+  diaryContextMessages,
   diaryDayGroups,
   diaryDayStatuses,
   parseDiaryResponse,
@@ -13,7 +14,7 @@ import {
   diaryContextMode,
   diaryEntryIsCurrent,
 } from '../meme/diary.js';
-import { DIARY_SKIP_THRESHOLD } from '../meme/data.js';
+import { DIARY_SKIP_THRESHOLD, normalize } from '../meme/data.js';
 import { historyTranscript } from '../meme/reply-context.js';
 
 const atOf = (date) => new Date(`${date}T12:00:00`).getTime();
@@ -35,6 +36,33 @@ test('diaryMessages 排除被忽略和缺少时间戳的消息', () => {
   ] };
   assert.equal(diaryMessages(chat).length, 1);
   assert.equal(diaryMessages(null).length, 0);
+});
+
+test('diaryContextMessages 开启截止时只到目标最后一天，关闭时保留全部未排除消息', () => {
+  const chat = { messages: [
+    msg('2026-11-09', { text: '前一天' }),
+    msg('2026-11-10', { text: '目标日' }),
+    msg('2026-11-11', { text: '后一天' }),
+    msg('2026-11-10', { text: '被忽略', excluded: true }),
+  ] };
+  assert.deepEqual(
+    diaryContextMessages(chat, ['2026-11-10'], true).map(item => item.text),
+    ['前一天', '目标日'],
+  );
+  assert.deepEqual(
+    diaryContextMessages(chat, ['2026-11-09', '2026-11-10'], true).map(item => item.text),
+    ['前一天', '目标日'],
+  );
+  assert.deepEqual(
+    diaryContextMessages(chat, ['2026-11-10'], false).map(item => item.text),
+    ['前一天', '目标日', '后一天'],
+  );
+  assert.deepEqual(diaryContextMessages(null, [], true), []);
+});
+
+test('日记上下文截止开关默认开启，用户关掉后保持关闭', () => {
+  assert.equal(normalize({}).diary.pastOnly, true);
+  assert.equal(normalize({ diary: { pastOnly: false } }).diary.pastOnly, false);
 });
 
 test('diaryDayGroups 按本地日期分组并升序排列', () => {

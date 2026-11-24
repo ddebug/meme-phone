@@ -39,6 +39,22 @@ export function diaryMessages(chat) {
     .filter(message => message && !message.excluded && Number.isFinite(Number(message.at)));
 }
 
+/** 日记生成的背景消息。pastOnly 时只取目标日期最后一天及以前的消息，避免补旧日记时看到后文。 */
+export function diaryContextMessages(chat, dates, pastOnly = true) {
+  const source = (Array.isArray(chat?.messages) ? chat.messages : [])
+    .filter(message => message && !message.excluded);
+  const targets = (Array.isArray(dates) ? dates : [])
+    .map(String)
+    .filter(date => DIARY_DATE_RE.test(date))
+    .sort();
+  if (!pastOnly || !targets.length) return source;
+  const cutoff = targets[targets.length - 1];
+  return source.filter(message => {
+    const at = Number(message.at);
+    return Number.isFinite(at) && dayKey(new Date(at)) <= cutoff;
+  });
+}
+
 /** 按手机本地日期分组；生成、状态判断和上下文替换共用这一份口径。 */
 export function diaryDayGroups(chat) {
   const groups = new Map();

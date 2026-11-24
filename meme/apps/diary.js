@@ -236,6 +236,24 @@ function threadState(ctx, contactId) {
   return store[contactId];
 }
 
+function threadSettingsBox(ctx, contactId) {
+  const enabled = ctx.state.diary?.enabled !== false;
+  const pastOnly = ctx.state.diary?.pastOnly !== false;
+  return `
+    <div class="mp-group-box" style="margin-top:10px">
+      <button class="mp-set-row" data-act="td-toggle-replace" data-contact="${esc(contactId)}" type="button">
+        <span class="mp-set-ico">${icon('book')}</span>
+        <span class="mp-set-name">用日记替换聊天<small>${enabled ? '现在开启：旧日期用日记替换原文；最近一天仍读原文' : '现在关闭：聊天上下文全部读原文'}</small></span>
+        <span class="mp-switch${enabled ? ' on' : ''}"></span>
+      </button>
+      <button class="mp-set-row" data-act="td-toggle-past-only" data-contact="${esc(contactId)}" type="button">
+        <span class="mp-set-ico">${icon('clock')}</span>
+        <span class="mp-set-name">补旧日记不读后文<small>${pastOnly ? '现在开启：只发送到所选最后一天，再往后不进上下文' : '现在关闭：全部聊天都会发送，后文可能影响补写'}</small></span>
+        <span class="mp-switch${pastOnly ? ' on' : ''}"></span>
+      </button>
+    </div>`;
+}
+
 function threadCalendar(ctx, contactId, statuses) {
   const st = threadState(ctx, contactId);
   const first = parseMonth(st.month);
@@ -359,19 +377,12 @@ function renderThreadPage(ctx, contactId) {
     if (st.month !== latestDate.slice(0, 7)) st.month = latestDate.slice(0, 7);
   }
   const selected = statuses.find(item => item.date === st.sel) || null;
-  const enabled = state.diary?.enabled !== false;
   const busy = ctx.shell.threadDiaryBusy === contactId;
   if (!statuses.length) {
     return `
       <div class="mp-page-body">
         <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记 · 按天整理聊天，只在这个角色里保存</div>
-        <div class="mp-group-box" style="margin-top:10px">
-          <button class="mp-set-row" data-act="td-toggle-replace" data-contact="${esc(contactId)}" type="button">
-            <span class="mp-set-ico">${icon('book')}</span>
-            <span class="mp-set-name">用日记替换聊天<small>${enabled ? '现在开启：旧日期用日记替换原文；最近一天仍读原文' : '现在关闭：聊天上下文全部读原文'}</small></span>
-            <span class="mp-switch${enabled ? ' on' : ''}"></span>
-          </button>
-        </div>
+        ${threadSettingsBox(ctx, contactId)}
         <div class="mp-td-toolbar">
           <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>
         </div>
@@ -382,13 +393,7 @@ function renderThreadPage(ctx, contactId) {
   return `
     <div class="mp-page-body">
       <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记 · 按天整理聊天，只在这个角色里保存</div>
-      <div class="mp-group-box" style="margin-top:10px">
-        <button class="mp-set-row" data-act="td-toggle-replace" data-contact="${esc(contactId)}" type="button">
-          <span class="mp-set-ico">${icon('book')}</span>
-          <span class="mp-set-name">用日记替换聊天<small>${enabled ? '现在开启：旧日期用日记替换原文；最近一天仍读原文' : '现在关闭：聊天上下文全部读原文'}</small></span>
-          <span class="mp-switch${enabled ? ' on' : ''}"></span>
-        </button>
-      </div>
+      ${threadSettingsBox(ctx, contactId)}
       <div class="mp-td-toolbar">
         <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>
         <span class="mp-td-toolbar-note">${statuses.filter(item => item.status === 'pending').length} 天待整理</span>
@@ -501,6 +506,16 @@ function handleThreadDiary(ctx, act, data, event) {
     ctx.save();
     ctx.rerender();
     ctx.toast(state.diary.enabled ? '旧日期会用日记替换原文；最近一天仍读原文' : '日记替换已关闭，聊天上下文全部读原文');
+    return true;
+  }
+  if (act === 'td-toggle-past-only') {
+    const enabled = state.diary.pastOnly !== false;
+    state.diary.pastOnly = !enabled;
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(state.diary.pastOnly
+      ? '补旧日记只会发送到所选最后一天，再往后的聊天不再进入上下文'
+      : '补旧日记会发送全部聊天作背景，后文也可能影响补写');
     return true;
   }
   if (act === 'td-prompt') {

@@ -11,9 +11,9 @@ import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { favoritesApp } from './apps/favorites.js';
 import { photoApp } from './apps/photo.js';
 import { buildMemoryContext } from './memory.js';
-import { buildReplyMessages, transcript, replyLead, proactiveLead, diaryTranscript, characterBlock, sceneBlock, userBlock } from './reply-context.js';
+import { buildReplyMessages, transcript, replyLead, proactiveLead, diaryTranscriptForMessages, characterBlock, sceneBlock, userBlock } from './reply-context.js';
 import { behaviorPrompt, behaviorSettings, parseBehaviorReply } from './behavior.js';
-import { DIARY_OUTPUT_PROTOCOL, diaryFingerprint } from './diary.js';
+import { DIARY_OUTPUT_PROTOCOL, diaryFingerprint, diaryContextMessages } from './diary.js';
 import { diaryApp, threadDiaryApp } from './apps/diary.js';
 import { contactsApp, contactApp } from './apps/contacts.js';
 import { settingsApp, appearanceApp } from './apps/settings.js';
@@ -335,7 +335,13 @@ function makeAi(getState) {
       const dates = Array.isArray(payload.dates) ? payload.dates.filter(Boolean).map(String) : [];
       if (!chat || !contact || !dates.length) throw new Error('没有可整理的日期');
       const profile = [characterBlock(state, contact), sceneBlock(state, contact), userBlock(state)].filter(Boolean).join('\n\n');
-      const transcriptText = diaryTranscript(state, chat) || '（没有聊天记录）';
+      const pastOnly = state.diary?.pastOnly !== false;
+      const cutoff = dates.slice().sort().at(-1) || '';
+      const contextMessages = diaryContextMessages(chat, dates, pastOnly);
+      const transcriptText = diaryTranscriptForMessages(state, chat, contextMessages) || '（没有聊天记录）';
+      const contextLabel = pastOnly
+        ? `【截至 ${cutoff} 的未排除手机聊天记录】`
+        : '【该联系人全部未排除的原始手机聊天记录】';
       const targets = dates.map(date => `${date}（${(chat.messages || []).filter(message => !message.excluded && dayKey(new Date(Number(message.at))) === date).length}条）`).join('、');
       const messages = [
         { role: 'system', content: `${state.diary?.prompt || '按角色视角写这一天的日记。'}\n\n${DIARY_OUTPUT_PROTOCOL}` },
@@ -347,12 +353,15 @@ function makeAi(getState) {
             `日记作者：${contact.name}（第一人称“我”）`,
             `用户：${state.settings?.user?.name || '我'}`,
             '',
-            '【该联系人全部未排除的原始手机聊天记录】',
+            contextLabel,
             transcriptText,
             '',
             '【本次任务】',
             `只为以下日期各写一篇角色视角日记：${targets}。`,
-            '其他日期仅用于理解身份和关系。一次返回全部指定日期的 entries JSON。',
+            pastOnly
+              ? `聊天记录已截到 ${cutoff}。更早的日期只用于理解身份和关系，不要推测或写入 ${cutoff} 之后的内容。`
+              : '其他日期仅用于理解身份和关系。',
+            '一次返回全部指定日期的 entries JSON。',
           ].join('\n'),
         },
       ];

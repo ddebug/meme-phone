@@ -9526,7 +9526,7 @@ function emptyState() {
     chats: {},
     /* 平行时空：从某个酒馆聊天文件分出来的分支，只存在这台小手机里 */
     theaters: {},
-    diary: { enabled: true, entries: {}, contacts: {}, prompt: DEFAULT_DIARY_PROMPT, lastGenerated: '' },
+    diary: { enabled: true, pastOnly: true, entries: {}, contacts: {}, prompt: DEFAULT_DIARY_PROMPT, lastGenerated: '' },
     emoji: DEFAULT_EMOJI.map((item, index) => ({ id: `e${index + 1}`, ...item })),
     plans: [],
     music: {
@@ -10826,6 +10826,7 @@ function normalize(raw) {
       ...base.diary,
       ...(raw.diary || {}),
       enabled: raw.diary?.enabled !== false,
+      pastOnly: raw.diary?.pastOnly !== false,
       prompt: diaryPromptFor(raw.diary?.prompt, base.diary.prompt),
       entries: { ...(raw.diary?.entries || {}) },
       contacts: {},
@@ -11378,6 +11379,22 @@ function diaryMessages(chat) {
     .filter(message => message && !message.excluded && Number.isFinite(Number(message.at)));
 }
 
+/** 日记生成的背景消息。pastOnly 时只取目标日期最后一天及以前的消息，避免补旧日记时看到后文。 */
+function diaryContextMessages(chat, dates, pastOnly = true) {
+  const source = (Array.isArray(chat?.messages) ? chat.messages : [])
+    .filter(message => message && !message.excluded);
+  const targets = (Array.isArray(dates) ? dates : [])
+    .map(String)
+    .filter(date => DIARY_DATE_RE.test(date))
+    .sort();
+  if (!pastOnly || !targets.length) return source;
+  const cutoff = targets[targets.length - 1];
+  return source.filter(message => {
+    const at = Number(message.at);
+    return Number.isFinite(at) && dayKey(new Date(at)) <= cutoff;
+  });
+}
+
 /** 按手机本地日期分组；生成、状态判断和上下文替换共用这一份口径。 */
 function diaryDayGroups(chat) {
   const groups = new Map();
@@ -11516,6 +11533,7 @@ exports["DIARY_DATE_RE"] = DIARY_DATE_RE;
 exports["DIARY_OUTPUT_PROTOCOL"] = DIARY_OUTPUT_PROTOCOL;
 exports["diaryFingerprint"] = diaryFingerprint;
 exports["diaryMessages"] = diaryMessages;
+exports["diaryContextMessages"] = diaryContextMessages;
 exports["diaryDayGroups"] = diaryDayGroups;
 exports["diaryRoleEntries"] = diaryRoleEntries;
 exports["diaryParamsFingerprint"] = diaryParamsFingerprint;
@@ -19118,6 +19136,24 @@ function threadState(ctx, contactId) {
   return store[contactId];
 }
 
+function threadSettingsBox(ctx, contactId) {
+  const enabled = ctx.state.diary?.enabled !== false;
+  const pastOnly = ctx.state.diary?.pastOnly !== false;
+  return `
+    <div class="mp-group-box" style="margin-top:10px">
+      <button class="mp-set-row" data-act="td-toggle-replace" data-contact="${esc(contactId)}" type="button">
+        <span class="mp-set-ico">${icon('book')}</span>
+        <span class="mp-set-name">用日记替换聊天<small>${enabled ? '现在开启：旧日期用日记替换原文；最近一天仍读原文' : '现在关闭：聊天上下文全部读原文'}</small></span>
+        <span class="mp-switch${enabled ? ' on' : ''}"></span>
+      </button>
+      <button class="mp-set-row" data-act="td-toggle-past-only" data-contact="${esc(contactId)}" type="button">
+        <span class="mp-set-ico">${icon('clock')}</span>
+        <span class="mp-set-name">补旧日记不读后文<small>${pastOnly ? '现在开启：只发送到所选最后一天，再往后不进上下文' : '现在关闭：全部聊天都会发送，后文可能影响补写'}</small></span>
+        <span class="mp-switch${pastOnly ? ' on' : ''}"></span>
+      </button>
+    </div>`;
+}
+
 function threadCalendar(ctx, contactId, statuses) {
   const st = threadState(ctx, contactId);
   const first = parseMonth(st.month);
@@ -19241,19 +19277,12 @@ function renderThreadPage(ctx, contactId) {
     if (st.month !== latestDate.slice(0, 7)) st.month = latestDate.slice(0, 7);
   }
   const selected = statuses.find(item => item.date === st.sel) || null;
-  const enabled = state.diary?.enabled !== false;
   const busy = ctx.shell.threadDiaryBusy === contactId;
   if (!statuses.length) {
     return `
       <div class="mp-page-body">
         <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记 · 按天整理聊天，只在这个角色里保存</div>
-        <div class="mp-group-box" style="margin-top:10px">
-          <button class="mp-set-row" data-act="td-toggle-replace" data-contact="${esc(contactId)}" type="button">
-            <span class="mp-set-ico">${icon('book')}</span>
-            <span class="mp-set-name">用日记替换聊天<small>${enabled ? '现在开启：旧日期用日记替换原文；最近一天仍读原文' : '现在关闭：聊天上下文全部读原文'}</small></span>
-            <span class="mp-switch${enabled ? ' on' : ''}"></span>
-          </button>
-        </div>
+        ${threadSettingsBox(ctx, contactId)}
         <div class="mp-td-toolbar">
           <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>
         </div>
@@ -19264,13 +19293,7 @@ function renderThreadPage(ctx, contactId) {
   return `
     <div class="mp-page-body">
       <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记 · 按天整理聊天，只在这个角色里保存</div>
-      <div class="mp-group-box" style="margin-top:10px">
-        <button class="mp-set-row" data-act="td-toggle-replace" data-contact="${esc(contactId)}" type="button">
-          <span class="mp-set-ico">${icon('book')}</span>
-          <span class="mp-set-name">用日记替换聊天<small>${enabled ? '现在开启：旧日期用日记替换原文；最近一天仍读原文' : '现在关闭：聊天上下文全部读原文'}</small></span>
-          <span class="mp-switch${enabled ? ' on' : ''}"></span>
-        </button>
-      </div>
+      ${threadSettingsBox(ctx, contactId)}
       <div class="mp-td-toolbar">
         <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>
         <span class="mp-td-toolbar-note">${statuses.filter(item => item.status === 'pending').length} 天待整理</span>
@@ -19383,6 +19406,16 @@ function handleThreadDiary(ctx, act, data, event) {
     ctx.save();
     ctx.rerender();
     ctx.toast(state.diary.enabled ? '旧日期会用日记替换原文；最近一天仍读原文' : '日记替换已关闭，聊天上下文全部读原文');
+    return true;
+  }
+  if (act === 'td-toggle-past-only') {
+    const enabled = state.diary.pastOnly !== false;
+    state.diary.pastOnly = !enabled;
+    ctx.save();
+    ctx.rerender();
+    ctx.toast(state.diary.pastOnly
+      ? '补旧日记只会发送到所选最后一天，再往后的聊天不再进入上下文'
+      : '补旧日记会发送全部聊天作背景，后文也可能影响补写');
     return true;
   }
   if (act === 'td-prompt') {
@@ -28517,9 +28550,9 @@ const { chatApp, threadApp, threadSettingsApp } = __req("meme/apps/chat.js");
 const { favoritesApp } = __req("meme/apps/favorites.js");
 const { photoApp } = __req("meme/apps/photo.js");
 const { buildMemoryContext } = __req("meme/memory.js");
-const { buildReplyMessages, transcript, replyLead, proactiveLead, diaryTranscript, characterBlock, sceneBlock, userBlock } = __req("meme/reply-context.js");
+const { buildReplyMessages, transcript, replyLead, proactiveLead, diaryTranscriptForMessages, characterBlock, sceneBlock, userBlock } = __req("meme/reply-context.js");
 const { behaviorPrompt, behaviorSettings, parseBehaviorReply } = __req("meme/behavior.js");
-const { DIARY_OUTPUT_PROTOCOL, diaryFingerprint } = __req("meme/diary.js");
+const { DIARY_OUTPUT_PROTOCOL, diaryFingerprint, diaryContextMessages } = __req("meme/diary.js");
 const { diaryApp, threadDiaryApp } = __req("meme/apps/diary.js");
 const { contactsApp, contactApp } = __req("meme/apps/contacts.js");
 const { settingsApp, appearanceApp } = __req("meme/apps/settings.js");
@@ -28841,7 +28874,13 @@ function makeAi(getState) {
       const dates = Array.isArray(payload.dates) ? payload.dates.filter(Boolean).map(String) : [];
       if (!chat || !contact || !dates.length) throw new Error('没有可整理的日期');
       const profile = [characterBlock(state, contact), sceneBlock(state, contact), userBlock(state)].filter(Boolean).join('\n\n');
-      const transcriptText = diaryTranscript(state, chat) || '（没有聊天记录）';
+      const pastOnly = state.diary?.pastOnly !== false;
+      const cutoff = dates.slice().sort().at(-1) || '';
+      const contextMessages = diaryContextMessages(chat, dates, pastOnly);
+      const transcriptText = diaryTranscriptForMessages(state, chat, contextMessages) || '（没有聊天记录）';
+      const contextLabel = pastOnly
+        ? `【截至 ${cutoff} 的未排除手机聊天记录】`
+        : '【该联系人全部未排除的原始手机聊天记录】';
       const targets = dates.map(date => `${date}（${(chat.messages || []).filter(message => !message.excluded && dayKey(new Date(Number(message.at))) === date).length}条）`).join('、');
       const messages = [
         { role: 'system', content: `${state.diary?.prompt || '按角色视角写这一天的日记。'}\n\n${DIARY_OUTPUT_PROTOCOL}` },
@@ -28853,12 +28892,15 @@ function makeAi(getState) {
             `日记作者：${contact.name}（第一人称“我”）`,
             `用户：${state.settings?.user?.name || '我'}`,
             '',
-            '【该联系人全部未排除的原始手机聊天记录】',
+            contextLabel,
             transcriptText,
             '',
             '【本次任务】',
             `只为以下日期各写一篇角色视角日记：${targets}。`,
-            '其他日期仅用于理解身份和关系。一次返回全部指定日期的 entries JSON。',
+            pastOnly
+              ? `聊天记录已截到 ${cutoff}。更早的日期只用于理解身份和关系，不要推测或写入 ${cutoff} 之后的内容。`
+              : '其他日期仅用于理解身份和关系。',
+            '一次返回全部指定日期的 entries JSON。',
           ].join('\n'),
         },
       ];

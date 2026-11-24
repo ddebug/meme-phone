@@ -115,10 +115,11 @@ export function installWorld(ctx) {
 
     /** 在酒馆当前打开的那份聊天上开一条里世界聊天；同一份文件不会重复开。 */
     async createFromCurrent(options = {}) {
+      const say = options.silent ? () => {} : message => ctx.toast(message);
       try {
         const host = await readOpenTavernChat();
         if (!host.available) {
-          ctx.toast(host.reason || '先在酒馆里打开一段聊天');
+          say(host.reason || '先在酒馆里打开一段聊天');
           return null;
         }
         const contactId = contactForTavernCharacter(state, {
@@ -127,7 +128,7 @@ export function installWorld(ctx) {
         });
         const contact = contactById(state, contactId);
         if (!contact) {
-          ctx.toast('这个酒馆角色还没进通讯录');
+          say('这个酒馆角色还没进通讯录');
           return null;
         }
         let chat = findWorldChat(state, host.chatFile);
@@ -141,18 +142,17 @@ export function installWorld(ctx) {
             storyDate: storyDateFromMetadata(host.metadata) || '第 1 天',
             origin: 'current-chat',
           });
-          ctx.toast(`里世界聊天已绑定《${host.chatFile || '当前聊天'}》`);
-        } else {
-          ctx.toast('这条聊天已经有一场里世界了');
+          say(`里世界聊天已绑定《${host.chatFile || '当前聊天'}》`);
+        } else if (!options.silent) {
+          say('这条聊天已经有一场里世界了');
         }
         markDirty(ctx, chat);
         if (options.open !== false) {
-          ctx.home?.();
-          ctx.go('thread', { chatId: chat.id });
+          api.open(chat.id);
         }
         return chat;
       } catch (error) {
-        ctx.toast(error?.message || '里世界聊天没开成');
+        say(error?.message || '里世界聊天没开成');
         return null;
       }
     },
@@ -186,8 +186,7 @@ export function installWorld(ctx) {
         }
         markDirty(ctx, chat);
         if (options.open !== false) {
-          ctx.home?.();
-          ctx.go('thread', { chatId: chat.id });
+          api.open(chat.id);
         }
         return chat;
       } catch (error) {
@@ -199,8 +198,16 @@ export function installWorld(ctx) {
     open(chatId) {
       const chat = state.chats?.[chatId];
       if (!isWorldChat(chat)) return false;
-      ctx.home?.();
-      ctx.go('thread', { chatId: chat.id });
+      if (ctx.shell) {
+        ctx.shell.stack.length = 0;
+        ctx.shell.sheet = null;
+        ctx.shell.stack.push({ view: 'app-worldchat', params: {} });
+        ctx.shell.stack.push({ view: 'thread', params: { chatId: chat.id } });
+        ctx.rerender?.();
+      } else {
+        ctx.go('app-worldchat', {});
+        ctx.go('thread', { chatId: chat.id });
+      }
       return true;
     },
 

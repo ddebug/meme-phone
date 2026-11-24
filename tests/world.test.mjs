@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { emptyState, chatFor, addContact, addChat, normalize } from '../meme/data.js';
 import { clockBlock } from '../meme/reply-context.js';
 import { installWorld, isWorldChat, createWorldChatForTests, storyDateOf } from '../meme/world.js';
+import { chatApp, worldChatApp } from '../meme/apps/chat.js';
 import { __resetHostScriptForTests } from '../meme/host.js';
 
 function stateWithMeta() {
@@ -13,6 +14,24 @@ function stateWithMeta() {
   meta.updatedAt = Date.now();
   return { state, contact, meta };
 }
+
+test('里世界和 Meta 是两个聊天 App，列表互不混入', () => {
+  const { state, contact } = stateWithMeta();
+  const world = createWorldChatForTests(state, {
+    contact, chatFile: 'file-split', chatId: 'file-split', storyDate: '第 2 天',
+  });
+  world.messages.push({ id: 'w1', from: 'them', text: '里世界的话', at: Date.now() });
+  const ctx = { state, shell: {} };
+  const metaList = chatApp.render(ctx);
+  const worldList = worldChatApp.render(ctx);
+  assert.match(metaList, /沈砚/);
+  assert.doesNotMatch(metaList, /file-split/);
+  assert.match(worldList, /file-split/);
+  assert.match(worldList, /第 2 天/);
+  assert.doesNotMatch(worldList, /Meta 聊天/);
+  assert.equal(chatApp.id, 'chat');
+  assert.equal(worldChatApp.id, 'worldchat');
+});
 
 test('里世界聊天就是普通会话，只多绑一份酒馆聊天文件', () => {
   const { state, contact, meta } = stateWithMeta();

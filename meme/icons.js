@@ -5,6 +5,7 @@
 
 const P = {
   chat: '<path d="M4 11.5c0-3.6 3.6-6.5 8-6.5s8 2.9 8 6.5-3.6 6.5-8 6.5c-1 0-2-.1-2.9-.4"/><path d="M4 11.5c0 1.3.6 2.5 1.6 3.5L5 19l3.6-1.4"/>',
+  'chat-world': '<path d="M4 11c0-3.3 3.3-6 7.4-6 4.1 0 7.4 2.7 7.4 6s-3.3 6-7.4 6c-.9 0-1.8-.1-2.6-.4"/><path d="M4 11c0 1.2.5 2.3 1.4 3.2L4.8 17.6l3.2-1.2"/><path d="M17.2 5.2a2.6 2.6 0 1 0 1.6 4.6 3 3 0 0 1-1.6-4.6z"/>',
   contacts: '<circle cx="9" cy="9" r="3.2"/><path d="M3.6 18.4c.5-2.7 2.7-4.3 5.4-4.3s4.9 1.6 5.4 4.3"/><circle cx="17" cy="10" r="2.3"/><path d="M16 14.6c2.4 0 4.2 1.3 4.6 3.6"/>',
   phone: '<rect x="7" y="3.2" width="10" height="17.6" rx="3"/><path d="M10.4 18.2h3.2"/><path d="M10.2 6.2h3.6"/>',
   diary: '<path d="M5.5 4.5h9.5a2.5 2.5 0 0 1 2.5 2.5v12.5H8a2.5 2.5 0 0 1-2.5-2.5z"/><path d="M8.5 4.5v15"/><path d="M11.4 9h3.6M11.4 12.6h3.6"/>',
@@ -61,6 +62,7 @@ export function icon(name, className = '') {
 /** 桌面图标配色：同族渐变，不用高饱和色块。 */
 export const TINT = {
   chat: ['#bcd4f6', '#8fb9f2'],
+  worldchat: ['#d9cdf2', '#a992e8'],
   contacts: ['#cfc2f7', '#a892ee'],
   diary: ['#f8cfdf', '#f2a0c2'],
   settings: ['#cfd2e6', '#a8aed0'],

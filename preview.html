@@ -973,8 +973,8 @@ body {
   padding: 9px 10px;
   border-radius: 26px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
   background: linear-gradient(180deg, rgba(255, 255, 255, .88), rgba(246, 242, 255, .70));
   backdrop-filter: blur(26px) saturate(160%);
   -webkit-backdrop-filter: blur(26px) saturate(160%);
@@ -982,11 +982,13 @@ body {
 }
 
 .mp-dock .mp-app .mp-tile {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   box-shadow: 0 6px 14px rgba(120, 110, 170, .20), inset 0 0 0 1px rgba(255, 255, 255, .5);
 }
+
+.mp-dock .mp-app .mp-i { width: 22px; height: 22px; }
 
 .mp-dock .mp-app .mp-app-label { display: none; }
 
@@ -1137,7 +1139,27 @@ body {
 .mp-row:active { transform: scale(.988); }
 .mp-row + .mp-row { margin-top: 8px; }
 
-/* 里世界聊天：列表里单独一段，绑定哪份酒馆聊天直接写在副标题上。 */
+/* 里世界 App 自己的页头：不跟 Meta 聊天混在同一张列表里。 */
+.mp-world-app-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 3px 14px;
+}
+
+.mp-world-app-title {
+  font-size: calc(19px * var(--font-scale));
+  font-weight: 700;
+  letter-spacing: .03em;
+  color: var(--text-1);
+}
+
+.mp-world-app-sub {
+  margin-top: 2px;
+  font-size: calc(10.5px * var(--font-scale));
+  color: var(--text-3);
+}
+
 .mp-list-section { margin-top: 14px; }
 .mp-list-head {
   display: flex;
@@ -14605,10 +14627,11 @@ function installWorld(ctx) {
 
     /** 在酒馆当前打开的那份聊天上开一条里世界聊天；同一份文件不会重复开。 */
     async createFromCurrent(options = {}) {
+      const say = options.silent ? () => {} : message => ctx.toast(message);
       try {
         const host = await readOpenTavernChat();
         if (!host.available) {
-          ctx.toast(host.reason || '先在酒馆里打开一段聊天');
+          say(host.reason || '先在酒馆里打开一段聊天');
           return null;
         }
         const contactId = contactForTavernCharacter(state, {
@@ -14617,7 +14640,7 @@ function installWorld(ctx) {
         });
         const contact = contactById(state, contactId);
         if (!contact) {
-          ctx.toast('这个酒馆角色还没进通讯录');
+          say('这个酒馆角色还没进通讯录');
           return null;
         }
         let chat = findWorldChat(state, host.chatFile);
@@ -14631,18 +14654,17 @@ function installWorld(ctx) {
             storyDate: storyDateFromMetadata(host.metadata) || '第 1 天',
             origin: 'current-chat',
           });
-          ctx.toast(`里世界聊天已绑定《${host.chatFile || '当前聊天'}》`);
-        } else {
-          ctx.toast('这条聊天已经有一场里世界了');
+          say(`里世界聊天已绑定《${host.chatFile || '当前聊天'}》`);
+        } else if (!options.silent) {
+          say('这条聊天已经有一场里世界了');
         }
         markDirty(ctx, chat);
         if (options.open !== false) {
-          ctx.home?.();
-          ctx.go('thread', { chatId: chat.id });
+          api.open(chat.id);
         }
         return chat;
       } catch (error) {
-        ctx.toast(error?.message || '里世界聊天没开成');
+        say(error?.message || '里世界聊天没开成');
         return null;
       }
     },
@@ -14676,8 +14698,7 @@ function installWorld(ctx) {
         }
         markDirty(ctx, chat);
         if (options.open !== false) {
-          ctx.home?.();
-          ctx.go('thread', { chatId: chat.id });
+          api.open(chat.id);
         }
         return chat;
       } catch (error) {
@@ -14689,8 +14710,16 @@ function installWorld(ctx) {
     open(chatId) {
       const chat = state.chats?.[chatId];
       if (!isWorldChat(chat)) return false;
-      ctx.home?.();
-      ctx.go('thread', { chatId: chat.id });
+      if (ctx.shell) {
+        ctx.shell.stack.length = 0;
+        ctx.shell.sheet = null;
+        ctx.shell.stack.push({ view: 'app-worldchat', params: {} });
+        ctx.shell.stack.push({ view: 'thread', params: { chatId: chat.id } });
+        ctx.rerender?.();
+      } else {
+        ctx.go('app-worldchat', {});
+        ctx.go('thread', { chatId: chat.id });
+      }
       return true;
     },
 
@@ -14804,6 +14833,7 @@ __mods["meme/icons.js"] = function(module, exports, __req){
 
 const P = {
   chat: '<path d="M4 11.5c0-3.6 3.6-6.5 8-6.5s8 2.9 8 6.5-3.6 6.5-8 6.5c-1 0-2-.1-2.9-.4"/><path d="M4 11.5c0 1.3.6 2.5 1.6 3.5L5 19l3.6-1.4"/>',
+  'chat-world': '<path d="M4 11c0-3.3 3.3-6 7.4-6 4.1 0 7.4 2.7 7.4 6s-3.3 6-7.4 6c-.9 0-1.8-.1-2.6-.4"/><path d="M4 11c0 1.2.5 2.3 1.4 3.2L4.8 17.6l3.2-1.2"/><path d="M17.2 5.2a2.6 2.6 0 1 0 1.6 4.6 3 3 0 0 1-1.6-4.6z"/>',
   contacts: '<circle cx="9" cy="9" r="3.2"/><path d="M3.6 18.4c.5-2.7 2.7-4.3 5.4-4.3s4.9 1.6 5.4 4.3"/><circle cx="17" cy="10" r="2.3"/><path d="M16 14.6c2.4 0 4.2 1.3 4.6 3.6"/>',
   phone: '<rect x="7" y="3.2" width="10" height="17.6" rx="3"/><path d="M10.4 18.2h3.2"/><path d="M10.2 6.2h3.6"/>',
   diary: '<path d="M5.5 4.5h9.5a2.5 2.5 0 0 1 2.5 2.5v12.5H8a2.5 2.5 0 0 1-2.5-2.5z"/><path d="M8.5 4.5v15"/><path d="M11.4 9h3.6M11.4 12.6h3.6"/>',
@@ -14860,6 +14890,7 @@ function icon(name, className = '') {
 /** 桌面图标配色：同族渐变，不用高饱和色块。 */
 const TINT = {
   chat: ['#bcd4f6', '#8fb9f2'],
+  worldchat: ['#d9cdf2', '#a992e8'],
   contacts: ['#cfc2f7', '#a892ee'],
   diary: ['#f8cfdf', '#f2a0c2'],
   settings: ['#cfd2e6', '#a8aed0'],
@@ -15861,6 +15892,7 @@ function createShell(options) {
       const chat = data.chat ? ctx.state.chats[data.chat] : recentChatOf(ctx.state);
       if (!chat) { ctx.toast('还没有聊天'); return; }
       shell.live = { inputValue: '', focus: false };
+      if (chat.world?.kind === 'world') ctx.go('app-worldchat', {});
       ctx.go('thread', { chatId: chat.id });
     },
     'home-page': (data) => { setHomePage(Number(data.page)); },
@@ -17917,29 +17949,31 @@ function settingsBody(ctx, chatId) {
 
 /* ------------------------------------------------------ 会话列表 */
 
-function listBody(ctx) {
+function listBody(ctx, mode = 'meta') {
   const state = ctx.state;
-  const chats = chatsOf(state).filter(chat => chat.messages.length || chat.unread || isWorldChat(chat));
-  const worldChats = chats.filter(isWorldChat);
-  const normalChats = chats.filter(chat => !isWorldChat(chat));
+  const worldMode = mode === 'world';
+  const chats = chatsOf(state).filter(chat => {
+    if (!chat.messages.length && !chat.unread && !isWorldChat(chat)) return false;
+    return worldMode ? isWorldChat(chat) : !isWorldChat(chat);
+  });
 
-  const row = (chat, world = false) => {
+  const rows = chats.map(chat => {
     const contact = contactById(state, chat.contactId);
     if (!contact) return '';
     const message = lastMessage(chat);
     const preview = message
       ? `${message.from === 'me' ? '我：' : ''}${messagePreview(message)}`
-      : (world ? '这条聊天还空着，先开口吧。' : '还没有消息，说点什么吧。');
-    const sub = world
+      : (worldMode ? '这条聊天还空着，先开口吧。' : '还没有消息，说点什么吧。');
+    const sub = worldMode
       ? `《${esc(chat.world.chatFile || '未命名聊天')}》 · ${esc(storyDateOf(chat))}`
       : esc(preview);
     return `
-      <button class="mp-row${world ? ' is-world' : ''}" data-act="open-thread" data-chat="${chat.id}" data-hold="chat-menu" type="button">
+      <button class="mp-row${worldMode ? ' is-world' : ''}" data-act="open-thread" data-chat="${chat.id}" data-hold="chat-menu" type="button">
         ${avatarHtml(contact.name, contact.avatar)}
         <div class="mp-row-main">
           <div class="mp-row-name">
             ${esc(contact.name)}
-            ${world ? '<span class="mp-pill world">里世界</span>' : ''}
+            ${worldMode ? '<span class="mp-pill world">里世界</span>' : ''}
             ${chat.pinned ? `<span class="mp-pill plain">${icon('pin')}</span>` : ''}
             ${contact.kind === 'group' ? '<span class="mp-pill plain">群</span>' : ''}
           </div>
@@ -17950,10 +17984,21 @@ function listBody(ctx) {
           ${chat.unread && !chat.muted ? `<span class="mp-badge-count">${chat.unread > 99 ? '99+' : chat.unread}</span>` : ''}
         </div>
       </button>`;
-  };
+  }).join('');
 
-  const worldRows = worldChats.map(chat => row(chat, true)).join('');
-  const normalRows = normalChats.map(chat => row(chat)).join('');
+  if (worldMode) {
+    return `
+      <div class="mp-page-body">
+        <div class="mp-world-app-head">
+          <div>
+            <div class="mp-world-app-title">里世界</div>
+            <div class="mp-world-app-sub">只连着酒馆里那几段聊天</div>
+          </div>
+          <button class="mp-icon-btn" data-act="world-new" type="button" aria-label="从当前酒馆聊天新建">${icon('plus')}</button>
+        </div>
+        ${rows || '<div class="mp-empty">还没有对应的里世界聊天。<br>在酒馆打开一段聊天，再打开手机就会自动进来。</div>'}
+      </div>`;
+  }
 
   return `
     <div class="mp-page-body">
@@ -17961,18 +18006,7 @@ function listBody(ctx) {
         <span style="flex:1"></span>
         <button class="mp-icon-btn" data-act="chat-new" type="button" aria-label="新建会话">${icon('plus')}</button>
       </div>
-      <div class="mp-list-section">
-        <div class="mp-list-head">
-          <span>里世界聊天</span>
-          <button class="mp-list-link" data-act="world-new" type="button">${icon('book')}从当前酒馆聊天新建</button>
-        </div>
-        <div class="mp-list-note">每条里世界聊天单独绑一份酒馆聊天记录，读那份记忆，也写回那份。</div>
-        ${worldRows || '<div class="mp-empty is-small">还没有里世界聊天。<br>先在酒馆打开一段聊天，再点右上角「从当前酒馆聊天新建」。</div>'}
-      </div>
-      <div class="mp-list-section">
-        <div class="mp-list-head"><span>Meta 聊天</span></div>
-        ${normalRows || '<div class="mp-empty is-small">还没有会话。<br>先去「通讯录」把角色加进来。</div>'}
-      </div>
+      ${rows || '<div class="mp-empty">还没有会话。<br>先去「通讯录」把角色加进来。</div>'}
     </div>`;
 }
 
@@ -18577,7 +18611,7 @@ const chatApp = {
 
   render(ctx) {
     activeThreadId = '';
-    return listBody(ctx);
+    return listBody(ctx, 'meta');
   },
 
   handle(ctx, act, data) {
@@ -18659,6 +18693,18 @@ const chatApp = {
 
     return false;
   },
+};
+
+/* 第二个聊天 App：只装里世界会话，和 Meta 聊天彻底分开。 */
+const worldChatApp = {
+  id: 'worldchat', name: '里世界', icon: 'chat-world',
+
+  render(ctx) {
+    activeThreadId = '';
+    return listBody(ctx, 'world');
+  },
+
+  handle: chatApp.handle,
 };
 
 /* ------------------------------------------------- 单角色聊天导出 / 导入 */
@@ -19530,6 +19576,7 @@ exports["cancelGeneration"] = cancelGeneration;
 exports["__resetGenerationsForTests"] = __resetGenerationsForTests;
 exports["turnMessages"] = turnMessages;
 exports["chatApp"] = chatApp;
+exports["worldChatApp"] = worldChatApp;
 exports["threadSettingsApp"] = threadSettingsApp;
 exports["threadApp"] = threadApp;
 };
@@ -29957,7 +30004,7 @@ const { createStore } = __req("meme/store.js");
 const { normalize, emptyState, demoState, syncTavernContacts, chatFor, chatsOf, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks, dayKey, theatersOf, setContactAvatar } = __req("meme/data.js");
 const { createShell, applyWall, applyLook } = __req("meme/shell.js");
 const { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost, countTextTokens, readLatestTavernChat, readOpenTavernChat } = __req("meme/host.js");
-const { chatApp, threadApp, threadSettingsApp } = __req("meme/apps/chat.js");
+const { chatApp, worldChatApp, threadApp, threadSettingsApp } = __req("meme/apps/chat.js");
 const { favoritesApp } = __req("meme/apps/favorites.js");
 const { photoApp } = __req("meme/apps/photo.js");
 const { buildMemoryContext } = __req("meme/memory.js");
@@ -29985,6 +30032,7 @@ const { parallelBranchApp } = __req("meme/apps/branch.js");
 
 const APPS = {
   'app-chat': chatApp,
+  'app-worldchat': worldChatApp,
   'app-favorites': favoritesApp,
   'photo-view': photoApp,
   'app-diary': diaryApp,
@@ -30035,6 +30083,7 @@ const DESKTOP_APPS = [
 
 const DOCK_APPS = [
   { id: 'chat', name: '聊天', icon: 'chat' },
+  { id: 'worldchat', name: '里世界', icon: 'chat-world' },
   { id: 'contacts', name: '通讯录', icon: 'contacts' },
   { id: 'diary', name: '日记', icon: 'diary' },
   { id: 'settings', name: '设置', icon: 'settings' },
@@ -30387,9 +30436,29 @@ function getState() {
 
 /* ------------------------------------------------------------ 打开界面 */
 
+/**
+ * 在酒馆聊天里打开手机时，直接落到“这段聊天对应的里世界聊天”。
+ * 不翻整台手机；只是把窗口栈设成 里世界列表 → 对应会话。
+ */
+async function enterWorldFromHost() {
+  if (!ctx?.world || !ctx?.shell) return false;
+  const chat = await ctx.world.createFromCurrent({ open: false, silent: true });
+  if (!chat) return false;
+  ctx.shell.stack.length = 0;
+  ctx.shell.sheet = null;
+  ctx.shell.stack.push({ view: 'app-worldchat', params: {} });
+  ctx.shell.stack.push({ view: 'thread', params: { chatId: chat.id } });
+  return true;
+}
+
 async function openMemePhone(options = {}) {
   await initMemePhone(options);
-  if (isOpen()) return rootEl;
+  if (isOpen()) {
+    try {
+      if (await enterWorldFromHost()) ctx.rerender();
+    } catch { /* 宿主读不到就留在当前页面 */ }
+    return rootEl;
+  }
 
   const state = store.get();
 
@@ -30525,8 +30594,9 @@ async function openMemePhone(options = {}) {
 
   shellApi = createShell({ root: rootEl, ctx, apps: APPS, desktopApps: DESKTOP_APPS, dockApps: DOCK_APPS });
 
-  /* 里世界聊天不是整机翻面：它只是聊天列表里一个绑了酒馆文件的普通会话。 */
+  /* 里世界是独立的第二个聊天 App；在酒馆里打开手机时直接落到当前聊天那一条。 */
   installWorld(ctx);
+  try { await enterWorldFromHost(); } catch { /* 没有宿主上下文就停在桌面 */ }
   shellApi.render();
 
   /* 主题与壁纸 */

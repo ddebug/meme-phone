@@ -19,7 +19,27 @@
 .mp-row:active { transform: scale(.988); }
 .mp-row + .mp-row { margin-top: 8px; }
 
-/* 里世界聊天：列表里单独一段，绑定哪份酒馆聊天直接写在副标题上。 */
+/* 里世界 App 自己的页头：不跟 Meta 聊天混在同一张列表里。 */
+.mp-world-app-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 3px 14px;
+}
+
+.mp-world-app-title {
+  font-size: calc(19px * var(--font-scale));
+  font-weight: 700;
+  letter-spacing: .03em;
+  color: var(--text-1);
+}
+
+.mp-world-app-sub {
+  margin-top: 2px;
+  font-size: calc(10.5px * var(--font-scale));
+  color: var(--text-3);
+}
+
 .mp-list-section { margin-top: 14px; }
 .mp-list-head {
   display: flex;

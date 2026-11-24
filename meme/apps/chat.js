@@ -668,29 +668,31 @@ function settingsBody(ctx, chatId) {
 
 /* ------------------------------------------------------ 会话列表 */
 
-function listBody(ctx) {
+function listBody(ctx, mode = 'meta') {
   const state = ctx.state;
-  const chats = chatsOf(state).filter(chat => chat.messages.length || chat.unread || isWorldChat(chat));
-  const worldChats = chats.filter(isWorldChat);
-  const normalChats = chats.filter(chat => !isWorldChat(chat));
+  const worldMode = mode === 'world';
+  const chats = chatsOf(state).filter(chat => {
+    if (!chat.messages.length && !chat.unread && !isWorldChat(chat)) return false;
+    return worldMode ? isWorldChat(chat) : !isWorldChat(chat);
+  });
 
-  const row = (chat, world = false) => {
+  const rows = chats.map(chat => {
     const contact = contactById(state, chat.contactId);
     if (!contact) return '';
     const message = lastMessage(chat);
     const preview = message
       ? `${message.from === 'me' ? '我：' : ''}${messagePreview(message)}`
-      : (world ? '这条聊天还空着，先开口吧。' : '还没有消息，说点什么吧。');
-    const sub = world
+      : (worldMode ? '这条聊天还空着，先开口吧。' : '还没有消息，说点什么吧。');
+    const sub = worldMode
       ? `《${esc(chat.world.chatFile || '未命名聊天')}》 · ${esc(storyDateOf(chat))}`
       : esc(preview);
     return `
-      <button class="mp-row${world ? ' is-world' : ''}" data-act="open-thread" data-chat="${chat.id}" data-hold="chat-menu" type="button">
+      <button class="mp-row${worldMode ? ' is-world' : ''}" data-act="open-thread" data-chat="${chat.id}" data-hold="chat-menu" type="button">
         ${avatarHtml(contact.name, contact.avatar)}
         <div class="mp-row-main">
           <div class="mp-row-name">
             ${esc(contact.name)}
-            ${world ? '<span class="mp-pill world">里世界</span>' : ''}
+            ${worldMode ? '<span class="mp-pill world">里世界</span>' : ''}
             ${chat.pinned ? `<span class="mp-pill plain">${icon('pin')}</span>` : ''}
             ${contact.kind === 'group' ? '<span class="mp-pill plain">群</span>' : ''}
           </div>
@@ -701,10 +703,21 @@ function listBody(ctx) {
           ${chat.unread && !chat.muted ? `<span class="mp-badge-count">${chat.unread > 99 ? '99+' : chat.unread}</span>` : ''}
         </div>
       </button>`;
-  };
+  }).join('');
 
-  const worldRows = worldChats.map(chat => row(chat, true)).join('');
-  const normalRows = normalChats.map(chat => row(chat)).join('');
+  if (worldMode) {
+    return `
+      <div class="mp-page-body">
+        <div class="mp-world-app-head">
+          <div>
+            <div class="mp-world-app-title">里世界</div>
+            <div class="mp-world-app-sub">只连着酒馆里那几段聊天</div>
+          </div>
+          <button class="mp-icon-btn" data-act="world-new" type="button" aria-label="从当前酒馆聊天新建">${icon('plus')}</button>
+        </div>
+        ${rows || '<div class="mp-empty">还没有对应的里世界聊天。<br>在酒馆打开一段聊天，再打开手机就会自动进来。</div>'}
+      </div>`;
+  }
 
   return `
     <div class="mp-page-body">
@@ -712,18 +725,7 @@ function listBody(ctx) {
         <span style="flex:1"></span>
         <button class="mp-icon-btn" data-act="chat-new" type="button" aria-label="新建会话">${icon('plus')}</button>
       </div>
-      <div class="mp-list-section">
-        <div class="mp-list-head">
-          <span>里世界聊天</span>
-          <button class="mp-list-link" data-act="world-new" type="button">${icon('book')}从当前酒馆聊天新建</button>
-        </div>
-        <div class="mp-list-note">每条里世界聊天单独绑一份酒馆聊天记录，读那份记忆，也写回那份。</div>
-        ${worldRows || '<div class="mp-empty is-small">还没有里世界聊天。<br>先在酒馆打开一段聊天，再点右上角「从当前酒馆聊天新建」。</div>'}
-      </div>
-      <div class="mp-list-section">
-        <div class="mp-list-head"><span>Meta 聊天</span></div>
-        ${normalRows || '<div class="mp-empty is-small">还没有会话。<br>先去「通讯录」把角色加进来。</div>'}
-      </div>
+      ${rows || '<div class="mp-empty">还没有会话。<br>先去「通讯录」把角色加进来。</div>'}
     </div>`;
 }
 
@@ -1328,7 +1330,7 @@ export const chatApp = {
 
   render(ctx) {
     activeThreadId = '';
-    return listBody(ctx);
+    return listBody(ctx, 'meta');
   },
 
   handle(ctx, act, data) {
@@ -1410,6 +1412,18 @@ export const chatApp = {
 
     return false;
   },
+};
+
+/* 第二个聊天 App：只装里世界会话，和 Meta 聊天彻底分开。 */
+export const worldChatApp = {
+  id: 'worldchat', name: '里世界', icon: 'chat-world',
+
+  render(ctx) {
+    activeThreadId = '';
+    return listBody(ctx, 'world');
+  },
+
+  handle: chatApp.handle,
 };
 
 /* ------------------------------------------------- 单角色聊天导出 / 导入 */

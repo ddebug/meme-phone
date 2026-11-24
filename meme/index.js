@@ -7,7 +7,7 @@ import { createStore } from './store.js';
 import { normalize, emptyState, demoState, syncTavernContacts, chatFor, chatsOf, llmPresetFor, replyContextFor, replyPresetFor, pushMessage, extrasEnabledFor, theaterPrompt, theaterKindFor, splitTheaterBlocks, dayKey, theatersOf, setContactAvatar } from './data.js';
 import { createShell, applyWall, applyLook } from './shell.js';
 import { readTavernCharacters, readCharacterBooks, setWorldEntryEnabled, readWorldBookNames, readUserAvatar, readTavernPersonas, readTavernCards, writeTavernPersona, readTavernApi, listTavernModels, generate, probeHost, countTextTokens, readLatestTavernChat, readOpenTavernChat } from './host.js';
-import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
+import { chatApp, worldChatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { favoritesApp } from './apps/favorites.js';
 import { photoApp } from './apps/photo.js';
 import { buildMemoryContext } from './memory.js';
@@ -35,6 +35,7 @@ import { parallelBranchApp } from './apps/branch.js';
 
 const APPS = {
   'app-chat': chatApp,
+  'app-worldchat': worldChatApp,
   'app-favorites': favoritesApp,
   'photo-view': photoApp,
   'app-diary': diaryApp,
@@ -85,6 +86,7 @@ const DESKTOP_APPS = [
 
 const DOCK_APPS = [
   { id: 'chat', name: '聊天', icon: 'chat' },
+  { id: 'worldchat', name: '里世界', icon: 'chat-world' },
   { id: 'contacts', name: '通讯录', icon: 'contacts' },
   { id: 'diary', name: '日记', icon: 'diary' },
   { id: 'settings', name: '设置', icon: 'settings' },
@@ -437,9 +439,29 @@ export function getState() {
 
 /* ------------------------------------------------------------ 打开界面 */
 
+/**
+ * 在酒馆聊天里打开手机时，直接落到“这段聊天对应的里世界聊天”。
+ * 不翻整台手机；只是把窗口栈设成 里世界列表 → 对应会话。
+ */
+async function enterWorldFromHost() {
+  if (!ctx?.world || !ctx?.shell) return false;
+  const chat = await ctx.world.createFromCurrent({ open: false, silent: true });
+  if (!chat) return false;
+  ctx.shell.stack.length = 0;
+  ctx.shell.sheet = null;
+  ctx.shell.stack.push({ view: 'app-worldchat', params: {} });
+  ctx.shell.stack.push({ view: 'thread', params: { chatId: chat.id } });
+  return true;
+}
+
 export async function openMemePhone(options = {}) {
   await initMemePhone(options);
-  if (isOpen()) return rootEl;
+  if (isOpen()) {
+    try {
+      if (await enterWorldFromHost()) ctx.rerender();
+    } catch { /* 宿主读不到就留在当前页面 */ }
+    return rootEl;
+  }
 
   const state = store.get();
 
@@ -575,8 +597,9 @@ export async function openMemePhone(options = {}) {
 
   shellApi = createShell({ root: rootEl, ctx, apps: APPS, desktopApps: DESKTOP_APPS, dockApps: DOCK_APPS });
 
-  /* 里世界聊天不是整机翻面：它只是聊天列表里一个绑了酒馆文件的普通会话。 */
+  /* 里世界是独立的第二个聊天 App；在酒馆里打开手机时直接落到当前聊天那一条。 */
   installWorld(ctx);
+  try { await enterWorldFromHost(); } catch { /* 没有宿主上下文就停在桌面 */ }
   shellApi.render();
 
   /* 主题与壁纸 */

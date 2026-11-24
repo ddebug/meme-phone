@@ -916,6 +916,7 @@ export function createShell(options) {
       const chat = data.chat ? ctx.state.chats[data.chat] : recentChatOf(ctx.state);
       if (!chat) { ctx.toast('还没有聊天'); return; }
       shell.live = { inputValue: '', focus: false };
+      if (chat.world?.kind === 'world') ctx.go('app-worldchat', {});
       ctx.go('thread', { chatId: chat.id });
     },
     'home-page': (data) => { setHomePage(Number(data.page)); },

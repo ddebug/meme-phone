@@ -8,7 +8,7 @@
 import { icon as ico, TINT } from './icons.js';
 import { PIXEL_BUNNY } from './theme-data.js';
 import {
-  unreadTotal, dayKey, chatsOf, contactById, lastMessage, messagePreview,
+  unreadTotal, dayKey, chatsOf, contactById,
 } from './data.js';
 
 export function esc(text) {
@@ -303,24 +303,15 @@ export function createShell(options) {
     ctx.save();
   }
 
-  function homePreview(chat) {
-    const last = lastMessage(chat);
-    if (!last) return '还没有消息';
-    const text = String(messagePreview(last) || '').replace(/\s+/g, ' ').trim();
-    if (!text) return last.image ? '[图片]' : '还没有消息';
-    return text.length > 22 ? `${text.slice(0, 22)}…` : text;
-  }
-
   function recentWidgetHtml(pageIndex, recentChat, recentContact) {
     const name = recentContact?.name || (recentChat ? '聊天' : '还没有聊天');
-    const preview = recentChat ? homePreview(recentChat) : '';
     const stamp = recentChat ? clockText(new Date(Number(recentChat.updatedAt) || Date.now())) : '';
     return `
       <button class="mp-home-widget mp-hw-recent" data-drag-id="widget-recent" data-page="${pageIndex}" data-act="open-recent"${recentChat ? ` data-chat="${esc(recentChat.id)}"` : ''} type="button" aria-label="最近聊天">
         <span class="mp-hw-top"><span class="mp-hw-kicker">最近聊天</span><span class="mp-hw-time">${esc(stamp)}</span></span>
         <span class="mp-hw-main">
           ${avatarHtml(name, recentContact?.avatar || '', 'mp-hw-avatar')}
-          <span class="mp-hw-copy"><span class="mp-hw-name">${esc(name)}</span><span class="mp-hw-preview">${esc(preview)}</span></span>
+          <span class="mp-hw-copy"><span class="mp-hw-name">${esc(name)}</span></span>
         </span>
       </button>`;
   }
@@ -332,7 +323,7 @@ export function createShell(options) {
         <span class="mp-hw-top"><span class="mp-hw-kicker">显示模式</span><span class="mp-hw-time">${night ? '夜间' : '日间'}</span></span>
         <span class="mp-hw-main">
           <span class="mp-hw-orb">${ico(night ? 'moon' : 'sun')}</span>
-          <span class="mp-hw-copy"><span class="mp-hw-name">${night ? '夜间模式' : '日间模式'}</span><span class="mp-hw-preview">${night ? '深色背景' : '浅色背景'}</span></span>
+          <span class="mp-hw-copy"><span class="mp-hw-name">${night ? '夜间模式' : '日间模式'}</span></span>
         </span>
       </button>`;
   }

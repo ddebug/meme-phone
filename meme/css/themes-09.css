@@ -36,7 +36,7 @@
 }
 
 .mp-root[data-mp-theme="night"] :is(.mp-hw-recent, .mp-hw-theme) .mp-hw-name { color: #fff; }
-.mp-root[data-mp-theme="night"] :is(.mp-hw-recent, .mp-hw-theme) :is(.mp-hw-kicker, .mp-hw-time, .mp-hw-preview) { color: rgba(255, 255, 255, .6); }
+.mp-root[data-mp-theme="night"] :is(.mp-hw-recent, .mp-hw-theme) :is(.mp-hw-kicker, .mp-hw-time) { color: rgba(255, 255, 255, .6); }
 .mp-root[data-mp-theme="night"] .mp-home-dot:not(.is-on)::before {
   background: rgba(255, 255, 255, .2);
 }

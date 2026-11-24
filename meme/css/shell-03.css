@@ -826,17 +826,28 @@
 
 .mp-dock .mp-app .mp-app-label { display: none; }
 
+/* iPhone 那颗 home indicator：颜色跟着底下画面自动反相（浅底出深条，深底出浅条） */
 .mp-home-bar {
   position: absolute;
-  bottom: 7px;
+  bottom: 8px;
   left: 50%;
-  width: 118px;
-  height: 4px;
+  width: 134px;
+  height: 5px;
   border-radius: 3px;
-  background: rgba(43, 41, 55, .26);
+  /* 用反相混合而不是固定色：壁纸 / 夜间 / 磨砂换肤都不用再单独配色 */
+  background: #f2f2f0;
+  opacity: .82;
+  mix-blend-mode: difference;
   transform: translateX(-50%);
+  transition: opacity .22s ease, transform .12s ease;
   z-index: 40;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mp-home-bar:active {
+  transform: translateX(-50%) scaleX(.94);
+  opacity: .62;
 }
 
 /* --------------------------------------------------------- 页面通用 */

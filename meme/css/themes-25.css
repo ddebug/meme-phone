@@ -118,7 +118,7 @@
 }
 
 .mp-root[data-mp-skin="frost"] .mp-home-bar {
-  background: rgba(28, 28, 30, .30);
+  opacity: .78;
 }
 
 /* ------------------------------------------------ 3. 桌面 / 面板 / 列表底 */
@@ -693,7 +693,7 @@
 }
 
 .mp-root[data-mp-skin="frost"][data-mp-theme="night"] .mp-home-bar {
-  background: rgba(255, 255, 255, .42);
+  opacity: .62;
 }
 
 /* frost 夜间面板与按钮 */

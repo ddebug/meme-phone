@@ -65,7 +65,7 @@
   color: var(--text);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .10);
 }
-.mp-root[data-mp-theme="night"] .mp-home-bar { background: rgba(236, 233, 247, .32); }
+.mp-root[data-mp-theme="night"] .mp-home-bar { opacity: .9; }
 .mp-root[data-mp-theme="night"] .mp-scrim {
   background: linear-gradient(180deg, rgba(10, 8, 20, .18) 0%, rgba(10, 8, 20, .32) 60%, rgba(10, 8, 20, .52) 100%);
 }

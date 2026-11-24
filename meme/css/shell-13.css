@@ -70,20 +70,20 @@
   box-shadow: 0 8px 18px rgba(120, 102, 230, .30);
 }
 
-/* 底部小横条：加宽点击区，也可上滑 */
+/* 底部小横条：iPhone 口径的宽度，点击区加宽，也可上滑 */
 .mp-home-bar {
-  width: 132px;
+  width: 134px;
   height: 5px;
-  bottom: 6px;
+  bottom: 8px;
 }
 
 .mp-home-bar::after {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: -8px;
+  bottom: -10px;
   transform: translateX(-50%);
-  width: 190px;
-  height: 44px;
+  width: 200px;
+  height: 46px;
 }
 

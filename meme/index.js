@@ -32,6 +32,7 @@ import { extrasApp, extrasSwitchApp, extraDetailApp, emojiApp,
 } from './apps/more.js';
 import { parallelApp } from './apps/parallel.js';
 import { parallelBranchApp, parallelSettingsApp, cancelParallelRun } from './apps/branch.js';
+import { migrateLegacyWorlds } from './legacy-world.js';
 
 const APPS = {
   'app-chat': chatApp,
@@ -400,6 +401,8 @@ export function initMemePhone(options = {}) {
     });
     const raw = await store.init();
     const state = normalize(raw || (demo ? demoState() : emptyState()));
+    /* 旧双世界存档：先把 metaPhone / worldPhones 里的聊天并回来，再落盘。 */
+    migrateLegacyWorlds(raw, state);
     store.replace(state);
 
     /* 第一次在酒馆里打开：把角色同步成联系人 */
@@ -445,12 +448,18 @@ export function getState() {
  */
 async function enterWorldFromHost() {
   if (!ctx?.world || !ctx?.shell) return false;
-  const chat = await ctx.world.createFromCurrent({ open: false, silent: true });
-  if (!chat) return false;
+  const located = await ctx.world.locateCurrent();
+  /* 不在酒馆里打开（预览/桌面）就保持原样，不强行跳到聊天。 */
+  if (!located?.available) return false;
   ctx.shell.stack.length = 0;
   ctx.shell.sheet = null;
-  ctx.shell.stack.push({ view: 'app-worldchat', params: {} });
-  ctx.shell.stack.push({ view: 'thread', params: { chatId: chat.id } });
+  if (located.chat) {
+    ctx.shell.stack.push({ view: 'app-worldchat', params: {} });
+    ctx.shell.stack.push({ view: 'thread', params: { chatId: located.chat.id } });
+    return true;
+  }
+  /* 当前聊天还没有里世界：回普通聊天列表。历史都在那里，别用一条新建的空里世界挡住。 */
+  ctx.shell.stack.push({ view: 'app-chat', params: {} });
   return true;
 }
 

@@ -113,6 +113,20 @@ export function installWorld(ctx) {
         .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0));
     },
 
+    /**
+     * 只找当前酒馆聊天对应的里世界，不新建。
+     * 打开手机时用这个：有就落进里世界；没有就回普通聊天列表，别凭空造一条空的把历史盖住。
+     */
+    async locateCurrent() {
+      try {
+        const host = await readOpenTavernChat();
+        if (!host.available) return { available: false, chat: null, host: null };
+        return { available: true, chat: findWorldChat(state, host.chatFile), host };
+      } catch {
+        return { available: false, chat: null, host: null };
+      }
+    },
+
     /** 在酒馆当前打开的那份聊天上开一条里世界聊天；同一份文件不会重复开。 */
     async createFromCurrent(options = {}) {
       const say = options.silent ? () => {} : message => ctx.toast(message);

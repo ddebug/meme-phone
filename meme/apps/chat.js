@@ -715,7 +715,7 @@ function listBody(ctx, mode = 'meta') {
           </div>
           <button class="mp-icon-btn" data-act="world-new" type="button" aria-label="从当前酒馆聊天新建">${icon('plus')}</button>
         </div>
-        ${rows || '<div class="mp-empty">还没有对应的里世界聊天。<br>在酒馆打开一段聊天，再打开手机就会自动进来。</div>'}
+        ${rows || '<div class="mp-empty">还没有对应的里世界聊天。<br>在酒馆打开一段聊天后，点右上角 + 新建。</div>'}
       </div>`;
   }
 

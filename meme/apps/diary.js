@@ -351,7 +351,7 @@ function threadDayRows(ctx, contactId, chat, statuses, latestDate, busy) {
   return `
     <div class="mp-group-label" style="margin-top:16px">按日期整理</div>
     <div class="mp-td-actions">
-      <button class="mp-btn" data-act="td-generate-selected" data-contact="${esc(contactId)}" type="button"${busy || !st.selected.size ? ' disabled' : ''}>${icon('spark')}整理勾选（${st.selected.size} 天）</button>
+      <button class="mp-btn" data-act="td-generate-selected" data-contact="${esc(contactId)}" type="button"${busy ? ' disabled' : ''}>${icon('spark')}整理勾选（${st.selected.size} 天）</button>
       <button class="mp-btn ghost" data-act="td-generate-pending" data-contact="${esc(contactId)}" type="button"${busy || !pending.length ? ' disabled' : ''}>全部待整理（${pending.length} 天）</button>
       <button class="mp-btn ghost" data-act="td-generate-all" data-contact="${esc(contactId)}" type="button"${busy || !overwritable.length ? ' disabled' : ''}>全部重写${overwritable.length ? `（${overwritable.length} 天）` : ''}</button>
     </div>
@@ -641,6 +641,7 @@ function handleThreadDiary(ctx, act, data, event) {
     return true;
   }
   if (act === 'td-generate-selected') {
+    if (!st.selected.size) { ctx.toast('先点日期左边的方框选几天'); return true; }
     requestThreadGeneration(ctx, contactId, [...st.selected]);
     return true;
   }

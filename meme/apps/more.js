@@ -9,10 +9,6 @@ import { contactsOf, contactById, extrasOf, THEATER_KINDS, normalizeTheaterKind,
 import { appointmentById, completeAppointment, respondAppointment } from '../behavior-domains.js';
 import { PIXEL_BUNNY } from '../theme-data.js';
 
-function head(title, sub) {
-  return `<div class="mp-subtitle" style="margin-top:2px">${esc(title)}${sub ? ` · ${esc(sub)}` : ''}</div>`;
-}
-
 /* --------------------------------------------------------- 小剧场 */
 
 let extrasFilter = 'all';
@@ -678,7 +674,6 @@ export const iconPickerApp = {
     return `
       <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}<span>返回</span></button><span style="flex:1"></span></div>
       <div class="mp-page-body">
-        ${head('更换图标', target.name)}
         <div class="mp-icon-preview">
           ${appTileMarkup(ctx.state, target, 'is-big')}
           <div><b>${esc(target.name)}</b><span>${image ? '当前是自定义图片' : '当前是内置图形'}</span></div>

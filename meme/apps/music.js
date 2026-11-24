@@ -788,11 +788,11 @@ export const musicApp = {
 
     return `
       <div class="mp-page-body mp-music">
-        <div class="mp-music-hero">
-          <button class="mp-icon-btn" data-act="music-import" type="button" aria-label="导入歌单">${icon('plus')}</button>
-        </div>
         ${playerHtml(ctx, ctx.state)}
-        <div class="mp-music-section-head"><b>我的歌单</b><span>${playlists.length ? `${playlists.length} 张` : '还没导入'}</span></div>
+        <div class="mp-music-section-head">
+          <b>我的歌单</b>
+          <span style="display:flex;align-items:center;gap:8px">${playlists.length ? `${playlists.length} 张` : '还没导入'}<button class="mp-icon-btn" data-act="music-import" type="button" aria-label="导入歌单">${icon('plus')}</button></span>
+        </div>
         ${cards || `
           <div class="mp-music-empty">
             <div class="mp-music-empty-art">${icon('music')}</div>
@@ -800,9 +800,6 @@ export const musicApp = {
             <span>粘贴网易云或汽水的歌单分享链接，歌名和封面会留在这里。</span>
             <button class="mp-btn accent" data-act="music-import" type="button">${icon('plus')}导入歌单</button>
           </div>`}
-        <div class="mp-music-note">
-          网易云公开歌单直接播放；汽水整张歌单都能导入。哪首放不出来，会自动按歌名换一个能放音源。
-        </div>
       </div>`;
   },
 

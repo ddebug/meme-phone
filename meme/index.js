@@ -90,7 +90,6 @@ const DOCK_APPS = [
   { id: 'chat', name: '聊天', icon: 'chat' },
   { id: 'worldchat', name: '里世界', icon: 'chat-world' },
   { id: 'contacts', name: '通讯录', icon: 'contacts' },
-  { id: 'diary', name: '日记', icon: 'diary' },
   { id: 'settings', name: '设置', icon: 'settings' },
 ];
 

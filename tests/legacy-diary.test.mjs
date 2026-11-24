@@ -11,27 +11,28 @@ function entry(text, createdAt = 0) {
   return { key: '', text, tags: [], auto: false, createdAt };
 }
 
-test('旧双世界存档：metaPhone 和 worldPhones 里缺的日记日期都会补回来', () => {
+test('全局日记不再恢复，旧世界线里的角色日记会补回来', () => {
   const raw = {
     version: 3,
     contacts: {},
     chats: {},
     diary: diary(),
-    legacyWorldsMerged: true, /* 聊天已经迁过，日记仍要单独跑 */
+    legacyWorldsMerged: true, /* 聊天已经迁过，角色日记仍要单独跑 */
     metaPhone: {
       data: {
-        diary: diary({
-          '2026-11-01': entry('Meta 线的日记', 1),
-        }),
+        diary: diary(
+          { '2026-11-01': entry('Meta 线的全局日记', 1) },
+          { c1: { '2026-11-01': entry('角色 A 的 Meta 日记', 1) } },
+        ),
       },
     },
     worldPhones: {
       w1: {
         data: {
-          diary: diary({
-            '2026-11-01': entry('里世界同一天的日记', 9),
-            '2026-11-03': entry('里世界的另一天', 3),
-          }),
+          diary: diary(
+            { '2026-11-03': entry('里世界的全局日记', 3) },
+            { c1: { '2026-11-01': entry('角色 A 的里世界日记', 9), '2026-11-03': entry('角色 A 的另一天', 3) } },
+          ),
         },
       },
     },
@@ -41,27 +42,36 @@ test('旧双世界存档：metaPhone 和 worldPhones 里缺的日记日期都会
 
   const changed = migrateLegacyDiaries(raw, state);
   assert.equal(changed, true);
-  assert.equal(Object.keys(state.diary.entries).length, 2);
-  assert.equal(state.diary.entries['2026-11-01'].text, 'Meta 线的日记');
-  assert.equal(state.diary.entries['2026-11-03'].text, '里世界的另一天');
+  /* 全局日记不恢复 */
+  assert.equal(Object.keys(state.diary.entries).length, 0);
+  /* 角色日记按联系人补回，已有正文的 11-01 用当前 Meta 那份 */
+  assert.equal(Object.keys(state.diary.contacts.c1).length, 2);
+  assert.equal(state.diary.contacts.c1['2026-11-01'].text, '角色 A 的 Meta 日记');
+  assert.equal(state.diary.contacts.c1['2026-11-03'].text, '角色 A 的另一天');
   assert.equal(state.legacyDiaryMerged, true);
 });
 
-test('同一天已经有正文就不覆盖，只补空日期', () => {
+test('角色日记同一天已经有正文就不覆盖，只补空日期', () => {
   const raw = {
     version: 3,
     contacts: {},
     chats: {},
-    diary: diary({ '2026-11-02': entry('当前这份', 5) }),
+    diary: diary({}, { c1: { '2026-11-02': entry('当前这份', 5) } }),
     worldPhones: {
-      w1: { data: { diary: diary({ '2026-11-02': entry('别的世界线', 99), '2026-11-04': entry('补进来的', 1) }) } },
+      w1: {
+        data: {
+          diary: diary({}, {
+            c1: { '2026-11-02': entry('别的世界线', 99), '2026-11-04': entry('补进来的', 1) },
+          }),
+        },
+      },
     },
   };
   const state = normalize(raw);
   const changed = migrateLegacyDiaries(raw, state);
   assert.equal(changed, true);
-  assert.equal(state.diary.entries['2026-11-02'].text, '当前这份');
-  assert.equal(state.diary.entries['2026-11-04'].text, '补进来的');
+  assert.equal(state.diary.contacts.c1['2026-11-02'].text, '当前这份');
+  assert.equal(state.diary.contacts.c1['2026-11-04'].text, '补进来的');
 });
 
 test('角色日记按联系人合并，缺的联系人整份补进来', () => {
@@ -106,11 +116,11 @@ test('没有旧日记快照不动存档；迁移只做一次', () => {
     contacts: {},
     chats: {},
     diary: diary(),
-    metaPhone: { data: { diary: diary({ '2026-11-01': entry('旧日记') }) } },
+    metaPhone: { data: { diary: diary({}, { c1: { '2026-11-01': entry('角色旧日记') } }) } },
   };
   const first = normalize(raw);
   assert.equal(migrateLegacyDiaries(raw, first), true);
   const persisted = JSON.parse(JSON.stringify(first));
   assert.equal(migrateLegacyDiaries(persisted, normalize(persisted)), false);
-  assert.equal(Object.keys(normalize(persisted).diary.entries).length, 1);
+  assert.equal(Object.keys(normalize(persisted).diary.contacts.c1).length, 1);
 });

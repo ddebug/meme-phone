@@ -197,32 +197,25 @@ function mergeDiaryEntries(target, source) {
 }
 
 function mergeDiary(target, source) {
-  if (!isMap(source)) return 0;
-  let added = 0;
-  target.enabled = target.enabled ?? source.enabled;
-  target.prompt = target.prompt || source.prompt;
-  target.pastOnly = target.pastOnly ?? source.pastOnly;
-  target.entries = isMap(target.entries) ? target.entries : {};
+  if (!isMap(source) || !isMap(source.contacts)) return 0;
   target.contacts = isMap(target.contacts) ? target.contacts : {};
-  added += mergeDiaryEntries(target.entries, source.entries);
-  if (isMap(source.contacts)) {
-    for (const [contactId, map] of Object.entries(source.contacts)) {
-      if (!contactId || !isMap(map)) continue;
-      if (!isMap(target.contacts[contactId])) {
-        target.contacts[contactId] = clone(map);
-        added += Object.keys(map).length;
-      } else {
-        added += mergeDiaryEntries(target.contacts[contactId], map);
-      }
+  let added = 0;
+  for (const [contactId, map] of Object.entries(source.contacts)) {
+    if (!contactId || !isMap(map)) continue;
+    if (!isMap(target.contacts[contactId])) {
+      target.contacts[contactId] = clone(map);
+      added += Object.keys(map).length;
+    } else {
+      added += mergeDiaryEntries(target.contacts[contactId], map);
     }
   }
   return added;
 }
 
 /**
- * 旧双世界存档里，日记也跟着世界线各存一份。新结构只有一份 diary，
- * 这里把 metaPhone / worldPhones 里缺的日期补进来；同一天已有正文的不覆盖。
- * 单独打 legacyDiaryMerged，已经迁过聊天的存档也会再跑一次日记。
+ * 旧双世界存档里，角色日记也跟着世界线各存一份（diary.contacts[contactId]）。
+ * 新结构只保留聊天里的角色日记，不再恢复全局日记；这里只把缺的角色日期补进来，
+ * 同一天已有正文的不覆盖。单独打 legacyDiaryMerged，已经迁过聊天的存档也会再跑一次。
  */
 export function migrateLegacyDiaries(raw, state) {
   if (!isMap(raw) || !isMap(state)) return false;

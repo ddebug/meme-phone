@@ -323,7 +323,7 @@ export function characterDetailHtml(ctx, card) {
       ${contact ? `
       <button class="mp-set-row" data-act="char-mem-open" data-id="${esc(contact.id)}" type="button">
         <span class="mp-set-ico">${icon('search')}</span>
-        <span class="mp-set-name">${esc(card.name)} 的记忆<small>看读到几段 / 几楼、多少字，也能换记忆方案</small></span>
+        <span class="mp-set-name">${esc(card.name)} 的记忆</span>
         <span style="color:var(--text-4)">${icon('chevron')}</span>
       </button>` : ''}
     </div>

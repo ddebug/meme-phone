@@ -554,7 +554,7 @@ function settingsBody(ctx, chatId) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-subtitle" style="margin-top:0">聊天设置 · 只改这个会话的开关和引用；角色卡、世界书是全局的，改会写到酒馆</div>
+      <div class="mp-subtitle" style="margin-top:0">聊天设置</div>
 
       <div class="mp-chat-set-head">
         ${avatarHtml(contact?.name || '?', contact?.avatar)}
@@ -568,7 +568,6 @@ function settingsBody(ctx, chatId) {
       <div class="mp-card" style="margin-top:12px">
         <div class="mp-card-title">这条会话实际用到的</div>
         ${effectiveLines.map(([label, value]) => `<div class="mp-card-sub">${esc(label)}：${esc(value)}</div>`).join('')}
-        <div class="mp-card-sub" style="color:var(--text-4)">这里就是现在生效的组合；下面的设置可以直接改这个会话。</div>
       </div>
 
       <div class="mp-group" style="margin-top:16px">

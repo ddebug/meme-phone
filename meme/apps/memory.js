@@ -249,8 +249,7 @@ function renderPage(ctx) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-subtitle" style="margin-top:0">酒馆记忆：读角色最新的酒馆聊天文件，有总结可切总结，没有就读最近原文</div>
-      <div class="mp-card-sub" style="padding:0 2px 2px">这一页只回答「从酒馆里拿什么给它看」。小手机自己的聊天历史在「AI 设置 · 上下文」，收藏和日记是另外两块，互不混用。</div>
+      <div class="mp-subtitle" style="margin-top:0">酒馆记忆</div>
 
       <div class="mp-group-head" style="margin-top:16px">
         <div class="mp-group-label">当前读取</div>
@@ -290,9 +289,7 @@ function renderPage(ctx) {
       <div class="mp-group-label" style="margin-top:16px">怎么读</div>
       <div class="mp-card">
         <div class="mp-card-title">层数</div>
-        <div class="mp-card-sub">一层就是酒馆里的一条消息。层数越多，模型记得越远，但占的上下文也越多。</div>
         <div class="mp-card-title" style="margin-top:12px">手机读法</div>
-        <div class="mp-card-sub">手机现在${memoryGlobalReadMode(state) === 'recent' ? '只读最近原文' : '总结优先，没有总结时读最近原文'}；这位角色单独切过的仍按上面的开关。</div>
       </div>
     </div>`;
 }

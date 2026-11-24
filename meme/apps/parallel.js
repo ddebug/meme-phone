@@ -197,13 +197,10 @@ export const parallelApp = {
     return `
       <div class="mp-page-body">
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <div class="mp-subtitle" style="margin-top:0;flex:1">平行时空 · 酒馆聊天的一条分支，只留在这台小手机</div>
+          <div class="mp-subtitle" style="margin-top:0;flex:1">平行时空</div>
           <button class="mp-icon-btn" data-act="branch-new" type="button" aria-label="从当前聊天开一场">${icon('plus')}</button>
         </div>
         ${cards || '<div class="mp-empty">还没有开过场。<br>先在酒馆打开一个聊天，再点右上角的「+」——会从那个聊天当前的最后一楼分出来，预设、角色卡、世界书和记忆都用酒馆原来那套。</div>'}
-        <div class="mp-card-sub" style="color:var(--text-4);margin-top:14px">
-          生成走酒馆自己的组装（预设 / 角色卡 / 世界书 / 记忆），回复只写进这里，不写回聊天文件，也不进未读。
-        </div>
       </div>`;
   },
 

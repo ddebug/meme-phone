@@ -101,7 +101,7 @@ export const settingsApp = {
 
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">设置 · meme-phone 0.1.0</div>
+        <div class="mp-subtitle" style="margin-top:0">设置</div>
 
         <div class="mp-group">
           <div class="mp-group-label">身份与外观</div>

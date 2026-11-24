@@ -10,7 +10,7 @@ import { esc, avatarHtml } from '../shell.js';
 import { walletBalance, userMembership, membershipLabel } from '../behavior-domains.js';
 
 function head(title, sub) {
-  return `<div class="mp-subtitle" style="margin-top:2px">${esc(title)} · ${esc(sub)}</div>`;
+  return `<div class="mp-subtitle" style="margin-top:2px">${esc(title)}${sub ? ` · ${esc(sub)}` : ''}</div>`;
 }
 
 function usersOf(state) {
@@ -69,7 +69,7 @@ export const userListApp = {
 
     return `
       <div class="mp-page-body">
-        ${head('用户', '跟酒馆同一份名单，改完写回酒馆')}
+        ${head('用户', '')}
 
         <div class="mp-draw-state${fromTavern ? ' is-on' : ''}">
           ${icon('contacts')}
@@ -85,7 +85,7 @@ export const userListApp = {
               <option value="pin"${mode === 'pin' ? ' selected' : ''}>固定一位${pinned ? ` · ${esc(pinned.name)}` : ''}</option>
             </select>${icon('chevron')}
           </div>
-          <div class="mp-subtitle" style="margin-top:6px;font-size:calc(11px * var(--font-scale))">${mode === 'follow' ? '酒馆换用户，小手机也会换。' : (pinned ? `现在固定用 ${esc(pinned.name)}，酒馆换人也不动。` : '挑一个人固定用。')}</div>
+          <div class="mp-subtitle" style="margin-top:6px;font-size:calc(11px * var(--font-scale))">${mode === 'follow' ? '' : (pinned ? `固定用 ${esc(pinned.name)}` : '')}</div>
         </div>
 
         <div class="mp-group">
@@ -229,7 +229,7 @@ export const userEditApp = {
             </button>
             <button class="mp-set-row" data-act="user-lore" data-key="${esc(user.key)}" type="button">
               <span class="mp-set-ico">${icon('book')}</span>
-              <span class="mp-set-name">世界书<small>选中这个人设时一起加载</small></span>
+              <span class="mp-set-name">世界书</span>
               <span class="mp-set-value">${esc(user.lorebook || '未绑定')}</span>
               ${icon('chevron')}
             </button>
@@ -245,7 +245,7 @@ export const userEditApp = {
           <div class="mp-group-box">
             <button class="mp-set-row" data-act="user-wallet" data-key="${esc(user.key)}" type="button">
               <span class="mp-set-ico">${icon('wallet')}</span>
-              <span class="mp-set-name">钱包<small>转账、红包、送会员都从余额扣</small></span>
+              <span class="mp-set-name">钱包</span>
               <span class="mp-set-value">¥${walletBalance(state).toFixed(2)}</span>
               ${icon('chevron')}
             </button>

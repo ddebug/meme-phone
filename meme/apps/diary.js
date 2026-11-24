@@ -116,7 +116,7 @@ function renderPage(ctx, params = {}) {
 
   return `
     <div class="mp-page-body">
-      <div class="mp-subtitle" style="margin-top:0">${contactId ? `${esc(contact?.name || 'TA')}的日记 · 只记录这个角色和你的聊天` : '日记 · 写过的日子会有小圆点'}</div>
+      <div class="mp-subtitle" style="margin-top:0">${contactId ? `${esc(contact?.name || 'TA')}的日记` : '日记'}</div>
       <div class="mp-month-bar">
         <button class="mp-icon-btn" data-act="diary-prev" data-contact="${esc(contactId)}" type="button" aria-label="上个月">${icon('back')}</button>
         <span class="mp-month">${target.getFullYear()} 年 ${target.getMonth() + 1} 月</span>
@@ -243,12 +243,12 @@ function threadSettingsBox(ctx, contactId) {
     <div class="mp-group-box" style="margin-top:10px">
       <button class="mp-set-row" data-act="td-toggle-replace" data-contact="${esc(contactId)}" type="button">
         <span class="mp-set-ico">${icon('book')}</span>
-        <span class="mp-set-name">用日记替换聊天<small>${enabled ? '现在开启：旧日期用日记替换原文；最近一天仍读原文' : '现在关闭：聊天上下文全部读原文'}</small></span>
+        <span class="mp-set-name">用日记替换聊天</span>
         <span class="mp-switch${enabled ? ' on' : ''}"></span>
       </button>
       <button class="mp-set-row" data-act="td-toggle-past-only" data-contact="${esc(contactId)}" type="button">
         <span class="mp-set-ico">${icon('clock')}</span>
-        <span class="mp-set-name">补旧日记不读后文<small>${pastOnly ? '现在开启：只发送到所选最后一天，再往后不进上下文' : '现在关闭：全部聊天都会发送，后文可能影响补写'}</small></span>
+        <span class="mp-set-name">补旧日记不读后文</span>
         <span class="mp-switch${pastOnly ? ' on' : ''}"></span>
       </button>
     </div>`;
@@ -384,7 +384,7 @@ function renderThreadPage(ctx, contactId) {
   if (!statuses.length) {
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记 · 按天整理聊天，只在这个角色里保存</div>
+        <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记</div>
         ${threadSettingsBox(ctx, contactId)}
         <div class="mp-td-toolbar">
           <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>
@@ -395,7 +395,7 @@ function renderThreadPage(ctx, contactId) {
   const target = parseMonth(st.month);
   return `
     <div class="mp-page-body">
-      <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记 · 按天整理聊天，只在这个角色里保存</div>
+      <div class="mp-subtitle" style="margin-top:0">${esc(contact.name)}的日记</div>
       ${threadSettingsBox(ctx, contactId)}
       <div class="mp-td-toolbar">
         <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>

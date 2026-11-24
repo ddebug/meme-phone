@@ -70,7 +70,7 @@ export const contactsApp = {
             ? `<button class="mp-icon-btn" data-act="char-search" type="button" aria-label="查角色">${icon('search')}</button>`
             : `<button class="mp-icon-btn" data-act="contact-add" type="button" aria-label="添加">${icon('plus')}</button>`}
         </div>
-        <div class="mp-subtitle">${tab === 'cards' ? '酒馆角色 · 酒馆里的角色卡，按卡片原样看；加进已添加就能开始聊天' : `已添加 · ${contacts.length} 位 · 只有这里的人才会出现在聊天里`}</div>
+        <div class="mp-subtitle">${tab === 'cards' ? '酒馆角色' : `已添加 · ${contacts.length} 位`}</div>
 
         <div class="mp-seg" style="margin:2px 0 12px">
           <button class="${tab === 'contacts' ? 'on' : ''}" data-act="contacts-tab" data-tab="contacts" type="button">已添加</button>

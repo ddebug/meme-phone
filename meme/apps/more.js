@@ -10,7 +10,7 @@ import { appointmentById, completeAppointment, respondAppointment } from '../beh
 import { PIXEL_BUNNY } from '../theme-data.js';
 
 function head(title, sub) {
-  return `<div class="mp-subtitle" style="margin-top:2px">${esc(title)} · ${esc(sub)}</div>`;
+  return `<div class="mp-subtitle" style="margin-top:2px">${esc(title)}${sub ? ` · ${esc(sub)}` : ''}</div>`;
 }
 
 /* --------------------------------------------------------- 小剧场 */
@@ -73,7 +73,7 @@ export const extrasApp = {
         </button>`;
       }).join('')}`).join('');
 
-    return `<div class="mp-page-body">${head('小剧场', '聊天之外的那些片段')}${filterBar}${cards || '<div class="mp-empty">这个类型还没有片段。<br>在加号菜单的「小剧场」里打开开关，聊完就会自动收到一段。</div>'}</div>`;
+    return `<div class="mp-page-body">${head('小剧场', '')}${filterBar}${cards || '<div class="mp-empty">这个类型还没有片段。<br>在加号菜单的「小剧场」里打开开关，聊完就会自动收到一段。</div>'}</div>`;
   },
 
   handle(ctx, act, data) {
@@ -151,13 +151,12 @@ export const extrasSwitchApp = {
 
     return `
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">小剧场 · 打开后，这一轮回复会让 AI 附一段小剧场；内容只进小剧场 App，不在聊天里显示</div>
+        <div class="mp-subtitle" style="margin-top:0">小剧场</div>
         ${kindPicker}
         <button class="mp-row" data-act="extras-toggle-all" type="button" style="width:100%;margin-top:10px">
           <span class="mp-set-ico">${icon('theater')}</span>
           <div class="mp-row-main">
             <div class="mp-row-name">全部打开</div>
-            <div class="mp-row-sub">一次打开或关闭所有角色</div>
           </div>
           <span class="mp-switch${allOn ? ' on' : ''}"></span>
         </button>
@@ -325,7 +324,7 @@ export const emojiApp = {
     const list = ctx.state.emoji;
     return `
       <div class="mp-page-body">
-        ${head('表情', '点一下就能贴到输入框')}
+        ${head('表情', '')}
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px">
           ${list.map(item => `
             <button class="mp-card" data-act="emoji-pick" data-id="${item.id}" type="button" style="margin:0;padding:12px 4px;text-align:center;border:0;font:inherit;cursor:pointer">
@@ -397,7 +396,7 @@ export const plansApp = {
     const statusText = { pending: '等回应', accepted: '已接受', rejected: '已拒绝', completed: '已完成' };
     return `
       <div class="mp-page-body">
-        ${head('计划', '要一起做的事')}
+        ${head('计划', '')}
         <div class="mp-group">
           <div class="mp-group-label">和角色的约定 · ${appointments.length}</div>
           <div class="mp-group-box">
@@ -704,7 +703,6 @@ export const iconPickerApp = {
         </div>
         <button class="mp-dress-link" data-act="icon-reset" type="button">${icon('refresh')}恢复这个 App 的默认图标</button>
         <input id="mpIconFile" data-app="${target.id}" type="file" accept="image/*" style="display:none">
-        <div class="mp-dress-note">图标会随小手机存档一起导出；建议选正方形、主体清楚的图。</div>
       </div>`;
   },
 
@@ -754,7 +752,7 @@ export const helpApp = {
   render() {
     return `
       <div class="mp-page-body">
-        ${head('帮助', '三分钟就能上手')}
+        ${head('帮助', '')}
         <div class="mp-card" style="font-size: calc(12.5px * var(--font-scale));line-height: calc(1.95 * var(--line-scale));color:var(--text-2)">
           <b style="color:var(--text)">桌面</b><br>
           左上是大字时钟和昨日日记，点它进日记。<br>

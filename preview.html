@@ -11695,13 +11695,8 @@ function normalize(raw) {
       legacy: Boolean(theater?.legacy),
     };
   }
-  /* v3：里世界聊天。旧版整机双世界的快照字段不再参与运行，读进来就丢掉。 */
+  /* v3：里世界聊天。旧版整机双世界的快照字段留在存档里，但运行层不再读。 */
   merged.version = Math.max(Number(merged.version) || 0, SCHEMA_VERSION);
-  delete merged.phoneSurface;
-  delete merged.activeWorldId;
-  delete merged.lastWorldId;
-  delete merged.worldPhones;
-  delete merged.metaPhone;
   Object.values(merged.chats).forEach(chat => {
     if (!chat || typeof chat !== 'object') return;
     if (chat.tavernFile) chat.tavernFile = String(chat.tavernFile).replace(/\.jsonl$/i, '');

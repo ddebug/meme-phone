@@ -8,7 +8,7 @@ import { icon } from '../icons.js';
 import { chatById, chatFor, contactById, dayKey, DEFAULT_DIARY_PROMPT, DIARY_SKIP_THRESHOLD } from '../data.js';
 import { esc } from '../shell.js';
 import {
-  diaryContextMode, diaryDayGroups, diaryDayStatuses, diaryFingerprint, diaryParamsFingerprint,
+  diaryContextMode, diaryDayGroups, diaryDayStatuses, diaryFingerprint, diaryNeedsWrite, diaryParamsFingerprint,
   diaryRoleEntries, parseDiaryResponse, removeDiaryEntry, saveDiaryEntry, setDiaryUseOriginal,
 } from '../diary.js';
 import { diaryTranscriptForMessages, estimateTokens, serializeMessage } from '../reply-context.js';
@@ -326,7 +326,7 @@ function threadDayRows(ctx, contactId, chat, statuses, latestDate, busy) {
   const st = threadState(ctx, contactId);
   const available = new Set(statuses.filter(item => item.status !== 'skipped').map(item => item.date));
   st.selected = new Set([...st.selected].filter(date => available.has(date)));
-  const pending = statuses.filter(item => item.status === 'pending');
+  const pending = statuses.filter(diaryNeedsWrite);
   const overwritable = statuses.filter(item => String(item.entry?.text || '').trim());
   const rows = statuses.slice().reverse().map(item => {
     const entry = item.entry;
@@ -338,7 +338,9 @@ function threadDayRows(ctx, contactId, chat, statuses, latestDate, busy) {
     const disabled = busy || item.status === 'skipped';
     return `
       <div class="mp-td-row">
-        <input class="mp-td-check" type="checkbox" data-act="td-select" data-contact="${esc(contactId)}" data-date="${item.date}"${st.selected.has(item.date) ? ' checked' : ''}${item.status === 'skipped' ? ' disabled' : ''} aria-label="选择 ${item.date}">
+        <label class="mp-td-check-hit" aria-label="选择 ${item.date}">
+          <input class="mp-td-check" type="checkbox" data-act="td-select" data-contact="${esc(contactId)}" data-date="${item.date}"${st.selected.has(item.date) ? ' checked' : ''}${item.status === 'skipped' ? ' disabled' : ''}>
+        </label>
         <div class="mp-td-main">
           <div class="mp-td-title">${Number(item.date.slice(5, 7))}月${Number(item.date.slice(8, 10))}日 <span class="mp-td-badge ${item.status}">${stateLabel}</span></div>
           <div class="mp-td-sub">${item.messageCount} 条 · ${esc(mode)} · 原文约 ${originalTokens} tk${summaryTokens ? ` · 日记约 ${summaryTokens} tk` : ''}</div>
@@ -396,7 +398,7 @@ function renderThreadPage(ctx, contactId) {
       ${threadSettingsBox(ctx, contactId)}
       <div class="mp-td-toolbar">
         <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>
-        <span class="mp-td-toolbar-note">${statuses.filter(item => item.status === 'pending').length} 天待整理</span>
+        <span class="mp-td-toolbar-note">${statuses.filter(diaryNeedsWrite).length} 天待整理</span>
       </div>
       <div class="mp-month-bar">
         <button class="mp-icon-btn" data-act="td-prev" data-contact="${esc(contactId)}" type="button" aria-label="上个月">${icon('back')}</button>
@@ -643,7 +645,7 @@ function handleThreadDiary(ctx, act, data, event) {
     return true;
   }
   if (act === 'td-generate-pending') {
-    requestThreadGeneration(ctx, contactId, diaryDayStatuses(state, chat).filter(item => item.status === 'pending').map(item => item.date));
+    requestThreadGeneration(ctx, contactId, diaryDayStatuses(state, chat).filter(diaryNeedsWrite).map(item => item.date));
     return true;
   }
   if (act === 'td-generate-run') {

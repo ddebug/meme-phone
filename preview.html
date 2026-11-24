@@ -2377,6 +2377,16 @@ body {
   box-shadow: var(--shadow-s);
 }
 
+.mp-td-check-hit {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  margin: -7px 0 -7px -7px;
+  cursor: pointer;
+}
+
 .mp-td-check {
   width: 16px;
   height: 16px;
@@ -11691,6 +11701,14 @@ function diaryDayStatuses(state, chat) {
   });
 }
 
+function diaryHasText(item) {
+  return Boolean(String(item?.entry?.text || '').trim());
+}
+
+function diaryNeedsWrite(item) {
+  return item?.status !== 'skipped' && !diaryHasText(item);
+}
+
 /** 这一天在上下文里实际会发什么：原文 / 日记。 */
 function diaryContextMode(state, chat, date, entry, dayMessages, latestDate = '') {
   if (state?.diary?.enabled === false) return '原文 · 日记替换已关闭';
@@ -11780,6 +11798,8 @@ exports["diaryParamsFingerprint"] = diaryParamsFingerprint;
 exports["diaryEntryIsCurrent"] = diaryEntryIsCurrent;
 exports["diaryEntryMismatch"] = diaryEntryMismatch;
 exports["diaryDayStatuses"] = diaryDayStatuses;
+exports["diaryHasText"] = diaryHasText;
+exports["diaryNeedsWrite"] = diaryNeedsWrite;
 exports["diaryContextMode"] = diaryContextMode;
 exports["parseDiaryResponse"] = parseDiaryResponse;
 exports["saveDiaryEntry"] = saveDiaryEntry;
@@ -16617,7 +16637,7 @@ const {
   chatHistoryFor, effectiveTavernHistory, pendingUserMessages, pendingUserCount, clearPendingMessages,
 } = __req("meme/data.js");
 const { memoryEffectiveSummary, memoryPresetTitle } = __req("meme/memory.js");
-const { diaryDayStatuses } = __req("meme/diary.js");
+const { diaryDayStatuses, diaryNeedsWrite } = __req("meme/diary.js");
 const { requestStats, estimateTokens, proactiveLead, serializeMessage } = __req("meme/reply-context.js");
 const { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } = __req("meme/chat-transfer.js");
 const { avatarHtml, chatAvatarHtml, esc, shortText, timeText } = __req("meme/shell.js");
@@ -17100,7 +17120,7 @@ function settingsBody(ctx, chatId) {
   const status = [mode, `${count} 条消息`, chat.pinned ? '置顶' : '', chat.muted ? '免打扰' : ''].filter(Boolean).join(' · ');
   const diaryStatuses = diaryDayStatuses(state, chat);
   const diaryWritten = diaryStatuses.filter(item => String(item.entry?.text || '').trim()).length;
-  const diaryPending = diaryStatuses.filter(item => item.status === 'pending').length;
+  const diaryPending = diaryStatuses.filter(diaryNeedsWrite).length;
   const diarySub = diaryWritten
     ? `${diaryWritten} 天已写${diaryPending ? ` · ${diaryPending} 天待整理` : ''}`
     : '按天记录这个角色和你的聊天';
@@ -19502,7 +19522,7 @@ const { icon } = __req("meme/icons.js");
 const { chatById, chatFor, contactById, dayKey, DEFAULT_DIARY_PROMPT, DIARY_SKIP_THRESHOLD } = __req("meme/data.js");
 const { esc } = __req("meme/shell.js");
 const {
-  diaryContextMode, diaryDayGroups, diaryDayStatuses, diaryFingerprint, diaryParamsFingerprint,
+  diaryContextMode, diaryDayGroups, diaryDayStatuses, diaryFingerprint, diaryNeedsWrite, diaryParamsFingerprint,
   diaryRoleEntries, parseDiaryResponse, removeDiaryEntry, saveDiaryEntry, setDiaryUseOriginal,
 } = __req("meme/diary.js");
 const { diaryTranscriptForMessages, estimateTokens, serializeMessage } = __req("meme/reply-context.js");
@@ -19820,7 +19840,7 @@ function threadDayRows(ctx, contactId, chat, statuses, latestDate, busy) {
   const st = threadState(ctx, contactId);
   const available = new Set(statuses.filter(item => item.status !== 'skipped').map(item => item.date));
   st.selected = new Set([...st.selected].filter(date => available.has(date)));
-  const pending = statuses.filter(item => item.status === 'pending');
+  const pending = statuses.filter(diaryNeedsWrite);
   const overwritable = statuses.filter(item => String(item.entry?.text || '').trim());
   const rows = statuses.slice().reverse().map(item => {
     const entry = item.entry;
@@ -19832,7 +19852,9 @@ function threadDayRows(ctx, contactId, chat, statuses, latestDate, busy) {
     const disabled = busy || item.status === 'skipped';
     return `
       <div class="mp-td-row">
-        <input class="mp-td-check" type="checkbox" data-act="td-select" data-contact="${esc(contactId)}" data-date="${item.date}"${st.selected.has(item.date) ? ' checked' : ''}${item.status === 'skipped' ? ' disabled' : ''} aria-label="选择 ${item.date}">
+        <label class="mp-td-check-hit" aria-label="选择 ${item.date}">
+          <input class="mp-td-check" type="checkbox" data-act="td-select" data-contact="${esc(contactId)}" data-date="${item.date}"${st.selected.has(item.date) ? ' checked' : ''}${item.status === 'skipped' ? ' disabled' : ''}>
+        </label>
         <div class="mp-td-main">
           <div class="mp-td-title">${Number(item.date.slice(5, 7))}月${Number(item.date.slice(8, 10))}日 <span class="mp-td-badge ${item.status}">${stateLabel}</span></div>
           <div class="mp-td-sub">${item.messageCount} 条 · ${esc(mode)} · 原文约 ${originalTokens} tk${summaryTokens ? ` · 日记约 ${summaryTokens} tk` : ''}</div>
@@ -19890,7 +19912,7 @@ function renderThreadPage(ctx, contactId) {
       ${threadSettingsBox(ctx, contactId)}
       <div class="mp-td-toolbar">
         <button class="mp-btn ghost" data-act="td-prompt" data-contact="${esc(contactId)}" type="button">${icon('brush')}日记提示词</button>
-        <span class="mp-td-toolbar-note">${statuses.filter(item => item.status === 'pending').length} 天待整理</span>
+        <span class="mp-td-toolbar-note">${statuses.filter(diaryNeedsWrite).length} 天待整理</span>
       </div>
       <div class="mp-month-bar">
         <button class="mp-icon-btn" data-act="td-prev" data-contact="${esc(contactId)}" type="button" aria-label="上个月">${icon('back')}</button>
@@ -20137,7 +20159,7 @@ function handleThreadDiary(ctx, act, data, event) {
     return true;
   }
   if (act === 'td-generate-pending') {
-    requestThreadGeneration(ctx, contactId, diaryDayStatuses(state, chat).filter(item => item.status === 'pending').map(item => item.date));
+    requestThreadGeneration(ctx, contactId, diaryDayStatuses(state, chat).filter(diaryNeedsWrite).map(item => item.date));
     return true;
   }
   if (act === 'td-generate-run') {

@@ -1190,6 +1190,16 @@
   box-shadow: var(--shadow-s);
 }
 
+.mp-td-check-hit {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  margin: -7px 0 -7px -7px;
+  cursor: pointer;
+}
+
 .mp-td-check {
   width: 16px;
   height: 16px;

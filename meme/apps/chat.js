@@ -12,7 +12,7 @@ import {
   chatHistoryFor, effectiveTavernHistory, pendingUserMessages, pendingUserCount, clearPendingMessages,
 } from '../data.js';
 import { memoryEffectiveSummary, memoryPresetTitle } from '../memory.js';
-import { diaryDayStatuses } from '../diary.js';
+import { diaryDayStatuses, diaryNeedsWrite } from '../diary.js';
 import { requestStats, estimateTokens, proactiveLead, serializeMessage } from '../reply-context.js';
 import { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } from '../chat-transfer.js';
 import { avatarHtml, chatAvatarHtml, esc, shortText, timeText } from '../shell.js';
@@ -495,7 +495,7 @@ function settingsBody(ctx, chatId) {
   const status = [mode, `${count} 条消息`, chat.pinned ? '置顶' : '', chat.muted ? '免打扰' : ''].filter(Boolean).join(' · ');
   const diaryStatuses = diaryDayStatuses(state, chat);
   const diaryWritten = diaryStatuses.filter(item => String(item.entry?.text || '').trim()).length;
-  const diaryPending = diaryStatuses.filter(item => item.status === 'pending').length;
+  const diaryPending = diaryStatuses.filter(diaryNeedsWrite).length;
   const diarySub = diaryWritten
     ? `${diaryWritten} 天已写${diaryPending ? ` · ${diaryPending} 天待整理` : ''}`
     : '按天记录这个角色和你的聊天';

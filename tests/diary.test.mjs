@@ -7,6 +7,7 @@ import {
   diaryContextMessages,
   diaryDayGroups,
   diaryDayStatuses,
+  diaryNeedsWrite,
   diaryEntryMismatch,
   diaryParamsFingerprint,
   parseDiaryResponse,
@@ -180,6 +181,15 @@ test('diaryDayStatuses：跳过、待整理、已整理按原文指纹判定', (
   assert.equal(diaryDayStatuses(state, chat)[0].status, 'summarized');
   state.diary.contacts.c1['2026-11-09'] = { text: '旧正文', sourceFingerprint: '旧指纹' };
   assert.equal(diaryDayStatuses(state, chat)[0].status, 'summarized');
+});
+
+test('diaryNeedsWrite 只算没有正文的日期，已整理和跳过都不进全部待整理', () => {
+  const messages = Array.from({ length: DIARY_SKIP_THRESHOLD + 1 }, (_, i) => msg('2026-11-11', { id: `n${i}`, text: `第${i}句` }));
+  const state = { contacts: { c1: { name: '沈砚' } }, settings: { user: { name: '我' } }, users: [], characters: [], diary: { prompt: 'p', contacts: { c1: {} } } };
+  const chat = { contactId: 'c1', messages };
+  assert.equal(diaryNeedsWrite(diaryDayStatuses(state, chat)[0]), true);
+  state.diary.contacts.c1['2026-11-11'] = { text: '已有日记' };
+  assert.equal(diaryNeedsWrite(diaryDayStatuses(state, chat)[0]), false);
 });
 
 test('diaryEntryMismatch 说明上下文为什么没替换，但已有正文仍显示已整理', () => {

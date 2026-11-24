@@ -118,6 +118,14 @@ export function diaryDayStatuses(state, chat) {
   });
 }
 
+export function diaryHasText(item) {
+  return Boolean(String(item?.entry?.text || '').trim());
+}
+
+export function diaryNeedsWrite(item) {
+  return item?.status !== 'skipped' && !diaryHasText(item);
+}
+
 /** 这一天在上下文里实际会发什么：原文 / 日记。 */
 export function diaryContextMode(state, chat, date, entry, dayMessages, latestDate = '') {
   if (state?.diary?.enabled === false) return '原文 · 日记替换已关闭';

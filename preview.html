@@ -30229,7 +30229,11 @@ function makeAi(getState) {
     const ctxSettings = replyContextFor(state, chat);
     /* 0 = 不限制：酒馆记忆和手机历史都按全量送，不再用本地预算截断。 */
     const memoryLimit = 0;
-    const storyBlock = ctxSettings.memory ? await story(state, chat, memoryLimit) : { text: '' };
+    /* Meta 手机按设计完全不碰酒馆记忆：连读都不读，不是读完再丢掉。 */
+    const isMetaPhone = state.phoneSurface === 'meta';
+    const storyBlock = !isMetaPhone && ctxSettings.memory
+      ? await story(state, chat, memoryLimit)
+      : { text: '' };
     const theaterKind = theaterKindFor(state);
     const wantsTheater = !options.proactive && extrasEnabledFor(state, contact?.id);
     const built = await buildReplyMessages(state, chat, contact, {

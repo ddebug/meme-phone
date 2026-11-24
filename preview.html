@@ -2125,7 +2125,7 @@ body {
   flex: 1;
   min-height: 38px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 4px;
   padding: 3px 3px 3px 12px;
   border-radius: 19px;
@@ -2138,7 +2138,8 @@ body {
   box-shadow: inset 0 0 0 1px rgba(142, 123, 242, .38), var(--shadow-s);
 }
 
-.mp-compose-box input {
+.mp-compose-box input,
+.mp-compose-box textarea {
   flex: 1;
   min-width: 0;
   border: 0;
@@ -2146,10 +2147,29 @@ body {
   background: none;
   font: inherit;
   font-size: calc(13.5px * var(--font-scale));
+  line-height: 1.45;
   color: var(--text);
 }
 
-.mp-compose-box input::placeholder { color: var(--text-4); }
+/* 输入框随内容长高：超过约 5 行就在框里滚，发出去的长消息也能看全 */
+.mp-root .mp-compose-box textarea {
+  display: block;
+  padding: 5px 0 6px;
+  max-height: 104px;
+  resize: none;
+  overflow-y: hidden;
+  word-break: break-word;
+  scrollbar-width: none;
+  /* 覆盖全局输入框底色：输入区要跟外面那颗白胶囊同色，别叠一层灰 */
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none;
+}
+
+.mp-compose-box textarea::-webkit-scrollbar { display: none; }
+
+.mp-compose-box input::placeholder,
+.mp-compose-box textarea::placeholder { color: var(--text-4); }
 
 .mp-sq-btn {
   width: 34px;
@@ -16263,7 +16283,7 @@ function createShell(options) {
     const prevView = shell.stack[shell.stack.length - 1]?.view || '';
     const prevScroll = root.querySelector('.mp-page-body')?.scrollTop || 0;
     /* 重绘前记下输入框的光标/选区，重绘后放回原位，别让正在打的字跳到末尾 */
-    const prevInput = root.querySelector('.mp-compose-box input');
+    const prevInput = root.querySelector('.mp-compose-box textarea');
     const prevSel = prevInput && root.ownerDocument?.activeElement === prevInput
       ? { start: prevInput.selectionStart, end: prevInput.selectionEnd, dir: prevInput.selectionDirection }
       : null;
@@ -16304,6 +16324,7 @@ function createShell(options) {
       </div>`;
 
     restoreLive(prevSel);
+    root.querySelectorAll('.mp-compose-box textarea').forEach(growComposer);
     shell.improveSendState();
     /* 文字弹层打开后把光标放进去，键盘能直接输入；不抢正在编辑的输入框焦点 */
     if (shell.sheet?.kind === 'text') {
@@ -16317,11 +16338,25 @@ function createShell(options) {
     if (shell.sheet) shell.sheetAnimated = true;
   }
 
+  /* 单行输入框随内容长高：超过 5 行就开始自己滚，不把整页顶飞 */
+  function growComposer(el) {
+    if (!el || el.tagName !== 'TEXTAREA') return;
+    const cs = getComputedStyle(el);
+    const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const max = 104 - pad;
+    el.style.height = '0px';
+    const need = Math.max(0, (el.scrollHeight || 0) - pad);
+    el.style.height = `${Math.min(need, max)}px`;
+    el.style.overflowY = need > max ? 'auto' : 'hidden';
+  }
+  shell.growComposer = growComposer;
+
   function restoreLive(prevSel = null) {
-    const input = root.querySelector('.mp-compose-box input');
+    const input = root.querySelector('.mp-compose-box textarea');
     if (input && shell.live.inputValue) {
       input.value = shell.live.inputValue;
       shell.improveSendState();
+      growComposer(input);
       if (shell.live.focus) {
         input.focus();
         const len = input.value.length;
@@ -16338,7 +16373,7 @@ function createShell(options) {
 
   shell.improveSendState = function improveSendState() {
     const button = root.querySelector('.mp-send');
-    const input = root.querySelector('.mp-compose-box input');
+    const input = root.querySelector('.mp-compose-box textarea');
     if (!button || !input) return;
     const hasText = Boolean(input.value.trim());
     const busy = button.dataset.busy === '1';
@@ -16694,10 +16729,11 @@ function createShell(options) {
     const entry = shell.stack[shell.stack.length - 1];
     const app = entry ? apps[entry.view] : null;
     if (app && typeof app.onInput === 'function' && app.onInput(ctx, event)) return;
-    const input = event.target.closest('.mp-compose-box input');
+    const input = event.target.closest('.mp-compose-box textarea');
     if (!input) return;
     shell.live.inputValue = input.value;
     shell.improveSendState();
+    growComposer(input);
     if (entry && ctx.onDraft) ctx.onDraft(entry, input.value);
   });
 
@@ -16710,13 +16746,13 @@ function createShell(options) {
 
   root.addEventListener('focusin', event => {
     if (event.target.closest('input, textarea')) shell.typing = true;
-    if (event.target.closest('.mp-compose-box input')) shell.live.focus = true;
+    if (event.target.closest('.mp-compose-box textarea')) shell.live.focus = true;
     if (event.target.closest('input, textarea')) scheduleLayout();
   });
 
   root.addEventListener('focusout', event => {
     if (event.target.closest('input, textarea')) shell.typing = false;
-    if (event.target.closest('.mp-compose-box input')) {
+    if (event.target.closest('.mp-compose-box textarea')) {
       shell.live.focus = false;
       /* 键盘收起后视口高度恢复，按真实窗口重新对一次缩放基准；延迟等收起动画结束 */
       setTimeout(() => { if (!shell.typing) refreshViewport(); }, 120);
@@ -16735,7 +16771,10 @@ function createShell(options) {
       if (shell.stack.length) { ctx.back(); return; }
       ctx.onClose?.();
     }
-    if (event.key === 'Enter' && event.target.closest('.mp-compose-box input')) {
+    if (event.key === 'Enter' && event.target.closest('.mp-compose-box textarea')) {
+      /* Enter 发送；Shift+Enter 换一行，长句可以在输入框里自己分段 */
+      if (event.shiftKey) return;
+      event.preventDefault();
       const send = root.querySelector('.mp-send');
       if (send) send.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     }
@@ -17409,9 +17448,9 @@ __mods["meme/chat-transfer.js"] = function(module, exports, __req){
 /**
  * meme-phone · 单角色聊天记录导出 / 导入
  *
- * 只处理一个会话（一个角色）的消息，不包含联系人、角色卡、记忆、预设或 API 配置。
- * 导入按消息 ID 合并，重复消息跳过，不覆盖当前聊天。
- * 同时兼容 acsus-phone-standalone 的单个角色导出文件。
+ * 只处理一个会话（一个角色）的消息和该角色名下的日记，不包含联系人、角色卡、
+ * 全局日记、记忆、预设或 API 配置。导入按消息 ID / 日记日期合并，已存在的跳过，
+ * 不覆盖当前聊天和现有日记。同时兼容 acsus-phone-standalone 的单个角色导出文件。
  */
 
 const { fromAcsusMessage } = __req("meme/behavior.js");
@@ -17425,6 +17464,7 @@ const MAX_CHAT_TRANSFER_MESSAGES = 50000;
 const MAX_VALUE_DEPTH = 12;
 const BLOCKED_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 const FROM_VALUES = new Set(['me', 'them', 'system']);
+const DIARY_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ACSUS_BEHAVIOR_KINDS = new Set([
   'transfer', 'redpacket', 'gift-membership', 'buy-membership', 'plan', 'plan-story',
   'friend-request', 'friend-added', 'friend-deleted', 'signature',
@@ -17505,15 +17545,63 @@ function exportMessageId(message, chatId, index) {
   return `m_export_${safeKeyPart(chatId, 'chat')}_${index}_${at}`;
 }
 
+function normalizeDiaryNumber(value) {
+  return Number.isFinite(Number(value)) ? Number(value) : null;
+}
+
+/** 导出 / 导入共用的日记条目清洗：只留白名单字段，日期必须合法。 */
+function normalizeDiaryEntry(entry, { index, contactId }) {
+  if (!isRecord(entry)) throw new TypeError(`日记第 ${index + 1} 条不是对象`);
+  const cleaned = cloneJsonValue(entry);
+  const date = String(cleaned.date || cleaned.key || '').trim();
+  if (!DIARY_DATE_RE.test(date)) throw new TypeError(`日记第 ${index + 1} 条日期无效`);
+
+  const tags = Array.isArray(cleaned.tags)
+    ? cleaned.tags.map(tag => String(tag ?? ''))
+    : [];
+
+  return {
+    date,
+    text: String(cleaned.text ?? '').trim(),
+    tags,
+    auto: cleaned.auto !== false,
+    useOriginal: cleaned.useOriginal === true,
+    sourceFingerprint: String(cleaned.sourceFingerprint || ''),
+    paramsFingerprint: String(cleaned.paramsFingerprint || ''),
+    fromTime: normalizeDiaryNumber(cleaned.fromTime),
+    toTime: normalizeDiaryNumber(cleaned.toTime),
+    messageCount: normalizeDiaryNumber(cleaned.messageCount),
+    createdAt: normalizeDiaryNumber(cleaned.createdAt),
+    updatedAt: normalizeDiaryNumber(cleaned.updatedAt),
+    contactId: String(contactId || ''),
+  };
+}
+
+/**
+ * 把角色名下的日记条目（date -> entry 映射）清洗成可导出的数组。
+ *
+ * @param {Object} [diaryEntries]
+ */
+function exportDiaryEntries(diaryEntries) {
+  if (!isRecord(diaryEntries)) return [];
+  return Object.entries(diaryEntries)
+    .map(([key, entry], index) => normalizeDiaryEntry(
+      { ...(isRecord(entry) ? entry : {}), date: String(entry?.date || key) },
+      { index },
+    ))
+    .sort((left, right) => left.date.localeCompare(right.date));
+}
+
 /**
  * 构造当前会话的导出包。
  *
  * @param {Object} options
  * @param {Object} options.chat
  * @param {Object} options.contact
+ * @param {Object} [options.diaryEntries] 该角色名下的日记映射（date -> entry）；不传则不带日记
  * @param {string} [options.exportedAt]
  */
-function createChatExport({ chat, contact, exportedAt = new Date().toISOString() }) {
+function createChatExport({ chat, contact, diaryEntries, exportedAt = new Date().toISOString() }) {
   if (!isRecord(chat)) throw new TypeError('缺少会话信息');
   if (!Array.isArray(chat.messages)) throw new TypeError('会话缺少消息数组');
   if (!isRecord(contact) || !contact.id || !contact.name) throw new TypeError('缺少角色信息');
@@ -17535,6 +17623,8 @@ function createChatExport({ chat, contact, exportedAt = new Date().toISOString()
     return cleaned;
   });
 
+  const diary = exportDiaryEntries(diaryEntries);
+
   return {
     format: MEME_CHAT_FORMAT,
     version: MEME_CHAT_VERSION,
@@ -17546,6 +17636,8 @@ function createChatExport({ chat, contact, exportedAt = new Date().toISOString()
     },
     messageCount: messages.length,
     messages,
+    diaryCount: diary.length,
+    diary,
   };
 }
 
@@ -17685,6 +17777,7 @@ function convertAcsusPackage(parsed, exportedAt) {
     character,
     messageCount: messages.length,
     messages,
+    diary: [],
     source: 'acsus',
   };
 }
@@ -17707,6 +17800,15 @@ function validateMemePackage(parsed, exportedAt) {
     index,
   }));
 
+  const rawDiary = Array.isArray(parsed.diary) ? parsed.diary : [];
+  if (parsed.diaryCount !== undefined && parsed.diaryCount !== rawDiary.length) {
+    throw new TypeError('日记数量与 diaryCount 不一致，文件可能不完整');
+  }
+  const diary = rawDiary.map((entry, index) => normalizeDiaryEntry(entry, {
+    index,
+    contactId: character.id,
+  }));
+
   return {
     format: MEME_CHAT_FORMAT,
     version: MEME_CHAT_VERSION,
@@ -17714,6 +17816,8 @@ function validateMemePackage(parsed, exportedAt) {
     character,
     messageCount: messages.length,
     messages,
+    diaryCount: diary.length,
+    diary,
     source: 'meme',
   };
 }
@@ -17785,6 +17889,38 @@ function mergeChatHistory(currentMessages, importedMessages) {
   };
 }
 
+/**
+ * 合并日记条目，按日期去重，已有日期不覆盖；直接写回传入的当前映射。
+ *
+ * @param {Object} currentEntries 当前角色日记映射（date -> entry）
+ * @param {Array<Object>} importedEntries 导入的日记数组（已清洗）
+ * @param {string} [contactId] 落到目标角色名下
+ */
+function mergeDiaryEntries(currentEntries, importedEntries, contactId = '') {
+  if (!isRecord(currentEntries)) throw new TypeError('当前日记映射不是对象');
+  if (!Array.isArray(importedEntries)) throw new TypeError('导入日记不是数组');
+
+  let addedCount = 0;
+  let skippedCount = 0;
+  for (const entry of importedEntries) {
+    if (!isRecord(entry) || typeof entry.date !== 'string' || !entry.date) {
+      throw new TypeError('导入日记缺少日期');
+    }
+    if (currentEntries[entry.date]) {
+      skippedCount += 1;
+      continue;
+    }
+    currentEntries[entry.date] = {
+      ...entry,
+      key: entry.date,
+      contactId: String(contactId || entry.contactId || ''),
+    };
+    addedCount += 1;
+  }
+
+  return { entries: currentEntries, addedCount, skippedCount };
+}
+
 exports["MEME_CHAT_FORMAT"] = MEME_CHAT_FORMAT;
 exports["MEME_CHAT_VERSION"] = MEME_CHAT_VERSION;
 exports["ACSUS_CHAT_FORMAT"] = ACSUS_CHAT_FORMAT;
@@ -17793,6 +17929,7 @@ exports["MAX_CHAT_TRANSFER_MESSAGES"] = MAX_CHAT_TRANSFER_MESSAGES;
 exports["createChatExport"] = createChatExport;
 exports["parseChatTransferText"] = parseChatTransferText;
 exports["mergeChatHistory"] = mergeChatHistory;
+exports["mergeDiaryEntries"] = mergeDiaryEntries;
 };
 __mods["meme/apps/chat.js"] = function(module, exports, __req){
 /**
@@ -17809,9 +17946,9 @@ const {
   chatHistoryFor, effectiveTavernHistory, pendingUserMessages, pendingUserCount, clearPendingMessages,
 } = __req("meme/data.js");
 const { memoryEffectiveSummary, memoryPresetTitle } = __req("meme/memory.js");
-const { diaryDayStatuses, diaryFingerprint, diaryNeedsWrite, diaryParamsFingerprint } = __req("meme/diary.js");
+const { diaryDayStatuses, diaryFingerprint, diaryNeedsWrite, diaryParamsFingerprint, diaryRoleEntries } = __req("meme/diary.js");
 const { requestStats, estimateTokens, proactiveLead, serializeMessage } = __req("meme/reply-context.js");
-const { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } = __req("meme/chat-transfer.js");
+const { createChatExport, parseChatTransferText, mergeChatHistory, mergeDiaryEntries, MAX_CHAT_TRANSFER_BYTES } = __req("meme/chat-transfer.js");
 const { avatarHtml, chatAvatarHtml, esc, shortText, timeText } = __req("meme/shell.js");
 const { isWorldChat, storyDateOf } = __req("meme/world.js");
 const { renderBehaviorBubble, isSystemBehavior, behaviorSettings, parseBehaviorReply } = __req("meme/behavior.js");
@@ -18665,7 +18802,7 @@ function threadBody(ctx, chatId) {
         ${composerPlusHtml(ctx, chat)}
         <div class="mp-composer-row">
           <div class="mp-compose-box">
-            <input type="text" placeholder="发消息…" value="${esc(ctx.shell.live.inputValue || '')}" aria-label="输入消息">
+            <textarea class="mp-compose-input" rows="1" placeholder="发消息…" aria-label="输入消息">${esc(ctx.shell.live.inputValue || '')}</textarea>
             <button class="mp-send ${sendState}" data-act="${sendAct}" data-chat="${chat.id}" data-busy="${busy ? '1' : '0'}" data-pending="${waiting}" type="button" aria-label="${esc(sendTitle)}" title="${esc(sendTitle)}">
               <span class="mp-send-wake">${icon('spark')}</span>
               <span class="mp-send-now">${icon('send')}</span>
@@ -18773,7 +18910,7 @@ function stopGeneration(ctx, chatId) {
 }
 
 function doSend(ctx, chatId) {
-  const input = ctx.shell.root.querySelector('.mp-compose-box input');
+  const input = ctx.shell.root.querySelector('.mp-compose-box textarea');
   const text = (input?.value || '').trim();
   const chat = chatById(ctx.state, chatId);
   if (!chat) return;
@@ -19246,7 +19383,8 @@ function exportThreadChat(ctx, chat, contact) {
     return;
   }
   try {
-    const payload = createChatExport({ chat, contact });
+    const diaryEntries = diaryRoleEntries(ctx.state, chat.contactId);
+    const payload = createChatExport({ chat, contact, diaryEntries });
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -19256,7 +19394,7 @@ function exportThreadChat(ctx, chat, contact) {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    ctx.toast(`已导出 ${payload.messageCount} 条消息`);
+    ctx.toast(`已导出 ${payload.messageCount} 条消息${payload.diaryCount ? `、${payload.diaryCount} 篇日记` : ''}`);
   } catch (error) {
     ctx.toast(`导出失败：${error?.message || '聊天记录读不出来'}`);
   }
@@ -19270,8 +19408,12 @@ function applyThreadChatImport(ctx, chat, transfer) {
   }
   if (!Array.isArray(chatNow.messages)) chatNow.messages = [];
   const merged = mergeChatHistory(chatNow.messages, transfer.messages);
-  if (!merged.addedCount) {
-    ctx.toast(`没有新增消息（${merged.skippedCount} 条重复）`);
+
+  const diaryEntries = diaryRoleEntries(ctx.state, chatNow.contactId, true);
+  const mergedDiary = mergeDiaryEntries(diaryEntries, transfer.diary || [], chatNow.contactId);
+
+  if (!merged.addedCount && !mergedDiary.addedCount) {
+    ctx.toast(`没有新增内容（${merged.skippedCount} 条消息、${mergedDiary.skippedCount} 篇日记重复）`);
     return;
   }
 
@@ -19281,32 +19423,41 @@ function applyThreadChatImport(ctx, chat, transfer) {
   ), Number(chatNow.updatedAt) || 0);
   chatNow.updatedAt = Math.max(Number(chatNow.updatedAt) || 0, newestAt);
 
+  const bits = [];
+  if (merged.addedCount) bits.push(`${merged.addedCount} 条消息`);
+  if (mergedDiary.addedCount) bits.push(`${mergedDiary.addedCount} 篇日记`);
+
   ctx.save().then(saved => {
     if (!saved) return;
     ctx.rerender();
-    ctx.toast(`已导入 ${merged.addedCount} 条消息${merged.skippedCount ? `，跳过 ${merged.skippedCount} 条重复` : ''}`);
+    ctx.toast(`已导入 ${bits.join('、')}${merged.skippedCount ? `，跳过 ${merged.skippedCount} 条重复消息` : ''}${mergedDiary.skippedCount ? `，跳过 ${mergedDiary.skippedCount} 篇重复日记` : ''}`);
   });
 }
 
 function reviewThreadChatImport(ctx, chat, contact, transfer) {
   const currentMessages = Array.isArray(chat.messages) ? chat.messages : [];
   const merged = mergeChatHistory(currentMessages, transfer.messages);
-  if (!merged.addedCount) {
-    ctx.toast(`没有新增消息（${merged.skippedCount} 条重复）`);
+  const currentDiary = diaryRoleEntries(ctx.state, chat.contactId);
+  const mergedDiary = mergeDiaryEntries({ ...currentDiary }, transfer.diary || [], chat.contactId);
+  if (!merged.addedCount && !mergedDiary.addedCount) {
+    ctx.toast('没有新增内容（消息和日记都已存在）');
     return;
   }
 
   const sourceName = transfer.character?.name || contact?.name || 'TA';
   const currentName = contact?.name || '当前角色';
   const differentCharacter = transfer.character?.id && transfer.character.id !== chat.contactId;
+  const parts = [];
+  if (merged.addedCount) parts.push(`${merged.addedCount} 条消息`);
+  if (mergedDiary.addedCount) parts.push(`${mergedDiary.addedCount} 篇日记`);
   const title = differentCharacter
-    ? `导入「${sourceName}」的 ${merged.addedCount} 条消息？`
-    : `导入 ${merged.addedCount} 条消息？`;
+    ? `导入「${sourceName}」的 ${parts.join('、')}？`
+    : `导入 ${parts.join('、')}？`;
 
   ctx.openSheet({
     title,
     items: [{
-      label: `合并到「${currentName}」${merged.skippedCount ? `，跳过 ${merged.skippedCount} 条重复` : ''}`,
+      label: `合并到「${currentName}」${merged.skippedCount || mergedDiary.skippedCount ? `，跳过重复` : ''}`,
       value: 'import',
       icon: 'upload',
     }],
@@ -19334,8 +19485,8 @@ function pickThreadChatImport(ctx, chat, contact) {
     }
     try {
       const transfer = parseChatTransferText(await file.text());
-      if (!transfer.messages.length) {
-        ctx.toast('文件里没有聊天消息');
+      if (!transfer.messages.length && !(transfer.diary || []).length) {
+        ctx.toast('文件里没有聊天消息或日记');
         return;
       }
       reviewThreadChatImport(ctx, chat, contact, transfer);
@@ -20443,7 +20594,7 @@ function composerHtml(ctx, theater) {
       </div>` : ''}
       <div class="mp-composer-row">
         <div class="mp-compose-box">
-          <input type="text" placeholder="发一句，酒馆那边接着写…" value="${esc(ctx.shell.live.inputValue || '')}" aria-label="输入消息">
+          <textarea class="mp-compose-input" rows="1" placeholder="发一句，酒馆那边接着写…" aria-label="输入消息">${esc(ctx.shell.live.inputValue || '')}</textarea>
           <button class="mp-send ${busy ? 'is-stop' : 'is-text'}" data-plain="1" data-busy="${busy ? '1' : '0'}" data-act="${busy ? 'branch-stop' : 'branch-send'}" data-theater="${theater.id}" type="button" aria-label="${busy ? '停止这次生成' : '发送'}">
             <span class="mp-send-now">${icon('send')}</span>
             <span class="mp-send-stop">${icon('stop')}</span>

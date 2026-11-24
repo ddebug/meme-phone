@@ -1,9 +1,9 @@
 /**
  * meme-phone · 单角色聊天记录导出 / 导入
  *
- * 只处理一个会话（一个角色）的消息，不包含联系人、角色卡、记忆、预设或 API 配置。
- * 导入按消息 ID 合并，重复消息跳过，不覆盖当前聊天。
- * 同时兼容 acsus-phone-standalone 的单个角色导出文件。
+ * 只处理一个会话（一个角色）的消息和该角色名下的日记，不包含联系人、角色卡、
+ * 全局日记、记忆、预设或 API 配置。导入按消息 ID / 日记日期合并，已存在的跳过，
+ * 不覆盖当前聊天和现有日记。同时兼容 acsus-phone-standalone 的单个角色导出文件。
  */
 
 import { fromAcsusMessage } from './behavior.js';
@@ -17,6 +17,7 @@ export const MAX_CHAT_TRANSFER_MESSAGES = 50000;
 const MAX_VALUE_DEPTH = 12;
 const BLOCKED_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 const FROM_VALUES = new Set(['me', 'them', 'system']);
+const DIARY_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ACSUS_BEHAVIOR_KINDS = new Set([
   'transfer', 'redpacket', 'gift-membership', 'buy-membership', 'plan', 'plan-story',
   'friend-request', 'friend-added', 'friend-deleted', 'signature',
@@ -97,15 +98,63 @@ function exportMessageId(message, chatId, index) {
   return `m_export_${safeKeyPart(chatId, 'chat')}_${index}_${at}`;
 }
 
+function normalizeDiaryNumber(value) {
+  return Number.isFinite(Number(value)) ? Number(value) : null;
+}
+
+/** 导出 / 导入共用的日记条目清洗：只留白名单字段，日期必须合法。 */
+function normalizeDiaryEntry(entry, { index, contactId }) {
+  if (!isRecord(entry)) throw new TypeError(`日记第 ${index + 1} 条不是对象`);
+  const cleaned = cloneJsonValue(entry);
+  const date = String(cleaned.date || cleaned.key || '').trim();
+  if (!DIARY_DATE_RE.test(date)) throw new TypeError(`日记第 ${index + 1} 条日期无效`);
+
+  const tags = Array.isArray(cleaned.tags)
+    ? cleaned.tags.map(tag => String(tag ?? ''))
+    : [];
+
+  return {
+    date,
+    text: String(cleaned.text ?? '').trim(),
+    tags,
+    auto: cleaned.auto !== false,
+    useOriginal: cleaned.useOriginal === true,
+    sourceFingerprint: String(cleaned.sourceFingerprint || ''),
+    paramsFingerprint: String(cleaned.paramsFingerprint || ''),
+    fromTime: normalizeDiaryNumber(cleaned.fromTime),
+    toTime: normalizeDiaryNumber(cleaned.toTime),
+    messageCount: normalizeDiaryNumber(cleaned.messageCount),
+    createdAt: normalizeDiaryNumber(cleaned.createdAt),
+    updatedAt: normalizeDiaryNumber(cleaned.updatedAt),
+    contactId: String(contactId || ''),
+  };
+}
+
+/**
+ * 把角色名下的日记条目（date -> entry 映射）清洗成可导出的数组。
+ *
+ * @param {Object} [diaryEntries]
+ */
+function exportDiaryEntries(diaryEntries) {
+  if (!isRecord(diaryEntries)) return [];
+  return Object.entries(diaryEntries)
+    .map(([key, entry], index) => normalizeDiaryEntry(
+      { ...(isRecord(entry) ? entry : {}), date: String(entry?.date || key) },
+      { index },
+    ))
+    .sort((left, right) => left.date.localeCompare(right.date));
+}
+
 /**
  * 构造当前会话的导出包。
  *
  * @param {Object} options
  * @param {Object} options.chat
  * @param {Object} options.contact
+ * @param {Object} [options.diaryEntries] 该角色名下的日记映射（date -> entry）；不传则不带日记
  * @param {string} [options.exportedAt]
  */
-export function createChatExport({ chat, contact, exportedAt = new Date().toISOString() }) {
+export function createChatExport({ chat, contact, diaryEntries, exportedAt = new Date().toISOString() }) {
   if (!isRecord(chat)) throw new TypeError('缺少会话信息');
   if (!Array.isArray(chat.messages)) throw new TypeError('会话缺少消息数组');
   if (!isRecord(contact) || !contact.id || !contact.name) throw new TypeError('缺少角色信息');
@@ -127,6 +176,8 @@ export function createChatExport({ chat, contact, exportedAt = new Date().toISOS
     return cleaned;
   });
 
+  const diary = exportDiaryEntries(diaryEntries);
+
   return {
     format: MEME_CHAT_FORMAT,
     version: MEME_CHAT_VERSION,
@@ -138,6 +189,8 @@ export function createChatExport({ chat, contact, exportedAt = new Date().toISOS
     },
     messageCount: messages.length,
     messages,
+    diaryCount: diary.length,
+    diary,
   };
 }
 
@@ -277,6 +330,7 @@ function convertAcsusPackage(parsed, exportedAt) {
     character,
     messageCount: messages.length,
     messages,
+    diary: [],
     source: 'acsus',
   };
 }
@@ -299,6 +353,15 @@ function validateMemePackage(parsed, exportedAt) {
     index,
   }));
 
+  const rawDiary = Array.isArray(parsed.diary) ? parsed.diary : [];
+  if (parsed.diaryCount !== undefined && parsed.diaryCount !== rawDiary.length) {
+    throw new TypeError('日记数量与 diaryCount 不一致，文件可能不完整');
+  }
+  const diary = rawDiary.map((entry, index) => normalizeDiaryEntry(entry, {
+    index,
+    contactId: character.id,
+  }));
+
   return {
     format: MEME_CHAT_FORMAT,
     version: MEME_CHAT_VERSION,
@@ -306,6 +369,8 @@ function validateMemePackage(parsed, exportedAt) {
     character,
     messageCount: messages.length,
     messages,
+    diaryCount: diary.length,
+    diary,
     source: 'meme',
   };
 }
@@ -375,4 +440,36 @@ export function mergeChatHistory(currentMessages, importedMessages) {
     addedCount: additions.length,
     skippedCount,
   };
+}
+
+/**
+ * 合并日记条目，按日期去重，已有日期不覆盖；直接写回传入的当前映射。
+ *
+ * @param {Object} currentEntries 当前角色日记映射（date -> entry）
+ * @param {Array<Object>} importedEntries 导入的日记数组（已清洗）
+ * @param {string} [contactId] 落到目标角色名下
+ */
+export function mergeDiaryEntries(currentEntries, importedEntries, contactId = '') {
+  if (!isRecord(currentEntries)) throw new TypeError('当前日记映射不是对象');
+  if (!Array.isArray(importedEntries)) throw new TypeError('导入日记不是数组');
+
+  let addedCount = 0;
+  let skippedCount = 0;
+  for (const entry of importedEntries) {
+    if (!isRecord(entry) || typeof entry.date !== 'string' || !entry.date) {
+      throw new TypeError('导入日记缺少日期');
+    }
+    if (currentEntries[entry.date]) {
+      skippedCount += 1;
+      continue;
+    }
+    currentEntries[entry.date] = {
+      ...entry,
+      key: entry.date,
+      contactId: String(contactId || entry.contactId || ''),
+    };
+    addedCount += 1;
+  }
+
+  return { entries: currentEntries, addedCount, skippedCount };
 }

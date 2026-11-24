@@ -1,10 +1,10 @@
 {
   "files": {
-    "meme/apps/api.js": "716b4cf7766f48ef706cd6b3ef8ccdefa2bb801e63a14cb4055925e8e00dc3e8",
-    "meme/apps/branch.js": "7d702cb0b52b88bc0fe45f21aa88723fabb2787f85b3211538fa6645c8d5bf05",
+    "meme/apps/api.js": "50b67ed8fa209b46cd6ed721a38f82bb42b136109d2f6d0afe560847a5f537d3",
+    "meme/apps/branch.js": "b9b4050843dc877597e7e586ab0fc06b7e2c0e35059d2ba92a6ab2a821511c4f",
     "meme/apps/characters.js": "5f133b4e8d8e7697fe8d2a88438ca534a82b77a1331f1018dcbe4ee0d013f406",
     "meme/apps/charphone.js": "3ee91aa4951dd52f2479049b760c819a19e3e2e63a0ea36eabcb5b46f4861d54",
-    "meme/apps/chat.js": "98d7d4cd0eb80e00537987476d9f7f765f66748afef2af3de4b09c78853d980a",
+    "meme/apps/chat.js": "f0de6b45704bd255798835d2794659496266f2141047f8934fe808976cdee34e",
     "meme/apps/contacts.js": "ff5ab35384b9504f4cf463ea21fa865aa07f285123b5ca166c6f9ea5b922b44d",
     "meme/apps/diary.js": "b272847eb3278c6a35bf779a7f6d9a5b53cc04849d88f1b63981cb15fbdd5e1f",
     "meme/apps/draw.js": "9af70980cfa54d6f17c47ec7643e9bbc86b956323f7f999ebdfd5ee76ee68379",
@@ -21,8 +21,8 @@
     "meme/behavior-domains.js": "aa83382221d370f38cd04adbba421121d51f555555758df971be83612846e9e6",
     "meme/behavior.js": "79c08415e3c6976c1e2a341142a0b9f35785a2b548c004686bb23ac878655057",
     "meme/book.js": "e126bbb5bc396ca0d1a715be877d8aad3248ae0600b1d0a9302f7305ff942337",
-    "meme/chat-transfer.js": "48ad6453afc86e03304db0946bfcb31f69a7aa0b2ab97ff1a00486e175f43e65",
-    "meme/css/apps-07.css": "91624c5fb263835ea285bd1965b8d9e038b6585a508c1fbff0d010c2a9522122",
+    "meme/chat-transfer.js": "41b3b0792250e4963103d45fb78b91079dfae9e23f3ae80a212ae9cc17b06edb",
+    "meme/css/apps-07.css": "60861b7e8bbd7d169bca24cef9530bc3882dc4f93104c29cecc1d0b01a908dd5",
     "meme/css/apps-14.css": "61fa7013d46c2445925c2af10012320acfe4b552f5785ab0763634d16970c732",
     "meme/css/apps-16.css": "03d79e55eba84bed191a1782c4f022eaaa0ca601a92d36499d2ffc9245eea79c",
     "meme/css/apps-20.css": "e33c55a68f74c418a1fc0af29713bf1f03af6324413f70504aabc73b90afb192",
@@ -61,9 +61,9 @@
     "meme/memory.js": "e125b669c17cbc04aa60c78b7de597532331980d77dcb4e21b11784bd932ac8e",
     "meme/preset-defaults.js": "91b57ffecde29707850053a7933634ae400b320aa001b7061484d0071ebb3328",
     "meme/reply-context.js": "a13361128b5a4cefd3673d0b82029800f74dae6a753b4198ca30c4d2075aba42",
-    "meme/shell.js": "6cf6320eca8b23b628632787bad217f9d4c0bcd1551b2c5232b4bf8f6335c887",
+    "meme/shell.js": "7e45a2fa8fd3525bc4f00689dd307036123cbad2ceb49d73991b973f98d94830",
     "meme/store.js": "8b89793e3191ee6974c87d381e4975badb439093a43bf7701288944f9f79ffde",
-    "meme/theme-data.js": "29b2d2dc8e8e8ad2335f20f951958f99a054dba33c837d452e3b13040d8ac69f",
+    "meme/theme-data.js": "d37c1bdb3fbcfb95ce4aa148020d93eadc9746b2c19befdaeade632fea2a8b60",
     "meme/world.js": "c4819e25be5c0810e5c263d8a4bed2975ea35288bf8d74894cb14eb4751975b0"
   }
 }

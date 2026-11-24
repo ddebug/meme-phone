@@ -375,6 +375,26 @@ export function createShell(options) {
   let homeSwipe = null;
   let suppressClickUntil = 0;
 
+  function dropAfter(el, x, y) {
+    const box = el.getBoundingClientRect();
+    const band = box.height * .28;
+    if (y >= box.top + band && y <= box.bottom - band) return x > box.left + box.width * .5;
+    return y > box.top + box.height * .5;
+  }
+
+  function nearestHomeItem(page, x, y, sourceId) {
+    let best = null;
+    page.querySelectorAll('[data-drag-id]').forEach(el => {
+      if (el.dataset.dragId === sourceId) return;
+      const box = el.getBoundingClientRect();
+      const dx = x < box.left ? box.left - x : (x > box.right ? x - box.right : 0);
+      const dy = y < box.top ? box.top - y : (y > box.bottom ? y - box.bottom : 0);
+      const distance = Math.hypot(dx, dy);
+      if (!best || distance < best.distance) best = { el, distance };
+    });
+    return best?.el || null;
+  }
+
   function dragHitAt(x, y, source) {
     const node = document.elementFromPoint(x, y);
     if (!node) return null;
@@ -382,15 +402,33 @@ export function createShell(options) {
     if (dot) return { type: 'dot', page: Number(dot.dataset.pageDrop), el: dot };
     const item = node.closest('[data-drag-id]');
     if (item && item.dataset.dragId !== source.id) {
-      return { type: 'item', page: Number(item.dataset.page), id: item.dataset.dragId, el: item };
+      return { type: 'item', page: Number(item.dataset.page), id: item.dataset.dragId, el: item, after: dropAfter(item, x, y) };
     }
     const page = node.closest('[data-home-page]');
-    if (page) return { type: 'page', page: Number(page.dataset.homePage), el: page };
-    return null;
+    if (!page) {
+      const viewport = node.closest('.mp-home-viewport');
+      if (!viewport) return null;
+      const current = viewport.querySelector(`[data-home-page="${pageIndexSafe()}"]`);
+      if (!current) return null;
+      return blankPageTarget(current, x, y, source);
+    }
+    return blankPageTarget(page, x, y, source);
+  }
+
+  function blankPageTarget(page, x, y, source) {
+    /* 落在空白处时找最近的一个项，按它的上半/下半、左半/右半决定插在前还是后。 */
+    const near = nearestHomeItem(page, x, y, source.id);
+    if (near) {
+      return { type: 'item', page: Number(page.dataset.homePage), id: near.dataset.dragId, el: near, after: dropAfter(near, x, y) };
+    }
+    return { type: 'page', page: Number(page.dataset.homePage), el: page };
   }
 
   function clearDragMarks() {
-    root.querySelectorAll('.is-drop-target').forEach(node => node.classList.remove('is-drop-target'));
+    root.querySelectorAll('.is-drop-target').forEach(node => {
+      node.classList.remove('is-drop-target');
+      delete node.dataset.dropAfter;
+    });
   }
 
   function finishDrag(event, cancelled = false) {
@@ -419,8 +457,7 @@ export function createShell(options) {
     if (target.type === 'item') {
       at = pages[destPage].indexOf(target.id);
       if (at < 0) at = pages[destPage].length;
-      const box = target.el.getBoundingClientRect();
-      if (event.clientX > box.left + box.width / 2) at += 1;
+      if (target.after) at += 1;
     }
     pages[destPage].splice(at, 0, current.id);
     saveHomePages(pages);
@@ -463,7 +500,10 @@ export function createShell(options) {
     drag.node.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(1.035)`;
     const hit = dragHitAt(event.clientX, event.clientY, drag);
     clearDragMarks();
-    if (hit && (hit.type === 'item' || hit.type === 'dot')) hit.el.classList.add('is-drop-target');
+    if (hit && (hit.type === 'item' || hit.type === 'dot')) {
+      hit.el.classList.add('is-drop-target');
+      if (hit.type === 'item') hit.el.dataset.dropAfter = hit.after ? '1' : '0';
+    }
   });
 
   root.addEventListener('pointerup', event => finishDrag(event));
@@ -542,7 +582,6 @@ export function createShell(options) {
     }).join('');
     const homePageHtml = pages.map((ids, index) => `
       <div class="mp-home-page" data-home-page="${index}">
-        ${index === 1 ? '<div class="mp-home-page-title">设置</div>' : ''}
         ${ids.map(id => homeItemHtml(id, index, state)).join('')}
       </div>`).join('');
     const homeDotsHtml = pages.map((_, index) => `

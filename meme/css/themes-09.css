@@ -38,7 +38,9 @@
 .mp-root[data-mp-theme="night"] .mp-hw-recent .mp-hw-kicker,
 .mp-root[data-mp-theme="night"] .mp-hw-recent .mp-hw-time,
 .mp-root[data-mp-theme="night"] .mp-hw-recent .mp-hw-preview { color: rgba(255, 255, 255, .6); }
-.mp-root[data-mp-theme="night"] .mp-home-dot:not(.is-on) { background: rgba(255, 255, 255, .2); }
+.mp-root[data-mp-theme="night"] .mp-home-dot:not(.is-on)::before {
+  background: rgba(255, 255, 255, .2);
+}
 
 .mp-root[data-mp-theme="night"] .mp-di-card { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .08); }
 .mp-root[data-mp-theme="night"] .mp-dock { background: linear-gradient(180deg, rgba(44, 38, 66, .7), rgba(26, 22, 42, .62)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .10), 0 16px 34px rgba(0, 0, 0, .4); }

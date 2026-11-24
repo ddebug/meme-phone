@@ -543,7 +543,7 @@ export const dressApp = {
     const themes = [
       { key: 'default', title: '晨光', preview: 'background:linear-gradient(150deg,#ffe3ef,#e4f7f0)' },
       { key: 'frost', title: '白色磨砂', preview: 'background:linear-gradient(145deg,rgba(230,230,230,.92),rgba(250,250,250,.76))' },
-      { key: 'pixel', title: '像素小兔', preview: `background-image:url(&quot;${PIXEL_BUNNY.banner}&quot;);background-size:cover;background-position:center` },
+      { key: 'pixel', title: '像素小兔', preview: `background-image:url(&quot;${PIXEL_BUNNY.wallpaper}&quot;);background-size:cover;background-position:center` },
     ];
     return `
       <div class="mp-page-body">

@@ -17,6 +17,23 @@ export function esc(text) {
 
 const WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
+/**
+ * 上滑回桌面只在手机底部这一小段起手才成立。
+ * 起点在能滚动的列表里（聊天消息、设置列表、弹层）或输入区时不接管，避免滚一下就被退出。
+ */
+export function canStartHomeSwipe({ pointerType = 'mouse', screenHeight = 844, fromBottom = 0, onScrollable = false } = {}) {
+  if (onScrollable) return false;
+  if (!Number(screenHeight)) return false;
+  const zone = pointerType === 'mouse' ? 96 : 64;
+  return Number(fromBottom) >= Number(screenHeight) - zone;
+}
+
+/** 上滑判定的几何条件：够快、向上、别歪。 */
+export function isHomeSwipeHit({ pointerType = 'mouse', dx = 0, dy = 0, dt = 0 } = {}) {
+  const need = pointerType === 'mouse' ? -60 : -90;
+  return Number(dy) <= need && Math.abs(Number(dx)) <= 80 && Number(dt) <= 620;
+}
+
 export function clockText(date = new Date()) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
@@ -1060,29 +1077,50 @@ export function createShell(options) {
     window.visualViewport.addEventListener('scroll', onWindowResize);
   }
 
-  /* 上滑：页面里快速上滑一段就回桌面 */
+  /* 上滑：在手机底部那一小段快速上滑才回桌面。
+     聊天/分支页的消息列表本身就要上滑滚，输入框里也要上滑选字，这些地方一律不算，
+     免得随手滚一下聊天就被退出。 */
   let swipe = null;
+
+  /** 从手势起点往上找，碰到能滚动的容器就不接管这次上滑。 */
+  function insideScrollable(node) {
+    let el = node;
+    while (el && el !== root) {
+      if (el.scrollHeight > el.clientHeight + 2) {
+        const overflow = getComputedStyle(el).overflowY;
+        if (overflow === 'auto' || overflow === 'scroll' || overflow === 'overlay') return true;
+      }
+      el = el.parentElement;
+    }
+    return false;
+  }
 
   root.addEventListener('pointerdown', event => {
     if (!shell.stack.length) return;
     const screen = root.querySelector('.mp-screen');
     if (!screen) return;
+    if (event.target.closest?.('input, textarea, [contenteditable="true"], .mp-messages, .mp-sheet, .mp-home-viewport')) return;
     const rect = screen.getBoundingClientRect();
-    const fromBottom = event.clientY - rect.top;
-    const zone = event.pointerType === 'mouse' ? rect.height - 150 : rect.height * 0.5;
-    if (fromBottom < zone) return;
+    if (!canStartHomeSwipe({
+      pointerType: event.pointerType,
+      screenHeight: rect.height,
+      fromBottom: event.clientY - rect.top,
+      onScrollable: insideScrollable(event.target),
+    })) return;
     swipe = { x: event.clientX, y: event.clientY, t: Date.now() };
   });
 
   root.addEventListener('pointerup', event => {
     if (!swipe) return;
-    const dy = event.clientY - swipe.y;
-    const dx = Math.abs(event.clientX - swipe.x);
-    const dt = Date.now() - swipe.t;
-    const need = event.pointerType === 'mouse' ? -60 : -90;
-    const hit = dy <= need && dx <= 80 && dt <= 620;
+    const current = swipe;
     swipe = null;
-    if (!hit || !shell.stack.length) return;
+    if (!shell.stack.length) return;
+    if (!isHomeSwipeHit({
+      pointerType: event.pointerType,
+      dx: event.clientX - current.x,
+      dy: event.clientY - current.y,
+      dt: Date.now() - current.t,
+    })) return;
     if (document.activeElement?.blur) document.activeElement.blur();
     shell.live = { inputValue: '', focus: false };
     ctx.home();

@@ -284,12 +284,6 @@ function renderPage(ctx) {
           <span style="color:var(--text-4)">${icon('chevron')}</span>
         </button>
       </div>
-
-      <div class="mp-group-label" style="margin-top:16px">怎么读</div>
-      <div class="mp-card">
-        <div class="mp-card-title">层数</div>
-        <div class="mp-card-title" style="margin-top:12px">手机读法</div>
-      </div>
     </div>`;
 }
 

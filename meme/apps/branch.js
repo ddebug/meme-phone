@@ -298,14 +298,6 @@ function settingsBody(ctx, params = {}) {
         </div>
       </div>
 
-      <div class="mp-card" style="margin-top:12px">
-        <div class="mp-card-title">这一场实际用到的</div>
-        <div class="mp-card-sub">背景：${esc(historyModeLabel)}</div>
-        <div class="mp-card-sub">记忆：${esc(memoryModeLabel)}</div>
-        <div class="mp-card-sub">额外指令：${esc(extraLabel)}</div>
-        <div class="mp-card-sub">预设、角色卡、世界书都跟酒馆现在那套走</div>
-      </div>
-
       <div class="mp-group" style="margin-top:16px">
         <div class="mp-group-label">背景</div>
         <div class="mp-group-box">

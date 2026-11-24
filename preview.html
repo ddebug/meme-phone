@@ -9878,6 +9878,8 @@ function emptyState() {
       theater: { kind: 'daily' },
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
+      /* 里世界：默认在酒馆聊天里打开手机时，直接进当前聊天对应的里世界 */
+      world: { autoEnter: true },
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5, prompt: '' },
       chat: {
         showTime: true, enterToSend: false, remind: true, wake: true, debugBar: false,
@@ -11382,6 +11384,7 @@ function normalize(raw) {
   }
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
+  merged.settings.world = { autoEnter: raw.settings?.world?.autoEnter !== false };
   delete merged.settings.summary;
   const memoryRaw = raw.settings?.memory;
   const memoryList = Array.isArray(memoryRaw?.presets) ? memoryRaw.presets : [];
@@ -18245,7 +18248,7 @@ function settingsBody(ctx, chatId) {
   const replyItemCount = replyItems.filter(item => item.kind === 'chat').length;
   const replyAppCount = replyItems.filter(item => item.kind === 'app').length;
   const injectedCount = replyItems.filter(item => item.kind === 'context' && item.enabled).length;
-  const replySub = `${replyName} · ${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
+  const replySub = `${replyItemCount} 条聊天提示${replyAppCount ? ` · ${replyAppCount} 条其他软件` : ''} · ${injectedCount ? `注入 ${injectedCount} 段` : '不注入上下文'}`;
   const behavior = behaviorSettings(state, chat);
   const historyConfig = chatHistoryFor(chat);
   const tavern = effectiveTavernHistory(state, chat, memoryPresetFor(state, chat));
@@ -18269,12 +18272,6 @@ function settingsBody(ctx, chatId) {
     '只改这个角色',
   ].join(' · ');
 
-  const effectiveLines = [
-    ['用哪个模型', llmName],
-    ['怎么回复', replyName],
-    ['参考什么', `酒馆记忆 ${memoryEffectiveSummary(state, chat.contactId, activeMemory)} · 小手机历史 ${phoneCountLabel}`],
-  ];
-
   return `
     <div class="mp-page-body">
 
@@ -18285,11 +18282,6 @@ function settingsBody(ctx, chatId) {
           <div class="mp-chat-set-sub">${esc(status)}</div>
         </div>
         ${chat.pinned ? `<span class="mp-pill">置顶</span>` : ''}
-      </div>
-
-      <div class="mp-card" style="margin-top:12px">
-        <div class="mp-card-title">这条会话实际用到的</div>
-        ${effectiveLines.map(([label, value]) => `<div class="mp-card-sub">${esc(label)}：${esc(value)}</div>`).join('')}
       </div>
 
       <div class="mp-group" style="margin-top:16px">
@@ -20565,14 +20557,6 @@ function settingsBody(ctx, params = {}) {
         </div>
       </div>
 
-      <div class="mp-card" style="margin-top:12px">
-        <div class="mp-card-title">这一场实际用到的</div>
-        <div class="mp-card-sub">背景：${esc(historyModeLabel)}</div>
-        <div class="mp-card-sub">记忆：${esc(memoryModeLabel)}</div>
-        <div class="mp-card-sub">额外指令：${esc(extraLabel)}</div>
-        <div class="mp-card-sub">预设、角色卡、世界书都跟酒馆现在那套走</div>
-      </div>
-
       <div class="mp-group" style="margin-top:16px">
         <div class="mp-group-label">背景</div>
         <div class="mp-group-box">
@@ -22303,6 +22287,13 @@ const settingsApp = {
           <div class="mp-group-label">里世界聊天</div>
           <div class="mp-group-box">
             ${row(ctx, {
+              iconName: 'chat-world',
+              title: '默认进入聊天记录聊天',
+              sub: '打开手机时直接落到当前酒馆聊天对应的里世界',
+              act: 'set-toggle-world-auto',
+              toggle: state.settings.world?.autoEnter !== false,
+            })}
+            ${row(ctx, {
               iconName: 'book',
               title: '里世界聊天',
               sub: worlds.length ? `${worlds.length} 条 · 每条单独绑一份酒馆聊天记录` : '还没有 · 从当前酒馆聊天新建',
@@ -22330,7 +22321,6 @@ const settingsApp = {
           <div class="mp-group-label">AI 设置 · 怎么回复</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'reply', title: '回复预设', act: 'set-open', app: 'presets' })}
-            ${row(ctx, { iconName: 'reply', title: '日记提示词', act: 'set-prompt' })}
           </div>
         </div>
 
@@ -22412,6 +22402,17 @@ const settingsApp = {
       return true;
     }
     if (act === 'set-world-branch') { ctx.go('app-parallel'); return true; }
+
+    if (act === 'set-toggle-world-auto') {
+      state.settings.world = state.settings.world || { autoEnter: true };
+      state.settings.world.autoEnter = state.settings.world.autoEnter === false;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(state.settings.world.autoEnter
+        ? '以后打开手机直接进当前聊天对应的里世界'
+        : '以后打开手机停在桌面，不自动进里世界');
+      return true;
+    }
     if (act === 'set-open-appearance') { ctx.go('app-appearance'); return true; }
     if (act === 'set-open-cards') { ctx.go('app-contacts', { tab: 'cards' }); return true; }
 
@@ -22490,19 +22491,6 @@ const settingsApp = {
           ? `已接入酒馆 · 角色 ${host.hasCharacters ? '可读' : '不可读'} · 模型 ${host.hasGenerate ? '可用' : '不可用'}`
           : '预览环境：没有接酒馆，回复是演示文案');
       }).catch(() => ctx.toast('读不到酒馆连接状态'));
-      return true;
-    }
-
-    if (act === 'set-prompt') {
-      ctx.openSheet({
-        kind: 'text', title: '日记怎么写', value: state.diary.prompt, placeholder: '给模型的指令…', confirm: '存下',
-        onText: (text) => {
-          state.diary.prompt = String(text || '').trim() || state.diary.prompt;
-          ctx.save();
-          ctx.toast('存好了');
-          ctx.rerender();
-        },
-      });
       return true;
     }
 
@@ -28415,12 +28403,6 @@ function renderPage(ctx) {
           <span style="color:var(--text-4)">${icon('chevron')}</span>
         </button>
       </div>
-
-      <div class="mp-group-label" style="margin-top:16px">怎么读</div>
-      <div class="mp-card">
-        <div class="mp-card-title">层数</div>
-        <div class="mp-card-title" style="margin-top:12px">手机读法</div>
-      </div>
     </div>`;
 }
 
@@ -31280,6 +31262,8 @@ function getState() {
  */
 async function enterWorldFromHost() {
   if (!ctx?.world || !ctx?.shell) return false;
+  /* 设置里关掉「默认进入聊天记录聊天」后，打开手机就停在桌面。 */
+  if (ctx.state?.settings?.world?.autoEnter === false) return false;
   const located = await ctx.world.locateCurrent();
   /* 不在酒馆里打开（预览/桌面）就保持原样，不强行跳到聊天。 */
   if (!located?.available) return false;

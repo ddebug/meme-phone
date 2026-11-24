@@ -471,6 +471,8 @@ export function emptyState() {
       theater: { kind: 'daily' },
       userMode: 'follow',        // follow 跟随酒馆 | pin 固定一个
       pinnedUser: '',            // pin 时用哪个酒馆用户（persona 头像文件名）
+      /* 里世界：默认在酒馆聊天里打开手机时，直接进当前聊天对应的里世界 */
+      world: { autoEnter: true },
       proactive: { enabled: true, idleMinutes: 120, dailyCount: 5, prompt: '' },
       chat: {
         showTime: true, enterToSend: false, remind: true, wake: true, debugBar: false,
@@ -1975,6 +1977,7 @@ export function normalize(raw) {
   }
   merged.settings.api = { ...base.settings.api, ...(raw.settings?.api || {}) };
   merged.settings.user = { ...base.settings.user, ...(raw.settings?.user || {}) };
+  merged.settings.world = { autoEnter: raw.settings?.world?.autoEnter !== false };
   delete merged.settings.summary;
   const memoryRaw = raw.settings?.memory;
   const memoryList = Array.isArray(memoryRaw?.presets) ? memoryRaw.presets : [];

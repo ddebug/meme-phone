@@ -116,6 +116,13 @@ export const settingsApp = {
           <div class="mp-group-label">里世界聊天</div>
           <div class="mp-group-box">
             ${row(ctx, {
+              iconName: 'chat-world',
+              title: '默认进入聊天记录聊天',
+              sub: '打开手机时直接落到当前酒馆聊天对应的里世界',
+              act: 'set-toggle-world-auto',
+              toggle: state.settings.world?.autoEnter !== false,
+            })}
+            ${row(ctx, {
               iconName: 'book',
               title: '里世界聊天',
               sub: worlds.length ? `${worlds.length} 条 · 每条单独绑一份酒馆聊天记录` : '还没有 · 从当前酒馆聊天新建',
@@ -143,7 +150,6 @@ export const settingsApp = {
           <div class="mp-group-label">AI 设置 · 怎么回复</div>
           <div class="mp-group-box">
             ${row(ctx, { iconName: 'reply', title: '回复预设', act: 'set-open', app: 'presets' })}
-            ${row(ctx, { iconName: 'reply', title: '日记提示词', act: 'set-prompt' })}
           </div>
         </div>
 
@@ -225,6 +231,17 @@ export const settingsApp = {
       return true;
     }
     if (act === 'set-world-branch') { ctx.go('app-parallel'); return true; }
+
+    if (act === 'set-toggle-world-auto') {
+      state.settings.world = state.settings.world || { autoEnter: true };
+      state.settings.world.autoEnter = state.settings.world.autoEnter === false;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(state.settings.world.autoEnter
+        ? '以后打开手机直接进当前聊天对应的里世界'
+        : '以后打开手机停在桌面，不自动进里世界');
+      return true;
+    }
     if (act === 'set-open-appearance') { ctx.go('app-appearance'); return true; }
     if (act === 'set-open-cards') { ctx.go('app-contacts', { tab: 'cards' }); return true; }
 
@@ -303,19 +320,6 @@ export const settingsApp = {
           ? `已接入酒馆 · 角色 ${host.hasCharacters ? '可读' : '不可读'} · 模型 ${host.hasGenerate ? '可用' : '不可用'}`
           : '预览环境：没有接酒馆，回复是演示文案');
       }).catch(() => ctx.toast('读不到酒馆连接状态'));
-      return true;
-    }
-
-    if (act === 'set-prompt') {
-      ctx.openSheet({
-        kind: 'text', title: '日记怎么写', value: state.diary.prompt, placeholder: '给模型的指令…', confirm: '存下',
-        onText: (text) => {
-          state.diary.prompt = String(text || '').trim() || state.diary.prompt;
-          ctx.save();
-          ctx.toast('存好了');
-          ctx.rerender();
-        },
-      });
       return true;
     }
 

@@ -450,6 +450,8 @@ export function getState() {
  */
 async function enterWorldFromHost() {
   if (!ctx?.world || !ctx?.shell) return false;
+  /* 设置里关掉「默认进入聊天记录聊天」后，打开手机就停在桌面。 */
+  if (ctx.state?.settings?.world?.autoEnter === false) return false;
   const located = await ctx.world.locateCurrent();
   /* 不在酒馆里打开（预览/桌面）就保持原样，不强行跳到聊天。 */
   if (!located?.available) return false;

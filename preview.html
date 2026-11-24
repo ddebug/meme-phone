@@ -11760,6 +11760,7 @@ function normalize(raw) {
         storyDate: String(chat.world.storyDate || '第 1 天').slice(0, 30),
         origin: String(chat.world.origin || 'tavern'),
         createdAt: Number(chat.world.createdAt) || 0,
+        syncEnabled: chat.world.syncEnabled !== false,
         queue: (() => {
           const seen = new Set();
           return (Array.isArray(chat.world.queue) ? chat.world.queue : [])
@@ -15021,6 +15022,7 @@ function installWorld(ctx) {
     /** 这一轮手机聊天写完，写回原聊天文件。 */
     async syncTurn(chat, turnId, messages) {
       if (!isWorldChat(chat) || !turnId) return;
+      if (chat.world.syncEnabled === false) return;
       if (!chat.world.chatFile && !chat.world.chatId) return;
       if (Array.isArray(chat.syncedTurnIds) && chat.syncedTurnIds.includes(turnId)) return;
       const text = formatTurnText(chat, messages);
@@ -15039,6 +15041,7 @@ function installWorld(ctx) {
 
     async flush(chat) {
       if (!isWorldChat(chat)) return;
+      if (chat.world.syncEnabled === false) return;
       if (flushingChats.has(chat)) return;
       flushingChats.add(chat);
       try {
@@ -18361,6 +18364,22 @@ function settingsBody(ctx, chatId) {
         </div>
       </div>
 
+      ${isWorldChat(chat) ? `
+      <div class="mp-group">
+        <div class="mp-group-label">同层小手机</div>
+        <div class="mp-group-box">
+          ${chatSetRow(chat.id, {
+            iconName: 'chat-world',
+            title: '写回酒馆聊天记录',
+            sub: chat.world.syncEnabled === false
+              ? '只在手机里保留，不再往酒馆追加隐藏楼层'
+              : '每轮结束写回绑定的那份酒馆聊天',
+            act: 'ts-toggle-world-sync',
+            toggle: chat.world.syncEnabled !== false,
+          })}
+        </div>
+      </div>` : ''}
+
       <div class="mp-group">
         <div class="mp-group-label">日记</div>
         <div class="mp-group-box">
@@ -19368,6 +19387,17 @@ const threadSettingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(chat.muted ? '这个会话不再显示未读角标' : '恢复未读角标');
+      return true;
+    }
+
+    if (act === 'ts-toggle-world-sync') {
+      if (!isWorldChat(chat)) return true;
+      chat.world.syncEnabled = chat.world.syncEnabled === false;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(chat.world.syncEnabled
+        ? '以后每轮会写回酒馆聊天记录'
+        : '以后不再写回酒馆，这条只留在手机里');
       return true;
     }
 
@@ -23255,7 +23285,7 @@ const dressApp = {
     const themes = [
       { key: 'default', title: '晨光', preview: 'background:linear-gradient(150deg,#ffe3ef,#e4f7f0)' },
       { key: 'frost', title: '白色磨砂', preview: 'background:linear-gradient(145deg,rgba(230,230,230,.92),rgba(250,250,250,.76))' },
-      { key: 'pixel', title: '像素小兔', preview: `background-image:url(&quot;${PIXEL_BUNNY.banner}&quot;);background-size:cover;background-position:center` },
+      { key: 'pixel', title: '像素小兔', preview: `background-image:url(&quot;${PIXEL_BUNNY.wallpaper}&quot;);background-size:cover;background-position:center` },
     ];
     return `
       <div class="mp-page-body">

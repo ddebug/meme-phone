@@ -2303,6 +2303,7 @@ export function normalize(raw) {
         storyDate: String(chat.world.storyDate || '第 1 天').slice(0, 30),
         origin: String(chat.world.origin || 'tavern'),
         createdAt: Number(chat.world.createdAt) || 0,
+        syncEnabled: chat.world.syncEnabled !== false,
         queue: (() => {
           const seen = new Set();
           return (Array.isArray(chat.world.queue) ? chat.world.queue : [])

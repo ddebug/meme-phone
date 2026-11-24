@@ -12,9 +12,9 @@ import {
   chatHistoryFor, effectiveTavernHistory, pendingUserMessages, pendingUserCount, clearPendingMessages,
 } from '../data.js';
 import { memoryEffectiveSummary, memoryPresetTitle } from '../memory.js';
-import { diaryDayStatuses, diaryFingerprint, diaryNeedsWrite, diaryParamsFingerprint } from '../diary.js';
+import { diaryDayStatuses, diaryFingerprint, diaryNeedsWrite, diaryParamsFingerprint, diaryRoleEntries } from '../diary.js';
 import { requestStats, estimateTokens, proactiveLead, serializeMessage } from '../reply-context.js';
-import { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } from '../chat-transfer.js';
+import { createChatExport, parseChatTransferText, mergeChatHistory, mergeDiaryEntries, MAX_CHAT_TRANSFER_BYTES } from '../chat-transfer.js';
 import { avatarHtml, chatAvatarHtml, esc, shortText, timeText } from '../shell.js';
 import { isWorldChat, storyDateOf } from '../world.js';
 import { renderBehaviorBubble, isSystemBehavior, behaviorSettings, parseBehaviorReply } from '../behavior.js';
@@ -567,6 +567,22 @@ function settingsBody(ctx, chatId) {
         </div>
       </div>
 
+      ${isWorldChat(chat) ? `
+      <div class="mp-group">
+        <div class="mp-group-label">同层小手机</div>
+        <div class="mp-group-box">
+          ${chatSetRow(chat.id, {
+            iconName: 'chat-world',
+            title: '写回酒馆聊天记录',
+            sub: chat.world.syncEnabled === false
+              ? '只在手机里保留，不再往酒馆追加隐藏楼层'
+              : '每轮结束写回绑定的那份酒馆聊天',
+            act: 'ts-toggle-world-sync',
+            toggle: chat.world.syncEnabled !== false,
+          })}
+        </div>
+      </div>` : ''}
+
       <div class="mp-group">
         <div class="mp-group-label">日记</div>
         <div class="mp-group-box">
@@ -852,7 +868,7 @@ function threadBody(ctx, chatId) {
         ${composerPlusHtml(ctx, chat)}
         <div class="mp-composer-row">
           <div class="mp-compose-box">
-            <input type="text" placeholder="发消息…" value="${esc(ctx.shell.live.inputValue || '')}" aria-label="输入消息">
+            <textarea class="mp-compose-input" rows="1" placeholder="发消息…" aria-label="输入消息">${esc(ctx.shell.live.inputValue || '')}</textarea>
             <button class="mp-send ${sendState}" data-act="${sendAct}" data-chat="${chat.id}" data-busy="${busy ? '1' : '0'}" data-pending="${waiting}" type="button" aria-label="${esc(sendTitle)}" title="${esc(sendTitle)}">
               <span class="mp-send-wake">${icon('spark')}</span>
               <span class="mp-send-now">${icon('send')}</span>
@@ -960,7 +976,7 @@ function stopGeneration(ctx, chatId) {
 }
 
 function doSend(ctx, chatId) {
-  const input = ctx.shell.root.querySelector('.mp-compose-box input');
+  const input = ctx.shell.root.querySelector('.mp-compose-box textarea');
   const text = (input?.value || '').trim();
   const chat = chatById(ctx.state, chatId);
   if (!chat) return;
@@ -1433,7 +1449,8 @@ function exportThreadChat(ctx, chat, contact) {
     return;
   }
   try {
-    const payload = createChatExport({ chat, contact });
+    const diaryEntries = diaryRoleEntries(ctx.state, chat.contactId);
+    const payload = createChatExport({ chat, contact, diaryEntries });
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1443,7 +1460,7 @@ function exportThreadChat(ctx, chat, contact) {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    ctx.toast(`已导出 ${payload.messageCount} 条消息`);
+    ctx.toast(`已导出 ${payload.messageCount} 条消息${payload.diaryCount ? `、${payload.diaryCount} 篇日记` : ''}`);
   } catch (error) {
     ctx.toast(`导出失败：${error?.message || '聊天记录读不出来'}`);
   }
@@ -1457,8 +1474,12 @@ function applyThreadChatImport(ctx, chat, transfer) {
   }
   if (!Array.isArray(chatNow.messages)) chatNow.messages = [];
   const merged = mergeChatHistory(chatNow.messages, transfer.messages);
-  if (!merged.addedCount) {
-    ctx.toast(`没有新增消息（${merged.skippedCount} 条重复）`);
+
+  const diaryEntries = diaryRoleEntries(ctx.state, chatNow.contactId, true);
+  const mergedDiary = mergeDiaryEntries(diaryEntries, transfer.diary || [], chatNow.contactId);
+
+  if (!merged.addedCount && !mergedDiary.addedCount) {
+    ctx.toast(`没有新增内容（${merged.skippedCount} 条消息、${mergedDiary.skippedCount} 篇日记重复）`);
     return;
   }
 
@@ -1468,32 +1489,41 @@ function applyThreadChatImport(ctx, chat, transfer) {
   ), Number(chatNow.updatedAt) || 0);
   chatNow.updatedAt = Math.max(Number(chatNow.updatedAt) || 0, newestAt);
 
+  const bits = [];
+  if (merged.addedCount) bits.push(`${merged.addedCount} 条消息`);
+  if (mergedDiary.addedCount) bits.push(`${mergedDiary.addedCount} 篇日记`);
+
   ctx.save().then(saved => {
     if (!saved) return;
     ctx.rerender();
-    ctx.toast(`已导入 ${merged.addedCount} 条消息${merged.skippedCount ? `，跳过 ${merged.skippedCount} 条重复` : ''}`);
+    ctx.toast(`已导入 ${bits.join('、')}${merged.skippedCount ? `，跳过 ${merged.skippedCount} 条重复消息` : ''}${mergedDiary.skippedCount ? `，跳过 ${mergedDiary.skippedCount} 篇重复日记` : ''}`);
   });
 }
 
 function reviewThreadChatImport(ctx, chat, contact, transfer) {
   const currentMessages = Array.isArray(chat.messages) ? chat.messages : [];
   const merged = mergeChatHistory(currentMessages, transfer.messages);
-  if (!merged.addedCount) {
-    ctx.toast(`没有新增消息（${merged.skippedCount} 条重复）`);
+  const currentDiary = diaryRoleEntries(ctx.state, chat.contactId);
+  const mergedDiary = mergeDiaryEntries({ ...currentDiary }, transfer.diary || [], chat.contactId);
+  if (!merged.addedCount && !mergedDiary.addedCount) {
+    ctx.toast('没有新增内容（消息和日记都已存在）');
     return;
   }
 
   const sourceName = transfer.character?.name || contact?.name || 'TA';
   const currentName = contact?.name || '当前角色';
   const differentCharacter = transfer.character?.id && transfer.character.id !== chat.contactId;
+  const parts = [];
+  if (merged.addedCount) parts.push(`${merged.addedCount} 条消息`);
+  if (mergedDiary.addedCount) parts.push(`${mergedDiary.addedCount} 篇日记`);
   const title = differentCharacter
-    ? `导入「${sourceName}」的 ${merged.addedCount} 条消息？`
-    : `导入 ${merged.addedCount} 条消息？`;
+    ? `导入「${sourceName}」的 ${parts.join('、')}？`
+    : `导入 ${parts.join('、')}？`;
 
   ctx.openSheet({
     title,
     items: [{
-      label: `合并到「${currentName}」${merged.skippedCount ? `，跳过 ${merged.skippedCount} 条重复` : ''}`,
+      label: `合并到「${currentName}」${merged.skippedCount || mergedDiary.skippedCount ? `，跳过重复` : ''}`,
       value: 'import',
       icon: 'upload',
     }],
@@ -1521,8 +1551,8 @@ function pickThreadChatImport(ctx, chat, contact) {
     }
     try {
       const transfer = parseChatTransferText(await file.text());
-      if (!transfer.messages.length) {
-        ctx.toast('文件里没有聊天消息');
+      if (!transfer.messages.length && !(transfer.diary || []).length) {
+        ctx.toast('文件里没有聊天消息或日记');
         return;
       }
       reviewThreadChatImport(ctx, chat, contact, transfer);
@@ -1574,6 +1604,17 @@ export const threadSettingsApp = {
       ctx.save();
       ctx.rerender();
       ctx.toast(chat.muted ? '这个会话不再显示未读角标' : '恢复未读角标');
+      return true;
+    }
+
+    if (act === 'ts-toggle-world-sync') {
+      if (!isWorldChat(chat)) return true;
+      chat.world.syncEnabled = chat.world.syncEnabled === false;
+      ctx.save();
+      ctx.rerender();
+      ctx.toast(chat.world.syncEnabled
+        ? '以后每轮会写回酒馆聊天记录'
+        : '以后不再写回酒馆，这条只留在手机里');
       return true;
     }
 

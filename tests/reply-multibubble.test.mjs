@@ -120,7 +120,7 @@ function controllerFixture(t, replyText, inputText = '') {
   let calls = 0;
   const ctx = {
     state: data.state, epoch: () => 1,
-    shell: { root: { querySelector: selector => selector === '.mp-compose-box input' ? input : box }, live: {} },
+    shell: { root: { querySelector: selector => selector === '.mp-compose-box textarea' ? input : box }, live: {} },
     save: async () => true, rerender() {}, toast() {},
     ai: {
       proactive: async () => { calls++; return replyText; },

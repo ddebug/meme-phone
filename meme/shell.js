@@ -771,7 +771,7 @@ export function createShell(options) {
     const prevView = shell.stack[shell.stack.length - 1]?.view || '';
     const prevScroll = root.querySelector('.mp-page-body')?.scrollTop || 0;
     /* 重绘前记下输入框的光标/选区，重绘后放回原位，别让正在打的字跳到末尾 */
-    const prevInput = root.querySelector('.mp-compose-box input');
+    const prevInput = root.querySelector('.mp-compose-box textarea');
     const prevSel = prevInput && root.ownerDocument?.activeElement === prevInput
       ? { start: prevInput.selectionStart, end: prevInput.selectionEnd, dir: prevInput.selectionDirection }
       : null;
@@ -812,6 +812,7 @@ export function createShell(options) {
       </div>`;
 
     restoreLive(prevSel);
+    root.querySelectorAll('.mp-compose-box textarea').forEach(growComposer);
     shell.improveSendState();
     /* 文字弹层打开后把光标放进去，键盘能直接输入；不抢正在编辑的输入框焦点 */
     if (shell.sheet?.kind === 'text') {
@@ -825,11 +826,25 @@ export function createShell(options) {
     if (shell.sheet) shell.sheetAnimated = true;
   }
 
+  /* 单行输入框随内容长高：超过 5 行就开始自己滚，不把整页顶飞 */
+  function growComposer(el) {
+    if (!el || el.tagName !== 'TEXTAREA') return;
+    const cs = getComputedStyle(el);
+    const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const max = 104 - pad;
+    el.style.height = '0px';
+    const need = Math.max(0, (el.scrollHeight || 0) - pad);
+    el.style.height = `${Math.min(need, max)}px`;
+    el.style.overflowY = need > max ? 'auto' : 'hidden';
+  }
+  shell.growComposer = growComposer;
+
   function restoreLive(prevSel = null) {
-    const input = root.querySelector('.mp-compose-box input');
+    const input = root.querySelector('.mp-compose-box textarea');
     if (input && shell.live.inputValue) {
       input.value = shell.live.inputValue;
       shell.improveSendState();
+      growComposer(input);
       if (shell.live.focus) {
         input.focus();
         const len = input.value.length;
@@ -846,7 +861,7 @@ export function createShell(options) {
 
   shell.improveSendState = function improveSendState() {
     const button = root.querySelector('.mp-send');
-    const input = root.querySelector('.mp-compose-box input');
+    const input = root.querySelector('.mp-compose-box textarea');
     if (!button || !input) return;
     const hasText = Boolean(input.value.trim());
     const busy = button.dataset.busy === '1';
@@ -1202,10 +1217,11 @@ export function createShell(options) {
     const entry = shell.stack[shell.stack.length - 1];
     const app = entry ? apps[entry.view] : null;
     if (app && typeof app.onInput === 'function' && app.onInput(ctx, event)) return;
-    const input = event.target.closest('.mp-compose-box input');
+    const input = event.target.closest('.mp-compose-box textarea');
     if (!input) return;
     shell.live.inputValue = input.value;
     shell.improveSendState();
+    growComposer(input);
     if (entry && ctx.onDraft) ctx.onDraft(entry, input.value);
   });
 
@@ -1218,13 +1234,13 @@ export function createShell(options) {
 
   root.addEventListener('focusin', event => {
     if (event.target.closest('input, textarea')) shell.typing = true;
-    if (event.target.closest('.mp-compose-box input')) shell.live.focus = true;
+    if (event.target.closest('.mp-compose-box textarea')) shell.live.focus = true;
     if (event.target.closest('input, textarea')) scheduleLayout();
   });
 
   root.addEventListener('focusout', event => {
     if (event.target.closest('input, textarea')) shell.typing = false;
-    if (event.target.closest('.mp-compose-box input')) {
+    if (event.target.closest('.mp-compose-box textarea')) {
       shell.live.focus = false;
       /* 键盘收起后视口高度恢复，按真实窗口重新对一次缩放基准；延迟等收起动画结束 */
       setTimeout(() => { if (!shell.typing) refreshViewport(); }, 120);
@@ -1243,7 +1259,10 @@ export function createShell(options) {
       if (shell.stack.length) { ctx.back(); return; }
       ctx.onClose?.();
     }
-    if (event.key === 'Enter' && event.target.closest('.mp-compose-box input')) {
+    if (event.key === 'Enter' && event.target.closest('.mp-compose-box textarea')) {
+      /* Enter 发送；Shift+Enter 换一行，长句可以在输入框里自己分段 */
+      if (event.shiftKey) return;
+      event.preventDefault();
       const send = root.querySelector('.mp-send');
       if (send) send.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     }

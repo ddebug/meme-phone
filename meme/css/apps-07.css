@@ -831,7 +831,7 @@
   flex: 1;
   min-height: 38px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 4px;
   padding: 3px 3px 3px 12px;
   border-radius: 19px;
@@ -844,7 +844,8 @@
   box-shadow: inset 0 0 0 1px rgba(142, 123, 242, .38), var(--shadow-s);
 }
 
-.mp-compose-box input {
+.mp-compose-box input,
+.mp-compose-box textarea {
   flex: 1;
   min-width: 0;
   border: 0;
@@ -852,10 +853,29 @@
   background: none;
   font: inherit;
   font-size: calc(13.5px * var(--font-scale));
+  line-height: 1.45;
   color: var(--text);
 }
 
-.mp-compose-box input::placeholder { color: var(--text-4); }
+/* 输入框随内容长高：超过约 5 行就在框里滚，发出去的长消息也能看全 */
+.mp-root .mp-compose-box textarea {
+  display: block;
+  padding: 5px 0 6px;
+  max-height: 104px;
+  resize: none;
+  overflow-y: hidden;
+  word-break: break-word;
+  scrollbar-width: none;
+  /* 覆盖全局输入框底色：输入区要跟外面那颗白胶囊同色，别叠一层灰 */
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none;
+}
+
+.mp-compose-box textarea::-webkit-scrollbar { display: none; }
+
+.mp-compose-box input::placeholder,
+.mp-compose-box textarea::placeholder { color: var(--text-4); }
 
 .mp-sq-btn {
   width: 34px;

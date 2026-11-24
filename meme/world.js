@@ -253,6 +253,7 @@ export function installWorld(ctx) {
     /** 这一轮手机聊天写完，写回原聊天文件。 */
     async syncTurn(chat, turnId, messages) {
       if (!isWorldChat(chat) || !turnId) return;
+      if (chat.world.syncEnabled === false) return;
       if (!chat.world.chatFile && !chat.world.chatId) return;
       if (Array.isArray(chat.syncedTurnIds) && chat.syncedTurnIds.includes(turnId)) return;
       const text = formatTurnText(chat, messages);
@@ -271,6 +272,7 @@ export function installWorld(ctx) {
 
     async flush(chat) {
       if (!isWorldChat(chat)) return;
+      if (chat.world.syncEnabled === false) return;
       if (flushingChats.has(chat)) return;
       flushingChats.add(chat);
       try {

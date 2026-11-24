@@ -85,7 +85,7 @@ function composerHtml(ctx, theater) {
       </div>` : ''}
       <div class="mp-composer-row">
         <div class="mp-compose-box">
-          <input type="text" placeholder="发一句，酒馆那边接着写…" value="${esc(ctx.shell.live.inputValue || '')}" aria-label="输入消息">
+          <textarea class="mp-compose-input" rows="1" placeholder="发一句，酒馆那边接着写…" aria-label="输入消息">${esc(ctx.shell.live.inputValue || '')}</textarea>
           <button class="mp-send ${busy ? 'is-stop' : 'is-text'}" data-plain="1" data-busy="${busy ? '1' : '0'}" data-act="${busy ? 'branch-stop' : 'branch-send'}" data-theater="${theater.id}" type="button" aria-label="${busy ? '停止这次生成' : '发送'}">
             <span class="mp-send-now">${icon('send')}</span>
             <span class="mp-send-stop">${icon('stop')}</span>

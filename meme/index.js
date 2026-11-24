@@ -13,7 +13,7 @@ import { photoApp } from './apps/photo.js';
 import { buildMemoryContext } from './memory.js';
 import { buildReplyMessages, transcript, replyLead, proactiveLead, diaryTranscriptForMessages, characterBlock, sceneBlock, userBlock } from './reply-context.js';
 import { behaviorPrompt, behaviorSettings, parseBehaviorReply } from './behavior.js';
-import { DIARY_OUTPUT_PROTOCOL, diaryFingerprint, diaryContextMessages } from './diary.js';
+import { DIARY_OUTPUT_PROTOCOL, diaryFingerprint, diaryContextMessages, diaryParamsFingerprint } from './diary.js';
 import { diaryApp, threadDiaryApp } from './apps/diary.js';
 import { contactsApp, contactApp } from './apps/contacts.js';
 import { settingsApp, appearanceApp } from './apps/settings.js';
@@ -179,6 +179,7 @@ function makeAi(getState) {
         state.settings?.memory?.readMode || '',
         state.diary?.enabled !== false ? 'diaryon' : 'diaryoff',
         diaryFingerprint(state.diary?.contacts?.[chat?.contactId] || {}),
+        diaryParamsFingerprint(state, chat),
         presetId ? `preset:${presetId}` : 'preset:active',
         options.presetOverride ? JSON.stringify(options.presetOverride.context || {}) : '',
         options.presetOverride ? JSON.stringify(options.presetOverride.items || []) : '',

@@ -208,12 +208,13 @@ function nativeHistoryTranscript(state, chat, limit, options = {}) {
   if (!chat) return '';
   const contact = state.contacts?.[chat.contactId];
   const omitIds = new Set([...(options.omitIds || []), options.omitId || ''].filter(Boolean).map(String));
-  const valid = (chat.messages || [])
-    .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded)
-    .filter(message => !omitIds.has(String(message.id)));
+  const allValid = (chat.messages || [])
+    .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded);
+  const valid = allValid.filter(message => !omitIds.has(String(message.id)));
   const count = Number(limit);
   const selected = Number.isFinite(count) && count > 0 ? valid.slice(-Math.floor(count)) : valid.slice();
-  const latestDate = valid.length ? dayKey(new Date(Number(valid[valid.length - 1].at))) : '';
+  /* 最近一天看整段聊天，不看这次发送窗口；否则最后一条被 omit 后，前一天会被误当“最近一天”而继续发原文。 */
+  const latestDate = allValid.length ? dayKey(new Date(Number(allValid[allValid.length - 1].at))) : '';
   const groups = diaryDayGroups(chat);
   const entries = state?.diary?.contacts?.[chat.contactId] || {};
   const replaced = new Set();
@@ -245,12 +246,13 @@ export function historyTranscript(state, chat, limit = 0, options = {}) {
   const contact = state.contacts?.[chat.contactId];
   const omitIds = new Set([...(options.omitIds || []), options.omitId || ''].filter(Boolean).map(String));
   const maxChars = Math.max(0, Number(options.maxChars) || 0);
-  const valid = (chat.messages || [])
-    .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded)
-    .filter(message => !omitIds.has(String(message.id)));
+  const allValid = (chat.messages || [])
+    .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded);
+  const valid = allValid.filter(message => !omitIds.has(String(message.id)));
   const count = Number(limit);
   const selected = Number.isFinite(count) && count > 0 ? valid.slice(-Math.floor(count)) : valid.slice();
-  const latestDate = valid.length ? dayKey(new Date(Number(valid[valid.length - 1].at))) : '';
+  /* 最近一天看整段聊天，不看这次发送窗口；否则最后一条被 omit 后，前一天会被误当“最近一天”而继续发原文。 */
+  const latestDate = allValid.length ? dayKey(new Date(Number(allValid[allValid.length - 1].at))) : '';
   const groups = diaryDayGroups(chat);
   const entries = state?.diary?.contacts?.[chat.contactId] || {};
   const replaced = new Set();

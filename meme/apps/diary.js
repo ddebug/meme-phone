@@ -449,6 +449,7 @@ async function runThreadGeneration(ctx, contactId, dates) {
     state.diary.lastGenerated = new Date().toISOString();
     threadState(ctx, contactId).selected.clear();
     ctx.save();
+    invalidateContextPreview(ctx, chat.id);
     ctx.toast(`整理好了 ${parsed.length} 天`);
   } catch (error) {
     ctx.toast(error?.message || '日记生成失败');
@@ -456,6 +457,12 @@ async function runThreadGeneration(ctx, contactId, dates) {
     ctx.shell.threadDiaryBusy = '';
     ctx.rerender();
   }
+}
+
+/** 日记一旦变化，聊天页的请求预览缓存也要作废，否则 tk 还是旧原文/旧日记。 */
+function invalidateContextPreview(ctx, chatId = '') {
+  try { ctx.ai?.clearPreview?.(chatId); } catch {}
+  if (!chatId || ctx.shell.debugPreview?.chatId === chatId) ctx.shell.debugPreview = null;
 }
 
 function requestThreadGeneration(ctx, contactId, dates) {
@@ -506,6 +513,7 @@ function handleThreadDiary(ctx, act, data, event) {
   if (act === 'td-toggle-replace') {
     state.diary.enabled = state.diary.enabled === false;
     ctx.save();
+    invalidateContextPreview(ctx);
     ctx.rerender();
     ctx.toast(state.diary.enabled ? '旧日期会用日记替换原文；最近一天仍读原文' : '日记替换已关闭，聊天上下文全部读原文');
     return true;
@@ -557,6 +565,7 @@ function handleThreadDiary(ctx, act, data, event) {
     ctx.closeSheet();
     state.diary.prompt = text;
     ctx.save();
+    invalidateContextPreview(ctx);
     ctx.rerender();
     ctx.toast('日记提示词已保存；旧日记会标成待整理，重新整理后生效');
     return true;
@@ -586,6 +595,7 @@ function handleThreadDiary(ctx, act, data, event) {
           messageCount: dayMessages.length || null,
         });
         ctx.save();
+        invalidateContextPreview(ctx, chat.id);
         ctx.rerender();
         ctx.toast('日记已保存；原始聊天没有改动');
       },
@@ -598,6 +608,7 @@ function handleThreadDiary(ctx, act, data, event) {
     try { setDiaryUseOriginal(state, contactId, date, checked); }
     catch (error) { ctx.toast(error.message); return true; }
     ctx.save();
+    invalidateContextPreview(ctx, chat.id);
     ctx.rerender();
     ctx.toast(checked ? '这一天发送时改用原文，日记保留' : '这一天允许用日记替换原文');
     return true;
@@ -618,6 +629,7 @@ function handleThreadDiary(ctx, act, data, event) {
     ctx.closeSheet();
     removeDiaryEntry(state, contactId, date);
     ctx.save();
+    invalidateContextPreview(ctx, chat.id);
     ctx.rerender();
     ctx.toast('日记已删除，原始聊天保留');
     return true;

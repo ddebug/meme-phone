@@ -12,7 +12,7 @@ import {
   chatHistoryFor, effectiveTavernHistory, pendingUserMessages, pendingUserCount, clearPendingMessages,
 } from '../data.js';
 import { memoryEffectiveSummary, memoryPresetTitle } from '../memory.js';
-import { diaryDayStatuses, diaryNeedsWrite } from '../diary.js';
+import { diaryDayStatuses, diaryFingerprint, diaryNeedsWrite, diaryParamsFingerprint } from '../diary.js';
 import { requestStats, estimateTokens, proactiveLead, serializeMessage } from '../reply-context.js';
 import { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } from '../chat-transfer.js';
 import { avatarHtml, chatAvatarHtml, esc, shortText, timeText } from '../shell.js';
@@ -162,6 +162,8 @@ function debugKey(ctx, chat) {
     ctx.state.settings?.api?.activeChat || '',
     replyPresetFor(ctx.state, chat)?.id || '',
     JSON.stringify(chat.history || {}),
+    (ctx.state.diary?.enabled !== false ? 'diaryon' : 'diaryoff') + ':' + diaryFingerprint(ctx.state.diary?.contacts?.[chat.contactId] || {}),
+    diaryParamsFingerprint(ctx.state, chat),
     ctx.state.settings?.memory?.activeId || '',
     ctx.state.settings?.memory?.readMode || '',
     wakeAllowed(ctx.state, chat) ? 'wake' : 'nowake',

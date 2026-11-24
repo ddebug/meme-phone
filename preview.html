@@ -16637,7 +16637,7 @@ const {
   chatHistoryFor, effectiveTavernHistory, pendingUserMessages, pendingUserCount, clearPendingMessages,
 } = __req("meme/data.js");
 const { memoryEffectiveSummary, memoryPresetTitle } = __req("meme/memory.js");
-const { diaryDayStatuses, diaryNeedsWrite } = __req("meme/diary.js");
+const { diaryDayStatuses, diaryFingerprint, diaryNeedsWrite, diaryParamsFingerprint } = __req("meme/diary.js");
 const { requestStats, estimateTokens, proactiveLead, serializeMessage } = __req("meme/reply-context.js");
 const { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } = __req("meme/chat-transfer.js");
 const { avatarHtml, chatAvatarHtml, esc, shortText, timeText } = __req("meme/shell.js");
@@ -16787,6 +16787,8 @@ function debugKey(ctx, chat) {
     ctx.state.settings?.api?.activeChat || '',
     replyPresetFor(ctx.state, chat)?.id || '',
     JSON.stringify(chat.history || {}),
+    (ctx.state.diary?.enabled !== false ? 'diaryon' : 'diaryoff') + ':' + diaryFingerprint(ctx.state.diary?.contacts?.[chat.contactId] || {}),
+    diaryParamsFingerprint(ctx.state, chat),
     ctx.state.settings?.memory?.activeId || '',
     ctx.state.settings?.memory?.readMode || '',
     wakeAllowed(ctx.state, chat) ? 'wake' : 'nowake',
@@ -19963,6 +19965,7 @@ async function runThreadGeneration(ctx, contactId, dates) {
     state.diary.lastGenerated = new Date().toISOString();
     threadState(ctx, contactId).selected.clear();
     ctx.save();
+    invalidateContextPreview(ctx, chat.id);
     ctx.toast(`整理好了 ${parsed.length} 天`);
   } catch (error) {
     ctx.toast(error?.message || '日记生成失败');
@@ -19970,6 +19973,12 @@ async function runThreadGeneration(ctx, contactId, dates) {
     ctx.shell.threadDiaryBusy = '';
     ctx.rerender();
   }
+}
+
+/** 日记一旦变化，聊天页的请求预览缓存也要作废，否则 tk 还是旧原文/旧日记。 */
+function invalidateContextPreview(ctx, chatId = '') {
+  try { ctx.ai?.clearPreview?.(chatId); } catch {}
+  if (!chatId || ctx.shell.debugPreview?.chatId === chatId) ctx.shell.debugPreview = null;
 }
 
 function requestThreadGeneration(ctx, contactId, dates) {
@@ -20020,6 +20029,7 @@ function handleThreadDiary(ctx, act, data, event) {
   if (act === 'td-toggle-replace') {
     state.diary.enabled = state.diary.enabled === false;
     ctx.save();
+    invalidateContextPreview(ctx);
     ctx.rerender();
     ctx.toast(state.diary.enabled ? '旧日期会用日记替换原文；最近一天仍读原文' : '日记替换已关闭，聊天上下文全部读原文');
     return true;
@@ -20071,6 +20081,7 @@ function handleThreadDiary(ctx, act, data, event) {
     ctx.closeSheet();
     state.diary.prompt = text;
     ctx.save();
+    invalidateContextPreview(ctx);
     ctx.rerender();
     ctx.toast('日记提示词已保存；旧日记会标成待整理，重新整理后生效');
     return true;
@@ -20100,6 +20111,7 @@ function handleThreadDiary(ctx, act, data, event) {
           messageCount: dayMessages.length || null,
         });
         ctx.save();
+        invalidateContextPreview(ctx, chat.id);
         ctx.rerender();
         ctx.toast('日记已保存；原始聊天没有改动');
       },
@@ -20112,6 +20124,7 @@ function handleThreadDiary(ctx, act, data, event) {
     try { setDiaryUseOriginal(state, contactId, date, checked); }
     catch (error) { ctx.toast(error.message); return true; }
     ctx.save();
+    invalidateContextPreview(ctx, chat.id);
     ctx.rerender();
     ctx.toast(checked ? '这一天发送时改用原文，日记保留' : '这一天允许用日记替换原文');
     return true;
@@ -20132,6 +20145,7 @@ function handleThreadDiary(ctx, act, data, event) {
     ctx.closeSheet();
     removeDiaryEntry(state, contactId, date);
     ctx.save();
+    invalidateContextPreview(ctx, chat.id);
     ctx.rerender();
     ctx.toast('日记已删除，原始聊天保留');
     return true;
@@ -28682,12 +28696,13 @@ function nativeHistoryTranscript(state, chat, limit, options = {}) {
   if (!chat) return '';
   const contact = state.contacts?.[chat.contactId];
   const omitIds = new Set([...(options.omitIds || []), options.omitId || ''].filter(Boolean).map(String));
-  const valid = (chat.messages || [])
-    .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded)
-    .filter(message => !omitIds.has(String(message.id)));
+  const allValid = (chat.messages || [])
+    .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded);
+  const valid = allValid.filter(message => !omitIds.has(String(message.id)));
   const count = Number(limit);
   const selected = Number.isFinite(count) && count > 0 ? valid.slice(-Math.floor(count)) : valid.slice();
-  const latestDate = valid.length ? dayKey(new Date(Number(valid[valid.length - 1].at))) : '';
+  /* 最近一天看整段聊天，不看这次发送窗口；否则最后一条被 omit 后，前一天会被误当“最近一天”而继续发原文。 */
+  const latestDate = allValid.length ? dayKey(new Date(Number(allValid[allValid.length - 1].at))) : '';
   const groups = diaryDayGroups(chat);
   const entries = state?.diary?.contacts?.[chat.contactId] || {};
   const replaced = new Set();
@@ -28719,12 +28734,13 @@ function historyTranscript(state, chat, limit = 0, options = {}) {
   const contact = state.contacts?.[chat.contactId];
   const omitIds = new Set([...(options.omitIds || []), options.omitId || ''].filter(Boolean).map(String));
   const maxChars = Math.max(0, Number(options.maxChars) || 0);
-  const valid = (chat.messages || [])
-    .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded)
-    .filter(message => !omitIds.has(String(message.id)));
+  const allValid = (chat.messages || [])
+    .filter(message => message && message.kind !== 'system' && message.kind !== 'recalled' && !message.excluded);
+  const valid = allValid.filter(message => !omitIds.has(String(message.id)));
   const count = Number(limit);
   const selected = Number.isFinite(count) && count > 0 ? valid.slice(-Math.floor(count)) : valid.slice();
-  const latestDate = valid.length ? dayKey(new Date(Number(valid[valid.length - 1].at))) : '';
+  /* 最近一天看整段聊天，不看这次发送窗口；否则最后一条被 omit 后，前一天会被误当“最近一天”而继续发原文。 */
+  const latestDate = allValid.length ? dayKey(new Date(Number(allValid[allValid.length - 1].at))) : '';
   const groups = diaryDayGroups(chat);
   const entries = state?.diary?.contacts?.[chat.contactId] || {};
   const replaced = new Set();
@@ -29169,7 +29185,7 @@ const { photoApp } = __req("meme/apps/photo.js");
 const { buildMemoryContext } = __req("meme/memory.js");
 const { buildReplyMessages, transcript, replyLead, proactiveLead, diaryTranscriptForMessages, characterBlock, sceneBlock, userBlock } = __req("meme/reply-context.js");
 const { behaviorPrompt, behaviorSettings, parseBehaviorReply } = __req("meme/behavior.js");
-const { DIARY_OUTPUT_PROTOCOL, diaryFingerprint, diaryContextMessages } = __req("meme/diary.js");
+const { DIARY_OUTPUT_PROTOCOL, diaryFingerprint, diaryContextMessages, diaryParamsFingerprint } = __req("meme/diary.js");
 const { diaryApp, threadDiaryApp } = __req("meme/apps/diary.js");
 const { contactsApp, contactApp } = __req("meme/apps/contacts.js");
 const { settingsApp, appearanceApp } = __req("meme/apps/settings.js");
@@ -29335,6 +29351,7 @@ function makeAi(getState) {
         state.settings?.memory?.readMode || '',
         state.diary?.enabled !== false ? 'diaryon' : 'diaryoff',
         diaryFingerprint(state.diary?.contacts?.[chat?.contactId] || {}),
+        diaryParamsFingerprint(state, chat),
         presetId ? `preset:${presetId}` : 'preset:active',
         options.presetOverride ? JSON.stringify(options.presetOverride.context || {}) : '',
         options.presetOverride ? JSON.stringify(options.presetOverride.items || []) : '',

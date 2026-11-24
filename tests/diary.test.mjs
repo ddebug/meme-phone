@@ -17,8 +17,8 @@ import {
   diaryContextMode,
   diaryEntryIsCurrent,
 } from '../meme/diary.js';
-import { DIARY_SKIP_THRESHOLD, normalize } from '../meme/data.js';
-import { historyTranscript } from '../meme/reply-context.js';
+import { DIARY_SKIP_THRESHOLD, normalize, demoState } from '../meme/data.js';
+import { historyTranscript, estimateTokens, requestStats, buildReplyMessages } from '../meme/reply-context.js';
 
 const atOf = (date) => new Date(`${date}T12:00:00`).getTime();
 const msg = (date, extra = {}) => ({ at: atOf(date), from: 'them', text: '聊了一句', ...extra });
@@ -232,6 +232,53 @@ test('historyTranscript：旧日期已整理时替换原文，最近一天保持
 
   state.diary.enabled = false;
   assert.ok(historyTranscript(state, chat, 30).includes('旧日原话0'));
+});
+
+test('token 预估按最终发送的历史文本算，日记替换后应明显变小', () => {
+  const longText = '这是一段用来占体积的聊天原文，'.repeat(6);
+  const oldMessages = Array.from({ length: DIARY_SKIP_THRESHOLD + 1 }, (_, i) =>
+    msg('2026-11-09', { id: `long${i}`, text: `${longText}${i}` }));
+  const latest = msg('2026-11-10', { id: 'latest', text: '最近一句' });
+  const state = {
+    contacts: { c1: { name: '沈砚' } },
+    settings: { user: { name: '我' } },
+    users: [],
+    characters: [],
+    diary: {
+      enabled: true,
+      prompt: '',
+      contacts: { c1: { '2026-11-09': { text: '九号那天聊了很多，最后约好周末见面。', sourceFingerprint: diaryFingerprint(oldMessages) } } },
+    },
+  };
+  const chat = { contactId: 'c1', messages: [...oldMessages, latest] };
+  const original = requestStats([{ role: 'system', content: historyTranscript(state, chat, 0, { diary: false }) }]).total;
+  const replaced = requestStats([{ role: 'system', content: historyTranscript(state, chat, 0) }]).total;
+  assert.ok(replaced < original, `日记替换后 token 应下降：${replaced} < ${original}`);
+  assert.ok(estimateTokens(historyTranscript(state, chat, 0)) < estimateTokens(historyTranscript(state, chat, 0, { diary: false })));
+});
+
+test('buildReplyMessages：最后一条被 omit 后，前一天仍按日记替换原文', async () => {
+  const state = demoState();
+  const chat = state.chats[Object.keys(state.chats)[0]];
+  const contact = state.contacts[chat.contactId];
+  const oldMessages = Array.from({ length: DIARY_SKIP_THRESHOLD + 1 }, (_, i) =>
+    msg('2026-11-09', { id: `omit${i}`, text: `旧日原话${i}` }));
+  const latest = msg('2026-11-10', { id: 'omit-latest', text: '最后一句' });
+  chat.messages = [...oldMessages, latest];
+  state.diary.enabled = true;
+  state.diary.contacts = {
+    [chat.contactId]: {
+      '2026-11-09': {
+        text: '被 omit 时也要替换的日记',
+        sourceFingerprint: diaryFingerprint(oldMessages),
+      },
+    },
+  };
+  const built = await buildReplyMessages(state, chat, contact, { memoryText: '', omitLastUser: true });
+  const history = built.messages.find(message => String(message.source).includes('历史小手机消息'));
+  assert.ok(history, '应组装出小手机历史');
+  assert.ok(history.content.includes('被 omit 时也要替换的日记'));
+  assert.ok(!history.content.includes('旧日原话0'));
 });
 
 

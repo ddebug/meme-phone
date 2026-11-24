@@ -32,6 +32,9 @@
   font-size: calc(10.5px * var(--font-scale));
   line-height: calc(1.5 * var(--line-scale));
   color: var(--text-4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mp-set-row.is-danger .mp-set-name { color: #b75a73; }
@@ -1364,6 +1367,8 @@
   border: 0;
   background: none;
   width: 100%;
+  /* label 做数字行时默认是 content-box，width:100% 会把整行撑出卡片右侧 */
+  box-sizing: border-box;
   text-align: left;
   color: inherit;
   font: inherit;

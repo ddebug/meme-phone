@@ -31,7 +31,7 @@ import { extrasApp, extrasSwitchApp, extraDetailApp, emojiApp,
   plansApp, dressApp, iconPickerApp, helpApp,
 } from './apps/more.js';
 import { parallelApp } from './apps/parallel.js';
-import { parallelBranchApp } from './apps/branch.js';
+import { parallelBranchApp, parallelSettingsApp, cancelParallelRun } from './apps/branch.js';
 
 const APPS = {
   'app-chat': chatApp,
@@ -46,6 +46,7 @@ const APPS = {
   'app-extras': extrasApp,
   'app-parallel': parallelApp,
   'parallel-branch': parallelBranchApp,
+  'parallel-settings': parallelSettingsApp,
   'extras-switch': extrasSwitchApp,
   'app-emoji': emojiApp,
   'app-plans': plansApp,
@@ -876,6 +877,8 @@ export async function openMemePhone(options = {}) {
 export function closeMemePhone() {
   if (!rootEl) return;
   stopMusic();
+  /* 平行时空的生成还在酒馆那边跑：先叫停，别让结果落回已经关掉的界面 */
+  cancelParallelRun();
   clearInterval(followTimer);
   followTimer = 0;
   clearTimeout(draftDebugTimer);
@@ -912,6 +915,11 @@ export function goView(view, params = {}) {
     payload = { chatId: first.id };
   }
   if (view === 'parallel-branch' && !params.theaterId) {
+    const first = theatersOf(ctx.state)[0];
+    if (!first) return;
+    payload = { theaterId: first.id };
+  }
+  if (view === 'parallel-settings' && !params.theaterId) {
     const first = theatersOf(ctx.state)[0];
     if (!first) return;
     payload = { theaterId: first.id };

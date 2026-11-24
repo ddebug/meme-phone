@@ -758,6 +758,33 @@ export function theaterTitleOf(theater) {
   return title || '未命名的一场';
 }
 
+/* 平行时空里「这一场」自己能调的东西：背景从哪截、记忆怎么给、要不要额外指令。
+   生成仍然走酒馆那套预设 / 角色卡 / 世界书，这里只改交给它之前的那一段上下文。 */
+export const THEATER_HISTORY_MODES = ['fork', 'recent', 'none'];
+export const THEATER_MEMORY_MODES = ['tavern', 'fixed'];
+export const THEATER_EXTRA_MAX = 2000;
+
+export function theaterConfig(raw) {
+  const cfg = raw && typeof raw === 'object' ? raw : {};
+  const floors = Number(cfg.historyFloors);
+  return {
+    historyMode: THEATER_HISTORY_MODES.includes(cfg.historyMode) ? cfg.historyMode : 'fork',
+    /* 没填过就用 30；填了就夹在 1 - 200 之间，0 也不至于把背景取空 */
+    historyFloors: Number.isFinite(floors) ? Math.min(200, Math.max(1, Math.round(floors))) : 30,
+    memoryMode: THEATER_MEMORY_MODES.includes(cfg.memoryMode) ? cfg.memoryMode : 'tavern',
+    extraPrompt: String(cfg.extraPrompt || '').slice(0, THEATER_EXTRA_MAX),
+    showTime: cfg.showTime !== false,
+    showAvatar: cfg.showAvatar !== false,
+  };
+}
+
+/** 改这一场的设置：只接受上面那几个键，改完立刻能拿来生成。 */
+export function setTheaterConfig(theater, patch = {}) {
+  if (!theater) return false;
+  theater.cfg = theaterConfig({ ...theaterConfig(theater.cfg), ...(patch || {}) });
+  return true;
+}
+
 /** 同一个聊天文件的第几场：角色 · 分叉 N。不改名就一直跟着这个口径走。 */
 export function defaultTheaterTitle(state, info = {}) {
   const file = String(info.chatFile || '');
@@ -791,6 +818,7 @@ export function addTheater(state, info = {}) {
       coverage: info.memory?.coverage || null,
     },
     messages: Array.isArray(info.messages) ? info.messages : [],
+    cfg: theaterConfig(info.cfg),
     createdAt: Number(info.createdAt) || Date.now(),
     updatedAt: Number(info.updatedAt) || Number(info.createdAt) || Date.now(),
   };
@@ -2310,6 +2338,7 @@ export function normalize(raw) {
           id: item.id || `${id}_m${index}`,
         }))
         .filter(item => item.mes),
+      cfg: theaterConfig(theater?.cfg),
       createdAt: Number(theater?.createdAt) || 0,
       updatedAt: Number(theater?.updatedAt) || Number(theater?.createdAt) || 0,
       legacy: Boolean(theater?.legacy),

@@ -5,10 +5,11 @@ import {
   demoState, normalize, chatsOf, chatFor, unreadTotal, pushMessage,
   addTheater, theatersOf, theaterById, theaterTitleOf, defaultTheaterTitle,
   theaterMessage, theaterMessagesCount, contactForTavernCharacter,
+  theaterConfig, setTheaterConfig, THEATER_EXTRA_MAX,
 } from '../meme/data.js';
 import { readOpenTavernChat, branchReply, readTavernMemory, __resetHostScriptForTests } from '../meme/host.js';
-import { parallelApp } from '../meme/apps/parallel.js';
-import { parallelBranchApp } from '../meme/apps/branch.js';
+import { parallelApp, branchContextPanelHtml } from '../meme/apps/parallel.js';
+import { parallelBranchApp, parallelSettingsApp } from '../meme/apps/branch.js';
 
 function fakeHost(options = {}) {
   const listeners = new Map();
@@ -35,7 +36,7 @@ function fakeHost(options = {}) {
       },
     },
     generateQuietPrompt: options.generateQuietPrompt || (async (args) => {
-      assert.equal(args.quietPrompt, '', '分支生成不塞额外指令，纯靠聊天历史');
+      ctx.quietPrompt = args.quietPrompt;
       ctx.sentFloors = ctx.chat.map(floor => floor.mes);
       ctx.eventSource.emit('chat_completion_prompt_ready', { chat: [{ role: 'system', content: '预设' }, { role: 'user', content: ctx.chat[ctx.chat.length - 1].mes }] });
       return '那我就在站台上陪你一会儿。';
@@ -218,8 +219,91 @@ test('平行时空：换了聊天文件就不拿别的聊天凑数', async () =>
   assert.equal(ctx.chat[1].mes, '还在改表。');
   await assert.rejects(
     () => branchReply({ chatId: 'demo-shen', forkFloor: 99, branch: [{ is_user: true, mes: '在吗' }] }),
-    /对不上/,
+    /接不上|对不上/,
   );
+});
+
+test('平行时空：这一场改成「最近几层」就取酒馆最新那段，不再从分叉点开始', async () => {
+  const ctx = fakeHost({
+    chat: [
+      { is_user: false, name: '沈砚', mes: '第一楼' },
+      { is_user: true, name: '颜', mes: '第二楼' },
+      { is_user: false, name: '沈砚', mes: '第三楼' },
+    ],
+  });
+  await branchReply({
+    chatId: 'demo-shen',
+    forkFloor: 1,
+    cfg: { historyMode: 'recent', historyFloors: 2 },
+    branch: [{ is_user: true, name: '颜', mes: '这条线里再问一次' }],
+    characterName: '沈砚',
+  });
+  assert.deepEqual(ctx.sentFloors, ['第二楼', '第三楼', '这条线里再问一次'], '只带最近两层');
+  assert.equal(ctx.chat.length, 3, '结束后原样放回');
+});
+
+test('平行时空：不带背景时只把这一场自己说的话交给酒馆', async () => {
+  const ctx = fakeHost();
+  await branchReply({
+    chatId: 'demo-shen',
+    forkFloor: 2,
+    cfg: { historyMode: 'none' },
+    branch: [{ is_user: true, name: '颜', mes: '就当没聊过' }],
+  });
+  assert.deepEqual(ctx.sentFloors, ['就当没聊过']);
+});
+
+test('平行时空：固定记忆与额外指令都拼进 quiet prompt，默认仍是空串', async () => {
+  const ctx = fakeHost();
+  const result = await branchReply({
+    chatId: 'demo-shen',
+    forkFloor: 2,
+    memory: { engine: 'baibai', text: '昨晚他在楼下等到十一点。' },
+    cfg: { memoryMode: 'fixed', extraPrompt: '这一场里他还不知道那件事。' },
+    branch: [{ is_user: true, name: '颜', mes: '你还在吗' }],
+  });
+  assert.match(result.quietPrompt, /昨晚他在楼下等到十一点/);
+  assert.match(result.quietPrompt, /这一场里他还不知道那件事/);
+  assert.equal(ctx.sentFloors.length, 3, '背景照常带，不因为拼了指令就少楼层');
+
+  const plain = fakeHost();
+  const normal = await branchReply({ chatId: 'demo-shen', forkFloor: 2, branch: [{ is_user: true, mes: '嗯' }] });
+  assert.equal(normal.quietPrompt, '', '默认什么都不塞');
+  assert.equal(plain.chat.length, 2);
+});
+
+test('平行时空：绑的是另一个聊天文件就不生成，免得拿错上下文', async () => {
+  const ctx = fakeHost();
+  await assert.rejects(
+    () => branchReply({
+      chatId: 'demo-shen',
+      chatFile: '别的角色 - 2026-11-10.jsonl',
+      forkFloor: 2,
+      branch: [{ is_user: true, mes: '在吗' }],
+    }),
+    /这一场接的是/,
+  );
+  assert.equal(ctx.chat.length, 2, '真实聊天没被换掉');
+});
+
+test('平行时空：同一时间只让一场生成，另一场直接排队拒绝', async () => {
+  let release = null;
+  const ctx = fakeHost({
+    generateQuietPrompt: () => new Promise(resolve => {
+      release = () => resolve('慢慢来。');
+      ctx.sentFloors = ctx.chat.map(floor => floor.mes);
+    }),
+  });
+  const first = branchReply({ chatId: 'demo-shen', forkFloor: 2, branch: [{ is_user: true, mes: '第一场' }] });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  await assert.rejects(
+    () => branchReply({ chatId: 'demo-shen', forkFloor: 2, branch: [{ is_user: true, mes: '第二场' }] }),
+    /另一场还在生成/,
+  );
+  release();
+  const result = await first;
+  assert.equal(result.text, '慢慢来。');
+  assert.equal(ctx.chat.length, 2);
 });
 
 test('平行时空：几万楼的长聊天换 chat 也不会撑爆调用栈', async () => {
@@ -327,7 +411,7 @@ test('平行时空：分支页的发送键只有发送/停止两态，不吃「�
   assert.match(send, /data-act="branch-send"/);
 });
 
-test('平行时空：长按菜单三项，看背景能打开这一场的快照面板', () => {
+test('平行时空：长按菜单只留一个设置入口，背景面板能说清这一场怎么接', () => {
   const state = demoState();
   const sheets = [];
   const ctx = {
@@ -338,14 +422,43 @@ test('平行时空：长按菜单三项，看背景能打开这一场的快照�
   };
   const theater = theatersOf(state)[0];
   assert.equal(parallelApp.handle(ctx, 'branch-menu', { theater: theater.id }), true);
-  assert.deepEqual(sheets[0].items.map(item => item.label), ['改名', '看背景', '删掉这一场']);
-  sheets[0].onPick('context');
-  const panel = sheets[1];
-  assert.equal(panel.title, '这一场的背景');
+  assert.deepEqual(sheets[0].items.map(item => item.label), ['这一场的设置', '打开这一场', '删掉这一场']);
+  const panel = { kind: 'panel', title: '这一场的背景', render: () => branchContextPanelHtml(theater) };
+  sheets[0].onPick('settings');
+  assert.equal(sheets.length, 1, '设置走整页，不再弹第二个菜单');
   const html = panel.render();
   assert.match(html, /第 3 楼/, '说清接在哪个聊天文件的第几楼');
-  assert.match(html, /快照 3 层/);
-  assert.match(html, /重新开一场/, '提示酒馆后来继续聊的不会自动进来');
+  assert.match(html, /内联快照 · 3 层/);
+  assert.match(html, /跟到最新楼层/, '提示酒馆后来继续聊的不会自动进来');
+});
+
+test('平行时空：这一场自己能调背景口径、记忆口径和额外指令', () => {
+  const cfg = theaterConfig(undefined);
+  assert.equal(cfg.historyMode, 'fork');
+  assert.equal(cfg.historyFloors, 30);
+  assert.equal(cfg.memoryMode, 'tavern');
+  assert.equal(cfg.extraPrompt, '');
+  assert.equal(cfg.showTime, true);
+  assert.equal(cfg.showAvatar, true);
+
+  const messy = theaterConfig({ historyMode: '乱写', historyFloors: 999, memoryMode: 'off', extraPrompt: 'x'.repeat(3000) });
+  assert.equal(messy.historyMode, 'fork', '不认识的取值退回默认');
+  assert.equal(messy.historyFloors, 200, '层数封顶 200');
+  assert.equal(messy.memoryMode, 'tavern', '记忆只有跟随酒馆 / 固定两份');
+  assert.equal(messy.extraPrompt.length, THEATER_EXTRA_MAX);
+
+  const state = { theaters: {} };
+  const theater = addTheater(state, { characterName: '沈砚', chatFile: 'f.jsonl', forkFloor: 3 });
+  assert.equal(theater.cfg.historyMode, 'fork');
+  setTheaterConfig(theater, { historyMode: 'recent', historyFloors: 12 });
+  assert.equal(theater.cfg.historyMode, 'recent');
+  assert.equal(theater.cfg.historyFloors, 12);
+  setTheaterConfig(theater, { historyFloors: 0 });
+  assert.equal(theater.cfg.historyFloors, 1, '层数至少 1');
+
+  const saved = normalize({ theaters: { [theater.id]: theater } }).theaters[theater.id];
+  assert.equal(saved.cfg.historyMode, 'recent');
+  assert.equal(saved.cfg.historyFloors, 1, '设置跟着存档一起往返');
 });
 test('平行时空：分支消息存成酒馆形状，也带上展示用的时间', () => {
   const message = theaterMessage({ isUser: true, name: '颜', text: '晚安', at: 1700000000000 });

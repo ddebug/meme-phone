@@ -471,3 +471,65 @@ test('平行时空：分支消息存成酒馆形状，也带上展示用的时�
   assert.ok(theater.messages.length, '演示数据里有一场已经说过话的分支');
   pushMessage(stato, Object.values(stato.chats)[0].id, { from: 'me', text: '原生聊天照常' });
 });
+
+test('平行时空：角色名不落到酒馆的系统占位名上', async () => {
+  /* 没选角色时酒馆的 name2 就是 'SillyTavern System'，别拿它当角色名 */
+  const ctx = fakeHost();
+  const chatFile = '沈砚 - 2026-11-10@22h10m.jsonl';
+  ctx.characters = [];
+  ctx.characterId = 'ghost-id-that-does-not-exist';
+  ctx.this_chid = undefined;
+  ctx.name2 = 'SillyTavern System';
+  ctx.chatId = chatFile;
+  ctx.getCurrentChatId = () => chatFile;
+  const host = await readOpenTavernChat();
+  assert.equal(host.available, true);
+  assert.equal(host.characterName, '沈砚', '认不到角色卡时按当前聊天文件名兜底');
+  assert.equal(host.chatFile, '沈砚 - 2026-11-10@22h10m.jsonl');
+  assert.ok(!/sillytavern/i.test(host.characterName));
+  __resetHostScriptForTests();
+});
+
+test('平行时空：认不到角色卡时按聊天文件名认角色', async () => {
+  const ctx = fakeHost();
+  const chatFile = '沈砚 - 2026-11-10@22h10m.jsonl';
+  ctx.characterId = 'ghost-id-that-does-not-exist';
+  ctx.this_chid = undefined;
+  ctx.name2 = 'SillyTavern System';
+  ctx.chatId = chatFile;
+  ctx.getCurrentChatId = () => chatFile;
+  const host = await readOpenTavernChat();
+  assert.equal(host.characterName, '沈砚', '按当前聊天文件名认回角色卡');
+  assert.equal(host.characterAvatar, 'shen.png');
+  __resetHostScriptForTests();
+});
+
+test('平行时空：characterId 是 avatar 串也能认出角色', async () => {
+  const ctx = fakeHost();
+  ctx.characterId = 'shen';
+  ctx.this_chid = undefined;
+  const host = await readOpenTavernChat();
+  assert.equal(host.characterName, '沈砚');
+  assert.equal(host.characterAvatar, 'shen.png');
+  __resetHostScriptForTests();
+});
+
+test('平行时空：旧存档里的占位角色名按聊天文件名改回来', () => {
+  const file = '沈砚 - 2026-11-10@22h10m.jsonl';
+  const state = normalize({
+    theaters: {
+      legacy: {
+        title: 'SillyTavern System · 分叉 1',
+        autoTitle: true,
+        characterName: 'SillyTavern System',
+        chatFile: file,
+        forkFloor: 3,
+      },
+    },
+  });
+  assert.equal(state.theaters.legacy.characterName, '沈砚');
+  assert.equal(state.theaters.legacy.title, '沈砚 · 分叉 1');
+  assert.equal(defaultTheaterTitle({ theaters: {} }, { characterName: 'SillyTavern System', chatFile: file }), '沈砚 · 分叉 1');
+  const fresh = addTheater({ theaters: {} }, { characterName: 'SillyTavern System', chatFile: file, forkFloor: 2 });
+  assert.equal(fresh.characterName, '沈砚', '新开的这一场也不带占位名');
+});

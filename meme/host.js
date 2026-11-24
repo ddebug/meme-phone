@@ -219,6 +219,68 @@ export async function setWorldEntryEnabled(bookName, uid, disabled) {
 }
 
 /** 当前打开的酒馆聊天，用来给日记、主动消息提供素材。 */
+/** 酒馆在没选角色时 name2 就是个系统占位名，绝不能拿它当角色名显示。 */
+const PLACEHOLDER_NAME = /^sillytavern(\s+system)?$/i;
+
+function charactersList(script) {
+  const raw = script?.characters;
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  if (raw && typeof raw === 'object') return Object.values(raw).filter(Boolean);
+  return [];
+}
+
+/**
+ * 找当前角色：不同版本 / 桌面端的 id 口径不一样（数字下标、avatar 串、名字），
+ * 逐个试，最后按「当前打开的聊天文件」认领，别一失手就落到 name2 的占位名上。
+ */
+export function resolveTavernCharacter(script) {
+  const list = charactersList(script);
+  if (!list.length) return null;
+  const ids = [script?.characterId, script?.this_chid, script?.chid]
+    .filter(value => value !== undefined && value !== null && value !== '');
+  for (const id of ids) {
+    const numeric = typeof id === 'number' ? id : (/^\d+$/.test(String(id)) ? Number(id) : NaN);
+    if (Number.isInteger(numeric) && list[numeric]) return list[numeric];
+    const text = String(id);
+    const bare = text.replace(/\.(png|jpe?g|webp)$/i, '');
+    const hit = list.find(item => {
+      const avatar = String(item?.avatar || '');
+      return avatar === text || avatar.replace(/\.(png|jpe?g|webp)$/i, '') === bare || String(item?.name || '') === text;
+    });
+    if (hit) return hit;
+  }
+  const chatId = String(script?.getCurrentChatId?.() || script?.chatId || '').replace(/\.jsonl$/i, '');
+  if (chatId) {
+    const hit = list.find(item => String(item?.chat || '').replace(/\.jsonl$/i, '') === chatId);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/** 聊天文件名 → 角色名：`沈砚 - 2026-11-10@22h10m.jsonl` → 沈砚。 */
+export function tavernNameFromChatFile(file) {
+  const bare = String(file || '').replace(/\.jsonl$/i, '').trim();
+  if (!bare) return '';
+  const dated = bare.match(/^(.*?)\s-\s\d{4}-\d{1,2}-\d{1,2}@/);
+  if (dated) return dated[1].trim();
+  const cut = bare.split(' - ')[0].trim();
+  if (cut && cut !== bare) return cut;
+  return '';
+}
+
+/** 角色名口径：角色卡 → 酒馆当前 name2（去掉系统占位名）→ 聊天文件名 → 最后一句角色发言。 */
+export function resolveTavernName(script, character, chatFile = '', chat = []) {
+  const name = String(character?.name || '').trim();
+  if (name && !PLACEHOLDER_NAME.test(name)) return name;
+  const fallback = String(script?.name2 || '').trim();
+  if (fallback && !PLACEHOLDER_NAME.test(fallback) && fallback !== String(script?.name1 || '')) return fallback;
+  const fromFile = tavernNameFromChatFile(chatFile);
+  if (fromFile) return fromFile;
+  const lines = Array.isArray(chat) ? chat : [];
+  const last = [...lines].reverse().find(line => line && !line.is_user && line.name);
+  return String(last?.name || 'TA');
+}
+
 export async function readTavernContext() {
   const script = await loadHostScript();
   if (!script) return {
@@ -233,13 +295,15 @@ export async function readTavernContext() {
       text: line.mes || '',
       at: line.send_date || '',
     })) : [];
-    const character = script.characters?.[script.this_chid];
+    const character = resolveTavernCharacter(script);
+    const rawChat = Array.isArray(script.chat) ? script.chat : [];
+    const chatFile = String(character?.chat || '');
     return {
       userName,
       chat,
-      characterName: character?.name || '',
+      characterName: resolveTavernName(script, character, chatFile || String(script.getCurrentChatId?.() || ''), rawChat),
       characterAvatar: character?.avatar || '',
-      chatFile: character?.chat || '',
+      chatFile,
       chatId: String(script.getCurrentChatId?.() || script.chatId || ''),
       metadata: script.chatMetadata || null,
     };
@@ -409,10 +473,8 @@ export async function appendTavernHiddenFloor({
   const chat = Array.isArray(script.chat) ? script.chat : null;
   if (!chat) return { ok: false, queued: false, reason: '拿不到酒馆当前聊天' };
   const currentId = String(script.getCurrentChatId?.() || script.chatId || '');
-  const currentCharacter = Array.isArray(script.characters)
-    ? script.characters[script.characterId ?? script.this_chid]
-    : null;
-  const currentFile = String(currentCharacter?.chat || '');
+  const currentCharacter = resolveTavernCharacter(script);
+  const currentFile = String(currentCharacter?.chat || (currentId ? (/\.jsonl$/i.test(currentId) ? currentId : '') : ''));
   const expectedId = String(chatId || '');
   const expectedFile = String(chatFile || '').replace(/\.jsonl$/i, '');
   const currentFileKey = currentFile.replace(/\.jsonl$/i, '');
@@ -549,15 +611,16 @@ export async function readOpenTavernChat() {
   if (!script) return { ...empty, reason: '不在酒馆里，读不到聊天文件' };
   const chat = Array.isArray(script.chat) ? script.chat : [];
   if (!chat.length) return { ...empty, reason: '酒馆里还没有打开聊天' };
-  const characterId = script.characterId ?? script.this_chid;
-  const character = Array.isArray(script.characters) ? script.characters[characterId] : null;
+  const character = resolveTavernCharacter(script);
+  const currentId = String(script.getCurrentChatId?.() || script.chatId || '');
+  const chatFile = String(character?.chat || (/\.jsonl$/i.test(currentId) ? currentId : ''));
   return {
     available: true,
     reason: '',
-    characterName: String(character?.name || script.name2 || ''),
+    characterName: resolveTavernName(script, character, chatFile, chat),
     characterAvatar: String(character?.avatar || ''),
-    chatFile: String(character?.chat || ''),
-    chatId: String(script.getCurrentChatId?.() || script.chatId || ''),
+    chatFile,
+    chatId: currentId,
     presetName: String(script.chatCompletionSettings?.preset_settings_openai || ''),
     forkFloor: chat.length,
     snapshot: 'live',
@@ -649,8 +712,7 @@ export async function branchReply({
       throw new Error('这一场绑的是另一个聊天文件，先在酒馆打开它再发');
     }
     const wantFile = String(chatFile || '').replace(/\.jsonl$/i, '');
-    const id = ctx.characterId ?? ctx.this_chid;
-    const currentFile = String((Array.isArray(ctx.characters) ? ctx.characters[id] : null)?.chat || '').replace(/\.jsonl$/i, '');
+    const currentFile = String(resolveTavernCharacter(ctx)?.chat || current).replace(/\.jsonl$/i, '');
     if (wantFile && currentFile && wantFile !== currentFile) {
       throw new Error(`这一场接的是《${wantFile}》，酒馆现在开的是《${currentFile}》，先在酒馆打开原本那个聊天`);
     }

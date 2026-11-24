@@ -665,6 +665,11 @@ export function contactForTavernCharacter(state, character = {}) {
     || Object.values(state.contacts).find(item => !item.tavernAvatar && item.name === character.name);
   if (existing) {
     if (!existing.tavernAvatar) existing.tavernAvatar = key;
+    /* 以前酒馆没认出角色时把占位名建成了联系人，认出来以后顺手改回来 */
+    if (character.name && !TAVERN_PLACEHOLDER_NAME.test(String(character.name)) && TAVERN_PLACEHOLDER_NAME.test(String(existing.name || ''))) {
+      existing.name = character.name;
+      existing.cardName = character.name;
+    }
     return existing.id;
   }
   const contact = addContact(state, {
@@ -785,10 +790,30 @@ export function setTheaterConfig(theater, patch = {}) {
   return true;
 }
 
+/** 酒馆的系统占位名（没选角色时 name2 就是它），不能当角色名存下来。 */
+const TAVERN_PLACEHOLDER_NAME = /^sillytavern(\s+system)?$/i;
+
+/** 聊天文件名 → 角色名：`沈砚 - 2026-11-10@22h10m.jsonl` → 沈砚。 */
+export function theaterNameFromFile(file) {
+  const bare = String(file || '').replace(/\.jsonl$/i, '').trim();
+  if (!bare) return '';
+  const dated = bare.match(/^(.*?)\s-\s\d{4}-\d{1,2}-\d{1,2}@/);
+  if (dated) return dated[1].trim();
+  const cut = bare.split(' - ')[0].trim();
+  return cut && cut !== bare ? cut : '';
+}
+
+/** 角色名清洗：占位名 / 空名一律按聊天文件名补回来。 */
+export function cleanTheaterCharacterName(name, chatFile = '') {
+  const raw = String(name || '').trim();
+  if (raw && !TAVERN_PLACEHOLDER_NAME.test(raw)) return raw;
+  return theaterNameFromFile(chatFile) || '';
+}
+
 /** 同一个聊天文件的第几场：角色 · 分叉 N。不改名就一直跟着这个口径走。 */
 export function defaultTheaterTitle(state, info = {}) {
   const file = String(info.chatFile || '');
-  const name = String(info.characterName || 'TA').trim() || 'TA';
+  const name = cleanTheaterCharacterName(info.characterName, file) || 'TA';
   const count = Object.values(state.theaters || {}).filter(item => (file ? item.chatFile === file : item.characterName === name)).length + 1;
   return `${name} · 分叉 ${count}`;
 }
@@ -804,7 +829,7 @@ export function addTheater(state, info = {}) {
     title: String(info.title || '').trim().slice(0, 32) || defaultTheaterTitle(state, info),
     autoTitle: !String(info.title || '').trim(),
     contactId: String(info.contactId || ''),
-    characterName: String(info.characterName || ''),
+    characterName: cleanTheaterCharacterName(info.characterName, info.chatFile),
     characterAvatar: String(info.characterAvatar || ''),
     chatFile: String(info.chatFile || ''),
     chatId: String(info.chatId || ''),
@@ -2307,12 +2332,18 @@ export function normalize(raw) {
     const rawBase = Array.isArray(theater?.base) ? theater.base.filter(item => item && typeof item === 'object') : [];
     const keepInline = rawBase.length > 0 && baseChars(rawBase) <= INLINE_BASE_MAX;
     const messages = Array.isArray(theater?.messages) ? theater.messages : [];
+    const cleanName = cleanTheaterCharacterName(theater?.characterName, theater?.chatFile);
+    const rawTitle = String(theater?.title || '').trim().slice(0, 32);
+    /* 旧存档里把酒馆占位名当成了角色名（标题也是自动生成的）→ 一并按聊天文件名改回来 */
+    const title = theater?.autoTitle !== false && TAVERN_PLACEHOLDER_NAME.test(rawTitle.split(' · ')[0] || '') && cleanName
+      ? `${cleanName} · ${rawTitle.split(' · ').slice(1).join(' · ') || '分叉 1'}`
+      : rawTitle;
     merged.theaters[id] = {
       id,
-      title: String(theater?.title || '').trim().slice(0, 32) || '未命名的一场',
+      title: title || '未命名的一场',
       autoTitle: theater?.autoTitle !== false,
       contactId: String(theater?.contactId || ''),
-      characterName: String(theater?.characterName || ''),
+      characterName: cleanName,
       characterAvatar: String(theater?.characterAvatar || ''),
       chatFile: String(theater?.chatFile || ''),
       chatId: String(theater?.chatId || ''),

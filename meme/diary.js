@@ -89,10 +89,17 @@ export function diaryParamsFingerprint(state, chat) {
 }
 
 export function diaryEntryIsCurrent(state, chat, entry, dayMessages) {
-  return Boolean(entry && typeof entry.text === 'string' && entry.text.trim() &&
-    dayMessages?.length > DIARY_SKIP_THRESHOLD && entry.sourceFingerprint &&
-    entry.sourceFingerprint === diaryFingerprint(dayMessages) &&
-    (!entry.paramsFingerprint || entry.paramsFingerprint === diaryParamsFingerprint(state, chat)));
+  return diaryEntryMismatch(state, chat, entry, dayMessages) === '';
+}
+
+/** 已有正文为什么不算当前：空、条数不够、缺原文指纹、原文变了、提示词/资料变了。 */
+export function diaryEntryMismatch(state, chat, entry, dayMessages) {
+  if (!entry || typeof entry.text !== 'string' || !entry.text.trim()) return 'empty';
+  if (!(dayMessages?.length > DIARY_SKIP_THRESHOLD)) return 'short';
+  if (!entry.sourceFingerprint) return 'missing-source';
+  if (entry.sourceFingerprint !== diaryFingerprint(dayMessages)) return 'source';
+  if (entry.paramsFingerprint && entry.paramsFingerprint !== diaryParamsFingerprint(state, chat)) return 'params';
+  return '';
 }
 
 /** 日期状态：跳过 / 待整理 / 已整理。旧日记没有原文指纹，一律先显示待整理。 */
@@ -100,13 +107,16 @@ export function diaryDayStatuses(state, chat) {
   const entries = diaryRoleEntries(state, chat?.contactId);
   return [...diaryDayGroups(chat)].map(([date, messages]) => {
     const entry = entries[date];
-    const summarized = diaryEntryIsCurrent(state, chat, entry, messages);
+    const mismatch = diaryEntryMismatch(state, chat, entry, messages);
+    const summarized = !mismatch;
+    const hasText = Boolean(entry && typeof entry.text === 'string' && entry.text.trim());
     return {
       date,
       messages,
       messageCount: messages.length,
       entry: entry || null,
       status: messages.length <= DIARY_SKIP_THRESHOLD ? 'skipped' : summarized ? 'summarized' : 'pending',
+      staleReason: hasText && messages.length > DIARY_SKIP_THRESHOLD && mismatch !== 'empty' ? mismatch : '',
     };
   });
 }

@@ -495,9 +495,10 @@ function settingsBody(ctx, chatId) {
   const status = [mode, `${count} 条消息`, chat.pinned ? '置顶' : '', chat.muted ? '免打扰' : ''].filter(Boolean).join(' · ');
   const diaryStatuses = diaryDayStatuses(state, chat);
   const diaryWritten = diaryStatuses.filter(item => String(item.entry?.text || '').trim()).length;
-  const diaryPending = diaryStatuses.filter(item => item.status === 'pending').length;
+  const diaryPending = diaryStatuses.filter(item => item.status === 'pending' && !String(item.entry?.text || '').trim()).length;
+  const diaryStale = diaryStatuses.filter(item => item.status === 'pending' && String(item.entry?.text || '').trim()).length;
   const diarySub = diaryWritten
-    ? `${diaryWritten} 天已写${diaryPending ? ` · ${diaryPending} 天待整理` : ''}`
+    ? `${diaryWritten} 天已写${diaryPending ? ` · ${diaryPending} 天待整理` : ''}${diaryStale ? ` · ${diaryStale} 天待更新` : ''}`
     : '按天记录这个角色和你的聊天';
   const presets = apiPresetsOf(state);
   const ownPreset = presets.find(item => item.id === chat.llmPresetId) || null;

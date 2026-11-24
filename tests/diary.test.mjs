@@ -7,6 +7,8 @@ import {
   diaryContextMessages,
   diaryDayGroups,
   diaryDayStatuses,
+  diaryEntryMismatch,
+  diaryParamsFingerprint,
   parseDiaryResponse,
   saveDiaryEntry,
   removeDiaryEntry,
@@ -176,6 +178,24 @@ test('diaryDayStatuses：跳过、待整理、已整理按原文指纹判定', (
   assert.equal(diaryDayStatuses(state, chat)[1].status, 'skipped');
   state.diary.contacts.c1['2026-11-09'] = { text: '整理好了', sourceFingerprint: diaryFingerprint(oldMessages) };
   assert.equal(diaryDayStatuses(state, chat)[0].status, 'summarized');
+});
+
+test('diaryEntryMismatch 指出过期原因，已有正文仍标待更新', () => {
+  const messages = Array.from({ length: DIARY_SKIP_THRESHOLD + 1 }, (_, i) => msg('2026-11-11', { id: `x${i}`, text: `第${i}句` }));
+  const state = { contacts: { c1: { name: '沈砚' } }, settings: { user: { name: '我' } }, users: [], characters: [], diary: { prompt: 'p', contacts: { c1: {} } } };
+  const chat = { contactId: 'c1', messages };
+  const entry = { text: '旧日记', sourceFingerprint: diaryFingerprint(messages), paramsFingerprint: diaryParamsFingerprint(state, chat) };
+  assert.equal(diaryEntryMismatch(state, chat, entry, messages), '');
+  assert.equal(diaryEntryMismatch(state, chat, { ...entry, sourceFingerprint: '旧指纹' }, messages), 'source');
+  assert.equal(diaryEntryMismatch(state, chat, { ...entry, sourceFingerprint: '' }, messages), 'missing-source');
+  assert.equal(diaryEntryMismatch(state, chat, { ...entry, paramsFingerprint: '旧参数' }, messages), 'params');
+
+  state.diary.contacts.c1['2026-11-11'] = { ...entry, sourceFingerprint: '旧指纹' };
+  const stale = diaryDayStatuses(state, chat).find(item => item.date === '2026-11-11');
+  assert.equal(stale.status, 'pending');
+  assert.equal(stale.staleReason, 'source');
+  state.diary.contacts.c1['2026-11-11'] = { ...entry, paramsFingerprint: '旧参数' };
+  assert.equal(diaryDayStatuses(state, chat).find(item => item.date === '2026-11-11').staleReason, 'params');
 });
 
 test('historyTranscript：旧日期已整理时替换原文，最近一天保持原文', () => {

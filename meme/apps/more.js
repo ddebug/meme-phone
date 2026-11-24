@@ -549,18 +549,17 @@ export const dressApp = {
     const dress = dressOf(ctx.state);
     const theme = ['default', 'frost', 'pixel'].includes(dress.theme) ? dress.theme : 'default';
     const themes = [
-      { key: 'default', title: '晨光', sub: '晨光紫气泡', preview: 'background:linear-gradient(150deg,#ffe3ef,#e4f7f0)' },
-      { key: 'frost', title: '白色磨砂', sub: '二改无光', preview: 'background:linear-gradient(145deg,rgba(230,230,230,.92),rgba(250,250,250,.76))' },
-      { key: 'pixel', title: '像素小兔', sub: '冷白桌面', preview: `background-image:url(&quot;${PIXEL_BUNNY.banner}&quot;);background-size:cover;background-position:center` },
+      { key: 'default', title: '晨光', preview: 'background:linear-gradient(150deg,#ffe3ef,#e4f7f0)' },
+      { key: 'frost', title: '白色磨砂', preview: 'background:linear-gradient(145deg,rgba(230,230,230,.92),rgba(250,250,250,.76))' },
+      { key: 'pixel', title: '像素小兔', preview: `background-image:url(&quot;${PIXEL_BUNNY.banner}&quot;);background-size:cover;background-position:center` },
     ];
     return `
       <div class="mp-page-body">
-        ${head('装扮', '主题与明暗、字体、灵动岛和 App 图标')}
+        <div class="mp-subtitle" style="margin-top:0">装扮</div>
         <div class="mp-dress-hero">
           <div class="mp-dress-aa">Aa</div>
           <div class="mp-dress-hero-text">
             <b>${esc(FONT_CHOICES.find(item => item.value === (dress.font || 'system'))?.label || '系统')} · ${esc(String(Math.round((Number(dress.fontSize) || 1) * 100)))}%</b>
-            <span>这是字体预览。换字号只影响文字，不拉伸手机壳。</span>
           </div>
         </div>
 
@@ -570,15 +569,13 @@ export const dressApp = {
             <button class="mp-theme-card${theme === item.key ? ' is-on' : ''}" data-act="dress-theme" data-key="${item.key}" type="button">
               <span class="mp-theme-preview" data-kind="${item.key}" style="${item.preview}"></span>
               <span class="mp-theme-name">${esc(item.title)}</span>
-              <span class="mp-theme-sub">${esc(item.sub)}</span>
             </button>`).join('')}
         </div>
-        <div class="mp-dress-note">主题只换外观，不动聊天记录和 App 数据。</div>
 
         <div class="mp-group-label" style="margin-top:14px">明暗</div>
         <button class="mp-dress-toggle" data-act="dress-daynight" type="button">
           <span class="mp-set-ico">${icon(settings.theme === 'night' ? 'moon' : 'sun')}</span>
-          <span class="mp-set-name">夜间模式<small>${settings.theme === 'night' ? '现在是深色，晚上不刺眼' : '现在是日间浅色，点右边换深色'}</small></span>
+          <span class="mp-set-name">夜间模式</span>
           <span class="mp-switch${settings.theme === 'night' ? ' on' : ''}"></span>
         </button>
 
@@ -594,7 +591,7 @@ export const dressApp = {
         <div class="mp-group-label" style="margin-top:14px">灵动岛</div>
         <button class="mp-dress-toggle" data-act="dress-island" type="button">
           <span class="mp-set-ico">${icon('spark')}</span>
-          <span class="mp-set-name">显示灵动岛<small>${dress.island === 'hide' ? '现在隐藏了，状态栏还在' : '点右边可以藏起来'}</small></span>
+          <span class="mp-set-name">显示灵动岛</span>
           <span class="mp-switch${dress.island === 'hide' ? '' : ' on'}"></span>
         </button>
 
@@ -615,7 +612,6 @@ export const dressApp = {
               <span>${esc(target.name)}</span>
             </button>`).join('')}
         </div>
-        <div class="mp-dress-note">每个图标都可以换图形，也可以从相片里选一张当图标。</div>
       </div>`;
   },
 

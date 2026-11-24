@@ -4,10 +4,9 @@
  */
 
 import { icon, TINT } from '../icons.js';
-import { esc, tintStyle } from '../shell.js';
-import { contactsOf, chatsOf, unreadTotal, proactivePromptFor, normalizeProactivePrompt } from '../data.js';
+import { esc } from '../shell.js';
+import { proactivePromptFor, normalizeProactivePrompt } from '../data.js';
 import { PROACTIVE_PROMPT_MAX_LENGTH } from '../preset-defaults.js';
-import { imageEndpoint } from './draw.js';
 
 function downloadBackup(ctx, includeKeys) {
   try {
@@ -98,15 +97,7 @@ export const settingsApp = {
     const state = ctx.state;
     const host = ctx.shell.hostInfo || {};
     const apiReady = host.hasGenerate;
-    const contacts = contactsOf(state).length;
     const customProactivePrompt = Boolean(normalizeProactivePrompt(state.settings.proactive.prompt));
-    const image = imageEndpoint(state);
-    const imageLabel = image.engine === 'custom' ? '自定义接口' : image.engine === 'doubao' ? '豆包 · 火山方舟' : 'NovelAI 官方';
-    const imageReady = image.engine === 'custom' ? Boolean(image.url) : Boolean(image.url && image.key);
-    const wallLabel = state.settings.wallpaper === 'none' ? '素色底'
-      : state.settings.wallpaper === 'day' ? '晨光素色'
-        : state.settings.wallpaper === 'night' ? '夜色素色'
-          : '自定义壁纸';
 
     return `
       <div class="mp-page-body">
@@ -115,8 +106,8 @@ export const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">身份与外观</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'contacts', title: '用户', sub: state.settings.user.name || '还没选', act: 'set-open', app: 'user' })}
-            ${row(ctx, { iconName: 'brush', title: '装扮与主题', sub: `${wallLabel} · ${state.settings.theme === 'night' ? '夜间' : '日间'}`, act: 'set-open-dress' })}
+            ${row(ctx, { iconName: 'contacts', title: '用户', value: state.settings.user.name || '还没选', act: 'set-open', app: 'user' })}
+            ${row(ctx, { iconName: 'brush', title: '装扮与主题', act: 'set-open-dress' })}
           </div>
         </div>
 
@@ -148,26 +139,26 @@ export const settingsApp = {
         <div class="mp-group">
           <div class="mp-group-label">AI 设置 · 参考什么材料</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'book', title: '手机读法', sub: state.settings.memory.readMode === 'recent' ? '只读最近原文' : '总结优先', act: 'set-toggle-memory-read', toggle: state.settings.memory.readMode !== 'recent' })}
-            ${row(ctx, { iconName: 'search', title: '酒馆角色', sub: state.charactersFromTavern ? `酒馆里 ${state.characters.length} 张角色卡` : '', act: 'set-open-cards' })}
+            ${row(ctx, { iconName: 'book', title: '手机读法', act: 'set-toggle-memory-read', toggle: state.settings.memory.readMode !== 'recent' })}
+            ${row(ctx, { iconName: 'search', title: '酒馆角色', act: 'set-open-cards' })}
           </div>
         </div>
 
         <div class="mp-group">
           <div class="mp-group-label">生成与玩法</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'image', title: '绘图', sub: imageReady ? `${imageLabel} · ${image.model || '模型没填'}` : `${imageLabel} · 还没填${image.engine === 'custom' ? '地址' : ' Key'}`, act: 'set-open', app: 'draw' })}
+            ${row(ctx, { iconName: 'image', title: '绘图', act: 'set-open', app: 'draw' })}
             ${row(ctx, { iconName: 'smile', title: '表情包', act: 'set-open', app: 'emoji' })}
-            ${row(ctx, { iconName: 'bookmark', title: '收藏', sub: `${(state.favorites || []).length} 条`, act: 'set-open', app: 'favorites' })}
+            ${row(ctx, { iconName: 'bookmark', title: '收藏', value: `${(state.favorites || []).length} 条`, act: 'set-open', app: 'favorites' })}
           </div>
         </div>
 
         <div class="mp-group">
           <div class="mp-group-label">数据与备份</div>
           <div class="mp-group-box">
-            ${row(ctx, { iconName: 'copy', title: '导出备份', sub: '不含接口 Key', act: 'set-export' })}
-            ${row(ctx, { iconName: 'upload', title: '从备份恢复', sub: '确认后覆盖当前数据', act: 'set-import' })}
-            ${row(ctx, { iconName: 'trash', title: '清空手机数据', sub: '联系方式、聊天、日记全部清掉', act: 'set-wipe' })}
+            ${row(ctx, { iconName: 'copy', title: '导出备份', act: 'set-export' })}
+            ${row(ctx, { iconName: 'upload', title: '从备份恢复', act: 'set-import' })}
+            ${row(ctx, { iconName: 'trash', title: '清空手机数据', act: 'set-wipe' })}
           </div>
         </div>
 
@@ -177,7 +168,7 @@ export const settingsApp = {
             ${row(ctx, { iconName: 'bell', title: '消息提醒', act: 'set-toggle-remind', toggle: state.settings.chat.remind !== false })}
             ${row(ctx, { iconName: 'code', title: '请求调试栏', act: 'set-toggle-debug', toggle: state.settings.chat.debugBar === true })}
             ${row(ctx, { iconName: 'help', title: '帮助', act: 'set-open', app: 'help' })}
-            ${row(ctx, { iconName: 'help', title: '关于 meme-phone', sub: `${contacts} 位联系人 · ${chatsOf(state).length} 个会话 · ${unreadTotal(state)} 条未读`, act: 'set-about' })}
+            ${row(ctx, { iconName: 'help', title: '关于 meme-phone', act: 'set-about' })}
           </div>
         </div>
       </div>`;
@@ -355,27 +346,24 @@ export const appearanceApp = {
     const customWall = ctx.state.settings.customWall || '';
 
     const walls = [
-      { key: 'none', title: '素色', sub: '不铺图片，屏幕里用干净的浅色纸（壳外仍透出酒馆）', swatch: 'repeating-conic-gradient(rgba(160,150,200,.18) 0% 25%, rgba(255,255,255,0) 0% 50%) 50% / 16px 16px' },
-      { key: 'day', title: '晨光素色', sub: '樱粉到薄荷的淡渐变，不铺图片', swatch: 'linear-gradient(160deg,#fbf7ff,#f2f5fd 48%,#f6faf5)' },
-      { key: 'night', title: '夜色素色', sub: '深墨蓝到紫罗兰的渐变，不铺图片', swatch: 'linear-gradient(160deg,#191627,#141222 52%,#0f141a)' },
-      { key: 'custom', title: '自定义', sub: customWall ? '用你选的那张图，只铺在手机屏幕里' : '从相册选一张图，壳外仍然透明', swatch: customWall ? `url("${customWall}") center / cover` : 'linear-gradient(150deg,#e7e1f7,#f7e8ef 55%,#e8f5f2)' },
+      { key: 'none', title: '素色', swatch: 'repeating-conic-gradient(rgba(160,150,200,.18) 0% 25%, rgba(255,255,255,0) 0% 50%) 50% / 16px 16px' },
+      { key: 'day', title: '晨光素色', swatch: 'linear-gradient(160deg,#fbf7ff,#f2f5fd 48%,#f6faf5)' },
+      { key: 'night', title: '夜色素色', swatch: 'linear-gradient(160deg,#191627,#141222 52%,#0f141a)' },
+      { key: 'custom', title: '自定义', swatch: customWall ? `url("${customWall}") center / cover` : 'linear-gradient(150deg,#e7e1f7,#f7e8ef 55%,#e8f5f2)' },
     ];
 
     const row = (item, act, dataKey) => `
-      <button class="mp-row" data-act="${act}" data-${dataKey}="${item.key}" type="button" style="padding:12px;align-items:flex-start">
+      <button class="mp-row" data-act="${act}" data-${dataKey}="${item.key}" type="button" style="padding:12px;align-items:center">
         <span style="width:66px;height:66px;border-radius:16px;flex:0 0 auto;background:${item.swatch};box-shadow:var(--shadow-s)"></span>
         <span class="mp-row-main">
           <span class="mp-row-name">${esc(item.title)}${wall === item.key ? '<span class="mp-pill">当前</span>' : ''}</span>
-          <span class="mp-row-sub" style="white-space:normal">${esc(item.sub)}</span>
         </span>
       </button>`;
 
     return `
       <div class="mp-nav"><button class="mp-back" data-act="back" type="button">${icon('back')}</button><span style="flex:1"></span></div>
       <div class="mp-page-body">
-        <div class="mp-subtitle" style="margin-top:0">壁纸只负责背景；明暗、字体、灵动岛与图标都在「装扮」里</div>
-
-        <div class="mp-group-label" style="margin-top:10px">背景</div>
+        <div class="mp-group-label" style="margin-top:0">背景</div>
         ${walls.map(item => row(item, 'pick-wall', 'wall')).join('')}
         <div style="display:flex;gap:8px;margin-top:8px">
           <button class="mp-btn" data-act="choose-custom-wall" type="button" style="flex:1">
@@ -384,7 +372,6 @@ export const appearanceApp = {
           ${customWall ? `<button class="mp-btn" data-act="remove-custom-wall" type="button" style="flex:0 0 auto;padding:0 16px">${icon('trash')}<span>删除</span></button>` : ''}
         </div>
         <input id="mpWallFile" type="file" accept="image/*" style="display:none">
-        <div class="mp-subtitle" style="margin-top:6px;font-size: calc(11.5px * var(--font-scale))">图片会存进小手机存档，导出备份时一起带走；只铺在屏幕里。</div>
 
         <button class="mp-dress-link" data-act="set-open-dress" type="button">${icon('brush')}换明暗、字体、灵动岛和 App 图标</button>
       </div>`;

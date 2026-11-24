@@ -178,3 +178,68 @@ export function migrateLegacyWorlds(raw, state) {
   state.legacyWorldsMergedAt = Date.now();
   return true;
 }
+
+/* --------------------------------------------------------------- 日记 */
+
+function mergeDiaryEntries(target, source) {
+  if (!isMap(source)) return 0;
+  let added = 0;
+  for (const [key, entry] of Object.entries(source)) {
+    if (!entry || typeof entry !== 'object') continue;
+    const existing = target[key];
+    /* 只补缺，不覆盖：同一天已经有正文就以当前这份为准，别让别的世界线把它冲掉。 */
+    if (existing && String(existing.text || '').trim()) continue;
+    if (!String(entry.text || '').trim() && existing) continue;
+    target[key] = clone(entry);
+    added += 1;
+  }
+  return added;
+}
+
+function mergeDiary(target, source) {
+  if (!isMap(source)) return 0;
+  let added = 0;
+  target.enabled = target.enabled ?? source.enabled;
+  target.prompt = target.prompt || source.prompt;
+  target.pastOnly = target.pastOnly ?? source.pastOnly;
+  target.entries = isMap(target.entries) ? target.entries : {};
+  target.contacts = isMap(target.contacts) ? target.contacts : {};
+  added += mergeDiaryEntries(target.entries, source.entries);
+  if (isMap(source.contacts)) {
+    for (const [contactId, map] of Object.entries(source.contacts)) {
+      if (!contactId || !isMap(map)) continue;
+      if (!isMap(target.contacts[contactId])) {
+        target.contacts[contactId] = clone(map);
+        added += Object.keys(map).length;
+      } else {
+        added += mergeDiaryEntries(target.contacts[contactId], map);
+      }
+    }
+  }
+  return added;
+}
+
+/**
+ * 旧双世界存档里，日记也跟着世界线各存一份。新结构只有一份 diary，
+ * 这里把 metaPhone / worldPhones 里缺的日期补进来；同一天已有正文的不覆盖。
+ * 单独打 legacyDiaryMerged，已经迁过聊天的存档也会再跑一次日记。
+ */
+export function migrateLegacyDiaries(raw, state) {
+  if (!isMap(raw) || !isMap(state)) return false;
+  if (raw.legacyDiaryMerged) return false;
+
+  const sources = [];
+  if (isMap(raw.metaPhone?.data?.diary)) sources.push(raw.metaPhone.data.diary);
+  for (const item of Object.values(isMap(raw.worldPhones) ? raw.worldPhones : {})) {
+    if (isMap(item?.data?.diary)) sources.push(item.data.diary);
+  }
+  if (!sources.length) return false;
+
+  state.diary = isMap(state.diary) ? state.diary : { entries: {}, contacts: {} };
+  sources.forEach(source => mergeDiary(state.diary, source));
+
+  state.legacyDiaryMerged = true;
+  state.legacyDiaryMergedAt = Date.now();
+  return true;
+}
+

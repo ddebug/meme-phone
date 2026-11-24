@@ -32,7 +32,7 @@ import { extrasApp, extrasSwitchApp, extraDetailApp, emojiApp,
 } from './apps/more.js';
 import { parallelApp } from './apps/parallel.js';
 import { parallelBranchApp, parallelSettingsApp, cancelParallelRun } from './apps/branch.js';
-import { migrateLegacyWorlds } from './legacy-world.js';
+import { migrateLegacyWorlds, migrateLegacyDiaries } from './legacy-world.js';
 
 const APPS = {
   'app-chat': chatApp,
@@ -90,6 +90,7 @@ const DOCK_APPS = [
   { id: 'chat', name: '聊天', icon: 'chat' },
   { id: 'worldchat', name: '里世界', icon: 'chat-world' },
   { id: 'contacts', name: '通讯录', icon: 'contacts' },
+  { id: 'diary', name: '日记', icon: 'diary' },
   { id: 'settings', name: '设置', icon: 'settings' },
 ];
 
@@ -403,6 +404,8 @@ export function initMemePhone(options = {}) {
     const state = normalize(raw || (demo ? demoState() : emptyState()));
     /* 旧双世界存档：先把 metaPhone / worldPhones 里的聊天并回来，再落盘。 */
     migrateLegacyWorlds(raw, state);
+    /* 日记也按世界线各存过一份：把快照里缺的日期补进来。 */
+    migrateLegacyDiaries(raw, state);
     store.replace(state);
 
     /* 第一次在酒馆里打开：把角色同步成联系人 */

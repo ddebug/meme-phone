@@ -10,8 +10,8 @@ const customPreset = {
   key: 'k',
 };
 
-function stubHost(quietSpy) {
-  globalThis.SillyTavern = { getContext: () => ({ generateQuietPrompt: quietSpy }) };
+function stubHost(rawSpy, quietSpy) {
+  globalThis.SillyTavern = { getContext: () => ({ generateRaw: rawSpy, generateQuietPrompt: quietSpy }) };
 }
 
 afterEach(() => {
@@ -44,16 +44,27 @@ test('B3：自定义接口空返回同样报错，不退回酒馆', async () => 
   assert.equal(tavernCalls, 0);
 });
 
-test('B3：酒馆预设走宿主安静提示，标记 provider=tavern', async () => {
-  stubHost(async () => '来自酒馆');
+test('酒馆 API 走 generateRaw：只发手机自己组装的 messages，不拼酒馆预设', async () => {
+  let captured = null;
+  let quietCalls = 0;
+  stubHost(async (args) => { captured = args; return '来自酒馆'; }, async () => { quietCalls += 1; return '不该走到'; });
   const result = await generate({
-    messages: [{ role: 'user', content: 'hi' }],
+    messages: [
+      { role: 'system', content: '手机自己的回复要求' },
+      { role: 'user', content: 'hi' },
+    ],
     preset: { engine: 'tavern' },
     demo: false,
   });
   assert.equal(result.text, '来自酒馆');
   assert.equal(result.provider, 'tavern');
   assert.equal(result.demo, false);
+  assert.deepEqual(captured.prompt, [
+    { role: 'system', content: '手机自己的回复要求' },
+    { role: 'user', content: 'hi' },
+  ], '发出去的就是手机组装好的 messages，不摊平成酒馆安静提示');
+  assert.equal(captured.systemPrompt, '');
+  assert.equal(quietCalls, 0, '不再走 generateQuietPrompt，酒馆预设/角色卡/世界书不会被拼进来');
 });
 
 test('B3：正式模式宿主不可用时返回错误，不拿演示文案冒充真实回复', async () => {

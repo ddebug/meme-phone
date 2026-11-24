@@ -13555,6 +13555,27 @@ function abortError() {
   return error;
 }
 
+/**
+ * 借酒馆当前的模型 / 连接，但只发小手机自己组装好的 messages。
+ * 走 `generateRaw`：酒馆侧不再组装角色卡 / 世界书 / 酒馆预设 / 聊天历史，
+ * 跟 `generateQuietPrompt`（整段安静提示，酒馆自己拼全套上下文）严格分开——
+ * 后者只留给平行时空分支那一条链路。
+ */
+async function tavernRawCompletion(script, { messages, system, prompt }) {
+  const raw = script?.generateRaw || globalThis.SillyTavern?.getContext?.()?.generateRaw;
+  if (typeof raw !== 'function') return '';
+  const outgoing = (Array.isArray(messages) ? messages : [])
+    .filter(message => message && String(message.content || '').trim())
+    .map(message => ({
+      role: ['system', 'user', 'assistant'].includes(message.role) ? message.role : 'system',
+      content: String(message.content).trim(),
+    }));
+  if (!outgoing.length && system) outgoing.push({ role: 'system', content: String(system).trim() });
+  if (!outgoing.length) outgoing.push({ role: 'user', content: String(prompt || '').trim() });
+  const text = await raw({ prompt: outgoing, systemPrompt: '' });
+  return typeof text === 'string' ? text : String(text ?? '');
+}
+
 async function generate({ prompt, system = '', messages = null, demoReply = '', preset = null, demo = false, signal = null }) {
   if (signal?.aborted) throw abortError();
   const script = await loadHostScript();
@@ -13568,12 +13589,10 @@ async function generate({ prompt, system = '', messages = null, demoReply = '', 
     return { text, demo: false, provider: preset.engine || 'custom' };
   }
 
-  if (script && typeof script.generateQuietPrompt === 'function') {
-    const quiet = tavernQuietPrompt(messages, system, prompt);
-    const text = await script.generateQuietPrompt({ quietPrompt: quiet, quietName: '' });
-    /* 酒馆 quiet prompt 没有公开的取消入口：停止后晚到的结果也不许写进聊天。 */
+  if (script) {
+    const rawText = await tavernRawCompletion(script, { messages, system, prompt });
     if (signal?.aborted) throw abortError();
-    if (typeof text === 'string' && text.trim()) return { text: text.trim(), demo: false, provider: 'tavern' };
+    if (typeof rawText === 'string' && rawText.trim()) return { text: rawText.trim(), demo: false, provider: 'tavern' };
     return { text: '', demo: false, error: '模型没有返回内容', provider: 'tavern' };
   }
 

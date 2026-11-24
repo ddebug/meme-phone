@@ -337,9 +337,10 @@ function threadDayRows(ctx, contactId, chat, statuses, latestDate, busy) {
     const summaryTokens = text ? formatTokens(text) : '';
     const disabled = busy || item.status === 'skipped';
     return `
-      <div class="mp-td-row">
+      <div class="mp-td-row${st.selected.has(item.date) ? ' is-selected' : ''}">
         <label class="mp-td-check-hit" aria-label="选择 ${item.date}">
           <input class="mp-td-check" type="checkbox" data-act="td-select" data-contact="${esc(contactId)}" data-date="${item.date}"${st.selected.has(item.date) ? ' checked' : ''}${item.status === 'skipped' ? ' disabled' : ''}>
+          <span class="mp-td-check-mark" aria-hidden="true"></span>
         </label>
         <div class="mp-td-main">
           <div class="mp-td-title">${Number(item.date.slice(5, 7))}月${Number(item.date.slice(8, 10))}日 <span class="mp-td-badge ${item.status}">${stateLabel}</span></div>

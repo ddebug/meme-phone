@@ -2376,8 +2376,12 @@ body {
   background: var(--card);
   box-shadow: var(--shadow-s);
 }
+.mp-td-row.is-selected {
+  box-shadow: 0 0 0 1.5px var(--accent), var(--shadow-s);
+}
 
 .mp-td-check-hit {
+  position: relative;
   width: 34px;
   height: 34px;
   flex: 0 0 auto;
@@ -2387,11 +2391,53 @@ body {
   cursor: pointer;
 }
 
+/* 自己画框：不依赖各宿主/主题对原生 checkbox 的覆盖，点击区同时就是整个 34×34 热区。 */
 .mp-td-check {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 auto;
-  accent-color: var(--accent);
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.mp-td-check-mark {
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--line);
+  border-radius: 5px;
+  background: var(--card);
+  pointer-events: none;
+  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+.mp-td-check:checked + .mp-td-check-mark {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.mp-td-check:checked + .mp-td-check-mark::after {
+  content: "";
+  display: block;
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(-45deg) translateY(-1px);
+}
+
+.mp-td-check:focus-visible + .mp-td-check-mark {
+  box-shadow: 0 0 0 3px rgba(142, 123, 242, .18);
+}
+
+.mp-td-check:disabled + .mp-td-check-mark {
+  opacity: .42;
 }
 
 .mp-td-main { flex: 1; min-width: 0; }
@@ -19853,9 +19899,10 @@ function threadDayRows(ctx, contactId, chat, statuses, latestDate, busy) {
     const summaryTokens = text ? formatTokens(text) : '';
     const disabled = busy || item.status === 'skipped';
     return `
-      <div class="mp-td-row">
+      <div class="mp-td-row${st.selected.has(item.date) ? ' is-selected' : ''}">
         <label class="mp-td-check-hit" aria-label="选择 ${item.date}">
           <input class="mp-td-check" type="checkbox" data-act="td-select" data-contact="${esc(contactId)}" data-date="${item.date}"${st.selected.has(item.date) ? ' checked' : ''}${item.status === 'skipped' ? ' disabled' : ''}>
+          <span class="mp-td-check-mark" aria-hidden="true"></span>
         </label>
         <div class="mp-td-main">
           <div class="mp-td-title">${Number(item.date.slice(5, 7))}月${Number(item.date.slice(8, 10))}日 <span class="mp-td-badge ${item.status}">${stateLabel}</span></div>

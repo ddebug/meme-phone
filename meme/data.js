@@ -558,12 +558,6 @@ export function emptyState() {
     friendRequests: [],
     signatures: { byContact: {} },
     dress: { accent: '#8e7bf2' },
-    /* Meta 是唯一那台；里世界按聊天 / 角色分别存实例快照。 */
-    metaPhone: null,
-    worldPhones: {},
-    phoneSurface: 'meta',
-    activeWorldId: '',
-    lastWorldId: '',
   };
 }
 
@@ -709,7 +703,11 @@ export function addChat(state, contactId, options = {}) {
 
 /** 一个联系人只保留一个一对一会话；群聊各自一条。 */
 export function chatFor(state, contactId) {
-  const existing = Object.values(state.chats).find(chat => chat.contactId === contactId && chat.kind !== 'group');
+  const existing = Object.values(state.chats).find(chat => (
+    chat.contactId === contactId
+    && chat.kind !== 'group'
+    && chat.world?.kind !== 'world'
+  ));
   return existing || addChat(state, contactId);
 }
 
@@ -2239,6 +2237,33 @@ export function normalize(raw) {
       })
       : [];
     chat.history = normalizeChatHistory(chat.history);
+    if (chat.world && typeof chat.world === 'object' && !Array.isArray(chat.world)) {
+      chat.world = {
+        kind: chat.world.kind === 'world' ? 'world' : '',
+        chatFile: String(chat.world.chatFile || '').replace(/\.jsonl$/i, ''),
+        chatId: String(chat.world.chatId || ''),
+        ownerName: String(chat.world.ownerName || '').slice(0, 40),
+        ownerAvatar: String(chat.world.ownerAvatar || ''),
+        storyDate: String(chat.world.storyDate || '第 1 天').slice(0, 30),
+        origin: String(chat.world.origin || 'tavern'),
+        createdAt: Number(chat.world.createdAt) || 0,
+        queue: (() => {
+          const seen = new Set();
+          return (Array.isArray(chat.world.queue) ? chat.world.queue : [])
+            .filter(item => {
+              if (!item || !item.turnId || seen.has(item.turnId)) return false;
+              seen.add(item.turnId);
+              return true;
+            })
+            .slice(-30);
+        })(),
+        lastSyncAt: Number(chat.world.lastSyncAt) || 0,
+        lastSyncError: String(chat.world.lastSyncError || ''),
+      };
+      if (!chat.world.kind) delete chat.world;
+    } else if (chat.world) {
+      delete chat.world;
+    }
     if (chat.replyPresetId && !replyIds.has(String(chat.replyPresetId))) chat.replyPresetId = '';
     chat.unread = chat.unread || 0;
     /* 旧版「平行时空」把场景塞在 chats 里：升级时挪进 theaters，不再混在聊天列表里 */
@@ -2290,17 +2315,13 @@ export function normalize(raw) {
       legacy: Boolean(theater?.legacy),
     };
   }
-  /* v3：双世界。老存档读进来时，顶层这一份就是 Meta；里世界实例随后由 world 层补。 */
+  /* v3：里世界聊天。旧版整机双世界的快照字段不再参与运行，读进来就丢掉。 */
   merged.version = Math.max(Number(merged.version) || 0, SCHEMA_VERSION);
-  merged.phoneSurface = ['meta', 'world'].includes(raw.phoneSurface) ? raw.phoneSurface : 'meta';
-  merged.activeWorldId = String(raw.activeWorldId || '');
-  merged.lastWorldId = String(raw.lastWorldId || '');
-  merged.worldPhones = raw.worldPhones && typeof raw.worldPhones === 'object' && !Array.isArray(raw.worldPhones)
-    ? raw.worldPhones
-    : {};
-  merged.metaPhone = raw.metaPhone && typeof raw.metaPhone === 'object' && !Array.isArray(raw.metaPhone)
-    ? raw.metaPhone
-    : null;
+  delete merged.phoneSurface;
+  delete merged.activeWorldId;
+  delete merged.lastWorldId;
+  delete merged.worldPhones;
+  delete merged.metaPhone;
   Object.values(merged.chats).forEach(chat => {
     if (!chat || typeof chat !== 'object') return;
     if (chat.tavernFile) chat.tavernFile = String(chat.tavernFile).replace(/\.jsonl$/i, '');

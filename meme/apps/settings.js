@@ -100,7 +100,6 @@ export const settingsApp = {
     const customProactivePrompt = Boolean(normalizeProactivePrompt(state.settings.proactive.prompt));
 
     const worlds = ctx.world?.list?.() || [];
-    const currentWorld = ctx.world?.current?.() || null;
 
     return `
       <div class="mp-page-body">
@@ -114,21 +113,21 @@ export const settingsApp = {
         </div>
 
         <div class="mp-group">
-          <div class="mp-group-label">双世界</div>
+          <div class="mp-group-label">里世界聊天</div>
           <div class="mp-group-box">
             ${row(ctx, {
-              iconName: 'phone',
-              title: currentWorld ? `里世界手机 · ${currentWorld.ownerName || '这一条'}` : '里世界手机',
-              sub: currentWorld ? `${currentWorld.storyDate || '第 1 天'} · ${worlds.length} 条世界线` : `${worlds.length} 条世界线 · 现在在 Meta`,
+              iconName: 'book',
+              title: '里世界聊天',
+              sub: worlds.length ? `${worlds.length} 条 · 每条单独绑一份酒馆聊天记录` : '还没有 · 从当前酒馆聊天新建',
               act: 'set-world-list',
             })}
             ${row(ctx, {
-              iconName: 'refresh',
-              title: currentWorld ? '翻回 Meta 手机' : '回到上一次的里世界手机',
-              sub: currentWorld ? 'Meta 用现实时间，不读这条聊天的记忆' : '只有一台 Meta，多个里世界各自隔离',
-              act: 'set-world-flip',
+              iconName: 'plus',
+              title: '从当前酒馆聊天新建',
+              sub: '读那一份记忆，聊完写回那份隐藏楼层',
+              act: 'set-world-new',
             })}
-            ${row(ctx, { iconName: 'parallel', title: '创建番外', sub: '从当前这台里世界手机的聊天分一条时间线', act: 'set-world-branch' })}
+            ${row(ctx, { iconName: 'parallel', title: '创建番外', sub: '从当前酒馆聊天分一条平行时间线', act: 'set-world-branch' })}
           </div>
         </div>
 
@@ -201,31 +200,28 @@ export const settingsApp = {
     if (act === 'set-open-dress') { ctx.go('app-dress'); return true; }
     if (act === 'set-world-list') {
       const worlds = ctx.world?.list?.() || [];
-      if (!worlds.length) { ctx.toast('还没有里世界手机；先在酒馆聊天里打开一次手机'); return true; }
-      const active = ctx.world?.current?.()?.id || '';
+      if (!worlds.length) { ctx.toast('还没有里世界聊天；先在酒馆打开一段聊天，再从当前聊天新建'); return true; }
       ctx.openSheet({
-        title: `里世界手机 · ${worlds.length} 台`,
-        note: '每台绑一个酒馆聊天文件；切过去只换这一台的数据，Meta 不动。',
+        title: `里世界聊天 · ${worlds.length} 条`,
+        note: '每一条都单独绑一份酒馆聊天记录：只读那份记忆，只写回那份。',
         items: worlds
           .slice()
           .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0))
           .slice(0, 20)
-          .map(world => ({
-            label: `${world.ownerName || '这一条'} · ${world.storyDate || '第 1 天'}`,
-            value: world.id,
-            icon: 'phone',
-            note: [world.sourceChatFile ? `《${world.sourceChatFile}》` : '没有绑定聊天', world.id === active ? '当前这台' : ''].filter(Boolean).join(' · '),
+          .map(chat => ({
+            label: `${chat.world.ownerName || '这一条'} · ${chat.world.storyDate || '第 1 天'}`,
+            value: chat.id,
+            icon: 'book',
+            note: `《${chat.world.chatFile || '没有绑定聊天'}》`,
           })),
         onPick: (id) => {
-          const world = ctx.world?.activate?.(id);
-          if (world) ctx.home?.();
+          ctx.world?.open?.(id);
         },
       });
       return true;
     }
-    if (act === 'set-world-flip') {
-      ctx.world?.flip?.();
-      ctx.home?.();
+    if (act === 'set-world-new') {
+      ctx.world?.createFromCurrent?.();
       return true;
     }
     if (act === 'set-world-branch') { ctx.go('app-parallel'); return true; }

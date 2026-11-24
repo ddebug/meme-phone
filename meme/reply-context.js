@@ -10,6 +10,7 @@ import { buildMemoryContext } from './memory.js';
 import { behaviorContextText } from './behavior.js';
 import { diaryDayGroups, diaryEntryIsCurrent } from './diary.js';
 import { formatCompactHistory } from './history-context.js';
+import { isWorldChat } from './world.js';
 
 /* ------------------------------------------------------------ 请求统计 */
 
@@ -336,10 +337,8 @@ export function userBlock(state) {
   ].filter(Boolean).join('\n');
 }
 
-export function clockBlock(state = null, now = new Date()) {
-  const world = state?.phoneSurface === 'world' && state.activeWorldId
-    ? state.worldPhones?.[state.activeWorldId]
-    : null;
+export function clockBlock(state = null, now = new Date(), chat = null) {
+  const world = isWorldChat(chat) ? chat.world : null;
   const clock = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
   if (world) {
     return [
@@ -507,7 +506,7 @@ async function contextBlockFor(item, state, chat, contact, context, memoryText, 
     const text = memoryText ? `【历史酒馆消息】\n${memoryText}` : '';
     return { text, status: text ? 'injected' : 'empty', reason: text ? '' : '这个会话还没读到记忆' };
   }
-  if (key === 'time') return { text: clockBlock(state), status: 'injected', reason: '' };
+  if (key === 'time') return { text: clockBlock(state, new Date(), chat), status: 'injected', reason: '' };
   if (key === 'history') {
     const limit = effectivePhoneHistoryLimit(chat, context);
     const lastId = ctxOpts.omitLast ? (chat.messages?.[chat.messages.length - 1]?.id || '') : '';
@@ -544,10 +543,10 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
     : replyItemsFor(state, chat);
   const messages = [];
   const reportItems = [];
-  /* Meta 手机不读酒馆记忆：那边是现实时间里的另一条线，不该被任何角色的剧情记忆污染。 */
-  const metaSurface = state?.phoneSurface === 'meta';
+  /* 只有绑了酒馆文件的里世界聊天读记忆；Meta 普通会话不碰酒馆。 */
+  const memoryAllowed = isWorldChat(chat);
 
-  if (!metaSurface && options.memoryText === undefined && context.memory && chat) {
+  if (memoryAllowed && options.memoryText === undefined && context.memory && chat) {
     try {
       const story = await buildMemoryContext(state, chat, 0);
       options.memoryText = String(story?.text || '');
@@ -555,7 +554,7 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
       options.memoryText = '';
     }
   }
-  const memoryText = metaSurface ? '' : String(options.memoryText || '');
+  const memoryText = memoryAllowed ? String(options.memoryText || '') : '';
 
   if (options.lead) messages.push({ role: 'system', content: options.lead, source: '场景提示', group: 'rule' });
 

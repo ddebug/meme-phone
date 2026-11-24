@@ -11,7 +11,7 @@ import { chatApp, threadApp, threadSettingsApp } from './apps/chat.js';
 import { favoritesApp } from './apps/favorites.js';
 import { photoApp } from './apps/photo.js';
 import { buildMemoryContext } from './memory.js';
-import { installWorld, ensurePhoneWorlds, captureData, captureLook } from './world.js';
+import { installWorld, isWorldChat } from './world.js';
 import { buildReplyMessages, transcript, replyLead, proactiveLead, diaryTranscriptForMessages, characterBlock, sceneBlock, userBlock } from './reply-context.js';
 import { behaviorPrompt, behaviorSettings, parseBehaviorReply } from './behavior.js';
 import { DIARY_OUTPUT_PROTOCOL, diaryFingerprint, diaryContextMessages, diaryParamsFingerprint } from './diary.js';
@@ -123,8 +123,8 @@ function makeAi(getState) {
     const ctxSettings = replyContextFor(state, chat);
     /* 0 = 不限制：酒馆记忆和手机历史都按全量送，不再用本地预算截断。 */
     const memoryLimit = 0;
-    /* Meta 手机按设计完全不碰酒馆记忆：连读都不读，不是读完再丢掉。 */
-    const isMetaPhone = state.phoneSurface === 'meta';
+    /* Meta 手机按设计完全不碰酒馆记忆；只有绑了酒馆文件的里世界聊天才读。 */
+    const isMetaPhone = !isWorldChat(chat);
     const storyBlock = !isMetaPhone && ctxSettings.memory
       ? await story(state, chat, memoryLimit)
       : { text: '' };
@@ -398,8 +398,6 @@ export function initMemePhone(options = {}) {
     });
     const raw = await store.init();
     const state = normalize(raw || (demo ? demoState() : emptyState()));
-    /* 双世界：老存档读进来先认成 Meta；具体里世界实例在打开手机时补。 */
-    if (!state.metaPhone) ensurePhoneWorlds(state);
     store.replace(state);
 
     /* 第一次在酒馆里打开：把角色同步成联系人 */
@@ -427,11 +425,6 @@ export function initMemePhone(options = {}) {
           store.touch();
         }
       } catch { /* 读不到角色卡就等用户手动同步 */ }
-    }
-    /* 同步过联系人和角色卡后，把 Meta 那份快照补成最新；否则 Meta 会少一批联系人。 */
-    if (state.metaPhone && state.phoneSurface === 'meta') {
-      state.metaPhone.data = captureData(state);
-      state.metaPhone.look = captureLook(state);
     }
     return state;
   })().catch(error => { initPromise = null; throw error; });
@@ -525,7 +518,6 @@ export async function openMemePhone(options = {}) {
     epoch: () => stateEpoch,
     demo: () => demoMode,
     save: () => {
-      ctx.world?.syncActive?.();
       return store.touch().then(() => true).catch(error => {
         ctx.toast?.(error.message || '保存失败，先去设置里导出备份');
         return false;
@@ -533,7 +525,6 @@ export async function openMemePhone(options = {}) {
     },
     reset: async () => {
       const next = emptyState();
-      ensurePhoneWorlds(next);
       stateEpoch += 1;
       store.replace(next);
       ctx.state = next;
@@ -584,11 +575,8 @@ export async function openMemePhone(options = {}) {
 
   shellApi = createShell({ root: rootEl, ctx, apps: APPS, desktopApps: DESKTOP_APPS, dockApps: DOCK_APPS });
 
-  /* 双世界：在聊天里打开手机默认进这台聊天的里世界；不在聊天里就是 Meta。 */
+  /* 里世界聊天不是整机翻面：它只是聊天列表里一个绑了酒馆文件的普通会话。 */
   installWorld(ctx);
-  try {
-    await ctx.world.openCurrentChat({ save: false, render: false });
-  } catch { /* 宿主没聊天时保持 Meta */ }
   shellApi.render();
 
   /* 主题与壁纸 */
@@ -978,7 +966,6 @@ export async function importState(raw) {
   try {
     const old = getCurrentState();
     next = normalizeBackup(raw);
-    ensurePhoneWorlds(next);
     carryMissingCredentials(old, next);
   } catch (error) {
     return { ok: false, error: error.message || '备份格式不对，当前数据未改动' };

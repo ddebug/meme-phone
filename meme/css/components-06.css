@@ -19,32 +19,52 @@
 .mp-row:active { transform: scale(.988); }
 .mp-row + .mp-row { margin-top: 8px; }
 
-/* 会话行右侧的「进入里世界手机」入口：单独一颗按钮，不嵌在整行按钮里。 */
-.mp-row-shell {
+/* 里世界聊天：列表里单独一段，绑定哪份酒馆聊天直接写在副标题上。 */
+.mp-list-section { margin-top: 14px; }
+.mp-list-head {
   display: flex;
-  align-items: stretch;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
+  margin: 0 3px 7px;
+  font-size: calc(11px * var(--font-scale));
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--text-3);
 }
 
-.mp-row-shell + .mp-row-shell { margin-top: 8px; }
-.mp-row-shell .mp-row { flex: 1; min-width: 0; }
-.mp-row-shell .mp-row + .mp-row { margin-top: 0; }
-
-.mp-row-world {
-  flex: 0 0 auto;
-  width: 42px;
-  display: grid;
-  place-items: center;
+.mp-list-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 0;
-  border-radius: var(--r-m);
-  background: var(--card);
+  background: none;
+  padding: 2px 0;
   color: var(--accent-deep);
+  font: inherit;
+  font-weight: 600;
   cursor: pointer;
-  box-shadow: var(--shadow-s);
 }
 
-.mp-row-world:active { transform: scale(.96); }
-.mp-row-world .mp-i { width: 19px; height: 19px; }
+.mp-list-link .mp-i { width: 13px; height: 13px; }
+
+.mp-list-note {
+  margin: 0 3px 8px;
+  font-size: calc(10.5px * var(--font-scale));
+  line-height: 1.5;
+  color: var(--text-3);
+}
+
+.mp-row.is-world {
+  box-shadow: var(--shadow-s), inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.mp-pill.world {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent-deep);
+}
+
+.mp-list-section .mp-row + .mp-row { margin-top: 8px; }
 
 .mp-row-main { flex: 1; min-width: 0; }
 

@@ -1,251 +1,52 @@
 /**
- * meme-phone · 双世界（Meta / 里世界）
+ * meme-phone · 里世界聊天
  *
- * 这一层只做「这台手机现在是哪条世界线」和「切走时把哪份数据收好」。
- * 数据本身仍然住在 state 顶层：contacts / chats / theaters / diary ...
- * 每个里世界实例各自存一份快照；Meta 永只有一份。
- * 这样不用重写任何 App，切换时整块换掉即可。
+ * 不做整台手机翻面，也不是另一套通讯录：
+ * 每一条里世界聊天就是一个普通会话，额外绑一个酒馆聊天文件。
+ * - 打开它时读那一份酒馆聊天记忆；
+ * - 时间显示剧情日期 + 现实钟点；
+ * - 聊完写回原聊天文件的隐藏 system 楼层；
+ * - 和「平行时空 / 番外」一样，一条聊天文件可以单独开一场，互不穿插。
  */
 
-import { addContact } from './data.js';
+import { addChat, contactById, contactForTavernCharacter } from './data.js';
 import { appendTavernHiddenFloor, readLatestTavernChat, readOpenTavernChat } from './host.js';
 
-/* 会跟着世界线走的数据。用户 / 角色卡 / 接口 Key 留在全局。 */
-const DATA_KEYS = [
-  'contacts', 'chats', 'theaters', 'lookups', 'diary', 'plans', 'extras',
-  'extrasOn', 'favorites', 'wallet', 'membership', 'appointments',
-  'friendRequests', 'signatures', 'music', 'dress',
-];
-
-/* 会跟着世界线走的外观 / 读法。 */
-const SETTINGS_KEYS = [
-  'theme', 'wallpaper', 'customWall', 'dress', 'desktop', 'profile', 'theater',
-];
-
-function clone(value) {
-  if (value == null) return value;
-  try {
-    return typeof structuredClone === 'function'
-      ? structuredClone(value)
-      : JSON.parse(JSON.stringify(value));
-  } catch {
-    return value;
-  }
+export function isWorldChat(chat) {
+  return chat?.world?.kind === 'world';
 }
 
-function plain(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+export function worldMeta(chat) {
+  return isWorldChat(chat) ? chat.world : null;
 }
 
-export function captureData(state) {
-  const out = {};
-  DATA_KEYS.forEach(key => { out[key] = clone(state?.[key]); });
-  return out;
+export function storyDateOf(chat) {
+  return String(chat?.world?.storyDate || '第 1 天');
 }
 
-export function restoreData(state, data) {
-  if (!plain(data)) return;
-  DATA_KEYS.forEach(key => {
-    if (data[key] !== undefined) state[key] = clone(data[key]);
-  });
-}
-
-export function captureLook(state) {
-  const settings = {};
-  SETTINGS_KEYS.forEach(key => {
-    if (state?.settings?.[key] !== undefined) settings[key] = clone(state.settings[key]);
-  });
-  settings.memory = { byContact: clone(state?.settings?.memory?.byContact || {}) };
-  return { settings };
-}
-
-export function restoreLook(state, look) {
-  if (!plain(look?.settings) || !state.settings) return;
-  SETTINGS_KEYS.forEach(key => {
-    if (look.settings[key] !== undefined) state.settings[key] = clone(look.settings[key]);
-  });
-  if (plain(look.settings.memory)) {
-    state.settings.memory = state.settings.memory || {};
-    state.settings.memory.byContact = clone(look.settings.memory.byContact || {});
-  }
-}
-
-/** 读一份旧存档时，把还没有双世界结构的状态补成「当前就是 Meta」。 */
-export function ensurePhoneWorlds(state) {
-  if (!state || typeof state !== 'object') return state;
-  if (!plain(state.worldPhones)) state.worldPhones = {};
-  if (!state.metaPhone || !plain(state.metaPhone.data)) {
-    state.metaPhone = { data: captureData(state), look: captureLook(state), at: Date.now() };
-  }
-  if (!['meta', 'world'].includes(state.phoneSurface)) state.phoneSurface = 'meta';
-  if (!String(state.activeWorldId || '')) state.activeWorldId = '';
-  if (!String(state.lastWorldId || '')) state.lastWorldId = '';
-  if (state.phoneSurface === 'world' && !state.worldPhones[state.activeWorldId]) {
-    state.phoneSurface = 'meta';
-    state.activeWorldId = '';
-  }
-  return state;
-}
-
-export function currentWorld(state) {
-  const id = String(state?.activeWorldId || '');
-  return id ? state?.worldPhones?.[id] || null : null;
-}
-
-export function worldDateText(state) {
-  const world = currentWorld(state);
-  return world ? String(world.storyDate || '第 1 天') : '';
-}
-
-export function worldLabel(state) {
-  const world = currentWorld(state);
-  return world ? String(world.ownerName || '里世界') : '';
-}
-
-function hashKey(key) {
-  let hash = 0;
-  const text = String(key || '');
-  for (let index = 0; index < text.length; index += 1) {
-    hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
-  }
-  return Math.abs(hash).toString(36);
-}
-
-function storyDateOf(metadata) {
-  const meta = plain(metadata) ? metadata : {};
-  const own = plain(meta.memePhone) ? meta.memePhone : plain(meta.meme_phone) ? meta.meme_phone : {};
+function storyDateFromMetadata(metadata) {
+  const meta = metadata && typeof metadata === 'object' ? metadata : {};
+  const own = meta.memePhone && typeof meta.memePhone === 'object'
+    ? meta.memePhone
+    : meta.meme_phone && typeof meta.meme_phone === 'object' ? meta.meme_phone : {};
   const value = own.storyDate || meta.meme_phone_story_date || meta.worldDate || '';
   return String(value || '').trim().slice(0, 30);
 }
 
-function emptyWorldData(state, contact, chatId, chatFile, chatChatId) {
-  const now = Date.now();
-  const contacts = {};
-  let chats = {};
-  if (contact) {
-    const seeded = addContact({ contacts: {} }, clone(contact));
-    contacts[seeded.id] = seeded;
-    chats = {
-      [chatId]: {
-        id: chatId,
-        contactId: seeded.id,
-        kind: seeded.kind === 'group' ? 'group' : 'single',
-        messages: [],
-        unread: 0,
-        draft: '',
-        pinned: false,
-        muted: false,
-        createdAt: now,
-        updatedAt: 0,
-        tavernFile: String(chatFile || ''),
-        tavernChatId: String(chatChatId || ''),
-        worldPhoneId: '',
-      },
-    };
-  }
-  return {
-    contacts,
-    chats,
-    theaters: {},
-    lookups: {},
-    diary: {
-      ...clone(state.diary || {}),
-      entries: {},
-      contacts: {},
-      lastGenerated: '',
-    },
-    plans: [],
-    extras: {},
-    extrasOn: [],
-    favorites: [],
-    wallet: { balance: 0, transactions: [] },
-    membership: { user: { type: 'none', expireAt: 0, queue: [], history: [] }, byContact: {} },
-    appointments: { byContact: {} },
-    friendRequests: [],
-    signatures: { byContact: {} },
-    music: { playlists: [], activeId: '', current: null },
-    dress: clone(state.dress || { accent: '#8e7bf2' }),
-  };
+function findWorldChat(state, chatFile) {
+  const file = String(chatFile || '').replace(/\.jsonl$/i, '');
+  return Object.values(state.chats || {}).find(chat => (
+    isWorldChat(chat)
+    && String(chat.world.chatFile || '').replace(/\.jsonl$/i, '') === file
+  )) || null;
 }
 
-function ensureInstance(state, options = {}) {
-  const key = String(options.key || '').trim();
-  if (!key) return null;
-  const existing = Object.values(state.worldPhones || {}).find(item => item && item.key === key);
-  if (existing) return existing;
-
-  const id = `wp_${hashKey(key)}`;
-  if (state.worldPhones[id]) return state.worldPhones[id];
-  const contact = options.contact || null;
-  const chatId = `ch_${id}`;
-  const data = emptyWorldData(state, contact, chatId, options.chatFile, options.chatId);
-  if (contact && data.chats[chatId]) data.chats[chatId].worldPhoneId = id;
-  const instance = {
-    id,
-    key,
-    ownerName: String(options.ownerName || contact?.name || '这段聊天'),
-    ownerAvatar: String(options.ownerAvatar || contact?.avatar || ''),
-    contactId: String(contact?.id || ''),
-    sourceChatFile: String(options.chatFile || ''),
-    sourceChatId: String(options.chatId || ''),
-    storyDate: String(options.storyDate || '第 1 天').slice(0, 30),
-    kind: String(options.kind || 'chat'),
-    data,
-    look: captureLook(state),
-    syncQueue: [],
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
-  state.worldPhones[id] = instance;
-  return instance;
-}
-
-/** 当前这份内存状态属于哪台：切走前收进对应槽里。 */
-export function syncActivePhone(state) {
-  if (!state) return;
-  if (state.phoneSurface === 'world') {
-    const world = currentWorld(state);
-    if (world) {
-      world.data = captureData(state);
-      world.look = captureLook(state);
-      world.updatedAt = Date.now();
-    }
-  } else if (state.metaPhone) {
-    state.metaPhone.data = captureData(state);
-    state.metaPhone.look = captureLook(state);
-    state.metaPhone.at = Date.now();
-  }
-}
-
-function activateInstance(state, instance) {
-  if (!instance) return false;
-  syncActivePhone(state);
-  restoreData(state, instance.data);
-  restoreLook(state, instance.look);
-  Object.values(state.chats || {}).forEach(chat => {
-    if (chat && !chat.worldPhoneId) chat.worldPhoneId = instance.id;
-  });
-  state.phoneSurface = 'world';
-  state.activeWorldId = instance.id;
-  state.lastWorldId = instance.id;
-  return true;
-}
-
-function activateMeta(state) {
-  if (!state.metaPhone) return false;
-  syncActivePhone(state);
-  restoreData(state, state.metaPhone.data);
-  restoreLook(state, state.metaPhone.look);
-  state.phoneSurface = 'meta';
-  state.activeWorldId = '';
-  return true;
-}
-
-function formatTurnText(world, messages) {
+function formatTurnText(chat, messages) {
+  const owner = String(chat?.world?.ownerName || 'TA');
   const lines = (Array.isArray(messages) ? messages : [])
     .filter(item => item && !item.excluded)
     .map(item => {
-      const who = item.from === 'me' ? (item.name || '我') : (world.ownerName || 'TA');
+      const who = item.from === 'me' ? (item.name || '我') : owner;
       const body = String(item.text || (item.image ? '［图片］' : '')).trim();
       return body ? `${who}：${body}` : '';
     })
@@ -253,65 +54,110 @@ function formatTurnText(world, messages) {
   return lines.slice(-8).join('\n');
 }
 
-function worldStamp() {
+function clockNow() {
   return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
+
+function createWorldChat(state, { contact, ownerName, ownerAvatar, chatFile, chatId, storyDate, origin }) {
+  if (!contact) return null;
+  const existing = findWorldChat(state, chatFile);
+  if (existing) return existing;
+  const chat = addChat(state, contact.id, { messages: [] });
+  chat.world = {
+    kind: 'world',
+    chatFile: String(chatFile || '').replace(/\.jsonl$/i, ''),
+    chatId: String(chatId || ''),
+    ownerName: String(ownerName || contact.name || 'TA'),
+    ownerAvatar: String(ownerAvatar || contact.avatar || ''),
+    storyDate: String(storyDate || '第 1 天').slice(0, 30),
+    origin: String(origin || 'tavern'),
+    createdAt: Date.now(),
+    queue: [],
+  };
+  chat.updatedAt = Date.now();
+  return chat;
+}
+
+function markDirty(ctx, chat) {
+  chat.updatedAt = Date.now();
+  ctx.save();
+}
+
+/* 同一个里世界会话同时只跑一个写回，避免同一轮被并发保存两次。 */
+const flushingChats = new WeakSet();
 
 export function installWorld(ctx) {
   const state = ctx.state;
 
   const api = {
-    ensure: () => ensurePhoneWorlds(state),
-    surface: () => (state.phoneSurface === 'world' && currentWorld(state) ? 'world' : 'meta'),
-    current: () => currentWorld(state),
-    dateText: () => worldDateText(state),
-    label: () => worldLabel(state),
-    meta: () => state.metaPhone,
-    list: () => Object.values(state.worldPhones || {}).filter(Boolean),
-    syncActive: () => syncActivePhone(state),
+    isWorldChat,
+    meta: worldMeta,
+    dateText(chat) { return isWorldChat(chat) ? storyDateOf(chat) : ''; },
+    label(chat) {
+      if (!isWorldChat(chat)) return '';
+      return `里世界 · ${storyDateOf(chat)}`;
+    },
 
-    /** 聊天里打开手机：认当前打开的酒馆聊天，同一份聊天永远回同一台里世界手机。 */
-    async openCurrentChat(options = {}) {
+    /** 当前停在哪条里世界聊天：状态栏的小标签用这个。 */
+    active() {
+      const stack = ctx.shell?.stack || [];
+      const entry = stack[stack.length - 1];
+      if (!entry || entry.view !== 'thread') return null;
+      const chat = state.chats?.[entry.params?.chatId];
+      return isWorldChat(chat) ? chat : null;
+    },
+
+    list() {
+      return Object.values(state.chats || {})
+        .filter(isWorldChat)
+        .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0));
+    },
+
+    /** 在酒馆当前打开的那份聊天上开一条里世界聊天；同一份文件不会重复开。 */
+    async createFromCurrent(options = {}) {
       try {
-        const live = await readOpenTavernChat();
-        if (!live.available) {
-          if (options.toast) ctx.toast(live.reason || '先在酒馆里打开一段聊天');
+        const host = await readOpenTavernChat();
+        if (!host.available) {
+          ctx.toast(host.reason || '先在酒馆里打开一段聊天');
           return null;
         }
-        const contact = { name: live.characterName || 'TA', avatar: live.characterAvatar || '', tavernAvatar: live.characterAvatar || '', kind: 'char' };
-        const key = `chat:${live.chatFile || live.chatId}:${live.characterAvatar || live.characterName}:main`;
-        const instance = ensureInstance(state, {
-          key,
-          contact,
-          ownerName: live.characterName,
-          ownerAvatar: live.characterAvatar,
-          chatFile: live.chatFile,
-          chatId: live.chatId,
-          storyDate: storyDateOf(live.metadata) || '第 1 天',
-          kind: 'current-chat',
+        const contactId = contactForTavernCharacter(state, {
+          name: host.characterName || 'TA',
+          tavernAvatar: host.characterAvatar || '',
         });
-        if (!instance) return null;
-        /* 已有实例沿用用户改过的剧情日期，不被旧聊天覆盖 */
-        if (!instance.storyDate || instance.storyDate === '第 1 天') {
-          const metaDate = storyDateOf(live.metadata);
-          if (metaDate) instance.storyDate = metaDate;
+        const contact = contactById(state, contactId);
+        if (!contact) {
+          ctx.toast('这个酒馆角色还没进通讯录');
+          return null;
         }
-        if (!instance.contactId) {
-          const seeded = Object.values(instance.data?.chats || {})[0];
-          instance.contactId = String(seeded?.contactId || '');
+        let chat = findWorldChat(state, host.chatFile);
+        if (!chat) {
+          chat = createWorldChat(state, {
+            contact,
+            ownerName: host.characterName,
+            ownerAvatar: host.characterAvatar,
+            chatFile: host.chatFile,
+            chatId: host.chatId,
+            storyDate: storyDateFromMetadata(host.metadata) || '第 1 天',
+            origin: 'current-chat',
+          });
+          ctx.toast(`里世界聊天已绑定《${host.chatFile || '当前聊天'}》`);
+        } else {
+          ctx.toast('这条聊天已经有一场里世界了');
         }
-        activateInstance(state, instance);
-        await api.flushPending(instance);
-        if (options.save !== false) ctx.save();
-        if (options.render !== false) ctx.rerender();
-        return instance;
+        markDirty(ctx, chat);
+        if (options.open !== false) {
+          ctx.home?.();
+          ctx.go('thread', { chatId: chat.id });
+        }
+        return chat;
       } catch (error) {
-        if (options.toast) ctx.toast(error?.message || '这台里世界手机没打开');
+        ctx.toast(error?.message || '里世界聊天没开成');
         return null;
       }
     },
 
-    /** 从 Meta 的会话 / 联系人打开某角色的里世界手机：读这个角色最近一份聊天。 */
+    /** 从某个角色的资料 / Meta 会话行进：读 TA 最近一份酒馆聊天来开。 */
     async openForContact(contact, options = {}) {
       if (!contact) return null;
       try {
@@ -321,84 +167,61 @@ export function installWorld(ctx) {
           floors: 0,
           includeMemory: true,
         });
-        const file = latest?.available ? latest.file : '';
-        const key = `char:${contact.tavernAvatar || contact.avatar || contact.name}:${file || 'latest'}`;
-        const instance = ensureInstance(state, {
-          key,
-          contact: {
-            get id() { return contact.id; },
-            name: contact.name,
-            avatar: contact.avatar,
-            tavernAvatar: contact.tavernAvatar,
-            kind: contact.kind,
-          },
-          ownerName: contact.name,
-          ownerAvatar: contact.avatar,
-          chatFile: file,
-          chatId: latest?.file || '',
-          storyDate: storyDateOf(latest?.metadata) || '第 1 天',
-          kind: 'contact',
-        });
-        if (!instance) return null;
-        instance.sourceChatFile = file || instance.sourceChatFile;
-        activateInstance(state, instance);
-        await api.flushPending(instance);
-        ctx.save();
-        if (typeof ctx.home === 'function') ctx.home(); else ctx.rerender();
-        if (!latest?.available) ctx.toast('没找到 TA 最近的酒馆聊天，先当成一条新世界线');
-        return instance;
+        if (!latest?.available) {
+          ctx.toast('没找到 TA 最近的酒馆聊天；先在酒馆打开一段');
+          return null;
+        }
+        let chat = findWorldChat(state, latest.file);
+        if (!chat) {
+          chat = createWorldChat(state, {
+            contact,
+            ownerName: contact.name,
+            ownerAvatar: contact.avatar,
+            chatFile: latest.file,
+            chatId: latest.chatId || latest.file,
+            storyDate: storyDateFromMetadata(latest.metadata) || '第 1 天',
+            origin: 'contact',
+          });
+          ctx.toast(`用 TA 最近的《${latest.file}》开了一场里世界聊天`);
+        }
+        markDirty(ctx, chat);
+        if (options.open !== false) {
+          ctx.home?.();
+          ctx.go('thread', { chatId: chat.id });
+        }
+        return chat;
       } catch (error) {
-        ctx.toast(error?.message || '这台里世界手机没打开');
+        ctx.toast(error?.message || '里世界聊天没开成');
         return null;
       }
     },
 
-    activate(id) {
-      const instance = state.worldPhones?.[id];
-      if (!instance) return false;
-      const ok = activateInstance(state, instance);
-      if (ok) {
-        ctx.save();
-        ctx.rerender();
-      }
-      return ok;
-    },
-
-    /** 翻面：里世界 ⇄ Meta。 */
-    flip() {
-      if (state.phoneSurface === 'world') {
-        activateMeta(state);
-      } else {
-        const last = state.worldPhones?.[state.lastWorldId] || currentWorld(state);
-        if (last) activateInstance(state, last);
-        else {
-          ctx.toast('先在聊天里打开一台里世界手机');
-          return false;
-        }
-      }
-      ctx.save();
-      ctx.rerender();
+    open(chatId) {
+      const chat = state.chats?.[chatId];
+      if (!isWorldChat(chat)) return false;
+      ctx.home?.();
+      ctx.go('thread', { chatId: chat.id });
       return true;
     },
 
-    editStoryDate() {
-      const world = currentWorld(state);
-      if (!world) return;
+    editStoryDate(chatId) {
+      const chat = state.chats?.[chatId] || api.active();
+      if (!isWorldChat(chat)) return;
       ctx.openSheet({
         kind: 'form',
-        title: '这条世界线的剧情日期',
-        note: '只改这台里世界手机显示的日期；状态栏右边的钟点仍然跟着现实走。',
+        title: '这条里世界聊天的剧情日期',
+        note: '只影响这条聊天显示的日期；状态栏右边的钟点仍然跟现实走。',
         fields: [{
           name: 'storyDate',
           label: '剧情日期',
-          value: world.storyDate || '第 1 天',
+          value: storyDateOf(chat),
           placeholder: '例如 第 3 天 / 霜月十二日',
           maxLength: 30,
         }],
         confirm: '保存',
         onForm: values => {
           const next = String(values.storyDate || '').trim().slice(0, 30);
-          world.storyDate = next || '第 1 天';
+          chat.world.storyDate = next || '第 1 天';
           ctx.save();
           ctx.rerender();
           ctx.toast('剧情日期改好了');
@@ -406,79 +229,73 @@ export function installWorld(ctx) {
       });
     },
 
-    /** 把一个生成轮次写回原聊天文件：隐藏 system 楼层 + extra + 待写队列。 */
+    /** 这一轮手机聊天写完，写回原聊天文件。 */
     async syncTurn(chat, turnId, messages) {
-      const world = currentWorld(state);
-      if (!world || state.phoneSurface !== 'world' || !chat || !turnId) return;
-      if (!world.sourceChatFile && !world.sourceChatId) return;
+      if (!isWorldChat(chat) || !turnId) return;
+      if (!chat.world.chatFile && !chat.world.chatId) return;
       if (Array.isArray(chat.syncedTurnIds) && chat.syncedTurnIds.includes(turnId)) return;
-      const text = formatTurnText(world, messages);
+      const text = formatTurnText(chat, messages);
       if (!text) return;
-      const payload = {
+      chat.world.queue = Array.isArray(chat.world.queue) ? chat.world.queue : [];
+      if (chat.world.queue.some(item => item.turnId === turnId)) return;
+      chat.world.queue.push({
         turnId,
-        chatId: chat.id,
         text,
-        stamp: worldStamp(),
-        storyDate: world.storyDate || '',
+        clock: clockNow(),
+        storyDate: storyDateOf(chat),
         at: Date.now(),
-      };
-      world.syncQueue = Array.isArray(world.syncQueue) ? world.syncQueue : [];
-      world.syncQueue.push(payload);
-      await api.flushPending(world, chat);
+      });
+      await api.flush(chat);
     },
 
-    async flushPending(instance = currentWorld(state), chat = null) {
-      const world = instance;
-      if (!world || !Array.isArray(world.syncQueue) || !world.syncQueue.length) return;
-      for (const item of world.syncQueue.slice()) {
-        try {
+    async flush(chat) {
+      if (!isWorldChat(chat)) return;
+      if (flushingChats.has(chat)) return;
+      flushingChats.add(chat);
+      try {
+        while (Array.isArray(chat.world.queue) && chat.world.queue.length) {
+          const item = chat.world.queue[0];
+          if (!item?.turnId) { chat.world.queue.shift(); continue; }
           const result = await appendTavernHiddenFloor({
-            chatId: world.sourceChatId,
-            chatFile: world.sourceChatFile,
+            chatId: chat.world.chatId,
+            chatFile: chat.world.chatFile,
             text: item.text,
             extra: {
-              worldPhoneId: world.id,
-              worldKey: world.key,
+              worldChatId: chat.id,
+              worldPhoneKey: `world-chat:${chat.world.chatFile}:${chat.contactId}`,
               turnId: item.turnId,
               storyDate: item.storyDate,
-              clock: item.stamp,
+              clock: item.clock,
             },
           });
           if (!result?.ok) {
-            if (result?.queued) break;
-            throw new Error(result?.reason || '写回失败');
+            chat.world.lastSyncError = result?.reason || '写回失败';
+            ctx.save();
+            return;
           }
-          world.syncQueue = world.syncQueue.filter(entry => entry.turnId !== item.turnId);
-          const target = chat || Object.values(state.chats || {}).find(entry => entry && entry.id === item.chatId);
-          if (target) {
-            if (!Array.isArray(target.syncedTurnIds)) target.syncedTurnIds = [];
-            if (!target.syncedTurnIds.includes(item.turnId)) target.syncedTurnIds.push(item.turnId);
-          }
-          world.lastSyncAt = Date.now();
-        } catch (error) {
-          /* 目标聊天没在酒馆里打开时先留在队列，等下次激活这台手机再写。 */
-          world.lastSyncError = error?.message || '写回失败';
-          break;
+          chat.world.queue.shift();
+          if (!Array.isArray(chat.syncedTurnIds)) chat.syncedTurnIds = [];
+          if (!chat.syncedTurnIds.includes(item.turnId)) chat.syncedTurnIds.push(item.turnId);
+          chat.world.lastSyncAt = Date.now();
+          chat.world.lastSyncError = '';
         }
+        ctx.save();
+      } finally {
+        flushingChats.delete(chat);
       }
-      ctx.save();
     },
   };
 
   ctx.world = api;
-  ensurePhoneWorlds(state);
   return api;
 }
 
-export function createWorldPhoneForTests(state, options) {
-  ensurePhoneWorlds(state);
-  return ensureInstance(state, options);
-}
-
-export function activateWorldForTests(state, id) {
-  return activateInstance(state, state.worldPhones?.[id]);
-}
-
-export function activateMetaForTests(state) {
-  return activateMeta(state);
+/** 测试用：不依赖酒馆宿主，直接在某个联系人上开一条里世界聊天。 */
+export function createWorldChatForTests(state, { contact, ...info }) {
+  return createWorldChat(state, {
+    contact,
+    ownerName: contact?.name,
+    ownerAvatar: contact?.avatar,
+    ...info,
+  });
 }

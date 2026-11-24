@@ -42,7 +42,6 @@ test('requestStats 优先使用消息自带的 group，不依赖用户改过的�
 
 test('Meta 手机不把酒馆记忆注进回复', async () => {
   const state = demoState();
-  state.phoneSurface = 'meta';
   const chat = state.chats[Object.keys(state.chats)[0]];
   const contact = state.contacts[chat.contactId];
   const built = await buildReplyMessages(state, chat, contact, {
@@ -56,9 +55,9 @@ test('Meta 手机不把酒馆记忆注进回复', async () => {
 
 test('实际组装后酒馆历史与小手机历史分开统计，字符数与注入内容一致', async () => {
   const state = demoState();
-  /* Meta 手机按设计不读酒馆记忆；这条统计用例测的是里世界这条线。 */
-  state.phoneSurface = 'world';
   const chat = state.chats[Object.keys(state.chats)[0]];
+  /* 统计这一条测的是里世界聊天：只有绑了酒馆文件的会话才读记忆。 */
+  chat.world = { kind: 'world', chatFile: 'stats-chat', chatId: 'stats-chat', storyDate: '第 1 天' };
   const contact = state.contacts[chat.contactId];
   const built = await buildReplyMessages(state, chat, contact, {
     memoryText: '酒馆历史'.repeat(100),

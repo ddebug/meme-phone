@@ -251,7 +251,7 @@ export const contactApp = {
         </div>
         ${contact.kind === 'group' ? '' : `<div style="display:flex;gap:8px;margin-bottom:10px">
           <button class="mp-btn mp-cp-entry" data-act="contact-phone" data-contact="${contact.id}" type="button" style="flex:1">${icon('search')}查 TA 的手机</button>
-          <button class="mp-btn" data-act="contact-world" data-contact="${contact.id}" type="button" style="flex:1">${icon('phone')}里世界手机</button>
+          <button class="mp-btn" data-act="contact-world" data-contact="${contact.id}" type="button" style="flex:1">${icon('book')}里世界聊天</button>
         </div>`}
         <div class="mp-group">
           <div class="mp-group-label">TA 的状态</div>
@@ -316,7 +316,7 @@ export const contactApp = {
 
     if (act === 'contact-world') {
       if (!contact) return true;
-      if (typeof ctx.world?.openForContact !== 'function') { ctx.toast('这个环境还没有里世界手机'); return true; }
+      if (typeof ctx.world?.openForContact !== 'function') { ctx.toast('这个环境还没有里世界聊天'); return true; }
       ctx.world.openForContact(contact);
       return true;
     }

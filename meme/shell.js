@@ -559,9 +559,7 @@ export function createShell(options) {
     const themedBanner = themeArt ? themeArt.banner : '';
     const bannerImage = ownBanner || themedBanner;
     const bannerStyle = bannerImage ? ` style="background-image:url(&quot;${bannerImage}&quot;);background-size:cover;background-position:center"` : '';
-    const stampText = ctx.world?.surface?.() === 'world'
-      ? (ctx.world.dateText?.() || '第 1 天')
-      : dateText().replace('<br>', ' · ');
+    const stampText = dateText().replace('<br>', ' · ');
     const pages = homePages();
     const pageIndex = pageIndexSafe();
 
@@ -779,7 +777,8 @@ export function createShell(options) {
       : null;
     root.className = 'mp-root';
     root.dataset.mpTheme = status;
-    root.dataset.mpSurface = ctx.world?.surface?.() || 'meta';
+    const activeWorld = ctx.world?.active?.() || null;
+    root.dataset.mpSurface = 'meta';
     applyWall(root, state.settings);
     applyLook(root, state.settings);
     /* 先算一次布局：整机高度与缩放一起写进首帧，避免开手机时先按 844 高闪一下再收 */
@@ -796,12 +795,11 @@ export function createShell(options) {
             <div class="mp-status">
               <span class="mp-status-left">
                 ${shell.stack.length && !shell.sheet ? `<button class="mp-status-back" data-act="back" type="button" aria-label="返回">${ico('back')}</button>` : ''}
-                ${ctx.world?.surface?.() === 'world'
-                  ? `<button class="mp-world-chip" data-act="world-date" type="button" title="改剧情日期">${esc(ctx.world.label?.() || '里世界')}</button>`
+                ${activeWorld
+                  ? `<button class="mp-world-chip" data-act="world-date" data-chat="${esc(activeWorld.id)}" type="button" title="改剧情日期">${esc(ctx.world.label?.(activeWorld) || '里世界')}</button>`
                   : ''}
               </span>
               <span class="mp-status-right">
-                <button class="mp-flip-btn" data-act="flip" type="button" aria-label="翻面">${ico('refresh')}</button>
                 <span>${clockText()}</span>
               </span>
             </div>
@@ -1004,16 +1002,7 @@ export function createShell(options) {
       render();
       ctx.save();
     },
-    'flip': () => {
-      const ok = ctx.world?.flip?.();
-      if (!ok) return;
-      const screen = root.querySelector('.mp-screen');
-      if (screen) {
-        screen.classList.add('is-flipping');
-        setTimeout(() => screen.classList.remove('is-flipping'), 460);
-      }
-    },
-    'world-date': () => { ctx.world?.editStoryDate?.(); },
+    'world-date': data => { ctx.world?.editStoryDate?.(data?.chat || ''); },
   };
 
   root.addEventListener('click', event => {

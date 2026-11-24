@@ -16,6 +16,7 @@ import { diaryDayStatuses, diaryFingerprint, diaryNeedsWrite, diaryParamsFingerp
 import { requestStats, estimateTokens, proactiveLead, serializeMessage } from '../reply-context.js';
 import { createChatExport, parseChatTransferText, mergeChatHistory, MAX_CHAT_TRANSFER_BYTES } from '../chat-transfer.js';
 import { avatarHtml, chatAvatarHtml, esc, shortText, timeText } from '../shell.js';
+import { isWorldChat, storyDateOf } from '../world.js';
 import { renderBehaviorBubble, isSystemBehavior, behaviorSettings, parseBehaviorReply } from '../behavior.js';
 import {
   applyBehaviorMessage, appointmentByMessage, respondAppointment, completeAppointment,
@@ -669,38 +670,41 @@ function settingsBody(ctx, chatId) {
 
 function listBody(ctx) {
   const state = ctx.state;
-  const chats = chatsOf(state).filter(chat => chat.messages.length || chat.unread);
+  const chats = chatsOf(state).filter(chat => chat.messages.length || chat.unread || isWorldChat(chat));
+  const worldChats = chats.filter(isWorldChat);
+  const normalChats = chats.filter(chat => !isWorldChat(chat));
 
-  const rows = chats.map(chat => {
+  const row = (chat, world = false) => {
     const contact = contactById(state, chat.contactId);
     if (!contact) return '';
     const message = lastMessage(chat);
     const preview = message
       ? `${message.from === 'me' ? '我：' : ''}${messagePreview(message)}`
-      : '还没有消息，说点什么吧。';
+      : (world ? '这条聊天还空着，先开口吧。' : '还没有消息，说点什么吧。');
+    const sub = world
+      ? `《${esc(chat.world.chatFile || '未命名聊天')}》 · ${esc(storyDateOf(chat))}`
+      : esc(preview);
     return `
-      <div class="mp-row-shell">
-        <button class="mp-row" data-act="open-thread" data-chat="${chat.id}" data-hold="chat-menu" type="button">
-          ${avatarHtml(contact.name, contact.avatar)}
-          <div class="mp-row-main">
-            <div class="mp-row-name">
-              ${esc(contact.name)}
-              ${chat.pinned ? `<span class="mp-pill plain">${icon('pin')}</span>` : ''}
-              ${contact.kind === 'group' ? '<span class="mp-pill plain">群</span>' : ''}
-            </div>
-            <div class="mp-row-sub">${esc(preview)}</div>
+      <button class="mp-row${world ? ' is-world' : ''}" data-act="open-thread" data-chat="${chat.id}" data-hold="chat-menu" type="button">
+        ${avatarHtml(contact.name, contact.avatar)}
+        <div class="mp-row-main">
+          <div class="mp-row-name">
+            ${esc(contact.name)}
+            ${world ? '<span class="mp-pill world">里世界</span>' : ''}
+            ${chat.pinned ? `<span class="mp-pill plain">${icon('pin')}</span>` : ''}
+            ${contact.kind === 'group' ? '<span class="mp-pill plain">群</span>' : ''}
           </div>
-          <div class="mp-row-side">
-            <span>${chat.updatedAt ? shortText(chat.updatedAt) : ''}</span>
-            ${chat.unread && !chat.muted ? `<span class="mp-badge-count">${chat.unread > 99 ? '99+' : chat.unread}</span>` : ''}
-          </div>
-        </button>
-        ${contact.kind === 'group' ? '' : `
-        <button class="mp-row-world" data-act="world-open" data-contact="${contact.id}" type="button" aria-label="打开 ${esc(contact.name)} 的里世界手机" title="进入 TA 的里世界手机">
-          ${icon('phone')}
-        </button>`}
-      </div>`;
-  }).join('');
+          <div class="mp-row-sub">${sub}</div>
+        </div>
+        <div class="mp-row-side">
+          <span>${chat.updatedAt ? shortText(chat.updatedAt) : ''}</span>
+          ${chat.unread && !chat.muted ? `<span class="mp-badge-count">${chat.unread > 99 ? '99+' : chat.unread}</span>` : ''}
+        </div>
+      </button>`;
+  };
+
+  const worldRows = worldChats.map(chat => row(chat, true)).join('');
+  const normalRows = normalChats.map(chat => row(chat)).join('');
 
   return `
     <div class="mp-page-body">
@@ -708,7 +712,18 @@ function listBody(ctx) {
         <span style="flex:1"></span>
         <button class="mp-icon-btn" data-act="chat-new" type="button" aria-label="新建会话">${icon('plus')}</button>
       </div>
-      ${rows || '<div class="mp-empty">还没有会话。<br>先去「通讯录」把角色加进来。</div>'}
+      <div class="mp-list-section">
+        <div class="mp-list-head">
+          <span>里世界聊天</span>
+          <button class="mp-list-link" data-act="world-new" type="button">${icon('book')}从当前酒馆聊天新建</button>
+        </div>
+        <div class="mp-list-note">每条里世界聊天单独绑一份酒馆聊天记录，读那份记忆，也写回那份。</div>
+        ${worldRows || '<div class="mp-empty is-small">还没有里世界聊天。<br>先在酒馆打开一段聊天，再点右上角「从当前酒馆聊天新建」。</div>'}
+      </div>
+      <div class="mp-list-section">
+        <div class="mp-list-head"><span>Meta 聊天</span></div>
+        ${normalRows || '<div class="mp-empty is-small">还没有会话。<br>先去「通讯录」把角色加进来。</div>'}
+      </div>
     </div>`;
 }
 
@@ -723,6 +738,7 @@ function threadBody(ctx, chatId) {
     return `${nav(ctx)}<div class="mp-page-body"><div class="mp-empty">这个会话已经不在了。</div></div>`;
   }
   const contact = contactById(state, chat.contactId);
+  if (isWorldChat(chat)) ctx.world?.flush?.(chat);
   const messages = chat.messages || [];
   const quote = ctx.shell.quote?.[chatId] || null;
   const pendingMessages = pendingUserMessages(chat);
@@ -825,7 +841,9 @@ function threadBody(ctx, chatId) {
         ${avatarHtml(contact?.name, contact?.avatar)}
         <div style="flex:1;min-width:0">
           <div class="mp-thread-name">${esc(contact?.name || '')}</div>
-          <div class="mp-thread-status"><span class="mp-dot"></span>${esc(contact?.signature || '在线')}</div>
+          <div class="mp-thread-status">${isWorldChat(chat)
+            ? `<button class="mp-thread-world" data-act="world-date" data-chat="${chat.id}" type="button" title="改剧情日期">${icon('book')}<span>里世界 · ${esc(storyDateOf(chat))}</span></button><span class="mp-thread-file">《${esc(chat.world.chatFile || '未命名聊天')}》</span>`
+            : `<span class="mp-dot"></span>${esc(contact?.signature || '在线')}`}</div>
         </div>
         <button class="mp-icon-btn" data-act="thread-settings" data-chat="${chat.id}" type="button" aria-label="聊天设置">${icon('settings')}</button>
       </div>
@@ -1279,8 +1297,8 @@ async function runGeneration(ctx, chat, contact, options = {}) {
     });
     ctx.toast('这轮的小剧场收进 App 了');
   }
-  /* 里世界手机：把这一轮（我发的 + TA 回的）写回原聊天文件的隐藏楼层。
-     写不进就留在世界实例的队列里，下次打开这条世界线再试。 */
+  /* 里世界聊天：把这一轮（我发的 + TA 回的）写回它绑定的那份聊天文件。
+     写不进就留在 chat.world.queue 里，下次打开这条聊天再试。 */
   if (firstSaved && kind === 'reply' && !replaceIds.length && ctx.world?.syncTurn) {
     const turnMessages = chat.messages.filter(item => item.turnId === turnId || pendingIds.includes(item.id));
     ctx.world.syncTurn(chat, turnId, turnMessages).catch(error => {
@@ -1318,16 +1336,23 @@ export const chatApp = {
       const chat = chatById(ctx.state, data.chat);
       if (chat) chat.unread = 0;
       ctx.save();
+      if (chat && isWorldChat(chat)) ctx.world?.flush?.(chat);
       ctx.shell.live = { inputValue: chat?.draft || '', focus: false };
       ctx.go('thread', { chatId: data.chat });
       setTimeout(() => scrollToBottom(ctx), 30);
       return true;
     }
 
+    if (act === 'world-new') {
+      if (typeof ctx.world?.createFromCurrent !== 'function') { ctx.toast('这个环境还没有里世界聊天'); return true; }
+      ctx.world.createFromCurrent();
+      return true;
+    }
+
     if (act === 'world-open') {
       const contact = contactById(ctx.state, data.contact);
       if (!contact) return true;
-      if (typeof ctx.world?.openForContact !== 'function') { ctx.toast('这个环境还没有里世界手机'); return true; }
+      if (typeof ctx.world?.openForContact !== 'function') { ctx.toast('这个环境还没有里世界聊天'); return true; }
       ctx.world.openForContact(contact, { source: 'meta' });
       return true;
     }

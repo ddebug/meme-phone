@@ -1301,6 +1301,22 @@ export function createShell(options) {
     if (!shell.stack.length && !shell.sheet) render();
   }, 60000);
 
+  /* 焦点隔离：手机打开期间焦点只留在小手机内部。
+     打开时先卸掉宿主页（酒馆输入框）残留的焦点；之后捕获阶段拦住任何落到根容器外的聚焦，
+     让宿主页重新失焦，避免背景酒馆跟着唤起软键盘。 */
+  function blurOutsideFocus() {
+    const active = document.activeElement;
+    if (active && active !== document.body && active !== document.documentElement
+      && !root.contains(active) && typeof active.blur === 'function') {
+      active.blur();
+    }
+  }
+  function onDocFocusIn(event) {
+    if (!root.contains(event.target)) blurOutsideFocus();
+  }
+  document.addEventListener('focusin', onDocFocusIn, true);
+  blurOutsideFocus();
+
   render();
 
   return {
@@ -1312,6 +1328,7 @@ export function createShell(options) {
       clearTimeout(shell.toastTimer);
       clearTimeout(keyboardTimer);
       if (layoutRaf) { cancelAnimationFrame(layoutRaf); layoutRaf = 0; }
+      document.removeEventListener('focusin', onDocFocusIn, true);
       window.removeEventListener('pointermove', onPhoneDragMove);
       window.removeEventListener('pointerup', endPhoneDrag);
       window.removeEventListener('pointercancel', endPhoneDrag);

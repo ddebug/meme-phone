@@ -148,6 +148,17 @@ function unlockHostScroll() {
   hostLocked = false;
 }
 
+/* 打开手机时卸掉宿主页（酒馆输入框）残留的焦点，避免背景酒馆跟着唤起软键盘 */
+function blurOutsideFocus(root) {
+  try {
+    const active = document.activeElement;
+    if (active && active !== document.body && active !== document.documentElement
+      && root && !root.contains(active) && typeof active.blur === 'function') {
+      active.blur();
+    }
+  } catch { /* 宿主文档读不到就跳过 */ }
+}
+
 const getCurrentState = () => store?.get() || null;
 
 /* ------------------------------------------------------------ 模型调用 */
@@ -510,6 +521,7 @@ async function enterWorldFromHost() {
 export async function openMemePhone(options = {}) {
   await initMemePhone(options);
   try { lockHostScroll(); } catch { /* 宿主文档读不到就跳过 */ }
+  blurOutsideFocus(rootEl);
   if (isOpen()) {
     try {
       if (await enterWorldFromHost()) ctx.rerender();

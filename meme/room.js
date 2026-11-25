@@ -86,6 +86,15 @@ function memoryLabel(theater) {
   return size ? `跟随酒馆 · ${size} 字` : '跟随酒馆';
 }
 
+/** 这次生成实际拿到的记忆是什么：柏宝书总结 / 没读到（不是原始楼层）。 */
+function memorySource(theater) {
+  const size = String(theater?.memory?.text || '').trim().length;
+  const engine = String(theater?.memory?.engine || '');
+  if (engine === 'baibai' && size) return `现在读到的是柏宝书总结，${size} 字`;
+  if (engine === 'baibai') return '柏宝书在，但这次没读到总结';
+  return '没读到柏宝书总结；生成时按酒馆自己的提示词注入走';
+}
+
 function hue(name) {
   let sum = 0;
   for (const ch of String(name || '?')) sum = (sum * 31 + ch.codePointAt(0)) % 360;
@@ -398,6 +407,7 @@ function settingsHtml(theater) {
             { value: 'fixed', label: '固定开场总结' },
           ],
         })}
+        <div class="prt-hint">${esc(memorySource(theater))}</div>
         ${row({ act: 'refresh-memory', id: theater.id, title: '读一下酒馆现在的记忆', sub: memorySize ? '用现在的总结替换开场那份' : '这场还没读到总结', value: memorySize ? '重新读' : '去读' })}
 
         <div class="prt-label">这一场</div>
@@ -407,6 +417,7 @@ function settingsHtml(theater) {
         </div>
         ${switchRow({ act: 'toggle-time', id: theater.id, title: '显示时间', on: cfg.showTime !== false })}
         ${switchRow({ act: 'toggle-avatar', id: theater.id, title: '显示头像', sub: '关掉以后只留文字，适合截图分享', on: cfg.showAvatar !== false })}
+        ${switchRow({ act: 'toggle-worldbook', id: theater.id, title: '带角色世界书', sub: '关掉以后这一场不注入这个角色绑的主书和附加书，酒馆那边不动', on: cfg.showWorldBook !== false })}
 
         <div class="prt-label">操作</div>
         ${row({ act: 'follow', id: theater.id, title: '跟到酒馆最新楼层', sub: `现在接在第 ${theater.forkFloor || 0} 楼`, value: '跟上' })}
@@ -740,13 +751,16 @@ function act(name, idValue, extra) {
       return;
     }
     case 'toggle-time':
-    case 'toggle-avatar': {
+    case 'toggle-avatar':
+    case 'toggle-worldbook': {
       if (!theater) return;
-      const key = name === 'toggle-time' ? 'showTime' : 'showAvatar';
+      const key = name === 'toggle-time' ? 'showTime'
+        : name === 'toggle-avatar' ? 'showAvatar' : 'showWorldBook';
       const now = theater.cfg?.[key] !== false;
       setTheaterConfig(theater, { [key]: !now });
       save();
       paint();
+      if (name === 'toggle-worldbook') toast(now ? '这一场不带角色世界书了' : '这一场会带上角色世界书');
       return;
     }
     case 'follow': if (theater) followLatest(theater); return;

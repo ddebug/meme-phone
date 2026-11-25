@@ -700,6 +700,50 @@ function toTavernFloor(message, fallbackName = '') {
  */
 let branchBusyId = '';
 
+/**
+ * 生成期间临时摘掉这个角色绑的世界书（主书 extensions.world + charLore 附加书），
+ * 结束后原样放回。只动内存里的引用，不写酒馆设置、不碰世界书文件。
+ * 摘不掉（找不到角色或酒馆没暴露）时返回空还原函数，照常带书生成。
+ */
+function suspendCharacterBooks(ctx, script, characterName) {
+  const restores = [];
+  try {
+    const characters = Array.isArray(ctx.characters) ? ctx.characters
+      : Array.isArray(script.characters) ? script.characters : [];
+    const name = String(characterName || '').trim();
+    const character = name ? characters.find(item => String(item?.name || '') === name) || null : null;
+    const ext = character?.data?.extensions;
+    if (ext && String(ext.world || '').trim()) {
+      const saved = ext.world;
+      ext.world = '';
+      restores.push(() => { ext.world = saved; });
+    }
+    const avatar = String(character?.avatar || '');
+    const file = avatar.replace(/\.[^/.]+$/, '');
+    if (file) {
+      /* world_info 在酒馆里是同一个对象，试着从上下文和宿主脚本各拿一次 */
+      const holders = [];
+      try { holders.push(ctx.getWorldInfoSettings?.()?.world_info); } catch { /* 拿不到就跳过 */ }
+      holders.push(script.world_info);
+      for (const worldInfo of holders) {
+        const lore = worldInfo?.charLore;
+        if (!Array.isArray(lore)) continue;
+        const entry = lore.find(item => item?.name === file || item?.name === avatar);
+        if (entry && Array.isArray(entry.extraBooks) && entry.extraBooks.length) {
+          const saved = entry.extraBooks;
+          entry.extraBooks = [];
+          restores.push(() => { entry.extraBooks = saved; });
+        }
+      }
+    }
+  } catch { /* 摘书失败就按原样带书生成 */ }
+  return () => {
+    for (const restore of restores) {
+      try { restore(); } catch { /* 放回失败不阻塞本轮 */ }
+    }
+  };
+}
+
 export function branchGenerating() {
   return branchBusyId;
 }
@@ -773,12 +817,17 @@ export async function branchReply({
     for (const floor of next) hostChat.push(floor);
   };
   branchBusyId = String(chatId || chatFile || 'branch');
+  /* 这一场关掉了角色世界书：生成期间把主书和附加书摘掉，结束后放回 */
+  const restoreBooks = cfg && typeof cfg === 'object' && cfg.showWorldBook === false
+    ? suspendCharacterBooks(ctx, script, characterName)
+    : null;
   try {
     if (promptEvent && eventSource?.on) eventSource.on(promptEvent, onPrompt);
     replaceFloors(temp);
     const text = await ctx.generateQuietPrompt({ quietPrompt, quietName: null });
     return { text: String(text ?? '').trim(), prompt: captured, quietPrompt };
   } finally {
+    restoreBooks?.();
     replaceFloors(backup);
     branchBusyId = '';
     if (promptEvent && eventSource?.removeListener) eventSource.removeListener(promptEvent, onPrompt);

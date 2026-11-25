@@ -782,6 +782,8 @@ export function theaterConfig(raw) {
     extraPrompt: String(cfg.extraPrompt || '').slice(0, THEATER_EXTRA_MAX),
     showTime: cfg.showTime !== false,
     showAvatar: cfg.showAvatar !== false,
+    /* 这一场要不要带这个角色绑定的世界书（主书 + 附加书）；关掉只影响这一次生成 */
+    showWorldBook: cfg.showWorldBook !== false,
   };
 }
 

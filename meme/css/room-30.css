@@ -674,6 +674,13 @@
 .prt .prt-row.is-danger .prt-row-name,
 .prt .prt-row.is-danger .prt-row-value { color: var(--danger); }
 
+.prt .prt-hint {
+  padding: 0 8px 6px;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--dim);
+}
+
 .prt .prt-chips {
   display: flex;
   flex-wrap: wrap;

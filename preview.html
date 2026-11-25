@@ -9816,6 +9816,13 @@ body {
 .prt .prt-row.is-danger .prt-row-name,
 .prt .prt-row.is-danger .prt-row-value { color: var(--danger); }
 
+.prt .prt-hint {
+  padding: 0 8px 6px;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--dim);
+}
+
 .prt .prt-chips {
   display: flex;
   flex-wrap: wrap;
@@ -11813,6 +11820,8 @@ function theaterConfig(raw) {
     extraPrompt: String(cfg.extraPrompt || '').slice(0, THEATER_EXTRA_MAX),
     showTime: cfg.showTime !== false,
     showAvatar: cfg.showAvatar !== false,
+    /* 这一场要不要带这个角色绑定的世界书（主书 + 附加书）；关掉只影响这一次生成 */
+    showWorldBook: cfg.showWorldBook !== false,
   };
 }
 
@@ -15276,6 +15285,50 @@ function toTavernFloor(message, fallbackName = '') {
  */
 let branchBusyId = '';
 
+/**
+ * 生成期间临时摘掉这个角色绑的世界书（主书 extensions.world + charLore 附加书），
+ * 结束后原样放回。只动内存里的引用，不写酒馆设置、不碰世界书文件。
+ * 摘不掉（找不到角色或酒馆没暴露）时返回空还原函数，照常带书生成。
+ */
+function suspendCharacterBooks(ctx, script, characterName) {
+  const restores = [];
+  try {
+    const characters = Array.isArray(ctx.characters) ? ctx.characters
+      : Array.isArray(script.characters) ? script.characters : [];
+    const name = String(characterName || '').trim();
+    const character = name ? characters.find(item => String(item?.name || '') === name) || null : null;
+    const ext = character?.data?.extensions;
+    if (ext && String(ext.world || '').trim()) {
+      const saved = ext.world;
+      ext.world = '';
+      restores.push(() => { ext.world = saved; });
+    }
+    const avatar = String(character?.avatar || '');
+    const file = avatar.replace(/\.[^/.]+$/, '');
+    if (file) {
+      /* world_info 在酒馆里是同一个对象，试着从上下文和宿主脚本各拿一次 */
+      const holders = [];
+      try { holders.push(ctx.getWorldInfoSettings?.()?.world_info); } catch { /* 拿不到就跳过 */ }
+      holders.push(script.world_info);
+      for (const worldInfo of holders) {
+        const lore = worldInfo?.charLore;
+        if (!Array.isArray(lore)) continue;
+        const entry = lore.find(item => item?.name === file || item?.name === avatar);
+        if (entry && Array.isArray(entry.extraBooks) && entry.extraBooks.length) {
+          const saved = entry.extraBooks;
+          entry.extraBooks = [];
+          restores.push(() => { entry.extraBooks = saved; });
+        }
+      }
+    }
+  } catch { /* 摘书失败就按原样带书生成 */ }
+  return () => {
+    for (const restore of restores) {
+      try { restore(); } catch { /* 放回失败不阻塞本轮 */ }
+    }
+  };
+}
+
 function branchGenerating() {
   return branchBusyId;
 }
@@ -15349,12 +15402,17 @@ async function branchReply({
     for (const floor of next) hostChat.push(floor);
   };
   branchBusyId = String(chatId || chatFile || 'branch');
+  /* 这一场关掉了角色世界书：生成期间把主书和附加书摘掉，结束后放回 */
+  const restoreBooks = cfg && typeof cfg === 'object' && cfg.showWorldBook === false
+    ? suspendCharacterBooks(ctx, script, characterName)
+    : null;
   try {
     if (promptEvent && eventSource?.on) eventSource.on(promptEvent, onPrompt);
     replaceFloors(temp);
     const text = await ctx.generateQuietPrompt({ quietPrompt, quietName: null });
     return { text: String(text ?? '').trim(), prompt: captured, quietPrompt };
   } finally {
+    restoreBooks?.();
     replaceFloors(backup);
     branchBusyId = '';
     if (promptEvent && eventSource?.removeListener) eventSource.removeListener(promptEvent, onPrompt);
@@ -16433,6 +16491,15 @@ function memoryLabel(theater) {
   return size ? `跟随酒馆 · ${size} 字` : '跟随酒馆';
 }
 
+/** 这次生成实际拿到的记忆是什么：柏宝书总结 / 没读到（不是原始楼层）。 */
+function memorySource(theater) {
+  const size = String(theater?.memory?.text || '').trim().length;
+  const engine = String(theater?.memory?.engine || '');
+  if (engine === 'baibai' && size) return `现在读到的是柏宝书总结，${size} 字`;
+  if (engine === 'baibai') return '柏宝书在，但这次没读到总结';
+  return '没读到柏宝书总结；生成时按酒馆自己的提示词注入走';
+}
+
 function hue(name) {
   let sum = 0;
   for (const ch of String(name || '?')) sum = (sum * 31 + ch.codePointAt(0)) % 360;
@@ -16745,6 +16812,7 @@ function settingsHtml(theater) {
             { value: 'fixed', label: '固定开场总结' },
           ],
         })}
+        <div class="prt-hint">${esc(memorySource(theater))}</div>
         ${row({ act: 'refresh-memory', id: theater.id, title: '读一下酒馆现在的记忆', sub: memorySize ? '用现在的总结替换开场那份' : '这场还没读到总结', value: memorySize ? '重新读' : '去读' })}
 
         <div class="prt-label">这一场</div>
@@ -16754,6 +16822,7 @@ function settingsHtml(theater) {
         </div>
         ${switchRow({ act: 'toggle-time', id: theater.id, title: '显示时间', on: cfg.showTime !== false })}
         ${switchRow({ act: 'toggle-avatar', id: theater.id, title: '显示头像', sub: '关掉以后只留文字，适合截图分享', on: cfg.showAvatar !== false })}
+        ${switchRow({ act: 'toggle-worldbook', id: theater.id, title: '带角色世界书', sub: '关掉以后这一场不注入这个角色绑的主书和附加书，酒馆那边不动', on: cfg.showWorldBook !== false })}
 
         <div class="prt-label">操作</div>
         ${row({ act: 'follow', id: theater.id, title: '跟到酒馆最新楼层', sub: `现在接在第 ${theater.forkFloor || 0} 楼`, value: '跟上' })}
@@ -17087,13 +17156,16 @@ function act(name, idValue, extra) {
       return;
     }
     case 'toggle-time':
-    case 'toggle-avatar': {
+    case 'toggle-avatar':
+    case 'toggle-worldbook': {
       if (!theater) return;
-      const key = name === 'toggle-time' ? 'showTime' : 'showAvatar';
+      const key = name === 'toggle-time' ? 'showTime'
+        : name === 'toggle-avatar' ? 'showAvatar' : 'showWorldBook';
       const now = theater.cfg?.[key] !== false;
       setTheaterConfig(theater, { [key]: !now });
       save();
       paint();
+      if (name === 'toggle-worldbook') toast(now ? '这一场不带角色世界书了' : '这一场会带上角色世界书');
       return;
     }
     case 'follow': if (theater) followLatest(theater); return;
@@ -23984,6 +24056,7 @@ function settingsBody(ctx, params = {}) {
           })}
           ${setRow(theater.id, { iconName: 'clock', title: '显示时间', sub: '关掉以后气泡下面不显示发送时间', act: 'ps-toggle-time', toggle: cfg.showTime !== false })}
           ${setRow(theater.id, { iconName: 'contacts', title: '显示头像', sub: '关掉以后只留气泡，适合截图分享', act: 'ps-toggle-avatar', toggle: cfg.showAvatar !== false })}
+          ${setRow(theater.id, { iconName: 'book', title: '带角色世界书', sub: '关掉以后这一场不注入这个角色绑的主书和附加书', act: 'ps-toggle-worldbook', toggle: cfg.showWorldBook !== false })}
         </div>
       </div>
 
@@ -24158,13 +24231,16 @@ const parallelSettingsApp = {
       return true;
     }
 
-    if (act === 'ps-toggle-time' || act === 'ps-toggle-avatar') {
-      const key = act === 'ps-toggle-time' ? 'showTime' : 'showAvatar';
+    if (act === 'ps-toggle-time' || act === 'ps-toggle-avatar' || act === 'ps-toggle-worldbook') {
+      const key = act === 'ps-toggle-time' ? 'showTime'
+        : act === 'ps-toggle-avatar' ? 'showAvatar' : 'showWorldBook';
       const now = theater.cfg?.[key] !== false;
       setTheaterConfig(theater, { [key]: !now });
       ctx.save();
       ctx.rerender();
-      ctx.toast(now ? '已收起' : '已显示');
+      ctx.toast(act === 'ps-toggle-worldbook'
+        ? (now ? '这一场不带角色世界书了' : '这一场会带上角色世界书')
+        : (now ? '已收起' : '已显示'));
       return true;
     }
 

@@ -369,6 +369,7 @@ function settingsBody(ctx, params = {}) {
           })}
           ${setRow(theater.id, { iconName: 'clock', title: '显示时间', sub: '关掉以后气泡下面不显示发送时间', act: 'ps-toggle-time', toggle: cfg.showTime !== false })}
           ${setRow(theater.id, { iconName: 'contacts', title: '显示头像', sub: '关掉以后只留气泡，适合截图分享', act: 'ps-toggle-avatar', toggle: cfg.showAvatar !== false })}
+          ${setRow(theater.id, { iconName: 'book', title: '带角色世界书', sub: '关掉以后这一场不注入这个角色绑的主书和附加书', act: 'ps-toggle-worldbook', toggle: cfg.showWorldBook !== false })}
         </div>
       </div>
 
@@ -543,13 +544,16 @@ export const parallelSettingsApp = {
       return true;
     }
 
-    if (act === 'ps-toggle-time' || act === 'ps-toggle-avatar') {
-      const key = act === 'ps-toggle-time' ? 'showTime' : 'showAvatar';
+    if (act === 'ps-toggle-time' || act === 'ps-toggle-avatar' || act === 'ps-toggle-worldbook') {
+      const key = act === 'ps-toggle-time' ? 'showTime'
+        : act === 'ps-toggle-avatar' ? 'showAvatar' : 'showWorldBook';
       const now = theater.cfg?.[key] !== false;
       setTheaterConfig(theater, { [key]: !now });
       ctx.save();
       ctx.rerender();
-      ctx.toast(now ? '已收起' : '已显示');
+      ctx.toast(act === 'ps-toggle-worldbook'
+        ? (now ? '这一场不带角色世界书了' : '这一场会带上角色世界书')
+        : (now ? '已收起' : '已显示'));
       return true;
     }
 

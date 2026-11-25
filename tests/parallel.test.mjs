@@ -440,6 +440,7 @@ test('平行时空：这一场自己能调背景口径、记忆口径和额外�
   assert.equal(cfg.extraPrompt, '');
   assert.equal(cfg.showTime, true);
   assert.equal(cfg.showAvatar, true);
+  assert.equal(cfg.showWorldBook, true, '默认带角色世界书');
 
   const messy = theaterConfig({ historyMode: '乱写', historyFloors: 999, memoryMode: 'off', extraPrompt: 'x'.repeat(3000) });
   assert.equal(messy.historyMode, 'fork', '不认识的取值退回默认');
@@ -455,6 +456,8 @@ test('平行时空：这一场自己能调背景口径、记忆口径和额外�
   assert.equal(theater.cfg.historyFloors, 12);
   setTheaterConfig(theater, { historyFloors: 0 });
   assert.equal(theater.cfg.historyFloors, 1, '层数至少 1');
+  setTheaterConfig(theater, { showWorldBook: false });
+  assert.equal(theater.cfg.showWorldBook, false, '角色世界书开关能存下来');
 
   const saved = normalize({ theaters: { [theater.id]: theater } }).theaters[theater.id];
   assert.equal(saved.cfg.historyMode, 'recent');

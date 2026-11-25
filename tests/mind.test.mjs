@@ -32,11 +32,31 @@ test('没有 [消息] 包裹时也能识别标注行', () => {
   assert.equal(bubbles[0].subtext, '我其实等了很久');
 });
 
-test('第一个气泡之前的标注直接丢掉，不当成消息', () => {
+test('第一个气泡之前写的 [心里] 也归这一轮，不当成消息', () => {
   const bubbles = parseBehaviorReply('[心里]我在想什么\n你来了');
   assert.equal(bubbles.length, 1);
   assert.equal(bubbles[0].text, '你来了');
-  assert.equal(bubbles[0].inner, undefined);
+  assert.equal(bubbles[0].inner, '我在想什么');
+});
+
+test('心理活动一段一条：多处 [心里] 只留一条，挂在段首那个气泡上', () => {
+  const text = [
+    '[消息]',
+    '到家了',
+    '[心里]其实今天很累，但不想让她担心。',
+    '[潜台词]我没事。',
+    '路上买了点吃的',
+    '[心里]第二句不该再写一遍。',
+    '[/消息]',
+  ].join('\n');
+  const bubbles = parseBehaviorReply(text);
+  assert.equal(bubbles.length, 2);
+  assert.match(bubbles[0].inner, /今天很累/);
+  assert.equal(bubbles[1].inner, undefined);
+  assert.equal(bubbles.filter(item => item.inner).length, 1);
+  /* 潜台词仍按气泡走：只挂在它上面那条 */
+  assert.equal(bubbles[0].subtext, '我没事。');
+  assert.equal(bubbles[1].subtext, undefined);
 });
 
 test('标注支持闭合写法，且按上限截断', () => {

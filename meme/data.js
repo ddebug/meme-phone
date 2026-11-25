@@ -5,7 +5,7 @@
  * 数据结构刻意保持扁平，避免旧版那种「十个模块共享一个巨型对象、谁都改它」的局面。
  */
 
-import { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT, DEFAULT_PROACTIVE_PROMPT, PROACTIVE_PROMPT_MAX_LENGTH } from './preset-defaults.js';
+import { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, LEGACY_MIND_PROMPT, MIND_PROMPT, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT, DEFAULT_PROACTIVE_PROMPT, PROACTIVE_PROMPT_MAX_LENGTH } from './preset-defaults.js';
 import { normalizeBehavior, behaviorPreview } from './behavior.js';
 
 export const SCHEMA_VERSION = 3;
@@ -2046,6 +2046,10 @@ export function normalize(raw) {
         }
         if (entry.id === REPLY_INSTRUCTION_ID && entry.content === LEGACY_NATURAL_REPLY_INSTRUCTION) {
           return { ...entry, content: NATURAL_REPLY_INSTRUCTION };
+        }
+        if (entry.id === 'reply_item_mind' && entry.content === LEGACY_MIND_PROMPT) {
+          /* 心理活动从「每条气泡一条」改成「一整段一条」，原样旧文案才替换 */
+          return { ...entry, content: MIND_PROMPT };
         }
         return entry;
       });

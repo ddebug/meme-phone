@@ -301,7 +301,8 @@ function messageLines(text) {
   return lines;
 }
 
-/* 心理活动 / 潜台词：紧跟气泡下一行的隐藏标注，只给用户点开看，不算一条消息。
+/* 心理活动 / 潜台词：藏在气泡后面的标注，只给用户点开看，不算一条消息。
+   心理活动属于「这一整段话」，一轮只收一条；潜台词逐条气泡跟在它前面那条后面。
    上限与 data.js 的 MESSAGE_INNER_MAX / MESSAGE_SUBTEXT_MAX 保持一致。 */
 const MIND_LIMITS = { inner: 240, subtext: 160 };
 
@@ -337,12 +338,18 @@ export function parseBehaviorReply(text, options = {}) {
   const lines = messageLines(source);
   const max = Math.max(1, Math.min(30, Number(options.max) || 30));
   const messages = [];
+  let turnInner = '';
   for (const line of lines) {
-    /* 标注行挂在它前面那个气泡上；第一个气泡之前出现的标注直接丢掉。 */
     const mind = parseMindLine(line);
     if (mind) {
+      if (mind.key === 'inner') {
+        /* [心里] 是这一整段话的念头，不跟某一条气泡走：一轮只留第一条，统一挂到这一轮开头那个气泡上。 */
+        if (!turnInner) turnInner = mind.value;
+        continue;
+      }
+      /* 潜台词才是逐条气泡的第二层意思：挂在它前面那个气泡上。 */
       const target = messages[messages.length - 1];
-      if (target) target[mind.key] = mind.value;
+      if (target) target.subtext = mind.value;
       continue;
     }
     if (messages.length >= max) continue;
@@ -356,6 +363,7 @@ export function parseBehaviorReply(text, options = {}) {
     }
     messages.push(parsed);
   }
+  if (turnInner && messages.length) messages[0].inner = turnInner;
   return messages;
 }
 

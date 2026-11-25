@@ -99,7 +99,6 @@ let ctx = null;
 let rootEl = null;
 let initPromise = null;
 let followTimer = 0;
-let draftDebugTimer = 0;
 /* document 上的 change 兜底监听：关手机时按引用移除，不在页面里越积越多 */
 let docChangeTarget = null;
 let docChangeHandler = null;
@@ -578,11 +577,7 @@ export async function openMemePhone(options = {}) {
       if (entry.view !== 'thread') return;
       const chat = state.chats[entry.params?.chatId];
       if (chat) chat.draft = value;
-      /* 调试栏要跟着草稿更新 token；输入停下后再重画，不逐键打断输入 */
-      if (state.settings.chat?.debugBar === true) {
-        clearTimeout(draftDebugTimer);
-        draftDebugTimer = setTimeout(() => ctx.rerender?.(), 480);
-      }
+      /* 草稿只存下来，不跟着每个字重算 token：预算只看已经发出去的消息 */
     },
     onClose: () => closeMemePhone(),
     /* 打开「TA 的手机」前先抓这个角色最近一份酒馆聊天；抓不到就继续用本机假资料。 */
@@ -894,8 +889,6 @@ export function closeMemePhone() {
   cancelParallelRun();
   clearInterval(followTimer);
   followTimer = 0;
-  clearTimeout(draftDebugTimer);
-  draftDebugTimer = 0;
   if (docChangeTarget && docChangeHandler) {
     docChangeTarget.removeEventListener('change', docChangeHandler, true);
   }

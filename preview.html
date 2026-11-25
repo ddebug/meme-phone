@@ -8551,8 +8551,10 @@ const LEGACY_NATURAL_REPLY_INSTRUCTION = '像平时发微信一样回消息：�
 const NATURAL_REPLY_INSTRUCTION = '像平时发微信一样聊天：口语、短句，按意思自然分成多个气泡，不把一整轮回复挤在同一条里。通常发2～5条；简单回应也可以只发1条，不为凑数重复或强行追问。每个气泡独占一行，统一放在[消息]与[/消息]之间。不要写旁白、括号动作或小说段落。';
 const MULTI_BUBBLE_REPLY_FORMAT = '[回复格式要求]\n参考即时通讯的发消息方式，一行一个气泡，空行忽略；按语义自然拆分，通常2～5条，简单回应可只发1条，不为凑数重复。\n只输出当前角色这一轮要发的内容，用[消息]和[/消息]包住，例如：\n[消息]\n刚刚忙完\n你吃饭了吗\n[/消息]\n不要添加角色名、时间戳、序号或代码块；不要写旁白、括号动作、场景描写，也不要代替用户或其他角色发言。每条可用的表情或行为标签单独占一行，且只使用本会话已开启的标签。\n[/回复格式要求]';
 
-/* 心理活动 / 潜台词是藏在气泡后面的两层含义：只有用户点开才看得到，不算聊天气泡。 */
-const MIND_PROMPT = '[心理活动与潜台词]\n这两种标注只给用户点开看，不会出现在聊天气泡里：\n- [心里]：TA 发这条时真正的念头，用「我」的口气，1 句，30 字以内。\n- [潜台词]：这条消息表面之下真正想说的，1 句，30 字以内。\n写法：\n- 紧跟在对应的气泡下面，另起一行，各自单独一行，两种标注之间不要空行。\n- 只写 TA 自己的，不写用户在想什么；不加引号，不解释，也不要写“他心里想”这类旁白。\n- 不必每条都写，只在真有第二层意思时加；一条气泡最多各一行，用户的消息不加。\n[/心理活动与潜台词]';
+/* 心理活动 / 潜台词是藏在气泡后面的两层含义：只有用户点开才看得到，不算聊天气泡。
+   心理活动是「发这一整段话时在想什么」，一轮只有一条；潜台词才是逐条气泡的第二层意思。 */
+const LEGACY_MIND_PROMPT = '[心理活动与潜台词]\n这两种标注只给用户点开看，不会出现在聊天气泡里：\n- [心里]：TA 发这条时真正的念头，用「我」的口气，1 句，30 字以内。\n- [潜台词]：这条消息表面之下真正想说的，1 句，30 字以内。\n写法：\n- 紧跟在对应的气泡下面，另起一行，各自单独一行，两种标注之间不要空行。\n- 只写 TA 自己的，不写用户在想什么；不加引号，不解释，也不要写“他心里想”这类旁白。\n- 不必每条都写，只在真有第二层意思时加；一条气泡最多各一行，用户的消息不加。\n[/心理活动与潜台词]';
+const MIND_PROMPT = '[心理活动与潜台词]\n这两种标注只给用户点开看，不会出现在聊天气泡里：\n- [心里]：这一整段话发出去时 TA 心里的念头，用「我」的口气，写 1～2 句、60 字以内。\n- [潜台词]：其中某一条气泡表面之下真正想说的，1 句，30 字以内。\n写法：\n- [心里] 一轮只写一次，放在所有气泡之后单独一行；不要每句气泡各写一遍。\n- [潜台词] 紧跟在对应的那条气泡下面，单独一行；只在真有第二层意思时才加，一条气泡最多一行。\n- 只写 TA 自己的，不写用户在想什么；不加引号，不解释，也不要写“他心里想”这类旁白。\n- 用户的消息不加。\n[/心理活动与潜台词]';
 
 // 主动开口是空发送触发的单次请求，不是后台定时器；时间变量在请求/预览时统一替换。
 const PROACTIVE_PROMPT_MAX_LENGTH = 4000;
@@ -8764,6 +8766,7 @@ exports["LEGACY_SINGLE_REPLY_FORMAT"] = LEGACY_SINGLE_REPLY_FORMAT;
 exports["LEGACY_NATURAL_REPLY_INSTRUCTION"] = LEGACY_NATURAL_REPLY_INSTRUCTION;
 exports["NATURAL_REPLY_INSTRUCTION"] = NATURAL_REPLY_INSTRUCTION;
 exports["MULTI_BUBBLE_REPLY_FORMAT"] = MULTI_BUBBLE_REPLY_FORMAT;
+exports["LEGACY_MIND_PROMPT"] = LEGACY_MIND_PROMPT;
 exports["MIND_PROMPT"] = MIND_PROMPT;
 exports["PROACTIVE_PROMPT_MAX_LENGTH"] = PROACTIVE_PROMPT_MAX_LENGTH;
 exports["DEFAULT_PROACTIVE_PROMPT"] = DEFAULT_PROACTIVE_PROMPT;
@@ -9073,7 +9076,8 @@ function messageLines(text) {
   return lines;
 }
 
-/* 心理活动 / 潜台词：紧跟气泡下一行的隐藏标注，只给用户点开看，不算一条消息。
+/* 心理活动 / 潜台词：藏在气泡后面的标注，只给用户点开看，不算一条消息。
+   心理活动属于「这一整段话」，一轮只收一条；潜台词逐条气泡跟在它前面那条后面。
    上限与 data.js 的 MESSAGE_INNER_MAX / MESSAGE_SUBTEXT_MAX 保持一致。 */
 const MIND_LIMITS = { inner: 240, subtext: 160 };
 
@@ -9109,12 +9113,18 @@ function parseBehaviorReply(text, options = {}) {
   const lines = messageLines(source);
   const max = Math.max(1, Math.min(30, Number(options.max) || 30));
   const messages = [];
+  let turnInner = '';
   for (const line of lines) {
-    /* 标注行挂在它前面那个气泡上；第一个气泡之前出现的标注直接丢掉。 */
     const mind = parseMindLine(line);
     if (mind) {
+      if (mind.key === 'inner') {
+        /* [心里] 是这一整段话的念头，不跟某一条气泡走：一轮只留第一条，统一挂到这一轮开头那个气泡上。 */
+        if (!turnInner) turnInner = mind.value;
+        continue;
+      }
+      /* 潜台词才是逐条气泡的第二层意思：挂在它前面那个气泡上。 */
       const target = messages[messages.length - 1];
-      if (target) target[mind.key] = mind.value;
+      if (target) target.subtext = mind.value;
       continue;
     }
     if (messages.length >= max) continue;
@@ -9128,6 +9138,7 @@ function parseBehaviorReply(text, options = {}) {
     }
     messages.push(parsed);
   }
+  if (turnInner && messages.length) messages[0].inner = turnInner;
   return messages;
 }
 
@@ -9482,7 +9493,7 @@ __mods["meme/data.js"] = function(module, exports, __req){
  * 数据结构刻意保持扁平，避免旧版那种「十个模块共享一个巨型对象、谁都改它」的局面。
  */
 
-const { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT, DEFAULT_PROACTIVE_PROMPT, PROACTIVE_PROMPT_MAX_LENGTH } = __req("meme/preset-defaults.js");
+const { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, LEGACY_MIND_PROMPT, MIND_PROMPT, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT, DEFAULT_PROACTIVE_PROMPT, PROACTIVE_PROMPT_MAX_LENGTH } = __req("meme/preset-defaults.js");
 const { normalizeBehavior, behaviorPreview } = __req("meme/behavior.js");
 
 const SCHEMA_VERSION = 3;
@@ -11523,6 +11534,10 @@ function normalize(raw) {
         }
         if (entry.id === REPLY_INSTRUCTION_ID && entry.content === LEGACY_NATURAL_REPLY_INSTRUCTION) {
           return { ...entry, content: NATURAL_REPLY_INSTRUCTION };
+        }
+        if (entry.id === 'reply_item_mind' && entry.content === LEGACY_MIND_PROMPT) {
+          /* 心理活动从「每条气泡一条」改成「一整段一条」，原样旧文案才替换 */
+          return { ...entry, content: MIND_PROMPT };
         }
         return entry;
       });
@@ -18122,15 +18137,15 @@ function debugKey(ctx, chat) {
   ].join('|');
 }
 
-function debugMode(ctx, chat, draft, pendingCount = pendingUserCount(chat)) {
-  if (String(draft || '').trim() || pendingCount > 0) return 'reply';
+function debugMode(ctx, chat, pendingCount = pendingUserCount(chat)) {
+  if (pendingCount > 0) return 'reply';
   return wakeAllowed(ctx.state, chat) ? 'proactive' : 'none';
 }
 
-/** 在缓存的 base 上补这一轮；输入变化时不用重新读记忆 / 世界书。 */
-function debugMessages(ctx, chat, contact, cache, draft) {
+/** 在缓存的 base 上补这一轮；只看已经发出去（待回）的消息，不跟着输入框里的草稿算。 */
+function debugMessages(ctx, chat, contact, cache) {
   const pending = pendingUserMessages(chat);
-  const mode = debugMode(ctx, chat, draft, pending.length);
+  const mode = debugMode(ctx, chat, pending.length);
   const messages = (cache.messages || []).map(message => ({ ...message }));
   if (mode === 'proactive') {
     const lead = proactiveLead(ctx.state, contact, chat);
@@ -18140,17 +18155,12 @@ function debugMessages(ctx, chat, contact, cache, draft) {
     messages.push({ role: 'user', content: '（现在没有新消息，主动开启聊天，按回复预设的格式发送。）', source: '主动消息占位' });
   } else if (mode === 'reply') {
     const who = ctx.state.settings?.user?.name || '我';
-    const draftText = String(draft || '').trim();
-    if (draftText) {
-      messages.push({ role: 'user', content: `${who}：${draftText}`, source: '最后一条聊天' });
-    } else {
-      const parts = pending.map(serializeMessage).filter(Boolean);
-      if (parts.length) {
-        const text = parts.length > 1
-          ? parts.map((part, index) => `〔${index + 1}〕${part}`).join('\n')
-          : parts[0];
-        messages.push({ role: 'user', content: `${who}：${text}`, source: '最后一条聊天' });
-      }
+    const parts = pending.map(serializeMessage).filter(Boolean);
+    if (parts.length) {
+      const text = parts.length > 1
+        ? parts.map((part, index) => `〔${index + 1}〕${part}`).join('\n')
+        : parts[0];
+      messages.push({ role: 'user', content: `${who}：${text}`, source: '最后一条聊天' });
     }
   }
   return { mode, messages };
@@ -18170,8 +18180,8 @@ function debugGroupHtml(group) {
     </div>`;
 }
 
-function debugPanelHtml(ctx, chat, contact, cache, draft) {
-  const { mode, messages } = debugMessages(ctx, chat, contact, cache, draft);
+function debugPanelHtml(ctx, chat, contact, cache) {
+  const { mode, messages } = debugMessages(ctx, chat, contact, cache);
   const stats = requestStats(messages);
   const skipped = (cache.report?.items || []).filter(item => item.status !== 'injected');
   const want = mode === 'proactive' ? '主动开口' : mode === 'reply' ? '这一轮' : '基础上下文';
@@ -18207,14 +18217,13 @@ function debugPanelHtml(ctx, chat, contact, cache, draft) {
 function debugBarHtml(ctx, chat, contact) {
   if (!debugEnabled(ctx)) return '';
   const cache = ctx.shell.debugPreview;
-  const draft = String(ctx.shell.live.inputValue || chat.draft || '');
   const open = Boolean(ctx.shell.debugOpen?.[chat.id]);
   const ready = cache?.chatId === chat.id && Array.isArray(cache.messages) && cache.key === debugKey(ctx, chat);
   const loading = !ready;
   let head = '统计中…';
   let mode = '';
   if (ready) {
-    const built = debugMessages(ctx, chat, contact, cache, draft);
+    const built = debugMessages(ctx, chat, contact, cache);
     const stats = requestStats(built.messages);
     mode = built.mode;
     head = mode === 'none' ? '输入后统计' : `≈ ${formatNumber(stats.total)} tk`;
@@ -18228,7 +18237,7 @@ function debugBarHtml(ctx, chat, contact) {
         <span class="mp-debug-tk" data-debug-tk>${head}</span>
         <span class="mp-debug-caret">${icon('chevron')}</span>
       </button>
-      ${open && ready ? debugPanelHtml(ctx, chat, contact, cache, draft) : ''}
+      ${open && ready ? debugPanelHtml(ctx, chat, contact, cache) : ''}
       ${open && !ready ? `<div class="mp-debug-panel"><div class="mp-debug-empty">${cache?.error ? `统计失败：${esc(cache.error)}` : '正在读这一轮的上下文…'}</div>${cache?.error ? `<button class="mp-debug-retry" data-act="debug-refresh" data-chat="${chat.id}" type="button">重新统计</button>` : ''}</div>` : ''}
     </div>`;
 }
@@ -18347,13 +18356,13 @@ function mindPanelHtml(ctx, chat, contact, message) {
       <div class="mp-mind-head">
         ${avatarHtml(contact?.name, contact?.avatar)}
         <div class="mp-mind-head-main">
-          <div class="mp-mind-name">${esc(name)} · 这一条背后</div>
+          <div class="mp-mind-name">${esc(name)} · 这一整段背后</div>
           <div class="mp-mind-time">${esc(timeText(message.at || Date.now()))}</div>
         </div>
       </div>
       <div class="mp-mind-block">
         <div class="mp-mind-label">${icon('eye')}<span>心理活动</span></div>
-        <div class="mp-mind-text${inner ? '' : ' is-empty'}">${esc(inner || '这条没有写心理活动；下一轮可以让 TA 把念头写出来。')}</div>
+        <div class="mp-mind-text${inner ? '' : ' is-empty'}">${esc(inner || '这段没有写心理活动；下一轮可以让 TA 把念头写出来。')}</div>
       </div>
       ${subtext ? `
       <div class="mp-mind-block is-sub">
@@ -31181,7 +31190,6 @@ let ctx = null;
 let rootEl = null;
 let initPromise = null;
 let followTimer = 0;
-let draftDebugTimer = 0;
 /* document 上的 change 兜底监听：关手机时按引用移除，不在页面里越积越多 */
 let docChangeTarget = null;
 let docChangeHandler = null;
@@ -31660,11 +31668,7 @@ async function openMemePhone(options = {}) {
       if (entry.view !== 'thread') return;
       const chat = state.chats[entry.params?.chatId];
       if (chat) chat.draft = value;
-      /* 调试栏要跟着草稿更新 token；输入停下后再重画，不逐键打断输入 */
-      if (state.settings.chat?.debugBar === true) {
-        clearTimeout(draftDebugTimer);
-        draftDebugTimer = setTimeout(() => ctx.rerender?.(), 480);
-      }
+      /* 草稿只存下来，不跟着每个字重算 token：预算只看已经发出去的消息 */
     },
     onClose: () => closeMemePhone(),
     /* 打开「TA 的手机」前先抓这个角色最近一份酒馆聊天；抓不到就继续用本机假资料。 */
@@ -31976,8 +31980,6 @@ function closeMemePhone() {
   cancelParallelRun();
   clearInterval(followTimer);
   followTimer = 0;
-  clearTimeout(draftDebugTimer);
-  draftDebugTimer = 0;
   if (docChangeTarget && docChangeHandler) {
     docChangeTarget.removeEventListener('change', docChangeHandler, true);
   }

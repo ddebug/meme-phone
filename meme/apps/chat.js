@@ -171,15 +171,15 @@ function debugKey(ctx, chat) {
   ].join('|');
 }
 
-function debugMode(ctx, chat, draft, pendingCount = pendingUserCount(chat)) {
-  if (String(draft || '').trim() || pendingCount > 0) return 'reply';
+function debugMode(ctx, chat, pendingCount = pendingUserCount(chat)) {
+  if (pendingCount > 0) return 'reply';
   return wakeAllowed(ctx.state, chat) ? 'proactive' : 'none';
 }
 
-/** 在缓存的 base 上补这一轮；输入变化时不用重新读记忆 / 世界书。 */
-function debugMessages(ctx, chat, contact, cache, draft) {
+/** 在缓存的 base 上补这一轮；只看已经发出去（待回）的消息，不跟着输入框里的草稿算。 */
+function debugMessages(ctx, chat, contact, cache) {
   const pending = pendingUserMessages(chat);
-  const mode = debugMode(ctx, chat, draft, pending.length);
+  const mode = debugMode(ctx, chat, pending.length);
   const messages = (cache.messages || []).map(message => ({ ...message }));
   if (mode === 'proactive') {
     const lead = proactiveLead(ctx.state, contact, chat);
@@ -189,17 +189,12 @@ function debugMessages(ctx, chat, contact, cache, draft) {
     messages.push({ role: 'user', content: '（现在没有新消息，主动开启聊天，按回复预设的格式发送。）', source: '主动消息占位' });
   } else if (mode === 'reply') {
     const who = ctx.state.settings?.user?.name || '我';
-    const draftText = String(draft || '').trim();
-    if (draftText) {
-      messages.push({ role: 'user', content: `${who}：${draftText}`, source: '最后一条聊天' });
-    } else {
-      const parts = pending.map(serializeMessage).filter(Boolean);
-      if (parts.length) {
-        const text = parts.length > 1
-          ? parts.map((part, index) => `〔${index + 1}〕${part}`).join('\n')
-          : parts[0];
-        messages.push({ role: 'user', content: `${who}：${text}`, source: '最后一条聊天' });
-      }
+    const parts = pending.map(serializeMessage).filter(Boolean);
+    if (parts.length) {
+      const text = parts.length > 1
+        ? parts.map((part, index) => `〔${index + 1}〕${part}`).join('\n')
+        : parts[0];
+      messages.push({ role: 'user', content: `${who}：${text}`, source: '最后一条聊天' });
     }
   }
   return { mode, messages };
@@ -219,8 +214,8 @@ function debugGroupHtml(group) {
     </div>`;
 }
 
-function debugPanelHtml(ctx, chat, contact, cache, draft) {
-  const { mode, messages } = debugMessages(ctx, chat, contact, cache, draft);
+function debugPanelHtml(ctx, chat, contact, cache) {
+  const { mode, messages } = debugMessages(ctx, chat, contact, cache);
   const stats = requestStats(messages);
   const skipped = (cache.report?.items || []).filter(item => item.status !== 'injected');
   const want = mode === 'proactive' ? '主动开口' : mode === 'reply' ? '这一轮' : '基础上下文';
@@ -256,14 +251,13 @@ function debugPanelHtml(ctx, chat, contact, cache, draft) {
 function debugBarHtml(ctx, chat, contact) {
   if (!debugEnabled(ctx)) return '';
   const cache = ctx.shell.debugPreview;
-  const draft = String(ctx.shell.live.inputValue || chat.draft || '');
   const open = Boolean(ctx.shell.debugOpen?.[chat.id]);
   const ready = cache?.chatId === chat.id && Array.isArray(cache.messages) && cache.key === debugKey(ctx, chat);
   const loading = !ready;
   let head = '统计中…';
   let mode = '';
   if (ready) {
-    const built = debugMessages(ctx, chat, contact, cache, draft);
+    const built = debugMessages(ctx, chat, contact, cache);
     const stats = requestStats(built.messages);
     mode = built.mode;
     head = mode === 'none' ? '输入后统计' : `≈ ${formatNumber(stats.total)} tk`;
@@ -277,7 +271,7 @@ function debugBarHtml(ctx, chat, contact) {
         <span class="mp-debug-tk" data-debug-tk>${head}</span>
         <span class="mp-debug-caret">${icon('chevron')}</span>
       </button>
-      ${open && ready ? debugPanelHtml(ctx, chat, contact, cache, draft) : ''}
+      ${open && ready ? debugPanelHtml(ctx, chat, contact, cache) : ''}
       ${open && !ready ? `<div class="mp-debug-panel"><div class="mp-debug-empty">${cache?.error ? `统计失败：${esc(cache.error)}` : '正在读这一轮的上下文…'}</div>${cache?.error ? `<button class="mp-debug-retry" data-act="debug-refresh" data-chat="${chat.id}" type="button">重新统计</button>` : ''}</div>` : ''}
     </div>`;
 }
@@ -396,13 +390,13 @@ function mindPanelHtml(ctx, chat, contact, message) {
       <div class="mp-mind-head">
         ${avatarHtml(contact?.name, contact?.avatar)}
         <div class="mp-mind-head-main">
-          <div class="mp-mind-name">${esc(name)} · 这一条背后</div>
+          <div class="mp-mind-name">${esc(name)} · 这一整段背后</div>
           <div class="mp-mind-time">${esc(timeText(message.at || Date.now()))}</div>
         </div>
       </div>
       <div class="mp-mind-block">
         <div class="mp-mind-label">${icon('eye')}<span>心理活动</span></div>
-        <div class="mp-mind-text${inner ? '' : ' is-empty'}">${esc(inner || '这条没有写心理活动；下一轮可以让 TA 把念头写出来。')}</div>
+        <div class="mp-mind-text${inner ? '' : ' is-empty'}">${esc(inner || '这段没有写心理活动；下一轮可以让 TA 把念头写出来。')}</div>
       </div>
       ${subtext ? `
       <div class="mp-mind-block is-sub">

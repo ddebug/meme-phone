@@ -288,7 +288,7 @@ export function createShell(options) {
     sheet: null,
     sheetAnimated: false,
     toastTimer: 0,
-    live: { inputValue: '', focus: false },
+    live: { inputValue: '', focus: false, tvRail: false },
     /* 是否有输入控件正聚焦：打字弹起软键盘期间为 true，用来忽略键盘造成的视口收缩 */
     typing: false,
     /* 缩放基准视口：打开手机时记下的窗口尺寸，不跟随软键盘期的可视高度抖动 */
@@ -848,6 +848,15 @@ export function createShell(options) {
 
   /* 浮层贴住当前可视区，整机按布局结果设缩放与高度：键盘弹起时只有高度在变 */
   function applyLayout() {
+    const tv = root?.querySelector('.mp-tv');
+    if (tv) {
+      const layout = layoutNow();
+      tv.style.top = `${Math.round(layout.box.top)}px`;
+      tv.style.left = `${Math.round(layout.box.left)}px`;
+      tv.style.width = `${Math.round(layout.box.w)}px`;
+      tv.style.height = `${Math.round(layout.box.h)}px`;
+      return layout;
+    }
     const overlay = root?.querySelector('.mp-overlay');
     const device = root?.querySelector('.mp-device');
     if (!overlay || !device) return null;
@@ -914,12 +923,23 @@ export function createShell(options) {
     root.className = 'mp-root';
     root.dataset.mpTheme = status;
     const activeWorld = ctx.world?.active?.() || null;
-    root.dataset.mpSurface = 'meta';
+    const topEntry = shell.stack[shell.stack.length - 1];
+    const surface = topEntry && apps[topEntry.view]?.surface === 'tavern' ? 'tavern' : 'meta';
+    root.dataset.mpSurface = surface;
     applyWall(root, state.settings);
     applyLook(root, state.settings);
     /* 先算一次布局：整机高度与缩放一起写进首帧，避免开手机时先按 844 高闪一下再收 */
     const layout = layoutNow();
     const overlayStyle = `top: ${Math.round(layout.box.top)}px; left: ${Math.round(layout.box.left)}px; width: ${Math.round(layout.box.w)}px; height: ${Math.round(layout.box.h)}px`;
+    /* 平行时空这类「桌面 App」不再套小手机外壳：整块铺满宿主视口，自己画顶栏与会话区 */
+    if (surface === 'tavern') {
+      root.innerHTML = `
+        <div class="mp-tv" style="${overlayStyle}">
+          ${pageHtml()}
+          ${sheetHtml()}
+          ${shell.toastMessage ? `<div class="mp-toast">${esc(shell.toastMessage)}</div>` : ''}
+        </div>`;
+    } else {
     root.innerHTML = `
       <div class="mp-overlay" style="${overlayStyle}">
         <div class="mp-device" style="height: ${Math.round(layout.height)}px; transform: ${deviceTransformOf(layout)}">
@@ -946,6 +966,7 @@ export function createShell(options) {
           </div>
         </div>
       </div>`;
+    }
 
     restoreLive(prevSel);
     root.querySelectorAll('.mp-compose-box textarea').forEach(growComposer);
@@ -1075,7 +1096,13 @@ export function createShell(options) {
   /* ----------------------------------------------------------- 事件绑定 */
 
   const acts = {
-    'open-app': (data) => { shell.live = { inputValue: '', focus: false }; ctx.go('app-' + data.app, {}); },
+    'open-app': (data) => {
+      shell.live = { inputValue: '', focus: false };
+      /* 有些 App 进来直接落到具体一页（比如平行时空回到最近说过话的那一场） */
+      const entry = apps['app-' + data.app]?.entryRoute?.(ctx);
+      if (entry) { ctx.go(entry.view, entry.params || {}); return; }
+      ctx.go('app-' + data.app, {});
+    },
     'open-recent': (data) => {
       const chat = data.chat ? ctx.state.chats[data.chat] : recentChatOf(ctx.state);
       if (!chat) { ctx.toast('还没有聊天'); return; }
@@ -1087,6 +1114,11 @@ export function createShell(options) {
     'home': () => { shell.live = { inputValue: '', focus: false }; ctx.home(); },
     'back': () => { if (shell.sheet) ctx.closeSheet(); else ctx.back(); },
     'sheet-close': () => ctx.closeSheet(),
+    /* 窄屏下平行时空的「场」侧栏默认收着，这颗按钮把它拉开 */
+    'tv-rail': () => {
+      shell.live.tvRail = !shell.live.tvRail;
+      render();
+    },
     'sheet-pick': (data) => {
       const sheet = shell.sheet;
       const handler = sheet?.onPick;

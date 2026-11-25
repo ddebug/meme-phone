@@ -123,52 +123,76 @@ export async function createParallelBranch(ctx) {
   return theater;
 }
 
+/* 平行时空是桌面级 App：左边一列「场」，右边是这一天线自己的会话，不再套小手机外壳 */
+export function parallelRailHtml(ctx, activeId = '') {
+  const list = theatersOf(ctx.state);
+  const order = [];
+  const groups = new Map();
+  for (const theater of list) {
+    const key = theater.chatFile || `x:${theater.characterName}`;
+    if (!groups.has(key)) {
+      groups.set(key, { file: theater.chatFile, characterName: theater.characterName, list: [] });
+      order.push(key);
+    }
+    groups.get(key).list.push(theater);
+  }
+
+  const rows = order.map(key => {
+    const group = groups.get(key);
+    const head = group.characterName || 'TA';
+    return `
+      <div class="mp-tv-group">${esc(head)}${group.file ? ` · ${esc(chatFileLabel(group.file, head))}` : ''}</div>
+      ${group.list.map(theater => {
+        const contact = contactById(ctx.state, theater.contactId);
+        return `
+        <button class="mp-tv-row${theater.id === activeId ? ' is-on' : ''}" data-act="open-branch" data-theater="${esc(theater.id)}" data-hold="branch-menu" type="button">
+          ${avatarHtml(contact?.name || theater.characterName, contact?.avatar || theater.characterAvatar)}
+          <span class="mp-tv-row-main">
+            <span class="mp-tv-row-name">${esc(theaterTitleOf(theater))}</span>
+            <span class="mp-tv-row-sub">${esc(branchPreview(theater))}</span>
+          </span>
+          <span class="mp-tv-row-side">${theater.updatedAt ? shortText(theater.updatedAt) : ''}</span>
+        </button>`;
+      }).join('')}`;
+  }).join('');
+
+  return `
+    <aside class="mp-tv-rail${ctx.shell?.live?.tvRail ? ' is-open' : ''}">
+      <div class="mp-tv-rail-head">
+        <button class="mp-tv-ibtn" data-act="back" type="button" aria-label="回小手机">${icon('back')}</button>
+        <span class="mp-tv-rail-title">平行时空</span>
+        <button class="mp-tv-ibtn is-accent" data-act="branch-new" type="button" aria-label="从当前聊天开一场">${icon('plus')}</button>
+      </div>
+      <div class="mp-tv-rail-list">
+        ${rows || '<div class="mp-tv-rail-empty">还没有开过场。<br>在酒馆打开一个聊天，点右上角「+」。</div>'}
+      </div>
+    </aside>`;
+}
+
 export const parallelApp = {
   id: 'parallel', name: '平行时空', icon: 'parallel',
+  surface: 'tavern',
+
+  /* 像酒馆一样：点进来就是最近说过话的那一场，左边那列随时能翻别的场 */
+  entryRoute(ctx) {
+    const latest = theatersOf(ctx.state)[0];
+    return latest ? { view: 'parallel-branch', params: { theaterId: latest.id } } : null;
+  },
 
   render(ctx) {
-    const list = theatersOf(ctx.state);
-    const order = [];
-    const groups = new Map();
-    for (const theater of list) {
-      const key = theater.chatFile || `x:${theater.characterName}`;
-      if (!groups.has(key)) {
-        groups.set(key, { file: theater.chatFile, characterName: theater.characterName, list: [] });
-        order.push(key);
-      }
-      groups.get(key).list.push(theater);
-    }
-
-    const cards = order.map(key => {
-      const group = groups.get(key);
-      const head = group.characterName || 'TA';
-      return `
-        <div class="mp-group-label" style="margin-top:12px">${esc(head)}${group.file ? ` · ${esc(chatFileLabel(group.file, head))}` : ''} · ${group.list.length} 场</div>
-        <div class="mp-group-box">
-          ${group.list.map(theater => {
-            const contact = contactById(ctx.state, theater.contactId);
-            return `
-            <button class="mp-row" data-act="open-branch" data-theater="${theater.id}" data-hold="branch-menu" type="button">
-              ${avatarHtml(contact?.name || theater.characterName, contact?.avatar || theater.characterAvatar)}
-              <div class="mp-row-main">
-                <div class="mp-row-name">${esc(theaterTitleOf(theater))}</div>
-                <div class="mp-row-sub">${esc(branchPreview(theater))}</div>
-              </div>
-              <div class="mp-row-side">
-                <span>${theater.updatedAt ? shortText(theater.updatedAt) : ''}</span>
-                <span class="mp-pill plain">${esc(branchPill(theater))} · ${(theater.messages || []).length} 句</span>
-              </div>
-            </button>`;
-          }).join('')}
-        </div>`;
-    }).join('');
-
     return `
-      <div class="mp-page-body">
-        <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <button class="mp-icon-btn" data-act="branch-new" type="button" aria-label="从当前聊天开一场">${icon('plus')}</button>
+      <div class="mp-tv-shell">
+        ${parallelRailHtml(ctx)}
+        <div class="mp-tv-main">
+          <div class="mp-tv-head">
+            <button class="mp-tv-ibtn tv-rail-btn" data-act="tv-rail" type="button" aria-label="看这一场之外的场">${icon('plan')}</button>
+            <span class="mp-tv-head-name">平行时空</span>
+          </div>
+          <div class="mp-tv-welcome">
+            <div class="mp-tv-welcome-text">从酒馆某段聊天分出来的一条时间线。<br>收发只存在这台小手机里，酒馆那边一个字都不会多。</div>
+            <button class="mp-tv-welcome-btn" data-act="branch-new" type="button">${icon('plus')}<span>从当前聊天开一场</span></button>
+          </div>
         </div>
-        ${cards || '<div class="mp-empty">还没有开过场。<br>先在酒馆打开一个聊天，再点左上角的「+」——会从那个聊天当前的最后一楼分出来，预设、角色卡、世界书和记忆都用酒馆原来那套。</div>'}
       </div>`;
   },
 

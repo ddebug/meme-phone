@@ -8596,6 +8596,503 @@ body {
   .mp-bubble-pay, .mp-bubble-member, .mp-bubble-plan, .mp-bubble-friend, .mp-bubble-story { min-width: 0; max-width: 100%; }
   .mp-wallet-balance { font-size: calc(30px * var(--font-scale)); }
 }
+/* ==========================================================================
+   平行时空 · 桌面式聊天
+   这个 App 不套小手机外壳：整块铺满宿主视口，左边一列「场」，右边是会话本身。
+   只有 `surface: 'tavern'` 的页面会走这套皮（见 shell.js 的 mpSurface）。
+   ========================================================================== */
+
+.mp-root[data-mp-surface="tavern"] {
+  --tv-bg: #efece6;
+  --tv-panel: #f8f6f1;
+  --tv-text: #2b2937;
+  --tv-dim: #7d7887;
+  --tv-line: rgba(43, 41, 55, .11);
+  --tv-soft: rgba(43, 41, 55, .05);
+  --tv-field: #ffffff;
+  --tv-accent: #7f6ce9;
+}
+
+.mp-root[data-mp-theme="night"][data-mp-surface="tavern"] {
+  --tv-bg: #15141b;
+  --tv-panel: #1d1c25;
+  --tv-text: #eceaf5;
+  --tv-dim: #948da5;
+  --tv-line: rgba(255, 255, 255, .1);
+  --tv-soft: rgba(255, 255, 255, .07);
+  --tv-field: #232130;
+  --tv-accent: #9b8bf5;
+}
+
+.mp-tv {
+  position: fixed;
+  z-index: 100000;
+  display: flex;
+  overflow: hidden;
+  background: var(--tv-bg);
+  color: var(--tv-text);
+  font-family: var(--font-ui);
+  font-size: calc(14px * var(--font-scale, 1));
+  line-height: 1.55;
+}
+
+.mp-tv .mp-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ------------------------------------------------------------ 左边：场的列表 */
+
+.mp-tv-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  position: relative;
+}
+
+.mp-tv-rail {
+  width: 252px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--tv-panel);
+  border-right: 1px solid var(--tv-line);
+}
+
+.mp-tv-rail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 10px 12px 12px;
+  border-bottom: 1px solid var(--tv-line);
+}
+
+.mp-tv-rail-title {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(13.5px * var(--font-scale, 1));
+  font-weight: 600;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-tv-ibtn {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: var(--tv-soft);
+  color: var(--tv-dim);
+  cursor: pointer;
+  transition: background .16s ease, color .16s ease;
+}
+
+.mp-tv-ibtn:active { transform: scale(.94); }
+.mp-tv-ibtn .mp-i { width: 16px; height: 16px; }
+.mp-tv-ibtn.is-accent { color: var(--tv-accent); }
+
+.mp-tv-rail-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 8px 20px;
+  scrollbar-width: thin;
+}
+
+.mp-tv-group {
+  padding: 10px 10px 4px;
+  font-size: 11.5px;
+  color: var(--tv-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-tv-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background .16s ease;
+}
+
+.mp-tv-row:hover { background: var(--tv-soft); }
+.mp-tv-row.is-on { background: rgba(127, 108, 233, .14); }
+
+.mp-tv-row .mp-avatar {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 9px;
+  font-size: 12px;
+}
+
+.mp-tv-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mp-tv-row-name {
+  font-size: calc(13px * var(--font-scale, 1));
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-tv-row-sub {
+  font-size: 11.5px;
+  color: var(--tv-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-tv-row-side {
+  flex: none;
+  font-size: 11px;
+  color: var(--tv-dim);
+}
+
+.mp-tv-rail-empty {
+  padding: 18px 12px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--tv-dim);
+}
+
+/* ------------------------------------------------------------ 右边：会话 */
+
+.mp-tv-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--tv-bg);
+}
+
+.mp-tv-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 18px;
+  background: var(--tv-panel);
+  border-bottom: 1px solid var(--tv-line);
+}
+
+.mp-tv-head .mp-avatar {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.mp-tv-head-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mp-tv-head-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: calc(14px * var(--font-scale, 1));
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-tv-head-sub {
+  font-size: 11.5px;
+  color: var(--tv-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-tv .mp-pill {
+  font-size: 10.5px;
+  padding: 1px 7px;
+  border-radius: 7px;
+  background: rgba(127, 108, 233, .14);
+  color: var(--tv-accent);
+  font-weight: 500;
+}
+
+.mp-tv-msgs {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 0 26px;
+  scrollbar-width: thin;
+}
+
+.mp-tv-note {
+  max-width: 880px;
+  margin: 0 auto 10px;
+  padding: 0 26px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--tv-dim);
+}
+
+.mp-tv .mp-mini-btn {
+  border: 0;
+  border-radius: 7px;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--tv-dim);
+  background: var(--tv-soft);
+  cursor: pointer;
+}
+
+.mp-tv .mp-msg {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 10px 26px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: none;
+  border: 0;
+}
+
+.mp-tv .mp-msg .mp-avatar {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.mp-tv .mp-msg-body {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+  display: block;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.mp-tv-who {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.mp-tv-who b {
+  font-size: calc(13px * var(--font-scale, 1));
+  font-weight: 600;
+  color: var(--tv-text);
+}
+
+.mp-tv-who span {
+  font-size: 11px;
+  color: var(--tv-dim);
+}
+
+.mp-tv-text {
+  font-size: calc(14px * var(--font-scale, 1));
+  line-height: calc(1.7 * var(--line-scale, 1));
+  color: var(--tv-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 酒馆里“我”和对方是同一条流水线：头像在左，名字在上，不分左右气泡 */
+.mp-tv .mp-msg.me {
+  flex-direction: row;
+  justify-content: flex-start;
+  background: none;
+  border: 0;
+}
+
+.mp-tv .mp-msg.me .mp-msg-body { text-align: left; }
+.mp-tv .mp-msg.me .mp-tv-who { justify-content: flex-start; }
+.mp-tv .mp-msg.me .mp-tv-text { color: var(--tv-text); }
+.mp-tv .mp-msg.me .mp-avatar { background: var(--tv-accent); color: #fff; }
+
+.mp-tv .mp-typing {
+  width: auto;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.mp-tv .mp-empty {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 20px 26px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--tv-dim);
+}
+
+/* 输入区：贴底一整条，中间跟会话同宽 */
+
+.mp-tv .mp-composer,
+.mp-tv-composer {
+  position: static;
+  flex: none;
+  padding: 10px 26px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--tv-panel);
+  border-top: 1px solid var(--tv-line);
+  box-shadow: none;
+}
+
+.mp-tv-composer .mp-composer-row {
+  max-width: 828px;
+  margin: 0 auto;
+}
+
+.mp-tv-composer .mp-compose-box {
+  min-height: 42px;
+  padding: 4px 4px 4px 12px;
+  border-radius: 12px;
+  background: var(--tv-field);
+  box-shadow: none;
+  border: 1px solid var(--tv-line);
+}
+
+.mp-tv-composer .mp-compose-box:focus-within {
+  border-color: rgba(127, 108, 233, .55);
+  box-shadow: 0 0 0 3px rgba(127, 108, 233, .12);
+}
+
+.mp-tv-composer .mp-send {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: rgba(127, 108, 233, .16);
+  color: var(--tv-accent);
+}
+
+.mp-tv-composer .mp-send.is-text {
+  background: var(--tv-accent);
+  color: #fff;
+}
+
+.mp-tv-composer .mp-composer-tip {
+  max-width: 828px;
+  margin: 0 auto 8px;
+}
+
+/* 设置页：同一套桌面皮，居中一列 */
+
+.mp-tv-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.mp-tv .mp-page-body {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 18px 22px 40px;
+}
+
+.mp-tv .mp-nav {
+  padding: 10px 16px;
+}
+
+.mp-tv-welcome {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px;
+  text-align: center;
+}
+
+.mp-tv-welcome-text {
+  font-size: calc(13.5px * var(--font-scale, 1));
+  line-height: 1.9;
+  color: var(--tv-dim);
+}
+
+.mp-tv-welcome-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--tv-accent);
+  color: #fff;
+  font: inherit;
+  font-size: calc(13px * var(--font-scale, 1));
+  cursor: pointer;
+}
+
+.mp-tv-welcome-btn .mp-i { width: 15px; height: 15px; }
+
+/* 弹层 / 轻提示跟着这块铺满的面板走，不留在手机里 */
+
+.mp-tv .mp-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+}
+
+/* 窄屏（手机 / 小窗）：左边这列收起来，点顶栏那颗按钮拉开 */
+
+@media (min-width: 901px) {
+  .tv-rail-btn { display: none; }
+}
+
+@media (max-width: 900px) {
+  .mp-tv-rail {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 6;
+    width: min(78vw, 300px);
+    transform: translateX(-102%);
+    transition: transform .2s ease;
+    box-shadow: 12px 0 30px rgba(0, 0, 0, .12);
+  }
+  .mp-tv-rail.is-open { transform: none; }
+  .mp-tv .mp-msg,
+  .mp-tv-note { padding-left: 16px; padding-right: 16px; }
+  .mp-tv .mp-composer { padding-left: 14px; padding-right: 14px; }
+}
 
 </style>
 </head>
@@ -15892,7 +16389,7 @@ function createShell(options) {
     sheet: null,
     sheetAnimated: false,
     toastTimer: 0,
-    live: { inputValue: '', focus: false },
+    live: { inputValue: '', focus: false, tvRail: false },
     /* 是否有输入控件正聚焦：打字弹起软键盘期间为 true，用来忽略键盘造成的视口收缩 */
     typing: false,
     /* 缩放基准视口：打开手机时记下的窗口尺寸，不跟随软键盘期的可视高度抖动 */
@@ -16452,6 +16949,15 @@ function createShell(options) {
 
   /* 浮层贴住当前可视区，整机按布局结果设缩放与高度：键盘弹起时只有高度在变 */
   function applyLayout() {
+    const tv = root?.querySelector('.mp-tv');
+    if (tv) {
+      const layout = layoutNow();
+      tv.style.top = `${Math.round(layout.box.top)}px`;
+      tv.style.left = `${Math.round(layout.box.left)}px`;
+      tv.style.width = `${Math.round(layout.box.w)}px`;
+      tv.style.height = `${Math.round(layout.box.h)}px`;
+      return layout;
+    }
     const overlay = root?.querySelector('.mp-overlay');
     const device = root?.querySelector('.mp-device');
     if (!overlay || !device) return null;
@@ -16518,12 +17024,23 @@ function createShell(options) {
     root.className = 'mp-root';
     root.dataset.mpTheme = status;
     const activeWorld = ctx.world?.active?.() || null;
-    root.dataset.mpSurface = 'meta';
+    const topEntry = shell.stack[shell.stack.length - 1];
+    const surface = topEntry && apps[topEntry.view]?.surface === 'tavern' ? 'tavern' : 'meta';
+    root.dataset.mpSurface = surface;
     applyWall(root, state.settings);
     applyLook(root, state.settings);
     /* 先算一次布局：整机高度与缩放一起写进首帧，避免开手机时先按 844 高闪一下再收 */
     const layout = layoutNow();
     const overlayStyle = `top: ${Math.round(layout.box.top)}px; left: ${Math.round(layout.box.left)}px; width: ${Math.round(layout.box.w)}px; height: ${Math.round(layout.box.h)}px`;
+    /* 平行时空这类「桌面 App」不再套小手机外壳：整块铺满宿主视口，自己画顶栏与会话区 */
+    if (surface === 'tavern') {
+      root.innerHTML = `
+        <div class="mp-tv" style="${overlayStyle}">
+          ${pageHtml()}
+          ${sheetHtml()}
+          ${shell.toastMessage ? `<div class="mp-toast">${esc(shell.toastMessage)}</div>` : ''}
+        </div>`;
+    } else {
     root.innerHTML = `
       <div class="mp-overlay" style="${overlayStyle}">
         <div class="mp-device" style="height: ${Math.round(layout.height)}px; transform: ${deviceTransformOf(layout)}">
@@ -16550,6 +17067,7 @@ function createShell(options) {
           </div>
         </div>
       </div>`;
+    }
 
     restoreLive(prevSel);
     root.querySelectorAll('.mp-compose-box textarea').forEach(growComposer);
@@ -16679,7 +17197,13 @@ function createShell(options) {
   /* ----------------------------------------------------------- 事件绑定 */
 
   const acts = {
-    'open-app': (data) => { shell.live = { inputValue: '', focus: false }; ctx.go('app-' + data.app, {}); },
+    'open-app': (data) => {
+      shell.live = { inputValue: '', focus: false };
+      /* 有些 App 进来直接落到具体一页（比如平行时空回到最近说过话的那一场） */
+      const entry = apps['app-' + data.app]?.entryRoute?.(ctx);
+      if (entry) { ctx.go(entry.view, entry.params || {}); return; }
+      ctx.go('app-' + data.app, {});
+    },
     'open-recent': (data) => {
       const chat = data.chat ? ctx.state.chats[data.chat] : recentChatOf(ctx.state);
       if (!chat) { ctx.toast('还没有聊天'); return; }
@@ -16691,6 +17215,11 @@ function createShell(options) {
     'home': () => { shell.live = { inputValue: '', focus: false }; ctx.home(); },
     'back': () => { if (shell.sheet) ctx.closeSheet(); else ctx.back(); },
     'sheet-close': () => ctx.closeSheet(),
+    /* 窄屏下平行时空的「场」侧栏默认收着，这颗按钮把它拉开 */
+    'tv-rail': () => {
+      shell.live.tvRail = !shell.live.tvRail;
+      render();
+    },
     'sheet-pick': (data) => {
       const sheet = shell.sheet;
       const handler = sheet?.onPick;
@@ -21019,52 +21548,76 @@ async function createParallelBranch(ctx) {
   return theater;
 }
 
+/* 平行时空是桌面级 App：左边一列「场」，右边是这一天线自己的会话，不再套小手机外壳 */
+function parallelRailHtml(ctx, activeId = '') {
+  const list = theatersOf(ctx.state);
+  const order = [];
+  const groups = new Map();
+  for (const theater of list) {
+    const key = theater.chatFile || `x:${theater.characterName}`;
+    if (!groups.has(key)) {
+      groups.set(key, { file: theater.chatFile, characterName: theater.characterName, list: [] });
+      order.push(key);
+    }
+    groups.get(key).list.push(theater);
+  }
+
+  const rows = order.map(key => {
+    const group = groups.get(key);
+    const head = group.characterName || 'TA';
+    return `
+      <div class="mp-tv-group">${esc(head)}${group.file ? ` · ${esc(chatFileLabel(group.file, head))}` : ''}</div>
+      ${group.list.map(theater => {
+        const contact = contactById(ctx.state, theater.contactId);
+        return `
+        <button class="mp-tv-row${theater.id === activeId ? ' is-on' : ''}" data-act="open-branch" data-theater="${esc(theater.id)}" data-hold="branch-menu" type="button">
+          ${avatarHtml(contact?.name || theater.characterName, contact?.avatar || theater.characterAvatar)}
+          <span class="mp-tv-row-main">
+            <span class="mp-tv-row-name">${esc(theaterTitleOf(theater))}</span>
+            <span class="mp-tv-row-sub">${esc(branchPreview(theater))}</span>
+          </span>
+          <span class="mp-tv-row-side">${theater.updatedAt ? shortText(theater.updatedAt) : ''}</span>
+        </button>`;
+      }).join('')}`;
+  }).join('');
+
+  return `
+    <aside class="mp-tv-rail${ctx.shell?.live?.tvRail ? ' is-open' : ''}">
+      <div class="mp-tv-rail-head">
+        <button class="mp-tv-ibtn" data-act="back" type="button" aria-label="回小手机">${icon('back')}</button>
+        <span class="mp-tv-rail-title">平行时空</span>
+        <button class="mp-tv-ibtn is-accent" data-act="branch-new" type="button" aria-label="从当前聊天开一场">${icon('plus')}</button>
+      </div>
+      <div class="mp-tv-rail-list">
+        ${rows || '<div class="mp-tv-rail-empty">还没有开过场。<br>在酒馆打开一个聊天，点右上角「+」。</div>'}
+      </div>
+    </aside>`;
+}
+
 const parallelApp = {
   id: 'parallel', name: '平行时空', icon: 'parallel',
+  surface: 'tavern',
+
+  /* 像酒馆一样：点进来就是最近说过话的那一场，左边那列随时能翻别的场 */
+  entryRoute(ctx) {
+    const latest = theatersOf(ctx.state)[0];
+    return latest ? { view: 'parallel-branch', params: { theaterId: latest.id } } : null;
+  },
 
   render(ctx) {
-    const list = theatersOf(ctx.state);
-    const order = [];
-    const groups = new Map();
-    for (const theater of list) {
-      const key = theater.chatFile || `x:${theater.characterName}`;
-      if (!groups.has(key)) {
-        groups.set(key, { file: theater.chatFile, characterName: theater.characterName, list: [] });
-        order.push(key);
-      }
-      groups.get(key).list.push(theater);
-    }
-
-    const cards = order.map(key => {
-      const group = groups.get(key);
-      const head = group.characterName || 'TA';
-      return `
-        <div class="mp-group-label" style="margin-top:12px">${esc(head)}${group.file ? ` · ${esc(chatFileLabel(group.file, head))}` : ''} · ${group.list.length} 场</div>
-        <div class="mp-group-box">
-          ${group.list.map(theater => {
-            const contact = contactById(ctx.state, theater.contactId);
-            return `
-            <button class="mp-row" data-act="open-branch" data-theater="${theater.id}" data-hold="branch-menu" type="button">
-              ${avatarHtml(contact?.name || theater.characterName, contact?.avatar || theater.characterAvatar)}
-              <div class="mp-row-main">
-                <div class="mp-row-name">${esc(theaterTitleOf(theater))}</div>
-                <div class="mp-row-sub">${esc(branchPreview(theater))}</div>
-              </div>
-              <div class="mp-row-side">
-                <span>${theater.updatedAt ? shortText(theater.updatedAt) : ''}</span>
-                <span class="mp-pill plain">${esc(branchPill(theater))} · ${(theater.messages || []).length} 句</span>
-              </div>
-            </button>`;
-          }).join('')}
-        </div>`;
-    }).join('');
-
     return `
-      <div class="mp-page-body">
-        <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <button class="mp-icon-btn" data-act="branch-new" type="button" aria-label="从当前聊天开一场">${icon('plus')}</button>
+      <div class="mp-tv-shell">
+        ${parallelRailHtml(ctx)}
+        <div class="mp-tv-main">
+          <div class="mp-tv-head">
+            <button class="mp-tv-ibtn tv-rail-btn" data-act="tv-rail" type="button" aria-label="看这一场之外的场">${icon('plan')}</button>
+            <span class="mp-tv-head-name">平行时空</span>
+          </div>
+          <div class="mp-tv-welcome">
+            <div class="mp-tv-welcome-text">从酒馆某段聊天分出来的一条时间线。<br>收发只存在这台小手机里，酒馆那边一个字都不会多。</div>
+            <button class="mp-tv-welcome-btn" data-act="branch-new" type="button">${icon('plus')}<span>从当前聊天开一场</span></button>
+          </div>
         </div>
-        ${cards || '<div class="mp-empty">还没有开过场。<br>先在酒馆打开一个聊天，再点左上角的「+」——会从那个聊天当前的最后一楼分出来，预设、角色卡、世界书和记忆都用酒馆原来那套。</div>'}
       </div>`;
   },
 
@@ -21134,6 +21687,7 @@ exports["branchHistoryLabel"] = branchHistoryLabel;
 exports["branchMemoryLabel"] = branchMemoryLabel;
 exports["branchContextPanelHtml"] = branchContextPanelHtml;
 exports["createParallelBranch"] = createParallelBranch;
+exports["parallelRailHtml"] = parallelRailHtml;
 exports["parallelApp"] = parallelApp;
 };
 __mods["meme/apps/branch.js"] = function(module, exports, __req){
@@ -21152,7 +21706,7 @@ const {
 } = __req("meme/data.js");
 const { branchReply, stopTavernGeneration, readOpenTavernChat, readTavernMemory } = __req("meme/host.js");
 const {
-  branchStatusLine, branchMemoryLabel, branchHistoryLabel, branchContextPanelHtml, chatFileLabel,
+  branchStatusLine, branchMemoryLabel, branchHistoryLabel, branchContextPanelHtml, chatFileLabel, parallelRailHtml,
 } = __req("meme/apps/parallel.js");
 const { estimateTokens } = __req("meme/reply-context.js");
 
@@ -21173,15 +21727,19 @@ function messageHtml(ctx, theater, message) {
   const cfg = theater.cfg || {};
   const me = Boolean(message.is_user);
   const contact = contactById(ctx.state, theater.contactId);
+  const name = me
+    ? (ctx.state.settings.user.name || '我')
+    : (contact?.name || theater.characterName || 'TA');
   const avatar = me
     ? avatarHtml(ctx.state.settings.user.name, ctx.state.settings.user.avatar)
     : avatarHtml(contact?.name || theater.characterName, contact?.avatar || theater.characterAvatar);
+  const time = cfg.showTime === false || !message.at ? '' : timeText(message.at);
   return `
     <div class="mp-msg${me ? ' me' : ''}">
       ${cfg.showAvatar === false ? '' : avatar}
       <div class="mp-msg-body">
-        <div class="mp-bubble">${esc(message.mes || '')}</div>
-        ${cfg.showTime === false ? '' : `<div class="mp-msg-meta"><span>${message.at ? timeText(message.at) : ''}</span></div>`}
+        <div class="mp-tv-who"><b>${esc(name)}</b>${time ? `<span>${time}</span>` : ''}</div>
+        <div class="mp-tv-text">${esc(message.mes || '')}</div>
       </div>
     </div>`;
 }
@@ -21189,14 +21747,14 @@ function messageHtml(ctx, theater, message) {
 function headHtml(ctx, theater) {
   const contact = contactById(ctx.state, theater.contactId);
   return `
-    <div class="mp-thread-head">
-      <button class="mp-back" data-act="back" type="button">${icon('back')}</button>
+    <div class="mp-tv-head">
+      <button class="mp-tv-ibtn tv-rail-btn" data-act="tv-rail" type="button" aria-label="看别的场">${icon('plan')}</button>
+      <button class="mp-tv-ibtn" data-act="back" type="button" aria-label="回小手机">${icon('back')}</button>
       ${avatarHtml(contact?.name || theater.characterName, contact?.avatar || theater.characterAvatar)}
-      <div style="flex:1;min-width:0">
-        <div class="mp-thread-name">${esc(theaterTitleOf(theater))}<span class="mp-pill">平行时空</span></div>
-        <div class="mp-thread-status"><span>${esc(branchStatusLine(theater))}</span></div>
+      <div class="mp-tv-head-main">
+        <div class="mp-tv-head-name">${esc(theaterTitleOf(theater))}<span class="mp-pill">平行时空</span></div>
       </div>
-      <button class="mp-icon-btn" data-act="branch-settings" data-theater="${theater.id}" type="button" aria-label="这一场的设置">${icon('settings')}</button>
+      <button class="mp-tv-ibtn" data-act="branch-settings" data-theater="${esc(theater.id)}" type="button" aria-label="这一场的设置">${icon('settings')}</button>
     </div>`;
 }
 
@@ -21206,9 +21764,9 @@ function contextStripHtml(theater) {
     : cfg.historyMode === 'recent' ? `最近 ${cfg.historyFloors || 30} 层`
       : `第 ${theater.forkFloor || 0} 楼`;
   return `
-    <div class="mp-msg-more" data-act="branch-settings" data-theater="${theater.id}" style="cursor:pointer">
+    <div class="mp-tv-note">
       ${esc(place)} · ${esc(branchMemoryLabel(theater))}
-      <button class="mp-mini-btn" data-act="branch-prompt" data-theater="${theater.id}" type="button" style="margin-left:8px">看提示词</button>
+      <button class="mp-mini-btn" data-act="branch-prompt" data-theater="${esc(theater.id)}" type="button">看提示词</button>
     </div>`;
 }
 
@@ -21217,17 +21775,17 @@ function composerHtml(ctx, theater) {
   const busy = Boolean(task && !task.done);
   const failed = theater.failed;
   return `
-    <div class="mp-composer">
+    <div class="mp-composer mp-tv-composer">
       ${failed ? `<div class="mp-composer-tip is-error">${esc(failed.reason || '这一轮没接通')}
-        <button class="mp-mini-btn" data-act="branch-retry" data-theater="${theater.id}" type="button" style="margin-left:8px">重试</button>
-        <button class="mp-mini-btn" data-act="branch-undo" data-theater="${theater.id}" type="button" style="margin-left:4px">撤回这句</button>
+        <button class="mp-mini-btn" data-act="branch-retry" data-theater="${esc(theater.id)}" type="button" style="margin-left:8px">重试</button>
+        <button class="mp-mini-btn" data-act="branch-undo" data-theater="${esc(theater.id)}" type="button" style="margin-left:4px">撤回这句</button>
       </div>` : ''}
       <div class="mp-composer-row">
         <div class="mp-compose-box">
           <textarea class="mp-compose-input" rows="1" placeholder="发一句，酒馆那边接着写…" aria-label="输入消息"
             enterkeyhint="send" autocomplete="off" autocorrect="off" autocapitalize="sentences"
             spellcheck="false" maxlength="2000">${esc(ctx.shell.live.inputValue || '')}</textarea>
-          <button class="mp-send ${busy ? 'is-stop' : 'is-text'}" data-plain="1" data-busy="${busy ? '1' : '0'}" data-act="${busy ? 'branch-stop' : 'branch-send'}" data-theater="${theater.id}" type="button" aria-label="${busy ? '停止这次生成' : '发送'}">
+          <button class="mp-send ${busy ? 'is-stop' : 'is-text'}" data-plain="1" data-busy="${busy ? '1' : '0'}" data-act="${busy ? 'branch-stop' : 'branch-send'}" data-theater="${esc(theater.id)}" type="button" aria-label="${busy ? '停止这次生成' : '发送'}">
             <span class="mp-send-now">${icon('send')}</span>
             <span class="mp-send-stop">${icon('stop')}</span>
           </button>
@@ -21572,10 +22130,25 @@ function refreshMemory(ctx, theater) {
 }
 
 const parallelSettingsApp = {
-  id: 'parallel-settings', name: '这一场的设置', icon: 'settings',
+  id: 'parallel-settings', name: '这一场的设置', icon: 'settings', surface: 'tavern',
 
   render(ctx, params = {}) {
-    return settingsBody(ctx, params);
+    const theater = theaterById(ctx.state, params.theaterId);
+    return `
+      <div class="mp-tv-shell">
+        ${parallelRailHtml(ctx, theater?.id || '')}
+        <div class="mp-tv-main">
+          <div class="mp-tv-head">
+            <button class="mp-tv-ibtn tv-rail-btn" data-act="tv-rail" type="button" aria-label="看别的场">${icon('plan')}</button>
+            <button class="mp-tv-ibtn" data-act="back" type="button" aria-label="回这一场">${icon('back')}</button>
+            <div class="mp-tv-head-main">
+              <div class="mp-tv-head-name">这一场的设置<span class="mp-pill">平行时空</span></div>
+              <div class="mp-tv-head-sub">${esc(theater?.characterName || 'TA')}${theater?.chatFile ? ` · ${esc(chatFileLabel(theater.chatFile, theater.characterName))}` : ''}</div>
+            </div>
+          </div>
+          <div class="mp-tv-body">${settingsBody(ctx, params)}</div>
+        </div>
+      </div>`;
   },
 
   handle(ctx, act, data) {
@@ -21741,7 +22314,7 @@ function cancelParallelRun() {
 }
 
 const parallelBranchApp = {
-  id: 'parallel-branch', name: '平行时空 · 这一场', icon: 'parallel',
+  id: 'parallel-branch', name: '平行时空 · 这一场', icon: 'parallel', surface: 'tavern',
 
   render(ctx, params = {}) {
     const theater = theaterById(ctx.state, params.theaterId);
@@ -21758,17 +22331,23 @@ const parallelBranchApp = {
       blocks.push(`
         <div class="mp-msg mp-msg-typing">
           ${avatarHtml(contact?.name || theater.characterName, contact?.avatar || theater.characterAvatar)}
-          <div class="mp-msg-body"><div class="mp-typing"><i></i><i></i><i></i></div></div>
+          <div class="mp-msg-body">
+            <div class="mp-tv-who"><b>${esc(contact?.name || theater.characterName || 'TA')}</b></div>
+            <div class="mp-typing"><i></i><i></i><i></i></div>
+          </div>
         </div>`);
     }
     if (!messages.length && !busy) {
       blocks.push('<div class="mp-empty" style="padding:14px 0">还没说话。<br>发一句，酒馆会顺着这条分支往下写。</div>');
     }
     return `
-      <div class="mp-thread">
-        ${headHtml(ctx, theater)}
-        <div class="mp-messages" id="mpMessages">${blocks.join('')}</div>
-        ${composerHtml(ctx, theater)}
+      <div class="mp-tv-shell">
+        ${parallelRailHtml(ctx, theater.id)}
+        <div class="mp-tv-main">
+          ${headHtml(ctx, theater)}
+          <div class="mp-messages mp-tv-msgs" id="mpMessages">${blocks.join('')}</div>
+          ${composerHtml(ctx, theater)}
+        </div>
       </div>`;
   },
 

@@ -13,7 +13,7 @@ import {
 } from '../data.js';
 import { branchReply, stopTavernGeneration, readOpenTavernChat, readTavernMemory } from '../host.js';
 import {
-  branchStatusLine, branchMemoryLabel, branchHistoryLabel, branchContextPanelHtml, chatFileLabel,
+  branchStatusLine, branchMemoryLabel, branchHistoryLabel, branchContextPanelHtml, chatFileLabel, parallelRailHtml,
 } from './parallel.js';
 import { estimateTokens } from '../reply-context.js';
 
@@ -34,15 +34,19 @@ function messageHtml(ctx, theater, message) {
   const cfg = theater.cfg || {};
   const me = Boolean(message.is_user);
   const contact = contactById(ctx.state, theater.contactId);
+  const name = me
+    ? (ctx.state.settings.user.name || '我')
+    : (contact?.name || theater.characterName || 'TA');
   const avatar = me
     ? avatarHtml(ctx.state.settings.user.name, ctx.state.settings.user.avatar)
     : avatarHtml(contact?.name || theater.characterName, contact?.avatar || theater.characterAvatar);
+  const time = cfg.showTime === false || !message.at ? '' : timeText(message.at);
   return `
     <div class="mp-msg${me ? ' me' : ''}">
       ${cfg.showAvatar === false ? '' : avatar}
       <div class="mp-msg-body">
-        <div class="mp-bubble">${esc(message.mes || '')}</div>
-        ${cfg.showTime === false ? '' : `<div class="mp-msg-meta"><span>${message.at ? timeText(message.at) : ''}</span></div>`}
+        <div class="mp-tv-who"><b>${esc(name)}</b>${time ? `<span>${time}</span>` : ''}</div>
+        <div class="mp-tv-text">${esc(message.mes || '')}</div>
       </div>
     </div>`;
 }
@@ -50,14 +54,14 @@ function messageHtml(ctx, theater, message) {
 function headHtml(ctx, theater) {
   const contact = contactById(ctx.state, theater.contactId);
   return `
-    <div class="mp-thread-head">
-      <button class="mp-back" data-act="back" type="button">${icon('back')}</button>
+    <div class="mp-tv-head">
+      <button class="mp-tv-ibtn tv-rail-btn" data-act="tv-rail" type="button" aria-label="看别的场">${icon('plan')}</button>
+      <button class="mp-tv-ibtn" data-act="back" type="button" aria-label="回小手机">${icon('back')}</button>
       ${avatarHtml(contact?.name || theater.characterName, contact?.avatar || theater.characterAvatar)}
-      <div style="flex:1;min-width:0">
-        <div class="mp-thread-name">${esc(theaterTitleOf(theater))}<span class="mp-pill">平行时空</span></div>
-        <div class="mp-thread-status"><span>${esc(branchStatusLine(theater))}</span></div>
+      <div class="mp-tv-head-main">
+        <div class="mp-tv-head-name">${esc(theaterTitleOf(theater))}<span class="mp-pill">平行时空</span></div>
       </div>
-      <button class="mp-icon-btn" data-act="branch-settings" data-theater="${theater.id}" type="button" aria-label="这一场的设置">${icon('settings')}</button>
+      <button class="mp-tv-ibtn" data-act="branch-settings" data-theater="${esc(theater.id)}" type="button" aria-label="这一场的设置">${icon('settings')}</button>
     </div>`;
 }
 
@@ -67,9 +71,9 @@ function contextStripHtml(theater) {
     : cfg.historyMode === 'recent' ? `最近 ${cfg.historyFloors || 30} 层`
       : `第 ${theater.forkFloor || 0} 楼`;
   return `
-    <div class="mp-msg-more" data-act="branch-settings" data-theater="${theater.id}" style="cursor:pointer">
+    <div class="mp-tv-note">
       ${esc(place)} · ${esc(branchMemoryLabel(theater))}
-      <button class="mp-mini-btn" data-act="branch-prompt" data-theater="${theater.id}" type="button" style="margin-left:8px">看提示词</button>
+      <button class="mp-mini-btn" data-act="branch-prompt" data-theater="${esc(theater.id)}" type="button">看提示词</button>
     </div>`;
 }
 
@@ -78,17 +82,17 @@ function composerHtml(ctx, theater) {
   const busy = Boolean(task && !task.done);
   const failed = theater.failed;
   return `
-    <div class="mp-composer">
+    <div class="mp-composer mp-tv-composer">
       ${failed ? `<div class="mp-composer-tip is-error">${esc(failed.reason || '这一轮没接通')}
-        <button class="mp-mini-btn" data-act="branch-retry" data-theater="${theater.id}" type="button" style="margin-left:8px">重试</button>
-        <button class="mp-mini-btn" data-act="branch-undo" data-theater="${theater.id}" type="button" style="margin-left:4px">撤回这句</button>
+        <button class="mp-mini-btn" data-act="branch-retry" data-theater="${esc(theater.id)}" type="button" style="margin-left:8px">重试</button>
+        <button class="mp-mini-btn" data-act="branch-undo" data-theater="${esc(theater.id)}" type="button" style="margin-left:4px">撤回这句</button>
       </div>` : ''}
       <div class="mp-composer-row">
         <div class="mp-compose-box">
           <textarea class="mp-compose-input" rows="1" placeholder="发一句，酒馆那边接着写…" aria-label="输入消息"
             enterkeyhint="send" autocomplete="off" autocorrect="off" autocapitalize="sentences"
             spellcheck="false" maxlength="2000">${esc(ctx.shell.live.inputValue || '')}</textarea>
-          <button class="mp-send ${busy ? 'is-stop' : 'is-text'}" data-plain="1" data-busy="${busy ? '1' : '0'}" data-act="${busy ? 'branch-stop' : 'branch-send'}" data-theater="${theater.id}" type="button" aria-label="${busy ? '停止这次生成' : '发送'}">
+          <button class="mp-send ${busy ? 'is-stop' : 'is-text'}" data-plain="1" data-busy="${busy ? '1' : '0'}" data-act="${busy ? 'branch-stop' : 'branch-send'}" data-theater="${esc(theater.id)}" type="button" aria-label="${busy ? '停止这次生成' : '发送'}">
             <span class="mp-send-now">${icon('send')}</span>
             <span class="mp-send-stop">${icon('stop')}</span>
           </button>
@@ -433,10 +437,25 @@ function refreshMemory(ctx, theater) {
 }
 
 export const parallelSettingsApp = {
-  id: 'parallel-settings', name: '这一场的设置', icon: 'settings',
+  id: 'parallel-settings', name: '这一场的设置', icon: 'settings', surface: 'tavern',
 
   render(ctx, params = {}) {
-    return settingsBody(ctx, params);
+    const theater = theaterById(ctx.state, params.theaterId);
+    return `
+      <div class="mp-tv-shell">
+        ${parallelRailHtml(ctx, theater?.id || '')}
+        <div class="mp-tv-main">
+          <div class="mp-tv-head">
+            <button class="mp-tv-ibtn tv-rail-btn" data-act="tv-rail" type="button" aria-label="看别的场">${icon('plan')}</button>
+            <button class="mp-tv-ibtn" data-act="back" type="button" aria-label="回这一场">${icon('back')}</button>
+            <div class="mp-tv-head-main">
+              <div class="mp-tv-head-name">这一场的设置<span class="mp-pill">平行时空</span></div>
+              <div class="mp-tv-head-sub">${esc(theater?.characterName || 'TA')}${theater?.chatFile ? ` · ${esc(chatFileLabel(theater.chatFile, theater.characterName))}` : ''}</div>
+            </div>
+          </div>
+          <div class="mp-tv-body">${settingsBody(ctx, params)}</div>
+        </div>
+      </div>`;
   },
 
   handle(ctx, act, data) {
@@ -602,7 +621,7 @@ export function cancelParallelRun() {
 }
 
 export const parallelBranchApp = {
-  id: 'parallel-branch', name: '平行时空 · 这一场', icon: 'parallel',
+  id: 'parallel-branch', name: '平行时空 · 这一场', icon: 'parallel', surface: 'tavern',
 
   render(ctx, params = {}) {
     const theater = theaterById(ctx.state, params.theaterId);
@@ -619,17 +638,23 @@ export const parallelBranchApp = {
       blocks.push(`
         <div class="mp-msg mp-msg-typing">
           ${avatarHtml(contact?.name || theater.characterName, contact?.avatar || theater.characterAvatar)}
-          <div class="mp-msg-body"><div class="mp-typing"><i></i><i></i><i></i></div></div>
+          <div class="mp-msg-body">
+            <div class="mp-tv-who"><b>${esc(contact?.name || theater.characterName || 'TA')}</b></div>
+            <div class="mp-typing"><i></i><i></i><i></i></div>
+          </div>
         </div>`);
     }
     if (!messages.length && !busy) {
       blocks.push('<div class="mp-empty" style="padding:14px 0">还没说话。<br>发一句，酒馆会顺着这条分支往下写。</div>');
     }
     return `
-      <div class="mp-thread">
-        ${headHtml(ctx, theater)}
-        <div class="mp-messages" id="mpMessages">${blocks.join('')}</div>
-        ${composerHtml(ctx, theater)}
+      <div class="mp-tv-shell">
+        ${parallelRailHtml(ctx, theater.id)}
+        <div class="mp-tv-main">
+          ${headHtml(ctx, theater)}
+          <div class="mp-messages mp-tv-msgs" id="mpMessages">${blocks.join('')}</div>
+          ${composerHtml(ctx, theater)}
+        </div>
       </div>`;
   },
 

@@ -15,7 +15,7 @@ import { memoryEffectiveSummary, memoryPresetTitle } from '../memory.js';
 import { diaryDayStatuses, diaryFingerprint, diaryNeedsWrite, diaryParamsFingerprint, diaryRoleEntries } from '../diary.js';
 import { requestStats, estimateTokens, proactiveLead, serializeMessage } from '../reply-context.js';
 import { createChatExport, parseChatTransferText, mergeChatHistory, mergeDiaryEntries, MAX_CHAT_TRANSFER_BYTES } from '../chat-transfer.js';
-import { avatarHtml, chatAvatarHtml, esc, shortText, timeText } from '../shell.js';
+import { avatarHtml, chatAvatarHtml, copyText, esc, shortText, timeText } from '../shell.js';
 import { isWorldChat, storyDateOf } from '../world.js';
 import { renderBehaviorBubble, isSystemBehavior, behaviorSettings, parseBehaviorReply } from '../behavior.js';
 import {
@@ -102,9 +102,20 @@ export function generationValid(ctx, task, chatId) {
   return Boolean(chat);                                // 会话已被删除
 }
 
+/** 释放这一轮申请的常亮额度：生成结束 / 取消 / 关手机都要走到。 */
+function releaseTaskWake(task) {
+  if (!task || !task.releaseWake) return;
+  try { task.releaseWake(); } catch { /* 平台没接就跳过 */ }
+  task.releaseWake = null;
+}
+
 export function finishGeneration(chatId) {
   const task = activeGenerations.get(chatId);
-  if (task) { task.done = true; activeGenerations.delete(chatId); }
+  if (task) {
+    task.done = true;
+    releaseTaskWake(task);
+    activeGenerations.delete(chatId);
+  }
 }
 
 /** 取消会话上的在途任务：先 abort 可中止的请求，再让晚到的结果失效。 */
@@ -114,6 +125,7 @@ export function cancelGeneration(chatId, reason = 'state-replaced') {
     task.cancelReason = reason;
     task.abort?.abort?.();
     task.done = true;
+    releaseTaskWake(task);
     activeGenerations.delete(chatId);
   }
 }
@@ -761,6 +773,8 @@ function threadBody(ctx, chatId) {
   const { startIndex, visible } = threadWindow(messages, shown);
 
   const blocks = [];
+  /* 多选态：整页共用一份，输入区要据此换成工具条 */
+  const selecting = selectState(ctx, chat);
   if (startIndex > 0) {
     blocks.push(`<button class="mp-msg-more" data-act="load-older" data-chat="${chat.id}" type="button">加载更早的 ${startIndex} 条</button>`);
   }
@@ -793,6 +807,7 @@ function threadBody(ctx, chatId) {
     }
     const me = message.from === 'me';
     const speaker = message.speaker ? contactById(state, message.speaker) : null;
+    const picked = selecting ? selecting.ids.includes(message.id) : false;
     const behaviorBubble = renderBehaviorBubble(message, { chatId: chat.id, contact });
     const bubble = behaviorBubble || (message.image
       ? `<button class="mp-bubble mp-bubble-photo" data-act="view-photo" data-chat="${chat.id}" data-msg="${message.id}" type="button"><img src="${esc(message.image)}" alt="照片"></button>`
@@ -809,20 +824,26 @@ function threadBody(ctx, chatId) {
     const subToggle = message.subtext
       ? `<button class="mp-eye${subOpen ? ' on' : ''}" data-act="toggle-subtext" data-chat="${chat.id}" data-msg="${message.id}" type="button" aria-pressed="${subOpen ? 'true' : 'false'}" aria-label="${subOpen ? '收起潜台词' : '看这条的潜台词'}">${icon(subOpen ? 'eye-off' : 'eye')}<span>潜台词</span></button>`
       : '';
+    /* 译文挂在气泡下面，和潜台词同一套排版；长按可以再翻一次 / 收起 */
+    const translation = String(message.translation || '').trim()
+      ? `<div class="mp-translation"><span class="mp-translation-label">译文</span><span class="mp-translation-text">${esc(message.translation)}</span></div>`
+      : '';
     blocks.push(`
-      <div class="mp-msg${me ? ' me' : ''}" data-hold="message-menu" data-chat="${chat.id}" data-msg="${message.id}">
+      <div class="mp-msg${me ? ' me' : ''}${picked ? ' is-selected' : ''}" ${selecting ? 'data-act="sel-row"' : 'data-hold="message-menu"'} data-chat="${chat.id}" data-msg="${message.id}">
+        ${selecting ? `<span class="mp-sel-dot${picked ? ' is-on' : ''}" aria-hidden="true"></span>` : ''}
         ${me
           ? avatarHtml(state.settings.user.name, state.settings.user.avatar)
           : `<button class="mp-avatar-btn${message.inner ? ' has-mind' : ''}" data-act="avatar-mind" data-chat="${chat.id}" data-msg="${message.id}" type="button" aria-label="看 TA 的心理活动"><span class="mp-avatar-wrap">${avatarHtml(speaker?.name || contact?.name, speaker?.avatar || contact?.avatar)}${message.inner ? '<i class="mp-avatar-mind" aria-hidden="true"></i>' : ''}</span></button>`}
         <div class="mp-msg-body">
           ${message.quote ? `<div class="mp-quote-line">${icon('reply')}<span>${esc(message.quote.text)}</span></div>` : ''}
           ${bubble}
+          ${translation}
           ${subHtml}
           <div class="mp-msg-meta">
             ${message.proactive ? '<span class="mp-tag-proactive">主动开口</span>' : ''}
             ${subToggle}
             ${speaker ? `<span>${esc(speaker.name)}</span>` : ''}
-            <span>${startGroup ? '' : timeText(message.at)}</span>
+            <span>${startGroup ? '' : timeText(message.at)}${message.edited ? ' · 已编辑' : ''}</span>
           </div>
         </div>
       </div>`);
@@ -859,10 +880,13 @@ function threadBody(ctx, chatId) {
           <button class="mp-sq-btn" data-act="clear-quote" data-chat="${chat.id}" type="button" style="width:26px;height:26px">${icon('close')}</button>
         </div>` : ''}
         ${chat.failedTurn ? `<div class="mp-composer-tip is-error">${esc(chat.failedTurn.reason || '这一轮没接通')} <button class="mp-mini-btn" data-act="retry-turn" data-chat="${chat.id}" type="button">重试</button></div>` : ''}
-        ${composerPlusHtml(ctx, chat)}
+        ${selecting ? selectBarHtml(chat, selecting) : composerPlusHtml(ctx, chat)}
+        ${selecting ? '' : `
         <div class="mp-composer-row">
           <div class="mp-compose-box">
-            <textarea class="mp-compose-input" rows="1" placeholder="发消息…" aria-label="输入消息">${esc(ctx.shell.live.inputValue || '')}</textarea>
+            <textarea class="mp-compose-input" rows="1" placeholder="发消息…" aria-label="输入消息"
+              enterkeyhint="send" autocomplete="off" autocorrect="off" autocapitalize="sentences"
+              spellcheck="false" maxlength="2000">${esc(ctx.shell.live.inputValue || '')}</textarea>
             <button class="mp-send ${sendState}" data-act="${sendAct}" data-chat="${chat.id}" data-busy="${busy ? '1' : '0'}" data-pending="${waiting}" type="button" aria-label="${esc(sendTitle)}" title="${esc(sendTitle)}">
               <span class="mp-send-wake">${icon('spark')}</span>
               <span class="mp-send-now">${icon('send')}</span>
@@ -874,9 +898,29 @@ function threadBody(ctx, chatId) {
           <button class="mp-plus-toggle${ctx.shell.plusOpen === chat.id ? ' is-open' : ''}" data-act="composer-plus" data-chat="${chat.id}" type="button" aria-expanded="${ctx.shell.plusOpen === chat.id}" aria-controls="mpComposerPlus">
             ${icon('plus')}<span>更多</span>
           </button>
-        </div>
+        </div>`}
         <input id="mpMsgPhoto" type="file" accept="image/*" data-chat="${chat.id}" style="position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0">
       </div>
+    </div>`;
+}
+
+/* 多选：只对当前会话生效，切换会话 / 返回时自动作废，不写进存档 */
+function selectState(ctx, chat) {
+  const select = ctx.shell.select;
+  if (!select || select.chatId !== chat.id) return null;
+  const live = new Set((chat.messages || []).map(item => item.id));
+  select.ids = (select.ids || []).filter(id => live.has(id));
+  return select;
+}
+
+function selectBarHtml(chat, selecting) {
+  const count = selecting.ids.length;
+  return `
+    <div class="mp-select-bar">
+      <span class="mp-select-count">已选 ${count} 条</span>
+      <button class="mp-mini-btn plain" data-act="sel-cancel" data-chat="${esc(chat.id)}" type="button">退出</button>
+      <button class="mp-mini-btn plain" data-act="sel-forward" data-chat="${esc(chat.id)}" type="button">${icon('forward')}转发</button>
+      <button class="mp-mini-btn" data-act="sel-delete" data-chat="${esc(chat.id)}" type="button">${icon('trash')}删除</button>
     </div>`;
 }
 
@@ -1174,6 +1218,10 @@ async function runGeneration(ctx, chat, contact, options = {}) {
   const { kind = 'reply', replaceIds = [] } = options;
   const task = startGeneration(ctx, chat.id, kind);
   if (!task) { ctx.toast('正在回复这条会话，稍等一下'); return; }
+
+  /* 生成期间别让手机锁屏：这一轮可能等十几秒，熄屏会把回来时的界面打回原点。
+     额度按任务记，finishGeneration / cancelGeneration / destroy 都会释放。 */
+  task.releaseWake = typeof ctx.shell?.keepAwake === 'function' ? ctx.shell.keepAwake() : null;
 
   setTyping(ctx, chat, true);
   ctx.rerender();
@@ -1923,6 +1971,142 @@ export const threadApp = {
       return true;
     }
 
+    /* --------------------------------------------------------- 多选 / 编辑 / 翻译 */
+
+    if (act === 'sel-row') {
+      const chat = chatById(ctx.state, chatId);
+      if (!chat) return true;
+      if (!ctx.shell.select || ctx.shell.select.chatId !== chatId) ctx.shell.select = { chatId, ids: [] };
+      const ids = ctx.shell.select.ids;
+      const index = ids.indexOf(data.msg);
+      if (index >= 0) ids.splice(index, 1);
+      else ids.push(data.msg);
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'sel-cancel') {
+      ctx.shell.select = null;
+      ctx.rerender();
+      return true;
+    }
+
+    if (act === 'sel-delete') {
+      const chat = chatById(ctx.state, chatId);
+      if (!chat) return true;
+      const select = selectState(ctx, chat);
+      if (!select || !select.ids.length) { ctx.toast('先点几条再删'); return true; }
+      const targetIds = select.ids.slice();
+      ctx.openSheet({
+        title: `删除选中的 ${targetIds.length} 条？`,
+        items: [{ label: `确认删除这 ${targetIds.length} 条`, value: 'delete', icon: 'trash', danger: true, note: '只删这几条，其他聊天记录留着；删了不能恢复。' }],
+        onPick: (pick) => {
+          if (pick !== 'delete') return;
+          let removed = 0;
+          let blocked = 0;
+          for (const id of targetIds) {
+            const message = chat.messages.find(item => item.id === id);
+            if (!message) continue;
+            const rolled = rollbackBehavior(ctx, chat, message);
+            if (!rolled.ok) { blocked += 1; continue; }
+            chat.messages = chat.messages.filter(item => item.id !== id);
+            removed += 1;
+          }
+          ctx.shell.select = null;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(blocked ? `删了 ${removed} 条，${blocked} 条关联状态退不回去先留着` : `已删除 ${removed} 条`);
+        },
+      });
+      return true;
+    }
+
+    if (act === 'sel-forward') {
+      const chat = chatById(ctx.state, chatId);
+      if (!chat) return true;
+      const select = selectState(ctx, chat);
+      if (!select || !select.ids.length) { ctx.toast('先点几条再转发'); return true; }
+      const contact = contactById(ctx.state, chat.contactId);
+      const picked = chat.messages.filter(item => select.ids.includes(item.id));
+      const targets = contactsOf(ctx.state).filter(item => item.id !== chat.contactId);
+      ctx.openSheet({
+        title: `转发这 ${picked.length} 条给谁`,
+        items: targets.slice(0, 10).map(item => ({ label: item.name, value: item.id, icon: 'contacts' })),
+        onPick: (targetId) => {
+          const target = contactsOf(ctx.state).find(item => item.id === targetId);
+          if (!target) return;
+          const targetChat = chatFor(ctx.state, target.id);
+          picked.forEach(message => {
+            pushMessage(ctx.state, targetChat.id, {
+              from: 'me',
+              kind: 'forwarded',
+              text: '',
+              forward: { text: messagePreview(message), from: contact?.name || 'TA' },
+              pending: true,
+            });
+          });
+          ctx.shell.select = null;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast(`已转发 ${picked.length} 条给「${target.name}」`);
+        },
+      });
+      return true;
+    }
+
+    if (act === 'edit-message') {
+      const chat = chatById(ctx.state, chatId);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (!chat || !message) return true;
+      if (message.from !== 'me') { ctx.toast('只能改自己发的那条'); return true; }
+      if (!String(message.text || '').trim()) { ctx.toast('这条没有文字可改'); return true; }
+      ctx.openSheet({
+        kind: 'text',
+        title: '改这条消息',
+        value: message.text,
+        placeholder: '改成…',
+        confirm: '保存',
+        onText: (value) => {
+          const next = String(value || '').replace(/\s+$/g, '');
+          if (!next.trim()) { ctx.toast('空着就不改了'); ctx.rerender(); return; }
+          if (next === message.text) { ctx.rerender(); return; }
+          message.text = next.slice(0, 2000);
+          message.edited = Date.now();
+          ctx.save();
+          ctx.rerender();
+          ctx.toast('已改好');
+        },
+      });
+      return true;
+    }
+
+    if (act === 'translate-message') {
+      const chat = chatById(ctx.state, chatId);
+      const message = chat?.messages.find(item => item.id === data.msg);
+      if (!chat || !message) return true;
+      if (!String(message.text || '').trim()) { ctx.toast('这条没有文字可翻'); return true; }
+      if (message.translation) {
+        message.translation = '';
+        ctx.save();
+        ctx.rerender();
+        ctx.toast('译文收起来了');
+        return true;
+      }
+      const text = message.text;
+      const target = /[\u4e00-\u9fa5]/.test(text) ? '英语' : '简体中文';
+      ctx.toast('正在翻这一条…');
+      ctx.ai.translate?.(ctx, text, target)
+        .then(out => {
+          if (!out) return;
+          message.translation = `${target}：${out}`;
+          ctx.save();
+          ctx.rerender();
+          ctx.toast('译文放上来了');
+        })
+        .catch(error => ctx.toast(error?.message || '这条没翻出来'));
+      return true;
+    }
+
     if (act === 'theater-kind') {
       const kind = theaterKindById(data.kind);
       ctx.state.settings.theater = { ...(ctx.state.settings.theater || {}), kind: kind.id };
@@ -2187,8 +2371,13 @@ export const threadApp = {
         items: [
           { label: '引用这条回复', value: 'quote', icon: 'reply' },
           ...(message.text ? [{ label: '复制文字', value: 'copy', icon: 'copy' }] : []),
+          ...(message.text ? [
+            { label: '编辑这条', value: 'edit', icon: 'brush', note: message.from === 'me' ? '改的是自己发出去那条' : '只能改自己发的那条' },
+            { label: '翻译这条', value: 'translate', icon: 'book', note: message.translation ? '再点一次收起译文' : '按当前模型翻，只翻这一句' },
+          ] : []),
           { label: '收藏这条', value: 'favorite', icon: 'bookmark', note: '存进「收藏」，删了聊天也还在' },
           { label: '转发给…', value: 'forward', icon: 'forward' },
+          { label: '多选、批量删除', value: 'select', icon: 'grip', note: '勾几条一起删 / 一起转发' },
           ...(recallable ? [{ label: '撤回这条', value: 'recall', icon: 'refresh', note: '两分钟内可以撤回' }] : []),
           { label: '存成小剧场', value: 'extra', icon: 'theater' },
           ...(message.inner ? [{ label: '看 TA 的心理活动', value: 'mind', icon: 'eye' }] : []),
@@ -2197,13 +2386,20 @@ export const threadApp = {
           { label: '删除这条', value: 'delete', icon: 'trash', danger: true },
         ],
         onPick: (value) => {
+          if (value === 'edit') { threadApp.handle(ctx, 'edit-message', { chat: chat.id, msg: message.id }); return; }
+          if (value === 'translate') { threadApp.handle(ctx, 'translate-message', { chat: chat.id, msg: message.id }); return; }
+          if (value === 'select') {
+            ctx.shell.select = { chatId: chat.id, ids: [message.id] };
+            ctx.rerender();
+            return;
+          }
           if (value === 'quote') {
             ctx.shell.quote = ctx.shell.quote || {};
             ctx.shell.quote[chat.id] = { text: messagePreview(message), from: message.from };
             ctx.rerender();
           }
           if (value === 'copy') {
-            navigator.clipboard?.writeText(message.text).then(() => ctx.toast('已复制'), () => ctx.toast('复制失败'));
+            copyText(message.text).then(ok => ctx.toast(ok ? '已复制' : '复制失败'));
           }
           if (value === 'favorite') {
             const favorites = (ctx.state.favorites = ctx.state.favorites || []);

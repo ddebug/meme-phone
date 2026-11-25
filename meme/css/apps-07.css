@@ -1517,3 +1517,78 @@
 .mp-root[data-mp-theme="night"] .mp-switch { background: #39393d; }
 .mp-root[data-mp-theme="night"] .mp-switch.on { background: #34c759; }
 
+/* 译文：挂在气泡下面，和潜台词同一套排版，长按再点一次收起 */
+.mp-translation {
+  align-self: stretch;
+  max-width: 100%;
+  padding: 6px 9px 6px 10px;
+  border-left: 2px solid rgba(90, 176, 214, .5);
+  border-radius: 4px 9px 9px 4px;
+  background: linear-gradient(150deg, rgba(90, 176, 214, .1), rgba(90, 176, 214, .04));
+  color: var(--text-2);
+  font-size: calc(11px * var(--font-scale));
+  line-height: calc(1.5 * var(--line-scale));
+  word-break: break-word;
+  user-select: text;
+}
+.mp-translation-label {
+  margin-right: 5px;
+  color: #3f8fb5;
+  font-size: calc(9px * var(--font-scale));
+  letter-spacing: .04em;
+}
+/* 译文卡片在气泡下方、贴在页面底色上：自己那侧也保持浅底深字，只把竖线换到右边，
+   别用白色半透明（白字落在浅背景上根本看不清） */
+.mp-msg.me .mp-translation {
+  border-left: 0;
+  border-right: 2px solid rgba(90, 176, 214, .5);
+  border-radius: 9px 4px 4px 9px;
+  color: var(--text-2);
+}
+.mp-msg.me .mp-translation-label { color: #3f8fb5; }
+.mp-root[data-mp-theme="night"] .mp-translation { border-left-color: rgba(120, 200, 236, .5); color: var(--text-2); }
+.mp-root[data-mp-theme="night"] .mp-translation-label { color: #7cc0dd; }
+
+/* 多选：整行变成可点的勾选行，勾选圈放在最外那一侧（自己的消息靠右、对方靠左），不和气泡叠在一起 */
+.mp-msg.is-selected { background: rgba(142, 123, 242, .08); border-radius: 10px; }
+.mp-root[data-mp-theme="night"] .mp-msg.is-selected { background: rgba(142, 123, 242, .16); }
+.mp-sel-dot {
+  flex: none;
+  align-self: center;
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(142, 123, 242, .45);
+  background: transparent;
+  transition: background .15s ease, border-color .15s ease;
+}
+.mp-sel-dot.is-on { border-color: #7f6ce9; background: #7f6ce9; }
+.mp-sel-dot.is-on::after {
+  content: '';
+  position: absolute;
+  left: 4.5px;
+  top: 1.5px;
+  width: 4px;
+  height: 8px;
+  border-right: 1.6px solid #fff;
+  border-bottom: 1.6px solid #fff;
+  transform: rotate(38deg);
+}
+.mp-msg { position: relative; }
+
+/* 多选工具条：选中模式下顶掉输入框，避免边选边打字 */
+.mp-select-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 2px 4px;
+}
+.mp-select-count {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-2);
+  font-size: calc(12px * var(--font-scale));
+  padding-left: 4px;
+}
+

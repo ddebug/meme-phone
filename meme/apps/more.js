@@ -4,7 +4,7 @@
  */
 
 import { icon, ICON_NAMES, ICON_LABELS, APP_ICON_TARGETS } from '../icons.js';
-import { esc, tintStyle, chatAvatarHtml } from '../shell.js';
+import { esc, copyText, tintStyle, chatAvatarHtml } from '../shell.js';
 import { contactsOf, contactById, extrasOf, THEATER_KINDS, normalizeTheaterKind, theaterKindById, theaterKindFor, chatFor } from '../data.js';
 import { appointmentById, completeAppointment, respondAppointment } from '../behavior-domains.js';
 import { PIXEL_BUNNY } from '../theme-data.js';
@@ -340,7 +340,7 @@ export const emojiApp = {
     if (act === 'emoji-pick') {
       const item = ctx.state.emoji.find(entry => entry.id === data.id);
       if (!item) return true;
-      navigator.clipboard?.writeText(item.char).then(() => ctx.toast(`复制了「${item.name}」`), () => ctx.toast(item.char));
+      copyText(item.char).then(ok => ctx.toast(ok ? `复制了「${item.name}」` : item.char));
       return true;
     }
     if (act === 'emoji-add') {

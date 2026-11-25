@@ -52,6 +52,78 @@ function readViewport() {
   return { w: window.innerWidth || 0, h: window.innerHeight || 0 };
 }
 
+/* 安全区：刘海/状态栏/Home 指示条。
+ * 宿主全屏（viewport-fit=cover）时 innerHeight 包含了被刘海盖住的那一段，
+ * 整机若按满尺寸铺，顶部时间电量就被挡住、底边上滑条会和 iOS 手势打架。
+ * env() 写在 CSS 里没法直接读，用一个零尺寸探针量出计算后的 padding 再拿数值。 */
+let safeInsetCache = { top: 0, right: 0, bottom: 0, left: 0 };
+
+/** 把可视区矩形按安全区内缩；纯函数便于校验。insets 缺项按 0，结果不会出现负尺寸。 */
+export function insetBox(box, insets) {
+  const b = box || {};
+  const i = insets || {};
+  const top = Number(i.top) || 0;
+  const left = Number(i.left) || 0;
+  const right = Number(i.right) || 0;
+  const bottom = Number(i.bottom) || 0;
+  return {
+    top: (Number(b.top) || 0) + top,
+    left: (Number(b.left) || 0) + left,
+    w: Math.max(0, (Number(b.w) || 0) - left - right),
+    h: Math.max(0, (Number(b.h) || 0) - top - bottom),
+  };
+}
+
+export function readSafeInsets() {
+  try {
+    const probe = document.createElement('div');
+    probe.setAttribute('aria-hidden', 'true');
+    probe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;'
+      + 'padding-top:env(safe-area-inset-top,0px);padding-right:env(safe-area-inset-right,0px);'
+      + 'padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);';
+    document.body.appendChild(probe);
+    const cs = getComputedStyle(probe);
+    safeInsetCache = {
+      top: parseFloat(cs.paddingTop) || 0,
+      right: parseFloat(cs.paddingRight) || 0,
+      bottom: parseFloat(cs.paddingBottom) || 0,
+      left: parseFloat(cs.paddingLeft) || 0,
+    };
+    probe.remove();
+  } catch {
+    /* 读不到就沿用上一次（预览页里通常是 0） */
+  }
+  return { ...safeInsetCache };
+}
+
+/* 复制文字：先走 Clipboard API，失败（无权限 / 非安全上下文 / 老 WebView）再用
+   隐藏 textarea + execCommand 兜底。返回是否成功。 */
+export function copyText(text) {
+  const value = String(text ?? '');
+  if (!value) return Promise.resolve(false);
+  const fallback = () => {
+    try {
+      const area = document.createElement('textarea');
+      area.value = value;
+      area.setAttribute('readonly', '');
+      area.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
+      document.body.appendChild(area);
+      area.select();
+      area.setSelectionRange(0, value.length);
+      const ok = document.execCommand && document.execCommand('copy');
+      area.remove();
+      return Boolean(ok);
+    } catch {
+      return false;
+    }
+  };
+  const clipboard = navigator.clipboard;
+  if (clipboard && typeof clipboard.writeText === 'function') {
+    return clipboard.writeText(value).then(() => true, fallback);
+  }
+  return Promise.resolve(fallback());
+}
+
 /* 决定缩放采用哪个视口：打字(软键盘弹起)期间保留基准，避免整机被压缩后的可视高度带小；
    非聚焦时采纳新视口，响应真实的窗口拖动 / 旋转。纯函数便于校验。 */
 export function viewportForScale(base, next, typing) {
@@ -227,6 +299,11 @@ export function createShell(options) {
     deviceOffset: { x: 0, y: 0 },
     /* 上一次渲染结束时所在的视图，用来区分「新进入会话」和「会话页内重绘」 */
     lastView: '',
+    /* 用户自己滚动的时间戳：重绘后的多档回锚只在用户没接手前生效，不和人抢滚动 */
+    userScrollAt: 0,
+    /* 切后台 / 回前台的时间戳，用来做恢复去重 */
+    awayAt: 0,
+    resumeAt: 0,
   };
 
   Object.assign(ctx, {
@@ -247,6 +324,21 @@ export function createShell(options) {
     timeText,
     shortText,
   });
+
+  /* 监听登记表：绑之前先移除同名同引用的旧监听（重复粘贴脚本、页面不重载时会残留旧绑定），
+     关手机时按引用统一清掉，反复开关不累积。放在最前面，后面任何 bind() 都能直接用。 */
+  const bindings = [];
+  function bind(target, type, handler, opts) {
+    if (!target || typeof target.addEventListener !== 'function') return;
+    try { target.removeEventListener(type, handler, opts); } catch { /* 旧环境不认 opts 就忽略 */ }
+    target.addEventListener(type, handler, opts);
+    bindings.push({ target, type, handler, opts });
+  }
+  function unbind(target, type, handler, opts) {
+    try { target.removeEventListener(type, handler, opts); } catch { /* ignore */ }
+    const index = bindings.findIndex(item => item.target === target && item.type === type && item.handler === handler);
+    if (index >= 0) bindings.splice(index, 1);
+  }
 
   /* ------------------------------------------------------------ 渲染 */
 
@@ -732,12 +824,16 @@ export function createShell(options) {
   /* 当前该用哪套尺寸：手机竖屏按宽度定缩放、把高度让给键盘；桌面沿用基准视口等比缩放 */
   function layoutNow() {
     const vp = readViewport();
-    const box = visualBox();
+    const raw = visualBox();
+    const insets = readSafeInsets();
+    /* 整机只铺安全区以内：刘海、状态栏、Home 指示条那几段留空，内容不会被盖住，
+       底边上滑也不会和 iOS 系统手势抢地方。预览页/桌面 insets 全是 0，表现和以前一致。 */
+    const box = insetBox(raw, insets);
     if (isMobileViewport(vp.w, vp.h)) {
-      return { mobile: true, box, ...deviceLayout(vp.w, vp.h, box.h, true) };
+      return { mobile: true, box, insets, ...deviceLayout(vp.w, vp.h, box.h, true) };
     }
     const base = shell.baseViewport || vp;
-    return { mobile: false, box, scale: computeDeviceScale(base.w, base.h), height: DEVICE_H };
+    return { mobile: false, box, insets, scale: computeDeviceScale(base.w, base.h), height: DEVICE_H };
   }
 
   function deviceTransformOf(layout) {
@@ -764,6 +860,43 @@ export function createShell(options) {
     device.style.transform = deviceTransformOf(layout);
     return layout;
   }
+
+  /* --------------------------------------------------------- 滚动回锚 */
+
+  /* 重绘后图片 / 字体 / 长文本陆续进来，高度会被顶开；一帧内锚一次往往还差一点，
+     所以 60/180/550ms 各补一次。用户中途自己接手滚动就立刻让位，不跟人抢。 */
+  function anchorScroll(box, target, stages = [0, 60, 180, 550]) {
+    if (!box) return;
+    const startedAt = Date.now();
+    const value = Number(target);
+    if (!Number.isFinite(value)) return;
+    const apply = () => {
+      if (!box.isConnected) return;
+      if (shell.userScrollAt > startedAt) return;
+      shell.silentScrollUntil = Date.now() + 80;
+      box.scrollTop = value;
+    };
+    apply();
+    stages.filter(ms => ms > 0).forEach(ms => setTimeout(apply, ms));
+  }
+
+  /* 滚到最新一条：每档重新取 scrollHeight（照片加载完高度会变） */
+  function stickToBottom(box, stages = [0, 60, 180, 550]) {
+    if (!box) return;
+    const startedAt = Date.now();
+    shell.pinBottomAt = startedAt;
+    const apply = () => {
+      if (!box.isConnected) return;
+      if (shell.userScrollAt > startedAt) return;
+      shell.silentScrollUntil = Date.now() + 80;
+      box.scrollTop = box.scrollHeight;
+    };
+    apply();
+    stages.filter(ms => ms > 0).forEach(ms => setTimeout(apply, ms));
+  }
+
+  shell.anchorScroll = anchorScroll;
+  shell.stickToBottom = stickToBottom;
 
   function render() {
     if (!root) return;
@@ -824,7 +957,7 @@ export function createShell(options) {
     }
     if (prevScroll > 0 && (shell.stack[shell.stack.length - 1]?.view || '') === prevView) {
       const box = root.querySelector('.mp-page-body');
-      if (box) box.scrollTop = prevScroll;
+      if (box) anchorScroll(box, prevScroll);
     }
     /* 从列表 / 桌面最近聊天 / 宿主直达等入口新进入会话页时，把消息列表落到最新一条；
        从会话子页（设置 / 日记 / 看图）返回时保留原来的滚动位置。 */
@@ -832,12 +965,10 @@ export function createShell(options) {
     const threadChildViews = ['thread', 'thread-settings', 'thread-diary', 'photo-view'];
     if (newView === 'thread' && !threadChildViews.includes(prevRenderedView)) {
       shell.scroller = null;
-      const stickThreadBottom = () => {
-        const box = root.querySelector('.mp-messages');
-        if (box) box.scrollTop = box.scrollHeight;
-      };
-      requestAnimationFrame(() => requestAnimationFrame(stickThreadBottom));
-      setTimeout(stickThreadBottom, 60);
+      /* 新进一个会话：上一次没退干净的多选状态就地作废 */
+      shell.select = null;
+      const box = root.querySelector('.mp-messages');
+      if (box) stickToBottom(box);
     }
     shell.lastView = newView;
     if (shell.sheet) shell.sheetAnimated = true;
@@ -873,7 +1004,7 @@ export function createShell(options) {
     }
     if (shell.scroller) {
       const box = root.querySelector('.mp-messages');
-      if (box) box.scrollTop = shell.scroller;
+      if (box) anchorScroll(box, shell.scroller);
     }
   }
 
@@ -1098,6 +1229,7 @@ export function createShell(options) {
     event.stopPropagation();
     phoneDrag = {
       id: event.pointerId,
+      node: handle,
       startX: event.clientX,
       startY: event.clientY,
       baseX: shell.deviceOffset?.x || 0,
@@ -1118,14 +1250,14 @@ export function createShell(options) {
     device.style.transform = deviceTransform();
     event.preventDefault();
   };
-  window.addEventListener('pointermove', onPhoneDragMove, { passive: false });
+  bind(window, 'pointermove', onPhoneDragMove, { passive: false });
   const endPhoneDrag = event => {
     if (!phoneDrag || event.pointerId !== phoneDrag.id) return;
     phoneDrag = null;
     root.querySelector('.mp-device')?.classList.remove('is-dragging');
   };
-  window.addEventListener('pointerup', endPhoneDrag);
-  window.addEventListener('pointercancel', endPhoneDrag);
+  bind(window, 'pointerup', endPhoneDrag);
+  bind(window, 'pointercancel', endPhoneDrag);
   /* 按当前窗口真实尺寸刷新缩放基准并重排整机 */
   function refreshViewport() {
     shell.baseViewport = readViewport();
@@ -1143,6 +1275,8 @@ export function createShell(options) {
     });
   }
   function onWindowResize() {
+    /* 视口变化（键盘弹起、旋转、地址栏收放）时，手里的拖拽/长按/上滑一律作废 */
+    cancelGestures('resize');
     /* 手机竖屏：键盘顶上来只缩高度、宽度不动，直接按新的可视区重排 */
     if (isMobileViewport(window.innerWidth || 0, window.innerHeight || 0)) {
       scheduleFrameLayout();
@@ -1154,12 +1288,101 @@ export function createShell(options) {
     shell.deviceOffset = clampDeviceOffset(shell.deviceOffset?.x || 0, shell.deviceOffset?.y || 0);
     scheduleFrameLayout();
   }
-  window.addEventListener('resize', onWindowResize);
+  bind(window, 'resize', onWindowResize);
   if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
-    window.visualViewport.addEventListener('resize', onWindowResize);
+    bind(window.visualViewport, 'resize', onWindowResize);
     /* iOS 软键盘时页面常被整体平移而不触发 resize，scroll 也当一次重排信号 */
-    window.visualViewport.addEventListener('scroll', onWindowResize);
+    bind(window.visualViewport, 'scroll', onWindowResize);
   }
+
+  /* ------------------------------------------------- 常亮 / 回前台 */
+
+  /* 屏幕常亮：生成回复 / 放语音期间别让手机中途锁屏。
+     计数式：归零、切后台、关手机都释放；回前台若还有计数就重新申请
+     ——系统在后台会掉这把锁，回来拿到的是已失效的锁，必须重新 request。 */
+  let wakeLock = null;
+  let wakeCount = 0;
+  function requestWake() {
+    try {
+      if (wakeLock || !navigator.wakeLock || typeof navigator.wakeLock.request !== 'function') return;
+      if (document.visibilityState === 'hidden') return;
+      navigator.wakeLock.request('screen').then(lock => {
+        wakeLock = lock;
+        try {
+          lock.addEventListener('release', () => { if (wakeLock === lock) wakeLock = null; });
+        } catch { /* 老实现没有 release 事件 */ }
+        /* 申请期间计数已经归零：马上放掉，别让屏幕白亮着 */
+        if (wakeCount <= 0 && wakeLock === lock) releaseWake();
+      }).catch(() => { /* 不支持 / 省电模式拒绝：不打扰用户 */ });
+    } catch { /* 宿主禁止就跳过 */ }
+  }
+  function releaseWake() {
+    const lock = wakeLock;
+    wakeLock = null;
+    if (!lock) return;
+    try { lock.release(); } catch { /* 已自动释放 */ }
+  }
+  /** 拿一次常亮额度，返回释放函数；重复调用同一份引用也算一次。 */
+  shell.keepAwake = function keepAwake() {
+    wakeCount += 1;
+    requestWake();
+    let released = false;
+    return function release() {
+      if (released) return;
+      released = true;
+      wakeCount = Math.max(0, wakeCount - 1);
+      if (wakeCount === 0) releaseWake();
+    };
+  };
+  shell.wakeCount = () => wakeCount;
+
+  /* 三重保险的「回前台」：visibilitychange、window focus、计时器跳变兜底，谁先到都走同一套恢复，
+     4 秒内去重只做一次。某些酒馆环境 webview 会冻计时器 / 不派发 visibility 事件，
+     只靠一条信号容易漏。 */
+  function markAway() {
+    if (!shell.awayAt) shell.awayAt = Date.now();
+  }
+  function resumeFromAway() {
+    const now = Date.now();
+    const awayMs = shell.awayAt ? Math.max(0, now - shell.awayAt) : 0;
+    shell.awayAt = 0;
+    if (now - (shell.resumeAt || 0) < 4000) return;
+    shell.resumeAt = now;
+    /* 回来时视口可能变过（旋转 / 键盘收起 / 地址栏收放），按真实窗口重排一次 */
+    try { refreshViewport(); } catch { /* 布局失败不影响其它恢复 */ }
+    /* 焦点不在输入框就清掉打字态，免得键盘明明收了还按打字口径算高度 */
+    const active = document.activeElement;
+    if (!(active && root.contains(active) && active.closest('input, textarea'))) shell.typing = false;
+    try { render(); } catch { /* 重绘失败留给下一次操作 */ }
+    if (typeof ctx.onResume === 'function') {
+      try { ctx.onResume({ awayMs }); } catch { /* 各 App 的恢复逻辑失败不影响界面 */ }
+    }
+  }
+  function onVisibilityChange() {
+    if (document.visibilityState === 'hidden') {
+      markAway();
+      releaseWake();
+      cancelGestures('hidden');
+      try { ctx.flushDraft?.(); } catch { /* 草稿落盘失败下次输入还会再存 */ }
+      return;
+    }
+    if (wakeCount > 0) requestWake();
+    resumeFromAway();
+  }
+  bind(document, 'visibilitychange', onVisibilityChange);
+  bind(window, 'blur', () => { markAway(); cancelGestures('blur'); });
+  bind(window, 'focus', () => { if (document.visibilityState === 'visible') resumeFromAway(); });
+
+  /* 计时器跳变兜底：可见状态下 tick 间隔被拉长，说明刚从后台回来 */
+  let lastTickAt = Date.now();
+  const tickWatch = setInterval(() => {
+    const now = Date.now();
+    if (now - lastTickAt > 12000 && document.visibilityState === 'visible') {
+      markAway();
+      resumeFromAway();
+    }
+    lastTickAt = now;
+  }, 5000);
 
   /* 上滑：在手机底部那一小段快速上滑才回桌面。
      聊天/分支页的消息列表本身就要上滑滚，输入框里也要上滑选字，这些地方一律不算，
@@ -1238,6 +1461,36 @@ export function createShell(options) {
   root.addEventListener('pointercancel', cancelHold);
   root.addEventListener('pointermove', cancelHold);
 
+  /* 把所有进行中的手势一次性作废：切后台 / 失焦 / 视口变化时调用，
+     并释放 pointer capture。否则回来时停在半截拖拽，或手指早没了还在等 pointerup。 */
+  function cancelGestures(reason = '') {
+    if (drag) {
+      const node = drag.node;
+      try { node?.releasePointerCapture?.(drag.pointerId); } catch { /* 没捕获就算了 */ }
+      try {
+        node?.classList.remove('is-dragging');
+        if (node) node.style.transform = '';
+      } catch { /* ignore */ }
+      drag = null;
+      root.classList.remove('is-item-dragging');
+      clearDragMarks();
+    }
+    if (homeSwipe) {
+      try { homeSwipe.view?.classList.remove('is-swiping'); } catch { /* ignore */ }
+      homeSwipe = null;
+    }
+    if (swipe) swipe = null;
+    clearTimeout(holdTimer);
+    holdTimer = 0;
+    holdTarget = null;
+    if (phoneDrag) {
+      try { phoneDrag.node?.releasePointerCapture?.(phoneDrag.id); } catch { /* ignore */ }
+      phoneDrag = null;
+      root.querySelector('.mp-device')?.classList.remove('is-dragging');
+    }
+    shell.gestureCancelReason = reason;
+  }
+
   /* 输入：不整页重绘，只切发送键状态并同步草稿 */
   root.addEventListener('input', event => {
     /* 真的在打字即视为输入态：兜住个别环境 focusin 没派发的情况 */
@@ -1250,8 +1503,47 @@ export function createShell(options) {
     shell.live.inputValue = input.value;
     shell.improveSendState();
     growComposer(input);
+    /* 输入法正在组词：候选字还没上屏，先不把半截拼音写进草稿，等 compositionend 补一次 */
+    if (event.isComposing) return;
     if (entry && ctx.onDraft) ctx.onDraft(entry, input.value);
   });
+
+  /* 输入法上屏 / 取消：组词结束时不会再补一次 input，这里同步草稿与发送键状态 */
+  root.addEventListener('compositionend', event => {
+    const input = event.target.closest?.('.mp-compose-box textarea');
+    if (!input) return;
+    const entry = shell.stack[shell.stack.length - 1];
+    shell.live.inputValue = input.value;
+    shell.improveSendState();
+    growComposer(input);
+    if (entry && ctx.onDraft) ctx.onDraft(entry, input.value);
+  });
+
+  /* 贴图：剪贴板里有图片就直接按「发照片」走，和相册选图共用同一套压缩 / 落盘链路 */
+  root.addEventListener('paste', event => {
+    const input = event.target.closest?.('.mp-compose-box textarea');
+    if (!input) return;
+    const items = Array.from(event.clipboardData?.items || []);
+    const imageItem = items.find(item => item.kind === 'file' && /^image\//.test(item.type || ''));
+    const file = imageItem?.getAsFile?.();
+    if (!file) return;
+    event.preventDefault();
+    const entry = shell.stack[shell.stack.length - 1];
+    const chatId = entry?.view === 'thread' ? String(entry.params?.chatId || '') : '';
+    if (typeof ctx.onPasteImage === 'function') ctx.onPasteImage(file, chatId);
+    else ctx.toast?.('这张图贴不进来');
+  });
+
+  /* 图片加载完会把列表高度顶开：刚滚到底的那一小段时间里补一次，照片进来不把位置挤歪 */
+  root.addEventListener('load', event => {
+    const img = event.target;
+    if (!img || img.tagName !== 'IMG') return;
+    const box = img.closest?.('.mp-messages');
+    if (!box) return;
+    if (!shell.pinBottomAt || Date.now() - shell.pinBottomAt > 5000) return;
+    if (shell.userScrollAt > shell.pinBottomAt) return;
+    box.scrollTop = box.scrollHeight;
+  }, true);
 
   /* 键盘弹出动画期间可视区会连续变化，聚焦后再补两次重排，兜住个别环境不发 resize 的情况 */
   let keyboardTimer = 0;
@@ -1270,13 +1562,20 @@ export function createShell(options) {
     if (event.target.closest('input, textarea')) shell.typing = false;
     if (event.target.closest('.mp-compose-box textarea')) {
       shell.live.focus = false;
+      /* 收起键盘这一刻把草稿落一次盘：刷新 / 切走 / 意外退出都不会丢刚打的字 */
+      try { ctx.flushDraft?.(); } catch { /* 落盘失败不影响下一次输入 */ }
       /* 键盘收起后视口高度恢复，按真实窗口重新对一次缩放基准；延迟等收起动画结束 */
       setTimeout(() => { if (!shell.typing) refreshViewport(); }, 120);
     }
   });
 
   root.addEventListener('scroll', event => {
-    if (event.target.classList?.contains('mp-messages')) shell.scroller = event.target.scrollTop;
+    const target = event.target;
+    const managed = target?.classList?.contains?.('mp-messages') || target?.classList?.contains?.('mp-page-body');
+    if (target?.classList?.contains('mp-messages')) shell.scroller = target.scrollTop;
+    /* 只有用户自己拖出来的滚动才记时间；程序回位（重绘后锚回原位）不算，
+       否则第一次回锚就会被自己写脏的时间戳挡住 */
+    if (managed && Date.now() > (shell.silentScrollUntil || 0)) shell.userScrollAt = Date.now();
   }, true);
 
   root.addEventListener('keydown', event => {
@@ -1314,7 +1613,7 @@ export function createShell(options) {
   function onDocFocusIn(event) {
     if (!root.contains(event.target)) blurOutsideFocus();
   }
-  document.addEventListener('focusin', onDocFocusIn, true);
+  bind(document, 'focusin', onDocFocusIn, true);
   blurOutsideFocus();
 
   render();
@@ -1322,20 +1621,20 @@ export function createShell(options) {
   return {
     shell,
     render,
-    /* 关手机时把挂在 window 上的监听和计时器一起收掉，反复开关不累积 */
+    /* 回前台 / 手动调用：按真实视口重排并把界面重绘一次 */
+    resume: resumeFromAway,
+    /* 关手机时把挂在 window / document 上的监听和计时器一起收掉，反复开关不累积 */
     destroy() {
       clearInterval(timer);
+      clearInterval(tickWatch);
       clearTimeout(shell.toastTimer);
       clearTimeout(keyboardTimer);
+      cancelGestures('destroy');
+      releaseWake();
+      wakeCount = 0;
       if (layoutRaf) { cancelAnimationFrame(layoutRaf); layoutRaf = 0; }
-      document.removeEventListener('focusin', onDocFocusIn, true);
-      window.removeEventListener('pointermove', onPhoneDragMove);
-      window.removeEventListener('pointerup', endPhoneDrag);
-      window.removeEventListener('pointercancel', endPhoneDrag);
-      window.removeEventListener('resize', onWindowResize);
-      if (window.visualViewport && typeof window.visualViewport.removeEventListener === 'function') {
-        window.visualViewport.removeEventListener('resize', onWindowResize);
-        window.visualViewport.removeEventListener('scroll', onWindowResize);
+      for (const item of bindings.splice(0)) {
+        try { item.target.removeEventListener(item.type, item.handler, item.opts); } catch { /* 目标已销毁就跳过 */ }
       }
       if (root) root.innerHTML = '';
     },

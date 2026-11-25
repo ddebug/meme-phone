@@ -159,6 +159,32 @@ function blurOutsideFocus(root) {
   } catch { /* 宿主文档读不到就跳过 */ }
 }
 
+/* 草稿落盘：逐字写整份状态太重（宿主每次保存都要上传整份存档），
+   改成停手 700ms 存一版，再在失焦 / 切后台 / 关手机时立刻补存一次，
+   刷新或异常退出也不会丢刚打的字。 */
+let draftDirty = false;
+let draftTimer = 0;
+
+function flushDraft() {
+  clearTimeout(draftTimer);
+  draftTimer = 0;
+  if (!draftDirty || !store) return;
+  draftDirty = false;
+  try {
+    const promise = store.touch();
+    if (promise && typeof promise.catch === 'function') {
+      promise.catch(() => { draftDirty = true; });
+    }
+  } catch {
+    draftDirty = true;
+  }
+}
+
+function scheduleDraftSave() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(flushDraft, 700);
+}
+
 const getCurrentState = () => store?.get() || null;
 
 /* ------------------------------------------------------------ 模型调用 */
@@ -215,6 +241,28 @@ function makeAi(getState) {
         sections: wantsTheater ? splitTheaterBlocks(result.text, contact?.name).sections : [],
         kind: wantsTheater ? theaterKind : '',
       };
+    },
+
+    /* 翻译一条消息：只翻这一句，不组装角色卡 / 历史，避免把上下文带进来改口吻 */
+    async translate(context, text, target = '中文') {
+      const state = getState();
+      const source = String(text || '').trim();
+      if (!source) throw new Error('这条没有可翻译的文字');
+      const prompt = [
+        `把下面这句话翻译成${target}。只输出译文，不要解释，不要加引号，不要保留原文。`,
+        '',
+        source.slice(0, 800),
+      ].join('\n');
+      const result = await generate({
+        prompt,
+        demoReply: source,
+        preset: llmPresetFor(state, null),
+        demo: demoMode,
+      });
+      if (result.error) throw new Error(result.error);
+      const out = String(result.text || '').trim();
+      if (!out) throw new Error('模型没有返回译文');
+      return out;
     },
 
     /**
@@ -627,10 +675,27 @@ export async function openMemePhone(options = {}) {
       ctx.rerender?.();
     },
     importBackup: (raw) => importState(raw),
+    /* 草稿即时落盘：失焦 / 切后台 / 关手机时由壳层调用 */
+    flushDraft,
+    /* 剪贴板贴图：和相册选图共用同一套压缩与落盘链路 */
+    onPasteImage: (file, chatId) => {
+      if (!chatId) { ctx.toast?.('先打开一个会话再贴图'); return; }
+      useMessagePhoto(file, chatId).catch(error => ctx.toast?.(error.message || '这张图没贴进去'));
+    },
+    /* 切后台回来：先补存草稿，再让世界线跟着核对一次当前酒馆聊天 */
+    onResume: () => {
+      try { flushDraft(); } catch { /* 草稿没存进也没关系，下次输入还会再存 */ }
+      try { ctx.world?.resume?.(); } catch { /* 世界线核对失败不影响界面 */ }
+    },
     onDraft: (entry, value) => {
       if (entry.view !== 'thread') return;
       const chat = state.chats[entry.params?.chatId];
-      if (chat) chat.draft = value;
+      if (!chat) return;
+      if (chat.draft !== value) {
+        chat.draft = value;
+        draftDirty = true;
+        scheduleDraftSave();
+      }
       /* 草稿只存下来，不跟着每个字重算 token：预算只看已经发出去的消息 */
     },
     onClose: () => closeMemePhone(),
@@ -939,6 +1004,8 @@ export async function openMemePhone(options = {}) {
 export function closeMemePhone() {
   if (!rootEl) return;
   stopMusic();
+  /* 关之前把草稿补存一次，别让最后几个字只留在内存里 */
+  try { flushDraft(); } catch { /* 存不进也不阻塞关闭 */ }
   /* 平行时空的生成还在酒馆那边跑：先叫停，别让结果落回已经关掉的界面 */
   cancelParallelRun();
   clearInterval(followTimer);

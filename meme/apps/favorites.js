@@ -4,7 +4,7 @@
  */
 
 import { icon } from '../icons.js';
-import { esc, shortText } from '../shell.js';
+import { esc, copyText, shortText } from '../shell.js';
 import { chatById } from '../data.js';
 
 export const favoritesApp = {
@@ -45,7 +45,7 @@ export const favoritesApp = {
         if (value === 'open' && chat) ctx.go('thread', { chatId: chat.id });
         if (value === 'photo' && item.image) ctx.go('photo-view', { src: item.image });
         if (value === 'copy') {
-          navigator.clipboard?.writeText(item.text).then(() => ctx.toast('已复制'), () => ctx.toast('复制失败'));
+          copyText(item.text).then(ok => ctx.toast(ok ? '已复制' : '复制失败'));
         }
         if (value === 'delete') {
           ctx.state.favorites = list.filter(entry => entry.id !== item.id);

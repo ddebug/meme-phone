@@ -830,6 +830,7 @@
 .mp-compose-box {
   flex: 1;
   min-height: 38px;
+  box-sizing: border-box;
   display: flex;
   align-items: flex-end;
   gap: 4px;
@@ -860,7 +861,7 @@
 /* 输入框随内容长高：超过约 5 行就在框里滚，发出去的长消息也能看全 */
 .mp-root .mp-compose-box textarea {
   display: block;
-  padding: 5px 0 6px;
+  padding: 6px 0;
   max-height: 104px;
   resize: none;
   overflow-y: hidden;

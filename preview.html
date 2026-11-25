@@ -15737,6 +15737,8 @@ function createShell(options) {
     bioEdit: false,
     homePage: 0,
     deviceOffset: { x: 0, y: 0 },
+    /* 上一次渲染结束时所在的视图，用来区分「新进入会话」和「会话页内重绘」 */
+    lastView: '',
   };
 
   Object.assign(ctx, {
@@ -16281,6 +16283,7 @@ function createShell(options) {
     const status = state.settings.theme === 'night' ? 'night' : 'day';
     /* 同一页重绘（切下拉、保存、开关）时把滚动位置带回原位，别让它看起来像整页刷新 */
     const prevView = shell.stack[shell.stack.length - 1]?.view || '';
+    const prevRenderedView = shell.lastView || '';
     const prevScroll = root.querySelector('.mp-page-body')?.scrollTop || 0;
     /* 重绘前记下输入框的光标/选区，重绘后放回原位，别让正在打的字跳到末尾 */
     const prevInput = root.querySelector('.mp-compose-box textarea');
@@ -16335,6 +16338,20 @@ function createShell(options) {
       const box = root.querySelector('.mp-page-body');
       if (box) box.scrollTop = prevScroll;
     }
+    /* 从列表 / 桌面最近聊天 / 宿主直达等入口新进入会话页时，把消息列表落到最新一条；
+       从会话子页（设置 / 日记 / 看图）返回时保留原来的滚动位置。 */
+    const newView = shell.stack[shell.stack.length - 1]?.view || '';
+    const threadChildViews = ['thread', 'thread-settings', 'thread-diary', 'photo-view'];
+    if (newView === 'thread' && !threadChildViews.includes(prevRenderedView)) {
+      shell.scroller = null;
+      const stickThreadBottom = () => {
+        const box = root.querySelector('.mp-messages');
+        if (box) box.scrollTop = box.scrollHeight;
+      };
+      requestAnimationFrame(() => requestAnimationFrame(stickThreadBottom));
+      setTimeout(stickThreadBottom, 60);
+    }
+    shell.lastView = newView;
     if (shell.sheet) shell.sheetAnimated = true;
   }
 

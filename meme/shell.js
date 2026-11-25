@@ -1002,26 +1002,48 @@ export function createShell(options) {
     const cs = getComputedStyle(el);
     const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
     const max = 104 - pad;
+    /* 量高度前会把高度清 0，先记下原来的滚动位置；否则长草稿每打一个字都会跳回顶部，
+       光标跑到框外，看不到自己正在写的最后一行。 */
+    const prevScrollTop = el.scrollTop;
+    const caretAtEnd = document.activeElement === el && el.selectionEnd === el.value.length;
+    /* 输入框长高会挤压消息列表。原来贴在底部看最新消息的，长高后要继续贴底。 */
+    const messages = el.closest('.mp-thread')?.querySelector('.mp-messages')
+      || el.closest('.mp-tv')?.querySelector('.mp-messages');
+    const messagesAtBottom = messages
+      ? messages.scrollHeight - messages.scrollTop - messages.clientHeight <= 8
+      : false;
     el.style.height = '0px';
     const need = Math.max(0, (el.scrollHeight || 0) - pad);
     el.style.height = `${Math.min(need, max)}px`;
-    el.style.overflowY = need > max ? 'auto' : 'hidden';
+    const scrolling = need > max;
+    el.style.overflowY = scrolling ? 'auto' : 'hidden';
+    if (scrolling) {
+      /* 正在末尾打字时跟到底部；在中间改字则维持原来的滚动位置。 */
+      el.scrollTop = caretAtEnd ? el.scrollHeight : prevScrollTop;
+    } else {
+      el.scrollTop = 0;
+    }
+    if (messagesAtBottom) messages.scrollTop = messages.scrollHeight;
   }
   shell.growComposer = growComposer;
 
   function restoreLive(prevSel = null) {
     const input = root.querySelector('.mp-compose-box textarea');
-    if (input && shell.live.inputValue) {
-      input.value = shell.live.inputValue;
+    /* 空输入框也要能恢复焦点：发完一条后 inputValue 是空字符串，只按值判断会把键盘弄丢。 */
+    const shouldFocus = Boolean(prevSel) || Boolean(shell.live.focus);
+    if (input && (shell.live.inputValue || shouldFocus)) {
+      input.value = shell.live.inputValue || '';
       shell.improveSendState();
       growComposer(input);
-      if (shell.live.focus) {
+      if (shouldFocus) {
         /* preventScroll：重绘后恢复焦点时不带动宿主页面滚动，避免聚焦瞬间整页跳一下 */
         input.focus({ preventScroll: true });
         const len = input.value.length;
         const start = prevSel ? Math.min(Math.max(0, prevSel.start), len) : len;
         const end = prevSel ? Math.min(Math.max(start, prevSel.end), len) : len;
         input.setSelectionRange(start, end, prevSel?.dir || 'none');
+        /* 长草稿恢复后把可视区带到光标处，别只看到开头几行。 */
+        if (input.scrollHeight > input.clientHeight) input.scrollTop = input.scrollHeight;
       }
     }
     if (shell.scroller) {

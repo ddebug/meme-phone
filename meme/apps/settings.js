@@ -7,6 +7,7 @@ import { icon, TINT } from '../icons.js';
 import { esc } from '../shell.js';
 import { proactivePromptFor, normalizeProactivePrompt } from '../data.js';
 import { PROACTIVE_PROMPT_MAX_LENGTH } from '../preset-defaults.js';
+import { openParallelRoom } from '../room.js';
 
 function downloadBackup(ctx, includeKeys) {
   try {
@@ -230,7 +231,7 @@ export const settingsApp = {
       ctx.world?.createFromCurrent?.();
       return true;
     }
-    if (act === 'set-world-branch') { ctx.go('app-parallel'); return true; }
+    if (act === 'set-world-branch') { openParallelRoom(ctx); return true; }
 
     if (act === 'set-toggle-world-auto') {
       state.settings.world = state.settings.world || { autoEnter: true };

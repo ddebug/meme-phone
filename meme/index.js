@@ -32,6 +32,7 @@ import { extrasApp, extrasSwitchApp, extraDetailApp, emojiApp,
 } from './apps/more.js';
 import { parallelApp } from './apps/parallel.js';
 import { parallelBranchApp, parallelSettingsApp, cancelParallelRun } from './apps/branch.js';
+import { cancelParallelRoom } from './room.js';
 import { migrateLegacyWorlds, migrateLegacyDiaries } from './legacy-world.js';
 
 const APPS = {
@@ -1008,6 +1009,7 @@ export function closeMemePhone() {
   try { flushDraft(); } catch { /* 存不进也不阻塞关闭 */ }
   /* 平行时空的生成还在酒馆那边跑：先叫停，别让结果落回已经关掉的界面 */
   cancelParallelRun();
+  cancelParallelRoom();
   clearInterval(followTimer);
   followTimer = 0;
   if (docChangeTarget && docChangeHandler) {

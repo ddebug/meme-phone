@@ -7,6 +7,7 @@
 
 import { icon as ico, TINT } from './icons.js';
 import { PIXEL_BUNNY } from './theme-data.js';
+import { openParallelRoom } from './room.js';
 import {
   unreadTotal, dayKey, chatsOf, contactById,
 } from './data.js';
@@ -1098,6 +1099,8 @@ export function createShell(options) {
   const acts = {
     'open-app': (data) => {
       shell.live = { inputValue: '', focus: false };
+      /* 平行时空是一个独立房间，不经过小手机这套 App 页面 */
+      if (data.app === 'parallel') { openParallelRoom(ctx); return; }
       /* 有些 App 进来直接落到具体一页（比如平行时空回到最近说过话的那一场） */
       const entry = apps['app-' + data.app]?.entryRoute?.(ctx);
       if (entry) { ctx.go(entry.view, entry.params || {}); return; }

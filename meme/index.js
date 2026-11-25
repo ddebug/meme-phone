@@ -107,6 +107,47 @@ let stateEpoch = 0;
 /* 是否演示模式：只有演示模式才允许返回演示文案，正式宿主断连不写假回复。 */
 let demoMode = false;
 
+/* 打开手机时锁宿主滚动 / 回弹并补 viewport-fit=cover，关闭后原样还原。
+   对齐参考插件做法：软键盘弹起时宿主页面不再跟着回弹 / 滚动，避免整页闪一下。 */
+let hostLocked = false;
+const hostSaved = { bodyOverflow: '', htmlOverscroll: '', bodyOverscroll: '', metaContent: null };
+
+function lockHostScroll() {
+  if (hostLocked) return;
+  const doc = document;
+  const html = doc.documentElement;
+  const body = doc.body;
+  if (!body) return;
+  hostSaved.bodyOverflow = body.style.overflow;
+  hostSaved.htmlOverscroll = html.style.overscrollBehavior;
+  hostSaved.bodyOverscroll = body.style.overscrollBehavior;
+  html.style.overscrollBehavior = 'none';
+  body.style.overscrollBehavior = 'none';
+  body.style.overflow = 'hidden';
+  const meta = doc.querySelector('meta[name="viewport"]');
+  if (meta && String(meta.content || '').indexOf('viewport-fit') < 0) {
+    hostSaved.metaContent = meta.content || '';
+    meta.content = `${hostSaved.metaContent}, viewport-fit=cover`;
+  }
+  hostLocked = true;
+}
+
+function unlockHostScroll() {
+  if (!hostLocked) return;
+  const doc = document;
+  const html = doc.documentElement;
+  const body = doc.body;
+  if (body) {
+    body.style.overflow = hostSaved.bodyOverflow;
+    body.style.overscrollBehavior = hostSaved.bodyOverscroll;
+  }
+  html.style.overscrollBehavior = hostSaved.htmlOverscroll;
+  const meta = doc.querySelector('meta[name="viewport"]');
+  if (meta && hostSaved.metaContent !== null) meta.content = hostSaved.metaContent;
+  hostSaved.metaContent = null;
+  hostLocked = false;
+}
+
 const getCurrentState = () => store?.get() || null;
 
 /* ------------------------------------------------------------ 模型调用 */
@@ -468,6 +509,7 @@ async function enterWorldFromHost() {
 
 export async function openMemePhone(options = {}) {
   await initMemePhone(options);
+  try { lockHostScroll(); } catch { /* 宿主文档读不到就跳过 */ }
   if (isOpen()) {
     try {
       if (await enterWorldFromHost()) ctx.rerender();
@@ -895,6 +937,7 @@ export function closeMemePhone() {
   docChangeTarget = null;
   docChangeHandler = null;
   shellApi?.destroy();
+  try { unlockHostScroll(); } catch { /* 还原失败不影响关闭 */ }
   rootEl.remove();
   rootEl = null;
   shellApi = null;

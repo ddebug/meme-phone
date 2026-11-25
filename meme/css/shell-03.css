@@ -14,6 +14,8 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
+  /* 浮层自身不参与宿主回弹，软键盘弹起时避免整层被带动 */
+  overscroll-behavior: none;
   /* 手机壳外完全透明：酒馆自己的背景直接透出来 */
   background: transparent;
   font-family: var(--font-ui);

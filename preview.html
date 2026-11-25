@@ -114,6 +114,8 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  /* 浮层自身不参与宿主回弹，软键盘弹起时避免整层被带动 */
+  overscroll-behavior: none;
   /* 手机壳外完全透明：酒馆自己的背景直接透出来 */
   background: transparent;
   font-family: var(--font-ui);
@@ -16390,7 +16392,8 @@ function createShell(options) {
       shell.improveSendState();
       growComposer(input);
       if (shell.live.focus) {
-        input.focus();
+        /* preventScroll：重绘后恢复焦点时不带动宿主页面滚动，避免聚焦瞬间整页跳一下 */
+        input.focus({ preventScroll: true });
         const len = input.value.length;
         const start = prevSel ? Math.min(Math.max(0, prevSel.start), len) : len;
         const end = prevSel ? Math.min(Math.max(start, prevSel.end), len) : len;
@@ -16658,17 +16661,27 @@ function createShell(options) {
     shell.deviceOffset = clampDeviceOffset(shell.deviceOffset?.x || 0, shell.deviceOffset?.y || 0);
     applyLayout();
   }
+  /* 一帧内的多次 resize / visualViewport 事件只落一次布局：软键盘弹起动画期间
+     可视高度连续变化，事件会连发，逐条写内联样式会让整机高度/位置来回闪。 */
+  let layoutRaf = 0;
+  function scheduleFrameLayout() {
+    if (layoutRaf) return;
+    layoutRaf = requestAnimationFrame(() => {
+      layoutRaf = 0;
+      applyLayout();
+    });
+  }
   function onWindowResize() {
     /* 手机竖屏：键盘顶上来只缩高度、宽度不动，直接按新的可视区重排 */
     if (isMobileViewport(window.innerWidth || 0, window.innerHeight || 0)) {
-      applyLayout();
+      scheduleFrameLayout();
       return;
     }
     /* 桌面：打字弹起软键盘时可视高度会被临时压缩，不能据此把整机缩小；
        聚焦期间保留基准视口，失焦后由 focusout 再按真实窗口刷新一次。 */
     shell.baseViewport = viewportForScale(shell.baseViewport, readViewport(), shell.typing);
     shell.deviceOffset = clampDeviceOffset(shell.deviceOffset?.x || 0, shell.deviceOffset?.y || 0);
-    applyLayout();
+    scheduleFrameLayout();
   }
   window.addEventListener('resize', onWindowResize);
   if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
@@ -16827,6 +16840,7 @@ function createShell(options) {
       clearInterval(timer);
       clearTimeout(shell.toastTimer);
       clearTimeout(keyboardTimer);
+      if (layoutRaf) { cancelAnimationFrame(layoutRaf); layoutRaf = 0; }
       window.removeEventListener('pointermove', onPhoneDragMove);
       window.removeEventListener('pointerup', endPhoneDrag);
       window.removeEventListener('pointercancel', endPhoneDrag);
@@ -31198,6 +31212,47 @@ let stateEpoch = 0;
 /* 是否演示模式：只有演示模式才允许返回演示文案，正式宿主断连不写假回复。 */
 let demoMode = false;
 
+/* 打开手机时锁宿主滚动 / 回弹并补 viewport-fit=cover，关闭后原样还原。
+   对齐参考插件做法：软键盘弹起时宿主页面不再跟着回弹 / 滚动，避免整页闪一下。 */
+let hostLocked = false;
+const hostSaved = { bodyOverflow: '', htmlOverscroll: '', bodyOverscroll: '', metaContent: null };
+
+function lockHostScroll() {
+  if (hostLocked) return;
+  const doc = document;
+  const html = doc.documentElement;
+  const body = doc.body;
+  if (!body) return;
+  hostSaved.bodyOverflow = body.style.overflow;
+  hostSaved.htmlOverscroll = html.style.overscrollBehavior;
+  hostSaved.bodyOverscroll = body.style.overscrollBehavior;
+  html.style.overscrollBehavior = 'none';
+  body.style.overscrollBehavior = 'none';
+  body.style.overflow = 'hidden';
+  const meta = doc.querySelector('meta[name="viewport"]');
+  if (meta && String(meta.content || '').indexOf('viewport-fit') < 0) {
+    hostSaved.metaContent = meta.content || '';
+    meta.content = `${hostSaved.metaContent}, viewport-fit=cover`;
+  }
+  hostLocked = true;
+}
+
+function unlockHostScroll() {
+  if (!hostLocked) return;
+  const doc = document;
+  const html = doc.documentElement;
+  const body = doc.body;
+  if (body) {
+    body.style.overflow = hostSaved.bodyOverflow;
+    body.style.overscrollBehavior = hostSaved.bodyOverscroll;
+  }
+  html.style.overscrollBehavior = hostSaved.htmlOverscroll;
+  const meta = doc.querySelector('meta[name="viewport"]');
+  if (meta && hostSaved.metaContent !== null) meta.content = hostSaved.metaContent;
+  hostSaved.metaContent = null;
+  hostLocked = false;
+}
+
 const getCurrentState = () => store?.get() || null;
 
 /* ------------------------------------------------------------ 模型调用 */
@@ -31559,6 +31614,7 @@ async function enterWorldFromHost() {
 
 async function openMemePhone(options = {}) {
   await initMemePhone(options);
+  try { lockHostScroll(); } catch { /* 宿主文档读不到就跳过 */ }
   if (isOpen()) {
     try {
       if (await enterWorldFromHost()) ctx.rerender();
@@ -31986,6 +32042,7 @@ function closeMemePhone() {
   docChangeTarget = null;
   docChangeHandler = null;
   shellApi?.destroy();
+  try { unlockHostScroll(); } catch { /* 还原失败不影响关闭 */ }
   rootEl.remove();
   rootEl = null;
   shellApi = null;

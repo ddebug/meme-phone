@@ -863,7 +863,8 @@ export function createShell(options) {
       shell.improveSendState();
       growComposer(input);
       if (shell.live.focus) {
-        input.focus();
+        /* preventScroll：重绘后恢复焦点时不带动宿主页面滚动，避免聚焦瞬间整页跳一下 */
+        input.focus({ preventScroll: true });
         const len = input.value.length;
         const start = prevSel ? Math.min(Math.max(0, prevSel.start), len) : len;
         const end = prevSel ? Math.min(Math.max(start, prevSel.end), len) : len;
@@ -1131,17 +1132,27 @@ export function createShell(options) {
     shell.deviceOffset = clampDeviceOffset(shell.deviceOffset?.x || 0, shell.deviceOffset?.y || 0);
     applyLayout();
   }
+  /* 一帧内的多次 resize / visualViewport 事件只落一次布局：软键盘弹起动画期间
+     可视高度连续变化，事件会连发，逐条写内联样式会让整机高度/位置来回闪。 */
+  let layoutRaf = 0;
+  function scheduleFrameLayout() {
+    if (layoutRaf) return;
+    layoutRaf = requestAnimationFrame(() => {
+      layoutRaf = 0;
+      applyLayout();
+    });
+  }
   function onWindowResize() {
     /* 手机竖屏：键盘顶上来只缩高度、宽度不动，直接按新的可视区重排 */
     if (isMobileViewport(window.innerWidth || 0, window.innerHeight || 0)) {
-      applyLayout();
+      scheduleFrameLayout();
       return;
     }
     /* 桌面：打字弹起软键盘时可视高度会被临时压缩，不能据此把整机缩小；
        聚焦期间保留基准视口，失焦后由 focusout 再按真实窗口刷新一次。 */
     shell.baseViewport = viewportForScale(shell.baseViewport, readViewport(), shell.typing);
     shell.deviceOffset = clampDeviceOffset(shell.deviceOffset?.x || 0, shell.deviceOffset?.y || 0);
-    applyLayout();
+    scheduleFrameLayout();
   }
   window.addEventListener('resize', onWindowResize);
   if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
@@ -1300,6 +1311,7 @@ export function createShell(options) {
       clearInterval(timer);
       clearTimeout(shell.toastTimer);
       clearTimeout(keyboardTimer);
+      if (layoutRaf) { cancelAnimationFrame(layoutRaf); layoutRaf = 0; }
       window.removeEventListener('pointermove', onPhoneDragMove);
       window.removeEventListener('pointerup', endPhoneDrag);
       window.removeEventListener('pointercancel', endPhoneDrag);

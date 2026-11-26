@@ -1659,16 +1659,18 @@ export function createShell(options) {
 
   /* 焦点隔离：手机打开期间焦点只留在小手机内部。
      打开时先卸掉宿主页（酒馆输入框）残留的焦点；之后捕获阶段拦住任何落到根容器外的聚焦，
-     让宿主页重新失焦，避免背景酒馆跟着唤起软键盘。 */
+     让宿主页重新失焦，避免背景酒馆跟着唤起软键盘。
+     平行时空是铺在 body 上的独立房间（.prt），它的输入框不属于手机根容器，要放行。 */
+  const inSideRoom = node => Boolean(node?.closest?.('.prt'));
   function blurOutsideFocus() {
     const active = document.activeElement;
     if (active && active !== document.body && active !== document.documentElement
-      && !root.contains(active) && typeof active.blur === 'function') {
+      && !root.contains(active) && !inSideRoom(active) && typeof active.blur === 'function') {
       active.blur();
     }
   }
   function onDocFocusIn(event) {
-    if (!root.contains(event.target)) blurOutsideFocus();
+    if (!root.contains(event.target) && !inSideRoom(event.target)) blurOutsideFocus();
   }
   bind(document, 'focusin', onDocFocusIn, true);
   blurOutsideFocus();

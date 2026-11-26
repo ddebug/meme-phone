@@ -861,16 +861,27 @@
 /* 输入框随内容长高：超过约 5 行就在框里滚，发出去的长消息也能看全 */
 .mp-root .mp-compose-box textarea {
   display: block;
-  padding: 6px 0;
-  max-height: 104px;
+  padding: 6px 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  box-sizing: content-box !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  font-family: inherit !important;
+  font-size: calc(13.5px * var(--font-scale)) !important;
+  line-height: 1.45 !important;
   resize: none;
   overflow-y: hidden;
   word-break: break-word;
   scrollbar-width: none;
+  -webkit-appearance: none;
+  appearance: none;
   /* 覆盖全局输入框底色：输入区要跟外面那颗白胶囊同色，别叠一层灰 */
   background: transparent !important;
   background-color: transparent !important;
-  box-shadow: none;
+  box-shadow: none !important;
 }
 
 .mp-compose-box textarea::-webkit-scrollbar { display: none; }

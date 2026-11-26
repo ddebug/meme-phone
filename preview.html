@@ -2157,16 +2157,27 @@ body {
 /* 输入框随内容长高：超过约 5 行就在框里滚，发出去的长消息也能看全 */
 .mp-root .mp-compose-box textarea {
   display: block;
-  padding: 6px 0;
-  max-height: 104px;
+  padding: 6px 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  box-sizing: content-box !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  font-family: inherit !important;
+  font-size: calc(13.5px * var(--font-scale)) !important;
+  line-height: 1.45 !important;
   resize: none;
   overflow-y: hidden;
   word-break: break-word;
   scrollbar-width: none;
+  -webkit-appearance: none;
+  appearance: none;
   /* 覆盖全局输入框底色：输入区要跟外面那颗白胶囊同色，别叠一层灰 */
   background: transparent !important;
   background-color: transparent !important;
-  box-shadow: none;
+  box-shadow: none !important;
 }
 
 .mp-compose-box textarea::-webkit-scrollbar { display: none; }
@@ -19069,9 +19080,15 @@ function createShell(options) {
   /* 单行输入框随内容长高：超过 5 行就开始自己滚，不把整页顶飞 */
   function growComposer(el) {
     if (!el || el.tagName !== 'TEXTAREA') return;
+    /* 用 inline important 把宿主主题的 textarea 边框/内边距/盒模型压掉；
+       只靠样式表的话，酒馆里带 #id 的规则可能比 .mp-root 这套选择器更高。 */
+    el.style.setProperty('box-sizing', 'content-box', 'important');
+    el.style.setProperty('border', '0', 'important');
+    el.style.setProperty('padding', '6px 0', 'important');
+    el.style.setProperty('max-height', 'none', 'important');
     const cs = getComputedStyle(el);
     const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-    const max = 104 - pad;
+    const border = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
     /* 量高度前会把高度清 0，先记下原来的滚动位置；否则长草稿每打一个字都会跳回顶部，
        光标跑到框外，看不到自己正在写的最后一行。 */
     const prevScrollTop = el.scrollTop;
@@ -19082,11 +19099,16 @@ function createShell(options) {
     const messagesAtBottom = messages
       ? messages.scrollHeight - messages.scrollTop - messages.clientHeight <= 8
       : false;
-    el.style.height = '0px';
-    const need = Math.max(0, (el.scrollHeight || 0) - pad);
-    el.style.height = `${Math.min(need, max)}px`;
-    const scrolling = need > max;
-    el.style.overflowY = scrolling ? 'auto' : 'hidden';
+    el.style.setProperty('height', '0px', 'important');
+    /* 酒馆/主题可能给 textarea 套了 border-box、边框或 padding。按实际盒模型换算，
+       否则 property 设成内容高度后再被 padding 吃掉，占位文字就会被裁掉半截。 */
+    const needTotal = (el.scrollHeight || 0) + border;
+    const maxTotal = 104;
+    const total = Math.min(needTotal, maxTotal);
+    const cssHeight = cs.boxSizing === 'border-box' ? total : total - pad - border;
+    el.style.setProperty('height', `${Math.max(0, cssHeight)}px`, 'important');
+    const scrolling = needTotal > maxTotal;
+    el.style.setProperty('overflow-y', scrolling ? 'auto' : 'hidden', 'important');
     if (scrolling) {
       /* 正在末尾打字时跟到底部；在中间改字则维持原来的滚动位置。 */
       el.scrollTop = caretAtEnd ? el.scrollHeight : prevScrollTop;

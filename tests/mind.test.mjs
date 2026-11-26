@@ -7,6 +7,7 @@ import {
   emptyState, normalize, pushMessage, defaultReplyItems, normalizeReplyItems,
   MESSAGE_INNER_MAX, MESSAGE_SUBTEXT_MAX,
 } from '../meme/data.js';
+import { LEGACY_TURN_MIND_PROMPT, MIND_PROMPT } from '../meme/preset-defaults.js';
 
 test('[心里] / [潜台词] 挂在前一个气泡上，不单独成为一条', () => {
   const text = [
@@ -39,23 +40,24 @@ test('第一个气泡之前写的 [心里] 也归这一轮，不当成消息', (
   assert.equal(bubbles[0].inner, '我在想什么');
 });
 
-test('心理活动一段一条：多处 [心里] 只留一条，挂在段首那个气泡上', () => {
+test('心理活动逐条气泡各一条：每条 [心里] 挂到它上面那条，不再只留第一条', () => {
   const text = [
     '[消息]',
     '到家了',
-    '[心里]其实今天很累，但不想让她担心。',
-    '[潜台词]我没事。',
+    '[心里]看到你这条，我把钥匙攥在手心里停了一会儿，心口那点悬着的劲松下来；现在最想先回你一句“我到了”，再赖在沙发上听你多说两句；等周末想带你去河边走走，把今天没说完的话补上。',
+    '[潜台词]我其实一直等你问这句。',
     '路上买了点吃的',
-    '[心里]第二句不该再写一遍。',
+    '[心里]听见你说买了吃的，我低头笑了一下，手指在袋子上敲了敲；此刻最想让你给我留一口，等会儿视频的时候一边吃一边给你看；以后想和你把楼下那几家小店挨个吃一遍。',
     '[/消息]',
   ].join('\n');
   const bubbles = parseBehaviorReply(text);
   assert.equal(bubbles.length, 2);
-  assert.match(bubbles[0].inner, /今天很累/);
-  assert.equal(bubbles[1].inner, undefined);
-  assert.equal(bubbles.filter(item => item.inner).length, 1);
+  assert.match(bubbles[0].inner, /钥匙攥在手心/);
+  assert.match(bubbles[1].inner, /低头笑了一下/);
+  assert.notEqual(bubbles[0].inner, bubbles[1].inner);
+  assert.equal(bubbles.filter(item => item.inner).length, 2);
   /* 潜台词仍按气泡走：只挂在它上面那条 */
-  assert.equal(bubbles[0].subtext, '我没事。');
+  assert.equal(bubbles[0].subtext, '我其实一直等你问这句。');
   assert.equal(bubbles[1].subtext, undefined);
 });
 
@@ -112,4 +114,19 @@ test('默认预设带「心理活动与潜台词」，老预设会被补上且�
 
   const twice = normalizeReplyItems(patched, {});
   assert.equal(twice.filter(item => item.id === 'reply_item_mind').length, 1);
+});
+
+test('旧「一整段一条」的默认文案会迁移成逐条心理活动', () => {
+  const state = emptyState();
+  const oldItems = defaultReplyItems().map(item => (
+    item.id === 'reply_item_mind' ? { ...item, content: LEGACY_TURN_MIND_PROMPT } : item
+  ));
+  state.settings.reply.presets[0].items = oldItems;
+  const migrated = normalize(JSON.parse(JSON.stringify(state)));
+  const preset = migrated.settings.reply.presets.find(item => item.id === 'reply_natural');
+  const mind = preset.items.find(item => item.id === 'reply_item_mind');
+  assert.equal(mind.content, MIND_PROMPT);
+  assert.match(mind.content, /每一条 TA 的气泡下面都写一条/);
+  assert.match(mind.content, /此刻我最想做的事/);
+  assert.match(mind.content, /以后我最想和你做的事/);
 });

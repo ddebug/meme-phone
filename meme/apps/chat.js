@@ -402,13 +402,13 @@ function mindPanelHtml(ctx, chat, contact, message) {
       <div class="mp-mind-head">
         ${avatarHtml(contact?.name, contact?.avatar)}
         <div class="mp-mind-head-main">
-          <div class="mp-mind-name">${esc(name)} · 这一整段背后</div>
+          <div class="mp-mind-name">${esc(name)} · 这条消息背后</div>
           <div class="mp-mind-time">${esc(timeText(message.at || Date.now()))}</div>
         </div>
       </div>
       <div class="mp-mind-block">
         <div class="mp-mind-label">${icon('eye')}<span>心理活动</span></div>
-        <div class="mp-mind-text${inner ? '' : ' is-empty'}">${esc(inner || '这段没有写心理活动；下一轮可以让 TA 把念头写出来。')}</div>
+        <div class="mp-mind-text${inner ? '' : ' is-empty'}">${esc(inner || '这条没有写心理活动；下一轮可以让 TA 把这一下的反应写出来。')}</div>
       </div>
       ${subtext ? `
       <div class="mp-mind-block is-sub">

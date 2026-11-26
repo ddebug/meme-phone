@@ -10113,9 +10113,10 @@ const NATURAL_REPLY_INSTRUCTION = '像平时发微信一样聊天：口语、短
 const MULTI_BUBBLE_REPLY_FORMAT = '[回复格式要求]\n参考即时通讯的发消息方式，一行一个气泡，空行忽略；按语义自然拆分，通常2～5条，简单回应可只发1条，不为凑数重复。\n只输出当前角色这一轮要发的内容，用[消息]和[/消息]包住，例如：\n[消息]\n刚刚忙完\n你吃饭了吗\n[/消息]\n不要添加角色名、时间戳、序号或代码块；不要写旁白、括号动作、场景描写，也不要代替用户或其他角色发言。每条可用的表情或行为标签单独占一行，且只使用本会话已开启的标签。\n[/回复格式要求]';
 
 /* 心理活动 / 潜台词是藏在气泡后面的两层含义：只有用户点开才看得到，不算聊天气泡。
-   心理活动是「发这一整段话时在想什么」，一轮只有一条；潜台词才是逐条气泡的第二层意思。 */
+   心理活动是每条气泡各自的小场景，潜台词是这条气泡没说出口的那层意思。 */
 const LEGACY_MIND_PROMPT = '[心理活动与潜台词]\n这两种标注只给用户点开看，不会出现在聊天气泡里：\n- [心里]：TA 发这条时真正的念头，用「我」的口气，1 句，30 字以内。\n- [潜台词]：这条消息表面之下真正想说的，1 句，30 字以内。\n写法：\n- 紧跟在对应的气泡下面，另起一行，各自单独一行，两种标注之间不要空行。\n- 只写 TA 自己的，不写用户在想什么；不加引号，不解释，也不要写“他心里想”这类旁白。\n- 不必每条都写，只在真有第二层意思时加；一条气泡最多各一行，用户的消息不加。\n[/心理活动与潜台词]';
-const MIND_PROMPT = '[心理活动与潜台词]\n这两种标注只给用户点开看，不会出现在聊天气泡里：\n- [心里]：这一整段话发出去时 TA 心里的念头，用「我」的口气，写 1～2 句、60 字以内。\n- [潜台词]：其中某一条气泡表面之下真正想说的，1 句，30 字以内。\n写法：\n- [心里] 一轮只写一次，放在所有气泡之后单独一行；不要每句气泡各写一遍。\n- [潜台词] 紧跟在对应的那条气泡下面，单独一行；只在真有第二层意思时才加，一条气泡最多一行。\n- 只写 TA 自己的，不写用户在想什么；不加引号，不解释，也不要写“他心里想”这类旁白。\n- 用户的消息不加。\n[/心理活动与潜台词]';
+const LEGACY_TURN_MIND_PROMPT = '[心理活动与潜台词]\n这两种标注只给用户点开看，不会出现在聊天气泡里：\n- [心里]：这一整段话发出去时 TA 心里的念头，用「我」的口气，写 1～2 句、60 字以内。\n- [潜台词]：其中某一条气泡表面之下真正想说的，1 句，30 字以内。\n写法：\n- [心里] 一轮只写一次，放在所有气泡之后单独一行；不要每句气泡各写一遍。\n- [潜台词] 紧跟在对应的那条气泡下面，单独一行；只在真有第二层意思时才加，一条气泡最多一行。\n- 只写 TA 自己的，不写用户在想什么；不加引号，不解释，也不要写“他心里想”这类旁白。\n- 用户的消息不加。\n[/心理活动与潜台词]';
+const MIND_PROMPT = '[心理活动与潜台词]\n这两种标注只给用户点开看，不会出现在聊天气泡里：\n- [心里]：每一条 TA 的气泡下面都写一条，用「我」的第一人称，写一个角色视角的小场景，不要只写一句抽象心情。按这三步写成一段自然的话：① 收到你这条消息、正要发出这句话时，我的情绪，或手上的小动作；② 此刻我最想做的事；③ 以后我最想和你做的事。80～160 字，不分点、不加“我心想”这类旁白。\n- [潜台词]：某一条气泡表面之下真正想说的，1 句，30 字以内。\n写法：\n- [心里] 紧跟在对应气泡下面，另起一行；每条气泡各写一条，不要只在第一条或最后一条写。\n- [潜台词] 也紧跟在对应气泡下面，单独一行；只在真有第二层意思时才加，一条气泡最多一行。\n- 先写 [心里]，再写 [潜台词]。\n- 这些动作和场景只允许写在 [心里] 里；聊天气泡本身仍然只写发出去的话，不写旁白、动作或小说段落。\n- 只写 TA 自己的，不写用户在想什么；不加引号、不解释、不写“他心里想”。\n- 用户的消息不加。\n示例：\n[消息]\n刚到家\n[心里]看到你这条，我握着杯子的手停了一下，心口先松了又有点酸；现在最想直接拨过去听听你的声音，哪怕只说一句；等这阵忙完，想带你去那家一直没去成的店，把今天没说完的话慢慢说完。\n[潜台词]我其实一直在等你先开口。\n[/消息]\n[/心理活动与潜台词]';
 
 // 主动开口是空发送触发的单次请求，不是后台定时器；时间变量在请求/预览时统一替换。
 const PROACTIVE_PROMPT_MAX_LENGTH = 4000;
@@ -10328,6 +10329,7 @@ exports["LEGACY_NATURAL_REPLY_INSTRUCTION"] = LEGACY_NATURAL_REPLY_INSTRUCTION;
 exports["NATURAL_REPLY_INSTRUCTION"] = NATURAL_REPLY_INSTRUCTION;
 exports["MULTI_BUBBLE_REPLY_FORMAT"] = MULTI_BUBBLE_REPLY_FORMAT;
 exports["LEGACY_MIND_PROMPT"] = LEGACY_MIND_PROMPT;
+exports["LEGACY_TURN_MIND_PROMPT"] = LEGACY_TURN_MIND_PROMPT;
 exports["MIND_PROMPT"] = MIND_PROMPT;
 exports["PROACTIVE_PROMPT_MAX_LENGTH"] = PROACTIVE_PROMPT_MAX_LENGTH;
 exports["DEFAULT_PROACTIVE_PROMPT"] = DEFAULT_PROACTIVE_PROMPT;
@@ -10638,7 +10640,7 @@ function messageLines(text) {
 }
 
 /* 心理活动 / 潜台词：藏在气泡后面的标注，只给用户点开看，不算一条消息。
-   心理活动属于「这一整段话」，一轮只收一条；潜台词逐条气泡跟在它前面那条后面。
+   心理活动和潜台词都逐条气泡跟随：各自挂到紧挨着的前一条气泡上。
    上限与 data.js 的 MESSAGE_INNER_MAX / MESSAGE_SUBTEXT_MAX 保持一致。 */
 const MIND_LIMITS = { inner: 240, subtext: 160 };
 
@@ -10674,16 +10676,18 @@ function parseBehaviorReply(text, options = {}) {
   const lines = messageLines(source);
   const max = Math.max(1, Math.min(30, Number(options.max) || 30));
   const messages = [];
-  let turnInner = '';
+  let pendingInner = '';
   for (const line of lines) {
     const mind = parseMindLine(line);
     if (mind) {
       if (mind.key === 'inner') {
-        /* [心里] 是这一整段话的念头，不跟某一条气泡走：一轮只留第一条，统一挂到这一轮开头那个气泡上。 */
-        if (!turnInner) turnInner = mind.value;
+        /* [心里] 逐条气泡跟随：写在气泡后面就挂到刚才那条；写在第一条气泡前面就先存着，
+           等第一条解析出来再挂上去。 */
+        if (messages.length) messages[messages.length - 1].inner = mind.value;
+        else pendingInner = mind.value;
         continue;
       }
-      /* 潜台词才是逐条气泡的第二层意思：挂在它前面那个气泡上。 */
+      /* [潜台词] 同样挂在它前面那个气泡上。 */
       const target = messages[messages.length - 1];
       if (target) target.subtext = mind.value;
       continue;
@@ -10691,6 +10695,10 @@ function parseBehaviorReply(text, options = {}) {
     if (messages.length >= max) continue;
     const parsed = parseOneBubble(line, messages.length, { ...options, at });
     if (!parsed) continue;
+    if (pendingInner) {
+      parsed.inner = pendingInner;
+      pendingInner = '';
+    }
     const gate = BEHAVIOR_GATE[parsed.kind];
     if (gate && options.allowed && options.allowed[gate] === false) {
       parsed.kind = 'text';
@@ -10699,7 +10707,6 @@ function parseBehaviorReply(text, options = {}) {
     }
     messages.push(parsed);
   }
-  if (turnInner && messages.length) messages[0].inner = turnInner;
   return messages;
 }
 
@@ -11054,7 +11061,7 @@ __mods["meme/data.js"] = function(module, exports, __req){
  * 数据结构刻意保持扁平，避免旧版那种「十个模块共享一个巨型对象、谁都改它」的局面。
  */
 
-const { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, LEGACY_MIND_PROMPT, MIND_PROMPT, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT, DEFAULT_PROACTIVE_PROMPT, PROACTIVE_PROMPT_MAX_LENGTH } = __req("meme/preset-defaults.js");
+const { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, LEGACY_MIND_PROMPT, LEGACY_TURN_MIND_PROMPT, MIND_PROMPT, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT, DEFAULT_PROACTIVE_PROMPT, PROACTIVE_PROMPT_MAX_LENGTH } = __req("meme/preset-defaults.js");
 const { normalizeBehavior, behaviorPreview } = __req("meme/behavior.js");
 
 const SCHEMA_VERSION = 3;
@@ -12673,13 +12680,13 @@ function demoState() {
   const chatShen = addChat(state, shen.id, {
     id: 'ch_demo_shen',
     messages: [
-      { from: 'them', text: '到楼下了，今天风有点大。', at: at(21, 2), inner: '要是她今天也加班，我就不该把车停这么远。', subtext: '就是顺路，别想多。' },
+      { from: 'them', text: '到楼下了，今天风有点大。', at: at(21, 2), inner: '看到你这条，我握着手机在车边停了一下，风把外套吹得有点鼓，心口那点期待又落回去；现在最想把车门锁上，去便利店买两杯热的等你；等这阵忙完，想带你去江边走走，不急着说回不回去。', subtext: '就是顺路，别想多。' },
       { from: 'me', text: '我还在加班，别等我了。', at: at(21, 10) },
-      { from: 'them', text: '那就等你到八点，便利店坐会儿。', at: at(21, 24), inner: '反正回去也是一个人，坐着等，总比空等强。' },
+      { from: 'them', text: '那就等你到八点，便利店坐会儿。', at: at(21, 24), inner: '听你说八点也不一定，我把关东煮的杯子转了半圈，笑意有点压不住又有点无奈；现在最想就坐在窗边等到你来，哪怕只待十分钟；以后想和你把这附近的小店一家家吃过去，不用每次都赶时间。' },
       { from: 'me', text: '八点真不一定能走。', at: at(21, 41) },
       { from: 'me', text: '你先回去。', at: at(22, 6) },
-      { from: 'them', text: '我到了，路上小心。', at: at(22, 40), quote: { text: '你先回去。', from: 'me' }, subtext: '我根本没走，就在楼下。' },
-      { from: 'them', text: '我的意思是，你要是坚持加班，我就只好把你那份夜宵先吃了。', at: at(22, 44), proactive: true, kind: 'proactive', inner: '她要是真不下来，我就把这份饭团留到明天早上再热一次。' },
+      { from: 'them', text: '我到了，路上小心。', at: at(22, 40), quote: { text: '你先回去。', from: 'me' }, inner: '看到你让我先回去，我在楼下站着没动，手指在车钥匙上磨了两下；现在最想抬头看看你办公室的灯还亮不亮；等以后想和你住得近一点，至少不用隔着一整条路说晚安。', subtext: '我根本没走，就在楼下。' },
+      { from: 'them', text: '我的意思是，你要是坚持加班，我就只好把你那份夜宵先吃了。', at: at(22, 44), proactive: true, kind: 'proactive', inner: '她要是真不下来，我就把这份饭团留到明天早上再热一次；现在最想再发一句逗她，让她别硬撑；以后想和她一起把夜宵吃完，而不是隔着手机看谁先困。' },
     ],
   });
   chatShen.unread = 2;
@@ -13098,8 +13105,9 @@ function normalize(raw) {
         if (entry.id === REPLY_INSTRUCTION_ID && entry.content === LEGACY_NATURAL_REPLY_INSTRUCTION) {
           return { ...entry, content: NATURAL_REPLY_INSTRUCTION };
         }
-        if (entry.id === 'reply_item_mind' && entry.content === LEGACY_MIND_PROMPT) {
-          /* 心理活动从「每条气泡一条」改成「一整段一条」，原样旧文案才替换 */
+        if (entry.id === 'reply_item_mind'
+          && (entry.content === LEGACY_MIND_PROMPT || entry.content === LEGACY_TURN_MIND_PROMPT)) {
+          /* 心理活动从「一整段一条」改回「每条气泡一条」，原样旧文案才替换；用户自己改过的不动 */
           return { ...entry, content: MIND_PROMPT };
         }
         return entry;
@@ -21327,13 +21335,13 @@ function mindPanelHtml(ctx, chat, contact, message) {
       <div class="mp-mind-head">
         ${avatarHtml(contact?.name, contact?.avatar)}
         <div class="mp-mind-head-main">
-          <div class="mp-mind-name">${esc(name)} · 这一整段背后</div>
+          <div class="mp-mind-name">${esc(name)} · 这条消息背后</div>
           <div class="mp-mind-time">${esc(timeText(message.at || Date.now()))}</div>
         </div>
       </div>
       <div class="mp-mind-block">
         <div class="mp-mind-label">${icon('eye')}<span>心理活动</span></div>
-        <div class="mp-mind-text${inner ? '' : ' is-empty'}">${esc(inner || '这段没有写心理活动；下一轮可以让 TA 把念头写出来。')}</div>
+        <div class="mp-mind-text${inner ? '' : ' is-empty'}">${esc(inner || '这条没有写心理活动；下一轮可以让 TA 把这一下的反应写出来。')}</div>
       </div>
       ${subtext ? `
       <div class="mp-mind-block is-sub">

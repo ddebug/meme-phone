@@ -5,7 +5,7 @@
  * 数据结构刻意保持扁平，避免旧版那种「十个模块共享一个巨型对象、谁都改它」的局面。
  */
 
-import { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, LEGACY_MIND_PROMPT, MIND_PROMPT, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT, DEFAULT_PROACTIVE_PROMPT, PROACTIVE_PROMPT_MAX_LENGTH } from './preset-defaults.js';
+import { FULL_REPLY_ITEM_DEFS, LEGACY_SINGLE_REPLY_FORMAT, LEGACY_NATURAL_REPLY_INSTRUCTION, LEGACY_MIND_PROMPT, LEGACY_TURN_MIND_PROMPT, MIND_PROMPT, NATURAL_REPLY_INSTRUCTION, MULTI_BUBBLE_REPLY_FORMAT, DEFAULT_PROACTIVE_PROMPT, PROACTIVE_PROMPT_MAX_LENGTH } from './preset-defaults.js';
 import { normalizeBehavior, behaviorPreview } from './behavior.js';
 
 export const SCHEMA_VERSION = 3;
@@ -1624,13 +1624,13 @@ export function demoState() {
   const chatShen = addChat(state, shen.id, {
     id: 'ch_demo_shen',
     messages: [
-      { from: 'them', text: '到楼下了，今天风有点大。', at: at(21, 2), inner: '要是她今天也加班，我就不该把车停这么远。', subtext: '就是顺路，别想多。' },
+      { from: 'them', text: '到楼下了，今天风有点大。', at: at(21, 2), inner: '看到你这条，我握着手机在车边停了一下，风把外套吹得有点鼓，心口那点期待又落回去；现在最想把车门锁上，去便利店买两杯热的等你；等这阵忙完，想带你去江边走走，不急着说回不回去。', subtext: '就是顺路，别想多。' },
       { from: 'me', text: '我还在加班，别等我了。', at: at(21, 10) },
-      { from: 'them', text: '那就等你到八点，便利店坐会儿。', at: at(21, 24), inner: '反正回去也是一个人，坐着等，总比空等强。' },
+      { from: 'them', text: '那就等你到八点，便利店坐会儿。', at: at(21, 24), inner: '听你说八点也不一定，我把关东煮的杯子转了半圈，笑意有点压不住又有点无奈；现在最想就坐在窗边等到你来，哪怕只待十分钟；以后想和你把这附近的小店一家家吃过去，不用每次都赶时间。' },
       { from: 'me', text: '八点真不一定能走。', at: at(21, 41) },
       { from: 'me', text: '你先回去。', at: at(22, 6) },
-      { from: 'them', text: '我到了，路上小心。', at: at(22, 40), quote: { text: '你先回去。', from: 'me' }, subtext: '我根本没走，就在楼下。' },
-      { from: 'them', text: '我的意思是，你要是坚持加班，我就只好把你那份夜宵先吃了。', at: at(22, 44), proactive: true, kind: 'proactive', inner: '她要是真不下来，我就把这份饭团留到明天早上再热一次。' },
+      { from: 'them', text: '我到了，路上小心。', at: at(22, 40), quote: { text: '你先回去。', from: 'me' }, inner: '看到你让我先回去，我在楼下站着没动，手指在车钥匙上磨了两下；现在最想抬头看看你办公室的灯还亮不亮；等以后想和你住得近一点，至少不用隔着一整条路说晚安。', subtext: '我根本没走，就在楼下。' },
+      { from: 'them', text: '我的意思是，你要是坚持加班，我就只好把你那份夜宵先吃了。', at: at(22, 44), proactive: true, kind: 'proactive', inner: '她要是真不下来，我就把这份饭团留到明天早上再热一次；现在最想再发一句逗她，让她别硬撑；以后想和她一起把夜宵吃完，而不是隔着手机看谁先困。' },
     ],
   });
   chatShen.unread = 2;
@@ -2049,8 +2049,9 @@ export function normalize(raw) {
         if (entry.id === REPLY_INSTRUCTION_ID && entry.content === LEGACY_NATURAL_REPLY_INSTRUCTION) {
           return { ...entry, content: NATURAL_REPLY_INSTRUCTION };
         }
-        if (entry.id === 'reply_item_mind' && entry.content === LEGACY_MIND_PROMPT) {
-          /* 心理活动从「每条气泡一条」改成「一整段一条」，原样旧文案才替换 */
+        if (entry.id === 'reply_item_mind'
+          && (entry.content === LEGACY_MIND_PROMPT || entry.content === LEGACY_TURN_MIND_PROMPT)) {
+          /* 心理活动从「一整段一条」改回「每条气泡一条」，原样旧文案才替换；用户自己改过的不动 */
           return { ...entry, content: MIND_PROMPT };
         }
         return entry;

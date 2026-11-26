@@ -1003,6 +1003,10 @@ export function createShell(options) {
        只靠样式表的话，酒馆里带 #id 的规则可能比 .mp-root 这套选择器更高。 */
     el.style.setProperty('box-sizing', 'content-box', 'important');
     el.style.setProperty('border', '0', 'important');
+    el.style.setProperty('border-radius', '0', 'important');
+    el.style.setProperty('outline', '0', 'important');
+    el.style.setProperty('box-shadow', 'none', 'important');
+    el.style.setProperty('background', 'transparent', 'important');
     el.style.setProperty('padding', '6px 0', 'important');
     el.style.setProperty('max-height', 'none', 'important');
     const cs = getComputedStyle(el);

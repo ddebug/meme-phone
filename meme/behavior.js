@@ -302,7 +302,7 @@ function messageLines(text) {
 }
 
 /* 心理活动 / 潜台词：藏在气泡后面的标注，只给用户点开看，不算一条消息。
-   心理活动和潜台词都逐条气泡跟随：各自挂到紧挨着的前一条气泡上。
+   心理活动按「一轮回复」只收一条，存在这一轮第一条气泡上；潜台词逐条气泡跟随。
    上限与 data.js 的 MESSAGE_INNER_MAX / MESSAGE_SUBTEXT_MAX 保持一致。 */
 const MIND_LIMITS = { inner: 240, subtext: 160 };
 
@@ -338,18 +338,17 @@ export function parseBehaviorReply(text, options = {}) {
   const lines = messageLines(source);
   const max = Math.max(1, Math.min(30, Number(options.max) || 30));
   const messages = [];
-  let pendingInner = '';
+  let turnInner = '';
   for (const line of lines) {
     const mind = parseMindLine(line);
     if (mind) {
       if (mind.key === 'inner') {
-        /* [心里] 逐条气泡跟随：写在气泡后面就挂到刚才那条；写在第一条气泡前面就先存着，
-           等第一条解析出来再挂上去。 */
-        if (messages.length) messages[messages.length - 1].inner = mind.value;
-        else pendingInner = mind.value;
+        /* [心里] 是这一整轮回复的念头，不跟某条气泡走：一轮只留第一条，统一存到开头那个气泡上；
+           面板会按 turnId 让同一轮每条气泡都能读到它。 */
+        if (!turnInner) turnInner = mind.value;
         continue;
       }
-      /* [潜台词] 同样挂在它前面那个气泡上。 */
+      /* [潜台词] 才逐条气泡跟随：挂在它前面那个气泡上。 */
       const target = messages[messages.length - 1];
       if (target) target.subtext = mind.value;
       continue;
@@ -357,10 +356,6 @@ export function parseBehaviorReply(text, options = {}) {
     if (messages.length >= max) continue;
     const parsed = parseOneBubble(line, messages.length, { ...options, at });
     if (!parsed) continue;
-    if (pendingInner) {
-      parsed.inner = pendingInner;
-      pendingInner = '';
-    }
     const gate = BEHAVIOR_GATE[parsed.kind];
     if (gate && options.allowed && options.allowed[gate] === false) {
       parsed.kind = 'text';
@@ -369,6 +364,7 @@ export function parseBehaviorReply(text, options = {}) {
     }
     messages.push(parsed);
   }
+  if (turnInner && messages.length) messages[0].inner = turnInner;
   return messages;
 }
 

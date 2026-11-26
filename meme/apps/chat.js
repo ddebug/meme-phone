@@ -159,6 +159,17 @@ export function turnMessages(chat, message) {
   return group;
 }
 
+/* 心理活动按「一轮回复」生成一次，存在这轮第一条气泡上；
+   同一轮里点任何一条气泡的头像，都看这一轮那一条心理活动。 */
+export function mindForMessage(chat, message) {
+  if (!message || message.from !== 'them') return '';
+  const own = String(message.inner || '').trim();
+  if (own) return own;
+  const group = turnMessages(chat, message);
+  const hit = group.find(entry => String(entry.item.inner || '').trim());
+  return hit ? String(hit.item.inner).trim() : '';
+}
+
 
 function debugEnabled(ctx) {
   /* 默认关着，想要的人自己去设置里打开（老存档里写着开的仍然开） */
@@ -394,7 +405,7 @@ function openMessageExtra(ctx, chat, contact, message) {
 }
 
 function mindPanelHtml(ctx, chat, contact, message) {
-  const inner = String(message.inner || '').trim();
+  const inner = mindForMessage(chat, message);
   const subtext = String(message.subtext || '').trim();
   const name = contact?.name || 'TA';
   return `
@@ -402,13 +413,13 @@ function mindPanelHtml(ctx, chat, contact, message) {
       <div class="mp-mind-head">
         ${avatarHtml(contact?.name, contact?.avatar)}
         <div class="mp-mind-head-main">
-          <div class="mp-mind-name">${esc(name)} · 这条消息背后</div>
+          <div class="mp-mind-name">${esc(name)} · 这次回复背后</div>
           <div class="mp-mind-time">${esc(timeText(message.at || Date.now()))}</div>
         </div>
       </div>
       <div class="mp-mind-block">
         <div class="mp-mind-label">${icon('eye')}<span>心理活动</span></div>
-        <div class="mp-mind-text${inner ? '' : ' is-empty'}">${esc(inner || '这条没有写心理活动；下一轮可以让 TA 把这一下的反应写出来。')}</div>
+        <div class="mp-mind-text${inner ? '' : ' is-empty'}">${esc(inner || '这一轮没有写心理活动；下一轮可以让 TA 把这次回消息时的反应写出来。')}</div>
       </div>
       ${subtext ? `
       <div class="mp-mind-block is-sub">
@@ -807,6 +818,7 @@ function threadBody(ctx, chatId) {
     }
     const me = message.from === 'me';
     const speaker = message.speaker ? contactById(state, message.speaker) : null;
+    const mind = me ? '' : mindForMessage(chat, message);
     const picked = selecting ? selecting.ids.includes(message.id) : false;
     const behaviorBubble = renderBehaviorBubble(message, { chatId: chat.id, contact });
     const bubble = behaviorBubble || (message.image
@@ -833,7 +845,7 @@ function threadBody(ctx, chatId) {
         ${selecting ? `<span class="mp-sel-dot${picked ? ' is-on' : ''}" aria-hidden="true"></span>` : ''}
         ${me
           ? avatarHtml(state.settings.user.name, state.settings.user.avatar)
-          : `<button class="mp-avatar-btn${message.inner ? ' has-mind' : ''}" data-act="avatar-mind" data-chat="${chat.id}" data-msg="${message.id}" type="button" aria-label="看 TA 的心理活动"><span class="mp-avatar-wrap">${avatarHtml(speaker?.name || contact?.name, speaker?.avatar || contact?.avatar)}${message.inner ? '<i class="mp-avatar-mind" aria-hidden="true"></i>' : ''}</span></button>`}
+          : `<button class="mp-avatar-btn${mind ? ' has-mind' : ''}" data-act="avatar-mind" data-chat="${chat.id}" data-msg="${message.id}" type="button" aria-label="看 TA 的心理活动"><span class="mp-avatar-wrap">${avatarHtml(speaker?.name || contact?.name, speaker?.avatar || contact?.avatar)}${mind ? '<i class="mp-avatar-mind" aria-hidden="true"></i>' : ''}</span></button>`}
         <div class="mp-msg-body">
           ${message.quote ? `<div class="mp-quote-line">${icon('reply')}<span>${esc(message.quote.text)}</span></div>` : ''}
           ${bubble}
@@ -2364,6 +2376,7 @@ export const threadApp = {
       const message = chat?.messages.find(item => item.id === data.msg);
       if (!chat || !message) return true;
       const contact = contactById(ctx.state, chat.contactId);
+      const mind = mindForMessage(chat, message);
       const mine = message.from === 'me';
       const recallable = mine && message.kind !== 'recalled' && Date.now() - message.at < 2 * 60 * 1000;
       ctx.openSheet({
@@ -2380,7 +2393,7 @@ export const threadApp = {
           { label: '多选、批量删除', value: 'select', icon: 'grip', note: '勾几条一起删 / 一起转发' },
           ...(recallable ? [{ label: '撤回这条', value: 'recall', icon: 'refresh', note: '两分钟内可以撤回' }] : []),
           { label: '存成小剧场', value: 'extra', icon: 'theater' },
-          ...(message.inner ? [{ label: '看 TA 的心理活动', value: 'mind', icon: 'eye' }] : []),
+          ...(mind ? [{ label: '看 TA 的心理活动', value: 'mind', icon: 'eye' }] : []),
           ...(message.subtext ? [{ label: '看这条的潜台词', value: 'sub', icon: 'eye-off' }] : []),
           ...(message.from === 'them' ? [{ label: '让 TA 重新说一次', value: 'regen', icon: 'refresh' }] : []),
           { label: '删除这条', value: 'delete', icon: 'trash', danger: true },

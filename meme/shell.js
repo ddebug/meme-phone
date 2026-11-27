@@ -999,6 +999,25 @@ export function createShell(options) {
   /* 单行输入框随内容长高：超过 5 行就开始自己滚，不把整页顶飞 */
   function growComposer(el) {
     if (!el || el.tagName !== 'TEXTAREA') return;
+    /* 宿主主题会把按钮撑大、把胶囊圆角改小；先钉住外框和发送键的尺寸，
+       否则发送键会顶到胶囊边缘，右侧圆弧看起来像被切平。 */
+    const box = el.closest('.mp-compose-box');
+    if (box) {
+      box.style.setProperty('border-radius', '19px', 'important');
+      box.style.setProperty('overflow', 'hidden', 'important');
+      box.style.setProperty('padding', '3px 12px 3px 12px', 'important');
+      const send = box.querySelector('.mp-send');
+      if (send) {
+        ['width', 'height', 'min-width', 'min-height', 'max-width', 'max-height'].forEach(prop => {
+          send.style.setProperty(prop, '32px', 'important');
+        });
+        send.style.setProperty('padding', '0', 'important');
+        send.style.setProperty('margin', '0', 'important');
+        send.style.setProperty('border-radius', '16px', 'important');
+        send.style.setProperty('box-sizing', 'border-box', 'important');
+        send.style.setProperty('flex', '0 0 32px', 'important');
+      }
+    }
     /* 用 inline important 把宿主主题的 textarea 边框/内边距/盒模型压掉；
        只靠样式表的话，酒馆里带 #id 的规则可能比 .mp-root 这套选择器更高。 */
     el.style.setProperty('box-sizing', 'content-box', 'important');

@@ -56,9 +56,10 @@
   z-index: 21;
   display: flex;
   flex-direction: column;
+  border-radius: inherit;
+  overflow: hidden;
+  /* 不用 backdrop-filter：iOS Safari 会绕过父级圆角裁剪，整页白底从手机弧边露出来 */
   background: linear-gradient(180deg, rgba(252, 250, 255, .96), rgba(248, 245, 253, .97));
-  backdrop-filter: blur(28px) saturate(130%);
-  -webkit-backdrop-filter: blur(28px) saturate(130%);
 }
 
 .mp-thread-head {
@@ -824,7 +825,7 @@
 .mp-composer-row {
   display: flex;
   align-items: flex-end;
-  gap: 0;
+  gap: 8px;
 }
 
 .mp-compose-box {
@@ -964,29 +965,21 @@
   box-shadow: inset 0 0 0 1px rgba(196, 80, 92, .42);
 }
 
-.mp-composer-tools {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  min-height: 26px;
-  margin-top: 7px;
-  padding: 0 2px;
-}
-
 .mp-plus-toggle {
-  height: 26px;
-  padding: 0 8px 0 6px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  max-width: 38px;
+  flex: 0 0 38px;
+  padding: 0;
+  display: grid;
+  place-items: center;
   border: 0;
-  border-radius: 9px;
+  border-radius: 19px;
   background: rgba(142, 123, 242, .08);
+  box-shadow: inset 0 0 0 1px var(--line-soft);
   color: var(--accent-deep);
   font: inherit;
-  font-size: calc(11px * var(--font-scale));
-  line-height: 1;
   cursor: pointer;
   transition: background .16s ease, color .16s ease, transform .14s ease;
 }
@@ -1008,7 +1001,7 @@
 .mp-root[data-mp-theme="night"] .mp-plus-toggle.is-open {
   background: rgba(142, 123, 242, .20);
 }
-.mp-plus-toggle .mp-i { width: 15px; height: 15px; flex: none; }
+.mp-plus-toggle .mp-i { width: 18px; height: 18px; flex: none; }
 
 .mp-composer-hint {
   display: inline-flex;

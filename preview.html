@@ -1352,9 +1352,10 @@ body {
   z-index: 21;
   display: flex;
   flex-direction: column;
+  border-radius: inherit;
+  overflow: hidden;
+  /* 不用 backdrop-filter：iOS Safari 会绕过父级圆角裁剪，整页白底从手机弧边露出来 */
   background: linear-gradient(180deg, rgba(252, 250, 255, .96), rgba(248, 245, 253, .97));
-  backdrop-filter: blur(28px) saturate(130%);
-  -webkit-backdrop-filter: blur(28px) saturate(130%);
 }
 
 .mp-thread-head {
@@ -2120,7 +2121,7 @@ body {
 .mp-composer-row {
   display: flex;
   align-items: flex-end;
-  gap: 0;
+  gap: 8px;
 }
 
 .mp-compose-box {
@@ -2260,29 +2261,21 @@ body {
   box-shadow: inset 0 0 0 1px rgba(196, 80, 92, .42);
 }
 
-.mp-composer-tools {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  min-height: 26px;
-  margin-top: 7px;
-  padding: 0 2px;
-}
-
 .mp-plus-toggle {
-  height: 26px;
-  padding: 0 8px 0 6px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  max-width: 38px;
+  flex: 0 0 38px;
+  padding: 0;
+  display: grid;
+  place-items: center;
   border: 0;
-  border-radius: 9px;
+  border-radius: 19px;
   background: rgba(142, 123, 242, .08);
+  box-shadow: inset 0 0 0 1px var(--line-soft);
   color: var(--accent-deep);
   font: inherit;
-  font-size: calc(11px * var(--font-scale));
-  line-height: 1;
   cursor: pointer;
   transition: background .16s ease, color .16s ease, transform .14s ease;
 }
@@ -2304,7 +2297,7 @@ body {
 .mp-root[data-mp-theme="night"] .mp-plus-toggle.is-open {
   background: rgba(142, 123, 242, .20);
 }
-.mp-plus-toggle .mp-i { width: 15px; height: 15px; flex: none; }
+.mp-plus-toggle .mp-i { width: 18px; height: 18px; flex: none; }
 
 .mp-composer-hint {
   display: inline-flex;
@@ -19115,6 +19108,17 @@ function createShell(options) {
         send.style.setProperty('box-sizing', 'border-box', 'important');
         send.style.setProperty('flex', '0 0 32px', 'important');
       }
+      const plus = box.parentElement?.querySelector('.mp-plus-toggle');
+      if (plus) {
+        ['width', 'height', 'min-width', 'min-height', 'max-width', 'max-height'].forEach(prop => {
+          plus.style.setProperty(prop, '38px', 'important');
+        });
+        plus.style.setProperty('padding', '0', 'important');
+        plus.style.setProperty('margin', '0', 'important');
+        plus.style.setProperty('border-radius', '19px', 'important');
+        plus.style.setProperty('box-sizing', 'border-box', 'important');
+        plus.style.setProperty('flex', '0 0 38px', 'important');
+      }
     }
     /* 用 inline important 把宿主主题的 textarea 边框/内边距/盒模型压掉；
        只靠样式表的话，酒馆里带 #id 的规则可能比 .mp-root 这套选择器更高。 */
@@ -21856,6 +21860,9 @@ function threadBody(ctx, chatId) {
         ${selecting ? selectBarHtml(chat, selecting) : composerPlusHtml(ctx, chat)}
         ${selecting ? '' : `
         <div class="mp-composer-row">
+          <button class="mp-plus-toggle${ctx.shell.plusOpen === chat.id ? ' is-open' : ''}" data-act="composer-plus" data-chat="${chat.id}" type="button" aria-label="更多功能" title="更多功能" aria-expanded="${ctx.shell.plusOpen === chat.id}" aria-controls="mpComposerPlus">
+            ${icon('plus')}
+          </button>
           <div class="mp-compose-box">
             <textarea class="mp-compose-input" rows="1" placeholder="发消息…" aria-label="输入消息"
               enterkeyhint="send" autocomplete="off" autocorrect="off" autocapitalize="sentences"
@@ -21866,11 +21873,6 @@ function threadBody(ctx, chatId) {
               <span class="mp-send-stop">${icon('stop')}</span>
             </button>
           </div>
-        </div>
-        <div class="mp-composer-tools">
-          <button class="mp-plus-toggle${ctx.shell.plusOpen === chat.id ? ' is-open' : ''}" data-act="composer-plus" data-chat="${chat.id}" type="button" aria-expanded="${ctx.shell.plusOpen === chat.id}" aria-controls="mpComposerPlus">
-            ${icon('plus')}<span>更多</span>
-          </button>
         </div>`}
         <input id="mpMsgPhoto" type="file" accept="image/*" data-chat="${chat.id}" style="position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0">
       </div>

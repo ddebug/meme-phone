@@ -1017,6 +1017,17 @@ export function createShell(options) {
         send.style.setProperty('box-sizing', 'border-box', 'important');
         send.style.setProperty('flex', '0 0 32px', 'important');
       }
+      const plus = box.parentElement?.querySelector('.mp-plus-toggle');
+      if (plus) {
+        ['width', 'height', 'min-width', 'min-height', 'max-width', 'max-height'].forEach(prop => {
+          plus.style.setProperty(prop, '38px', 'important');
+        });
+        plus.style.setProperty('padding', '0', 'important');
+        plus.style.setProperty('margin', '0', 'important');
+        plus.style.setProperty('border-radius', '19px', 'important');
+        plus.style.setProperty('box-sizing', 'border-box', 'important');
+        plus.style.setProperty('flex', '0 0 38px', 'important');
+      }
     }
     /* 用 inline important 把宿主主题的 textarea 边框/内边距/盒模型压掉；
        只靠样式表的话，酒馆里带 #id 的规则可能比 .mp-root 这套选择器更高。 */

@@ -895,6 +895,9 @@ function threadBody(ctx, chatId) {
         ${selecting ? selectBarHtml(chat, selecting) : composerPlusHtml(ctx, chat)}
         ${selecting ? '' : `
         <div class="mp-composer-row">
+          <button class="mp-plus-toggle${ctx.shell.plusOpen === chat.id ? ' is-open' : ''}" data-act="composer-plus" data-chat="${chat.id}" type="button" aria-label="更多功能" title="更多功能" aria-expanded="${ctx.shell.plusOpen === chat.id}" aria-controls="mpComposerPlus">
+            ${icon('plus')}
+          </button>
           <div class="mp-compose-box">
             <textarea class="mp-compose-input" rows="1" placeholder="发消息…" aria-label="输入消息"
               enterkeyhint="send" autocomplete="off" autocorrect="off" autocapitalize="sentences"
@@ -905,11 +908,6 @@ function threadBody(ctx, chatId) {
               <span class="mp-send-stop">${icon('stop')}</span>
             </button>
           </div>
-        </div>
-        <div class="mp-composer-tools">
-          <button class="mp-plus-toggle${ctx.shell.plusOpen === chat.id ? ' is-open' : ''}" data-act="composer-plus" data-chat="${chat.id}" type="button" aria-expanded="${ctx.shell.plusOpen === chat.id}" aria-controls="mpComposerPlus">
-            ${icon('plus')}<span>更多</span>
-          </button>
         </div>`}
         <input id="mpMsgPhoto" type="file" accept="image/*" data-chat="${chat.id}" style="position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0">
       </div>

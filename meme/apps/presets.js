@@ -153,33 +153,20 @@ function previewHtml(preset) {
     </div>`;
 }
 
-function characterOptions(ctx) {
-  const names = [...new Set((ctx.state.characters || []).map(card => String(card?.name || '')).filter(Boolean))];
-  return names.map(name => ({ value: name, label: name }));
-}
-
 function openCharactersForm(ctx, preset, item) {
-  const options = characterOptions(ctx);
   ctx.openSheet({
     kind: 'form',
     title: `「${item.label}」对谁生效`,
     confirm: '保存',
     fields: [
-      options.length ? {
-        name: 'characters',
-        type: 'checks',
-        label: '角色卡',
-        value: normalizeCharacters(item.characters),
-        options,
-        hint: '勾选 = 只在这些角色的一对一聊天里生效；一个都不勾 = 全部角色。群聊只注入没勾角色的公共条目。',
-      } : {
+      {
         name: 'characters',
         type: 'text',
         label: '角色卡名字',
         value: normalizeCharacters(item.characters).join('、'),
-        placeholder: '留空 = 全部角色',
-        maxLength: 200,
-        hint: '还没读到角色卡；先按名字填，用「、」或逗号分隔。',
+        placeholder: '留空 = 全部角色；多个用「、」分隔',
+        maxLength: 2000,
+        hint: '只在这些角色的一对一聊天里生效；留空 = 全部角色。群聊只注入没填角色的公共条目。',
       },
     ],
     onForm: values => {
@@ -215,7 +202,6 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat', groupId = '') {
     ? rawDefaultGroup
     : replyGroupIdFor({ kind: defaultKind }, groups);
   const groupName = groups.find(group => group.id === defaultGroup)?.name || '未分组';
-  const charOptions = characterOptions(ctx);
   ctx.openSheet({
     kind: 'form',
     title: item ? `编辑条目 · ${groupName}` : `添加条目 · ${groupName}`,
@@ -227,13 +213,12 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat', groupId = '') {
         { value: 'app', label: '其他软件' },
       ] },
       { name: 'app', type: 'text', label: '软件名', value: item?.app || '', placeholder: '日历 / 外卖 / 音乐 / 购物', maxLength: 20, hint: '类型选“其他软件”时才填，聊天条目留空' },
-      charOptions.length ? {
-        name: 'characters', type: 'checks', label: '适用角色',
-        value: normalizeCharacters(item?.characters), options: charOptions,
-        hint: '勾选 = 只在这些角色的一对一聊天里生效；一个都不勾 = 全部角色。群聊只注入没勾角色的公共条目。',
-      } : {
-        name: 'characters', type: 'text', label: '适用角色', value: normalizeCharacters(item?.characters).join('、'), placeholder: '留空 = 全部角色', maxLength: 200,
-        hint: '还没读到角色卡；先按名字填，用「、」或逗号分隔。',
+      {
+        name: 'characters', type: 'text', label: '适用角色',
+        value: normalizeCharacters(item?.characters).join('、'),
+        placeholder: '留空 = 全部角色；多个用「、」分隔',
+        maxLength: 2000,
+        hint: '只在这些角色的一对一聊天里生效；留空 = 全部角色。群聊只注入没填角色的公共条目。',
       },
       { name: 'role', type: 'select', label: '角色', value: item?.role || 'system', options: [
         { value: 'system', label: '系统（system）' },

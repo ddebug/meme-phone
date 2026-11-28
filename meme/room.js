@@ -138,6 +138,24 @@ function isBusy(theater) {
   return Boolean(task && !task.done);
 }
 
+/* 酒馆的 quiet 生成没有流式，转圈之外得让人知道过了多久、还没回是正常在等还是卡住了 */
+function startTicker(theater, task) {
+  const tick = () => {
+    const node = room.root?.querySelector(`[data-prt-elapse="${theater.id}"]`);
+    if (!node) return;
+    const secs = Math.max(0, Math.round((Date.now() - task.startedAt) / 1000));
+    node.textContent = secs >= 20 ? `酒馆那边还没回 · ${secs}s` : `${secs}s`;
+    node.classList.toggle('is-slow', secs >= 20);
+  };
+  tick();
+  task.timer = setInterval(tick, 1000);
+}
+
+function stopTicker(task) {
+  if (task?.timer) clearInterval(task.timer);
+  if (task) task.timer = null;
+}
+
 function toast(text) {
   if (!room.root) return;
   let node = room.root.querySelector('.prt-toast');
@@ -255,7 +273,7 @@ function streamHtml(theater) {
         ${avatar(nameOf(theater), avatarOf(theater))}
         <div class="prt-body">
           <div class="prt-who"><b>${esc(nameOf(theater))}</b></div>
-          <div class="prt-dots"><i></i><i></i><i></i></div>
+          <div class="prt-dots"><i></i><i></i><i></i><span class="prt-elapse" data-prt-elapse="${esc(theater.id)}"></span></div>
         </div>
       </article>`);
   }
@@ -356,6 +374,8 @@ function contextBlock(theater) {
             ? '不给背景楼层，只看这一场自己说的话。'
             : `每次生成从酒馆当前聊天取前 ${theater.forkFloor || 0} 楼。`)}</div>
       <div class="prt-ctx-row"><b>分叉点</b><span>第 ${theater.forkFloor || 0} 楼</span></div>
+      ${theater.lastBackground?.trimmed ? `
+        <div class="prt-ctx-row"><b>实际背景</b><span>最近 ${theater.lastBackground.floors?.length || 0} 楼 / 共 ${theater.lastBackground.total || 0} 楼</span></div>` : ''}
       ${extra ? `<div class="prt-ctx-row"><b>额外指令</b><span>${esc(String(cfg.extraPrompt).trim().length)} 字</span></div>` : ''}
       ${theater.memory?.text ? `
         <div class="prt-ctx-row"><b>开场记忆</b><span>${esc(memoryLabel(theater))}</span></div>
@@ -531,9 +551,10 @@ async function bindIfNeeded(theater) {
 }
 
 async function generate(theater) {
-  const task = { done: false, stopped: false };
+  const task = { done: false, stopped: false, startedAt: Date.now() };
   room.runs.set(theater.id, task);
   paint();
+  startTicker(theater, task);
   try {
     const result = await branchReply({
       base: theater.base || [],
@@ -549,12 +570,14 @@ async function generate(theater) {
     const text = String(result.text || '').trim();
     if (!text) throw new Error('酒馆那边没有返回内容');
     if (Array.isArray(result.prompt) && result.prompt.length) room.prompts.set(theater.id, result.prompt);
+    if (result.background) theater.lastBackground = result.background;
     theater.messages.push(theaterMessage({ name: theater.characterName, text, at: Date.now(), source: 'tavern' }));
     theater.failed = null;
   } catch (error) {
     if (!task.stopped) theater.failed = { at: Date.now(), reason: error?.message || '这一轮没接通' };
   } finally {
     task.done = true;
+    stopTicker(task);
     room.runs.delete(theater.id);
     theater.updatedAt = Date.now();
     save();
@@ -563,10 +586,18 @@ async function generate(theater) {
 }
 
 async function send(theater) {
-  if (isBusy(theater)) return;
+  if (isBusy(theater)) { toast('这一轮还在写；等它回，或者点右下角停掉'); return; }
   const text = String(room.draft || '').trim();
   if (!text) { toast('先写一句，酒馆那边才有下文'); return; }
-  const bound = await bindIfNeeded(theater);
+  let bound = false;
+  try {
+    bound = await bindIfNeeded(theater);
+  } catch (error) {
+    theater.failed = { at: Date.now(), reason: error?.message || '没接上酒馆的当前聊天' };
+    save();
+    paint();
+    return;
+  }
   if (!bound) { toast('这一场还没绑定酒馆聊天：先在酒馆打开一个聊天再发'); return; }
   theater.messages.push(theaterMessage({
     isUser: true, name: room.ctx.state.settings.user.name, text, at: Date.now(), source: 'user',
@@ -694,7 +725,7 @@ function close() {
   room.root = null;
   room.panel = null;
   room.dialog = null;
-  for (const task of room.runs.values()) task.stopped = true;
+  for (const task of room.runs.values()) { task.stopped = true; stopTicker(task); }
   if (room.runs.size) stopTavernGeneration();
   room.runs.clear();
   try { room.ctx?.home?.(); } catch { /* 已经关掉了 */ }

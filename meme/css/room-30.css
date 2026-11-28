@@ -341,9 +341,20 @@
 
 .prt .prt-dots {
   display: inline-flex;
+  align-items: center;
   gap: 4px;
   padding: 4px 0;
 }
+
+.prt .prt-dots .prt-elapse {
+  margin-left: 6px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.prt .prt-dots .prt-elapse.is-slow { color: var(--accent); }
 
 .prt .prt-dots i {
   width: 5px;

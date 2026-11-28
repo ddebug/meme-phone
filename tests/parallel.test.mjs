@@ -7,7 +7,7 @@ import {
   theaterMessage, theaterMessagesCount, contactForTavernCharacter,
   theaterConfig, setTheaterConfig, THEATER_EXTRA_MAX,
 } from '../meme/data.js';
-import { readOpenTavernChat, branchReply, readTavernMemory, __resetHostScriptForTests } from '../meme/host.js';
+import { readOpenTavernChat, branchReply, readTavernMemory, trimFloorsToBudget, __resetHostScriptForTests } from '../meme/host.js';
 import { parallelApp, branchContextPanelHtml } from '../meme/apps/parallel.js';
 import { parallelBranchApp, parallelSettingsApp } from '../meme/apps/branch.js';
 
@@ -317,7 +317,8 @@ test('平行时空：几万楼的长聊天换 chat 也不会撑爆调用栈', as
     branch: [{ is_user: true, name: '颜', mes: '再分一条线。' }],
     characterName: '沈砚',
   });
-  assert.equal(ctx.sentFloors.length, 70001, '生成时临时装进分叉点 + 这一场');
+  assert.equal(ctx.sentFloors.length, result.background.floors.length + 1, '生成时只装背景窗口 + 这一场');
+  assert.ok(ctx.sentFloors.length < 70001, '几万楼按上下文窗口裁过，不会整包塞进提示词');
   assert.equal(ctx.chat.length, floors.length, '结束后恢复原样');
   assert.equal(result.text, '那我就在站台上陪你一会儿。');
 });
@@ -535,4 +536,47 @@ test('平行时空：旧存档里的占位角色名按聊天文件名改回来',
   assert.equal(defaultTheaterTitle({ theaters: {} }, { characterName: 'SillyTavern System', chatFile: file }), '沈砚 · 分叉 1');
   const fresh = addTheater({ theaters: {} }, { characterName: 'SillyTavern System', chatFile: file, forkFloor: 2 });
   assert.equal(fresh.characterName, '沈砚', '新开的这一场也不带占位名');
+});
+
+
+test('trimFloorsToBudget keeps the newest floors inside the budget', () => {
+  const floors = Array.from({ length: 40 }, (_, i) => ({ mes: 'x'.repeat(600), idx: i }));
+  const out = trimFloorsToBudget(floors, { maxContext: 1200 });
+  assert.equal(out.total, 40);
+  assert.equal(out.budget, 1500);
+  assert.ok(out.trimmed);
+  assert.ok(out.floors.length > 0 && out.floors.length < 40);
+  assert.equal(out.floors[out.floors.length - 1].idx, 39, 'keeps the tail nearest the fork point');
+});
+
+test('branchReply trims a huge background and reports it', async () => {
+  const chat = Array.from({ length: 60 }, (_, i) => ({ is_user: i % 2 === 0, name: 'A', mes: 'y'.repeat(600) }));
+  const ctx = fakeHost({ chat });
+  ctx.maxContext = 1200;
+  const originalLength = chat.length;
+  const result = await branchReply({
+    chatId: 'demo-shen',
+    forkFloor: originalLength,
+    branch: [{ is_user: true, name: 'A', mes: 'tail question' }],
+    characterName: 'A',
+  });
+  assert.ok(result.background);
+  assert.equal(result.background.total, 60);
+  assert.ok(result.background.trimmed);
+  assert.ok(ctx.sentFloors.length < 61, 'did not push all 60 floors into the prompt');
+  assert.equal(ctx.chat.length, originalLength, 'real chat restored');
+});
+
+test('branchReply rejects after the deadline and still restores the chat', async () => {
+  const chat = [
+    { is_user: false, name: 'A', mes: 'one' },
+    { is_user: true, name: 'B', mes: 'two' },
+  ];
+  const ctx = fakeHost({ chat, generateQuietPrompt: () => new Promise(() => {}) });
+  await assert.rejects(
+    () => branchReply({ base: chat.slice(), branch: [{ is_user: true, mes: 'hi' }], cfg: { timeoutMs: 1000 } }),
+    /./,
+  );
+  assert.equal(ctx.chat.length, 2);
+  assert.equal(ctx.chat[0].mes, 'one');
 });

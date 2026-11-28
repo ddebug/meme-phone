@@ -9495,9 +9495,20 @@ body {
 
 .prt .prt-dots {
   display: inline-flex;
+  align-items: center;
   gap: 4px;
   padding: 4px 0;
 }
+
+.prt .prt-dots .prt-elapse {
+  margin-left: 6px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.prt .prt-dots .prt-elapse.is-slow { color: var(--accent); }
 
 .prt .prt-dots i {
   width: 5px;
@@ -14571,6 +14582,8 @@ __mods["meme/host.js"] = function(module, exports, __req){
  */
 
 let hostScript = null;
+
+const { estimateTokens } = __req("meme/reply-context.js");
 let hostScriptTried = false;
 
 async function loadHostScript() {
@@ -15265,6 +15278,35 @@ function toTavernFloor(message, fallbackName = '') {
  */
 let branchBusyId = '';
 
+/** 平行时空一轮生成的死线：酒馆 quiet 生成没有流式，卡住时只能靠这个兜底。 */
+const BRANCH_TIMEOUT_MS = 180000;
+
+/**
+ * 按酒馆的上下文窗口从最新往回裁背景楼层：酒馆自己也会裁，这里先裁掉能省下整段
+ * 提示词组装和世界书扫描的时间（几百楼的聊天能差好几分钟）。
+ * 返回 { floors, total, used, trimmed, budget }。
+ */
+function trimFloorsToBudget(floors, ctx) {
+  const list = Array.isArray(floors) ? floors : [];
+  const maxContext = Number(ctx?.maxContext || 0) || 8192;
+  const budget = Math.max(1500, Math.min(Math.round(maxContext * 0.55), 24000));
+  let used = 0;
+  let start = list.length;
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const cost = estimateTokens(list[index]?.mes || '') + 8;
+    if (used + cost > budget && start < list.length) break;
+    used += cost;
+    start = index;
+  }
+  return {
+    floors: list.slice(start),
+    total: list.length,
+    used,
+    budget,
+    trimmed: start > 0,
+  };
+}
+
 /**
  * 生成期间临时摘掉这个角色绑的世界书（主书 extensions.world + charLore 附加书），
  * 结束后原样放回。只动内存里的引用，不写酒馆设置、不碰世界书文件。
@@ -15358,6 +15400,10 @@ async function branchReply({
   }
   if (!baseFloors.length && !branch.length) throw new Error('这一场还没有可以接着说的上下文');
 
+  /* 背景按酒馆的上下文窗口截一段：几百楼的聊天整包塞进去，酒馆光组装提示词就要好几分钟，
+     手机端还会把整个界面卡住。酒馆自己也会从最新往回裁，这里先按同样口径裁掉，结果一样、快得多。 */
+  const background = trimFloorsToBudget(baseFloors, ctx);
+
   /* quiet prompt：固定记忆 + 这一场自己的额外指令；都没有就保持空串，纯靠聊天历史 */
   const quietParts = [];
   if (memoryMode === 'fixed' && String(memory?.text || '').trim()) {
@@ -15369,7 +15415,7 @@ async function branchReply({
   if (branchBusyId) throw new Error('另一场还在生成，等它写完再发');
 
   const backup = hostChat.slice();
-  const temp = [...baseFloors, ...branch.map(item => toTavernFloor(item, characterName))];
+  const temp = [...background.floors, ...branch.map(item => toTavernFloor(item, characterName))];
   const eventSource = ctx.eventSource;
   const promptEvent = ctx.eventTypes?.CHAT_COMPLETION_PROMPT_READY;
   let captured = null;
@@ -15386,12 +15432,28 @@ async function branchReply({
   const restoreBooks = cfg && typeof cfg === 'object' && cfg.showWorldBook === false
     ? suspendCharacterBooks(ctx, script, characterName)
     : null;
+  const startedAt = Date.now();
+  const timeoutMs = Math.min(600000, Math.max(1000, Number(cfg?.timeoutMs) || BRANCH_TIMEOUT_MS));
+  let timer = null;
+  /* 酒馆的 quiet 生成不走流式，界面上只有我们自己转的圈；接口真卡住时 Promise 会一直悬着。
+     这里加一道死线：到点停掉酒馆这一轮、把聊天还原，再把原因交回界面，别让人对着圈发呆。 */
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      try { stopTavernGeneration(); } catch { /* 没有停止入口就等它自己断 */ }
+      reject(new Error('酒馆 3 分钟没有回包，已经替你停了；可以重试，或把背景换成「最近一段」再试'));
+    }, timeoutMs);
+  });
   try {
     if (promptEvent && eventSource?.on) eventSource.on(promptEvent, onPrompt);
     replaceFloors(temp);
-    const text = await ctx.generateQuietPrompt({ quietPrompt, quietName: null });
-    return { text: String(text ?? '').trim(), prompt: captured, quietPrompt };
+    const text = await Promise.race([
+      ctx.generateQuietPrompt({ quietPrompt, quietName: null }),
+      deadline,
+    ]);
+    console.debug(`[meme-phone] 平行时空生成完成：${Date.now() - startedAt}ms，背景 ${temp.length} 楼`);
+    return { text: String(text ?? '').trim(), prompt: captured, quietPrompt, background };
   } finally {
+    if (timer) clearTimeout(timer);
     restoreBooks?.();
     replaceFloors(backup);
     branchBusyId = '';
@@ -16366,6 +16428,8 @@ exports["tavernQuietPrompt"] = tavernQuietPrompt;
 exports["generate"] = generate;
 exports["readOpenTavernChat"] = readOpenTavernChat;
 exports["readTavernMemory"] = readTavernMemory;
+exports["BRANCH_TIMEOUT_MS"] = BRANCH_TIMEOUT_MS;
+exports["trimFloorsToBudget"] = trimFloorsToBudget;
 exports["branchGenerating"] = branchGenerating;
 exports["branchReply"] = branchReply;
 exports["stopTavernGeneration"] = stopTavernGeneration;
@@ -16523,6 +16587,24 @@ function isBusy(theater) {
   return Boolean(task && !task.done);
 }
 
+/* 酒馆的 quiet 生成没有流式，转圈之外得让人知道过了多久、还没回是正常在等还是卡住了 */
+function startTicker(theater, task) {
+  const tick = () => {
+    const node = room.root?.querySelector(`[data-prt-elapse="${theater.id}"]`);
+    if (!node) return;
+    const secs = Math.max(0, Math.round((Date.now() - task.startedAt) / 1000));
+    node.textContent = secs >= 20 ? `酒馆那边还没回 · ${secs}s` : `${secs}s`;
+    node.classList.toggle('is-slow', secs >= 20);
+  };
+  tick();
+  task.timer = setInterval(tick, 1000);
+}
+
+function stopTicker(task) {
+  if (task?.timer) clearInterval(task.timer);
+  if (task) task.timer = null;
+}
+
 function toast(text) {
   if (!room.root) return;
   let node = room.root.querySelector('.prt-toast');
@@ -16640,7 +16722,7 @@ function streamHtml(theater) {
         ${avatar(nameOf(theater), avatarOf(theater))}
         <div class="prt-body">
           <div class="prt-who"><b>${esc(nameOf(theater))}</b></div>
-          <div class="prt-dots"><i></i><i></i><i></i></div>
+          <div class="prt-dots"><i></i><i></i><i></i><span class="prt-elapse" data-prt-elapse="${esc(theater.id)}"></span></div>
         </div>
       </article>`);
   }
@@ -16741,6 +16823,8 @@ function contextBlock(theater) {
             ? '不给背景楼层，只看这一场自己说的话。'
             : `每次生成从酒馆当前聊天取前 ${theater.forkFloor || 0} 楼。`)}</div>
       <div class="prt-ctx-row"><b>分叉点</b><span>第 ${theater.forkFloor || 0} 楼</span></div>
+      ${theater.lastBackground?.trimmed ? `
+        <div class="prt-ctx-row"><b>实际背景</b><span>最近 ${theater.lastBackground.floors?.length || 0} 楼 / 共 ${theater.lastBackground.total || 0} 楼</span></div>` : ''}
       ${extra ? `<div class="prt-ctx-row"><b>额外指令</b><span>${esc(String(cfg.extraPrompt).trim().length)} 字</span></div>` : ''}
       ${theater.memory?.text ? `
         <div class="prt-ctx-row"><b>开场记忆</b><span>${esc(memoryLabel(theater))}</span></div>
@@ -16916,9 +17000,10 @@ async function bindIfNeeded(theater) {
 }
 
 async function generate(theater) {
-  const task = { done: false, stopped: false };
+  const task = { done: false, stopped: false, startedAt: Date.now() };
   room.runs.set(theater.id, task);
   paint();
+  startTicker(theater, task);
   try {
     const result = await branchReply({
       base: theater.base || [],
@@ -16934,12 +17019,14 @@ async function generate(theater) {
     const text = String(result.text || '').trim();
     if (!text) throw new Error('酒馆那边没有返回内容');
     if (Array.isArray(result.prompt) && result.prompt.length) room.prompts.set(theater.id, result.prompt);
+    if (result.background) theater.lastBackground = result.background;
     theater.messages.push(theaterMessage({ name: theater.characterName, text, at: Date.now(), source: 'tavern' }));
     theater.failed = null;
   } catch (error) {
     if (!task.stopped) theater.failed = { at: Date.now(), reason: error?.message || '这一轮没接通' };
   } finally {
     task.done = true;
+    stopTicker(task);
     room.runs.delete(theater.id);
     theater.updatedAt = Date.now();
     save();
@@ -16948,10 +17035,18 @@ async function generate(theater) {
 }
 
 async function send(theater) {
-  if (isBusy(theater)) return;
+  if (isBusy(theater)) { toast('这一轮还在写；等它回，或者点右下角停掉'); return; }
   const text = String(room.draft || '').trim();
   if (!text) { toast('先写一句，酒馆那边才有下文'); return; }
-  const bound = await bindIfNeeded(theater);
+  let bound = false;
+  try {
+    bound = await bindIfNeeded(theater);
+  } catch (error) {
+    theater.failed = { at: Date.now(), reason: error?.message || '没接上酒馆的当前聊天' };
+    save();
+    paint();
+    return;
+  }
   if (!bound) { toast('这一场还没绑定酒馆聊天：先在酒馆打开一个聊天再发'); return; }
   theater.messages.push(theaterMessage({
     isUser: true, name: room.ctx.state.settings.user.name, text, at: Date.now(), source: 'user',
@@ -17079,7 +17174,7 @@ function close() {
   room.root = null;
   room.panel = null;
   room.dialog = null;
-  for (const task of room.runs.values()) task.stopped = true;
+  for (const task of room.runs.values()) { task.stopped = true; stopTicker(task); }
   if (room.runs.size) stopTavernGeneration();
   room.runs.clear();
   try { room.ctx?.home?.(); } catch { /* 已经关掉了 */ }

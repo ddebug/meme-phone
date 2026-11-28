@@ -6,6 +6,8 @@
  */
 
 let hostScript = null;
+
+import { estimateTokens } from './reply-context.js';
 let hostScriptTried = false;
 
 export async function loadHostScript() {
@@ -700,6 +702,35 @@ function toTavernFloor(message, fallbackName = '') {
  */
 let branchBusyId = '';
 
+/** 平行时空一轮生成的死线：酒馆 quiet 生成没有流式，卡住时只能靠这个兜底。 */
+export const BRANCH_TIMEOUT_MS = 180000;
+
+/**
+ * 按酒馆的上下文窗口从最新往回裁背景楼层：酒馆自己也会裁，这里先裁掉能省下整段
+ * 提示词组装和世界书扫描的时间（几百楼的聊天能差好几分钟）。
+ * 返回 { floors, total, used, trimmed, budget }。
+ */
+export function trimFloorsToBudget(floors, ctx) {
+  const list = Array.isArray(floors) ? floors : [];
+  const maxContext = Number(ctx?.maxContext || 0) || 8192;
+  const budget = Math.max(1500, Math.min(Math.round(maxContext * 0.55), 24000));
+  let used = 0;
+  let start = list.length;
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const cost = estimateTokens(list[index]?.mes || '') + 8;
+    if (used + cost > budget && start < list.length) break;
+    used += cost;
+    start = index;
+  }
+  return {
+    floors: list.slice(start),
+    total: list.length,
+    used,
+    budget,
+    trimmed: start > 0,
+  };
+}
+
 /**
  * 生成期间临时摘掉这个角色绑的世界书（主书 extensions.world + charLore 附加书），
  * 结束后原样放回。只动内存里的引用，不写酒馆设置、不碰世界书文件。
@@ -793,6 +824,10 @@ export async function branchReply({
   }
   if (!baseFloors.length && !branch.length) throw new Error('这一场还没有可以接着说的上下文');
 
+  /* 背景按酒馆的上下文窗口截一段：几百楼的聊天整包塞进去，酒馆光组装提示词就要好几分钟，
+     手机端还会把整个界面卡住。酒馆自己也会从最新往回裁，这里先按同样口径裁掉，结果一样、快得多。 */
+  const background = trimFloorsToBudget(baseFloors, ctx);
+
   /* quiet prompt：固定记忆 + 这一场自己的额外指令；都没有就保持空串，纯靠聊天历史 */
   const quietParts = [];
   if (memoryMode === 'fixed' && String(memory?.text || '').trim()) {
@@ -804,7 +839,7 @@ export async function branchReply({
   if (branchBusyId) throw new Error('另一场还在生成，等它写完再发');
 
   const backup = hostChat.slice();
-  const temp = [...baseFloors, ...branch.map(item => toTavernFloor(item, characterName))];
+  const temp = [...background.floors, ...branch.map(item => toTavernFloor(item, characterName))];
   const eventSource = ctx.eventSource;
   const promptEvent = ctx.eventTypes?.CHAT_COMPLETION_PROMPT_READY;
   let captured = null;
@@ -821,12 +856,28 @@ export async function branchReply({
   const restoreBooks = cfg && typeof cfg === 'object' && cfg.showWorldBook === false
     ? suspendCharacterBooks(ctx, script, characterName)
     : null;
+  const startedAt = Date.now();
+  const timeoutMs = Math.min(600000, Math.max(1000, Number(cfg?.timeoutMs) || BRANCH_TIMEOUT_MS));
+  let timer = null;
+  /* 酒馆的 quiet 生成不走流式，界面上只有我们自己转的圈；接口真卡住时 Promise 会一直悬着。
+     这里加一道死线：到点停掉酒馆这一轮、把聊天还原，再把原因交回界面，别让人对着圈发呆。 */
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      try { stopTavernGeneration(); } catch { /* 没有停止入口就等它自己断 */ }
+      reject(new Error('酒馆 3 分钟没有回包，已经替你停了；可以重试，或把背景换成「最近一段」再试'));
+    }, timeoutMs);
+  });
   try {
     if (promptEvent && eventSource?.on) eventSource.on(promptEvent, onPrompt);
     replaceFloors(temp);
-    const text = await ctx.generateQuietPrompt({ quietPrompt, quietName: null });
-    return { text: String(text ?? '').trim(), prompt: captured, quietPrompt };
+    const text = await Promise.race([
+      ctx.generateQuietPrompt({ quietPrompt, quietName: null }),
+      deadline,
+    ]);
+    console.debug(`[meme-phone] 平行时空生成完成：${Date.now() - startedAt}ms，背景 ${temp.length} 楼`);
+    return { text: String(text ?? '').trim(), prompt: captured, quietPrompt, background };
   } finally {
+    if (timer) clearTimeout(timer);
     restoreBooks?.();
     replaceFloors(backup);
     branchBusyId = '';

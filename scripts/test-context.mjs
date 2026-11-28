@@ -92,7 +92,7 @@ function findItem(items, id) {
   ok(report.items.some(item => item.id === 'reply_context_character' && item.status === 'disabled'), '报告标记为已关闭');
 }
 
-/* 3. 按角色卡路由：只对江迟生效的条目，在沈砚会话里不注入 */
+/* 3. 旧版的“只对某些角色”字段不再参与路由 */
 {
   const { state, preset, chat, contact } = stateWithPreset();
   const items = normalizeReplyItems(preset.items, preset.context);
@@ -100,24 +100,21 @@ function findItem(items, id) {
   preset.items = items;
 
   const shen = await buildReplyMessages(state, chat, contact);
-  ok(!contents(shen.messages).includes('【角色档案 · 沈砚】'), '别的角色会话不注入');
-  ok(shen.report.items.some(item => item.id === 'reply_context_character' && item.status === 'other-character'), '报告说明是角色路由拦下');
-
-  const jiangChat = chatsOf(state).find(item => state.contacts[item.contactId]?.name === '江迟');
-  const jiang = await buildReplyMessages(state, jiangChat, state.contacts[jiangChat.contactId]);
-  ok(contents(jiang.messages).includes('【角色档案 · 江迟】'), '指定角色的一对一会话正常注入');
+  ok(contents(shen.messages).includes('【角色档案 · 沈砚】'), '旧角色限定字段不再拦截当前会话');
+  ok(shen.report.items.some(item => item.id === 'reply_context_character' && item.status === 'injected'), '报告标记为已注入');
 }
 
-/* 4. 群聊只注入公共条目 */
+/* 4. 群聊也走同一条注入规则，不再按角色路由 */
 {
-  const { state, preset, chat, contact } = stateWithPreset();
+  const { state, preset } = stateWithPreset();
   const items = normalizeReplyItems(preset.items, preset.context);
-  findItem(items, 'reply_context_character').characters = ['沈砚'];
+  const chinese = findItem(items, 'reply_item_chinese');
+  chinese.characters = ['江迟'];
   preset.items = items;
   const group = chatsOf(state).find(item => item.kind === 'group');
   const result = await buildReplyMessages(state, group, state.contacts[group.contactId]);
-  ok(!contents(result.messages).includes('【角色档案'), '群聊不注入具体角色条目');
-  ok(result.report.items.some(item => item.id === 'reply_context_character' && item.status === 'other-character'), '群聊被角色路由拦下');
+  ok(contents(result.messages).includes(chinese.content), '群聊也注入普通条目');
+  ok(result.report.items.some(item => item.id === 'reply_item_chinese' && item.status === 'injected'), '群聊报告标记为已注入');
 }
 
 /* 5. 去重：同内容条目只进一次 */
@@ -176,7 +173,7 @@ function findItem(items, id) {
   ok(!!findItem(items, 'reply_context_lorebook'), '旧预设补上人设世界书条目');
   ok(!!findItem(items, 'reply_context_scene'), '旧预设补上场景条目');
   ok(findItem(items, 'reply_context_lorebook').enabled === true, '补上的条目默认开启');
-  ok(findItem(items, 'reply_item_custom').characters.length === 0, '旧条目默认适用全部角色');
+  ok(!Object.hasOwn(findItem(items, 'reply_item_custom'), 'characters'), '旧条目不再生成适用角色字段');
 }
 
 /* 9. 预设之间互不覆盖：改一套的条目不影响另一套 */

@@ -6,7 +6,7 @@
 
 import { icon } from '../icons.js';
 import { esc } from '../shell.js';
-import { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext, normalizeReplyItems, normalizeCharacters, normalizeReplyGroups, replyGroupIdFor, positionalReplyGroups, defaultReplyItems, REPLY_CONTEXT_SPECS, chatsOf, REPLY_INSTRUCTION_ID, withReplyInstruction } from '../data.js';
+import { newId, replyPresetsOf, replyPresetFor, normalizeReplyContext, normalizeReplyItems, normalizeReplyGroups, replyGroupIdFor, positionalReplyGroups, defaultReplyItems, REPLY_CONTEXT_SPECS, chatsOf, REPLY_INSTRUCTION_ID, withReplyInstruction } from '../data.js';
 import { tavernQuietPrompt } from '../host.js';
 
 let editingId = '';
@@ -106,16 +106,9 @@ function setContextEnabled(preset, key, enabled) {
   preset.context = context;
 }
 
-function charactersLabel(item) {
-  const list = normalizeCharacters(item?.characters);
-  if (!list.length) return '';
-  return list.length > 2 ? `仅 ${list.slice(0, 2).join('、')} 等 ${list.length} 个角色` : `仅 ${list.join('、')}`;
-}
-
 const PREVIEW_STATUS = {
   disabled: '关掉了',
   app: '不进聊天',
-  'other-character': '别的角色',
   empty: '没有内容',
   duplicate: '内容重复',
   'over-budget': '超出预算',
@@ -153,40 +146,6 @@ function previewHtml(preset) {
     </div>`;
 }
 
-function openCharactersForm(ctx, preset, item) {
-  ctx.openSheet({
-    kind: 'form',
-    title: `「${item.label}」对谁生效`,
-    confirm: '保存',
-    fields: [
-      {
-        name: 'characters',
-        type: 'text',
-        label: '角色卡名字',
-        value: normalizeCharacters(item.characters).join('、'),
-        placeholder: '留空 = 全部角色；多个用「、」分隔',
-        maxLength: 2000,
-        hint: '只在这些角色的一对一聊天里生效；留空 = 全部角色。群聊只注入没填角色的公共条目。',
-      },
-    ],
-    onForm: values => {
-      const items = promptItems(preset);
-      const index = items.findIndex(candidate => candidate.id === item.id);
-      if (index < 0) return;
-      const raw = Array.isArray(values.characters)
-        ? values.characters
-        : String(values.characters || '').split(/[、,，/]/).map(part => part.trim());
-      const next = normalizeCharacters(raw);
-      items[index] = { ...items[index], characters: next };
-      preset.items = items;
-      resetPreview();
-      ctx.save();
-      ctx.rerender();
-      ctx.toast(next.length ? `只对 ${next.join('、')} 生效` : '改成全部角色');
-    },
-  });
-}
-
 function openItemForm(ctx, preset, itemId = '', scope = 'chat', groupId = '') {
   const items = promptItems(preset);
   const index = itemId ? items.findIndex(item => item.id === itemId) : -1;
@@ -213,13 +172,6 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat', groupId = '') {
         { value: 'app', label: '其他软件' },
       ] },
       { name: 'app', type: 'text', label: '软件名', value: item?.app || '', placeholder: '日历 / 外卖 / 音乐 / 购物', maxLength: 20, hint: '类型选“其他软件”时才填，聊天条目留空' },
-      {
-        name: 'characters', type: 'text', label: '适用角色',
-        value: normalizeCharacters(item?.characters).join('、'),
-        placeholder: '留空 = 全部角色；多个用「、」分隔',
-        maxLength: 2000,
-        hint: '只在这些角色的一对一聊天里生效；留空 = 全部角色。群聊只注入没填角色的公共条目。',
-      },
       { name: 'role', type: 'select', label: '角色', value: item?.role || 'system', options: [
         { value: 'system', label: '系统（system）' },
         { value: 'user', label: '用户（user）' },
@@ -242,9 +194,6 @@ function openItemForm(ctx, preset, itemId = '', scope = 'chat', groupId = '') {
         label: String(values.label || '').trim().slice(0, 30) || '自定义条目',
         kind: values.kind === 'app' ? 'app' : 'chat',
         app: values.kind === 'app' ? String(values.app || '').trim().slice(0, 20) : '',
-        characters: normalizeCharacters(Array.isArray(values.characters)
-          ? values.characters
-          : String(values.characters || '').split(/[、,，/]/).map(part => part.trim())),
         role: ['system', 'user', 'assistant'].includes(values.role) ? values.role : 'system',
         content: String(values.content || '').trim().slice(0, 4000),
         enabled: item?.enabled !== false,
@@ -287,7 +236,6 @@ function serializePresetItem(item) {
     deletable: item.deletable,
     group: item.group || '',
     order: item.order,
-    characters: normalizeCharacters(item.characters),
     ...(item.kind === 'app' ? { kind: 'app', app: item.app || '' } : {}),
     ...(item.kind === 'context' ? { kind: 'context', auto: item.auto } : {}),
     ...(item.note ? { note: item.note } : {}),
@@ -928,10 +876,7 @@ export const replyPresetApp = {
         : defaults;
       if (currentMain) {
         const nextMain = nextItems.find(item => item.id === REPLY_INSTRUCTION_ID);
-        if (nextMain) {
-          nextMain.enabled = currentMain.enabled;
-          nextMain.characters = currentMain.characters;
-        }
+        if (nextMain) nextMain.enabled = currentMain.enabled;
       }
       ctx.openSheet({
         kind: 'pick',
@@ -1039,11 +984,9 @@ export const replyPresetApp = {
               note: value === context.historyLimit ? '现在用的' : '',
             })),
             { label: `自定义条数 · 当前 ${context.historyLimit > 0 ? `${context.historyLimit} 条` : '全部'}`, value: 'custom', icon: 'clock' },
-            { label: '只对某些角色生效', value: 'characters', icon: 'contacts', note: charactersLabel(item) || '现在是全部角色' },
           ],
           onPick: value => {
             if (value === 'toggle') toggle();
-            else if (value === 'characters') openCharactersForm(ctx, preset, item);
             else if (value === 'custom') openLimitForm();
             else if (String(value).startsWith('n:')) {
               const count = Number(String(value).slice(2));
@@ -1071,11 +1014,9 @@ export const replyPresetApp = {
               label: `世界书最多 ${value} 字`,
               note: value === context.bookBudget ? '现在用的' : '',
             })),
-            { label: '只对某些角色生效', value: 'characters', icon: 'contacts', note: charactersLabel(item) || '现在是全部角色' },
           ],
           onPick: value => {
             if (value === 'toggle') toggle();
-            else if (value === 'characters') openCharactersForm(ctx, preset, item);
             else if (String(value).startsWith('f:')) {
               const count = Number(String(value).slice(2));
               setNumber('bookFloors', count, `世界书关键词改成看最近 ${count} 条`);
@@ -1094,11 +1035,9 @@ export const replyPresetApp = {
         note: `${spec?.note || '手机读取当前数据'}。这条不用手写，内容跟着当前会话变。`,
         items: [
           { label: toggleLabel, value: 'toggle', icon: item.enabled ? 'close' : 'plus' },
-          { label: '只对某些角色生效', value: 'characters', icon: 'contacts', note: charactersLabel(item) || '现在是全部角色' },
         ],
         onPick: value => {
           if (value === 'toggle') toggle();
-          else if (value === 'characters') openCharactersForm(ctx, preset, item);
         },
       });
       return true;

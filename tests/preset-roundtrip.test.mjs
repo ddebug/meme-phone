@@ -27,14 +27,14 @@ test('C3：导入预设保留主文案 text，不被清空', () => {
   assert.equal(out.name, '测试预设');
 });
 
-test('C3：条目的角色/启用/可编辑/角色限定/其他软件字段往返保留，相对顺序不变', () => {
+test('C3：条目的角色/启用/可编辑/其他软件字段往返保留，旧的适用角色字段被丢弃', () => {
   const out = normalizeImportedPreset(external, 0, new Set());
   const me = out.items.find(item => item.id === 'i1');
   assert.equal(me.role, 'system');
   assert.equal(me.enabled, true);
   assert.equal(me.editable, true);
   assert.equal(me.deletable, true);
-  assert.deepEqual(me.characters, ['沈砚']);
+  assert.equal(me.characters, undefined);
   assert.equal(me.content, '只说中文，口语化');
 
   const app = out.items.find(item => item.id === 'i2');

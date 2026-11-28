@@ -55,7 +55,7 @@ test('多气泡：旧内置原样格式/回复指令安全迁移且幂等', () =
   assert.equal(format.content, MULTI_BUBBLE_REPLY_FORMAT);
   assert.equal(format.enabled, false);
   assert.equal(format.order, oldOrder);
-  assert.deepEqual(format.characters, ['沈砚']);
+  assert.equal(format.characters, undefined);
   assert.equal(items.find(item => item.id === REPLY_INSTRUCTION_ID).content, NATURAL_REPLY_INSTRUCTION);
   assert.deepEqual(normalize(rebuilt).settings.reply, rebuilt.settings.reply);
 });

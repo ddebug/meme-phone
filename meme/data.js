@@ -41,7 +41,6 @@ export function replyInstructionItem(content, order = 2.5) {
     kind: 'chat',
     auto: '',
     app: '',
-    characters: [],
     content: String(content || '').trim().slice(0, 4000),
     enabled: true,
     editable: true,
@@ -317,7 +316,6 @@ function contextItem(key, overrides = {}) {
     kind: 'context',
     auto: key,
     app: '',
-    characters: [],
     content: spec.content,
     enabled: true,
     editable: false,
@@ -345,7 +343,6 @@ export function defaultReplyItems() {
       kind: 'chat',
       auto: '',
       app: '',
-      characters: [],
       content: String(def.content || ''),
       enabled: def.enabled !== false,
       editable: true,
@@ -374,21 +371,11 @@ const LEGACY_DEFAULT_ITEM_IDS = [
   'reply_item_footer',
 ];
 
+/** 旧版断言：这一组是不是三套内置预设的默认条目。 */
 function isLegacyDefaultReplyItems(items) {
   if (!Array.isArray(items) || items.length !== LEGACY_DEFAULT_ITEM_IDS.length) return false;
   const ids = items.map(item => String(item?.id || ''));
   return ids.every(id => LEGACY_DEFAULT_ITEM_IDS.includes(id));
-}
-
-/** 条目适用的角色卡：空数组 = 全部角色；最多 12 个，去重。 */
-export function normalizeCharacters(raw) {
-  if (!Array.isArray(raw)) return [];
-  const list = [];
-  raw.forEach(value => {
-    const name = String(value || '').trim().slice(0, 40);
-    if (name && !list.includes(name)) list.push(name);
-  });
-  return list.slice(0, 12);
 }
 
 export function normalizeReplyItems(raw, rawContext) {
@@ -407,7 +394,6 @@ export function normalizeReplyItems(raw, rawContext) {
         id: spec.id,
         label: spec.label,
         enabled: item?.enabled !== undefined ? item.enabled !== false : context[auto] !== false,
-        characters: normalizeCharacters(item?.characters),
         group: String(item?.group || 'group_context').trim().slice(0, 40),
         order: Number.isFinite(order) ? order : spec.hintOrder,
       };
@@ -421,7 +407,6 @@ export function normalizeReplyItems(raw, rawContext) {
       kind,
       auto: '',
       app: kind === 'app' ? String(item?.app || '').trim().slice(0, 20) : '',
-      characters: normalizeCharacters(item?.characters),
       content: String(item?.content || '').trim().slice(0, 4000),
       enabled: item?.enabled !== false,
       editable: item?.editable !== false,
@@ -1046,29 +1031,6 @@ export function cardNameAmbiguous(state, contact) {
   if (!cards.length || !contact || contact.tavernAvatar) return false;
   const names = [contact.cardName, contact.name].map(value => String(value || '').trim()).filter(Boolean);
   return names.some(name => cards.filter(card => card.name === name).length > 1);
-}
-
-/** 一个联系人能被哪些写法匹配到：头像文件名、卡名、联系人名。 */
-export function characterRefsFor(state, contact) {
-  const card = characterCardFor(state, contact);
-  return new Set([
-    contact?.tavernAvatar,
-    contact?.name,
-    card?.avatar,
-    card?.name,
-  ].map(value => String(value || '').trim()).filter(Boolean));
-}
-
-/**
- * 条目是否适用于这个会话/联系人。
- * characters 为空 = 全部角色；群聊按约定只吃公共条目，具体角色条目只在一对一生效。
- */
-export function itemAppliesToChat(state, item, chat, contact) {
-  const targets = normalizeCharacters(item?.characters);
-  if (!targets.length) return true;
-  if (!chat || chat.kind === 'group') return false;
-  const refs = characterRefsFor(state, contact);
-  return targets.some(name => refs.has(name));
 }
 
 /** 手机里保存的 LLM 整体方案：只保存一套聊天 API + 一套回复预设，不碰酒馆记忆。 */

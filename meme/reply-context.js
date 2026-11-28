@@ -4,7 +4,7 @@
  * 旧的独立拼装函数已删除，避免出现两套逻辑。
  */
 
-import { replyContextFor, replyItemsFor, replyPresetFor, normalizeReplyContext, normalizeReplyItems, fillPromptTokens, characterCardFor, itemAppliesToChat, effectivePhoneHistoryLimit, dayKey, proactivePromptFor, pendingUserMessages } from './data.js';
+import { replyContextFor, replyItemsFor, replyPresetFor, normalizeReplyContext, normalizeReplyItems, fillPromptTokens, characterCardFor, effectivePhoneHistoryLimit, dayKey, proactivePromptFor, pendingUserMessages } from './data.js';
 import { readWorldBook } from './host.js';
 import { buildMemoryContext } from './memory.js';
 import { behaviorContextText } from './behavior.js';
@@ -530,7 +530,7 @@ async function contextBlockFor(item, state, chat, contact, context, memoryText, 
 /**
  * 唯一组装入口。
  * @returns {{messages: Array, report: object}}
- * report.items 记录每条的去向：injected / disabled / app / other-character / empty / duplicate / over-budget，
+ * report.items 记录每条的去向：injected / disabled / app / empty / duplicate / over-budget，
  * 预览页直接拿它解释「为什么没出现」。
  */
 export async function buildReplyMessages(state, chat, contact, options = {}) {
@@ -590,10 +590,6 @@ export async function buildReplyMessages(state, chat, contact, options = {}) {
     }
     if (item.kind === 'app') {
       reportItems.push({ ...base, status: 'app', chars: 0, reason: '给其他软件的条目，不进聊天' });
-      continue;
-    }
-    if (!itemAppliesToChat(state, item, chat, contact)) {
-      reportItems.push({ ...base, status: 'other-character', chars: 0, reason: '只对别的角色生效' });
       continue;
     }
 
